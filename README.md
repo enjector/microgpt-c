@@ -143,8 +143,25 @@ cmake -DQUANTIZATION_INT8=ON -DMICROGPT_SIMD=ON ..
 | `microgpt.h` | Model config, public API declarations |
 | `microgpt.c` | Core engine: model, forward/backward, Adam, data loading |
 | `main.c` | Entry point: load data → train → generate samples |
+| `microgpt_amalgamated.c` | **Single-file build** — same algorithm, no header needed |
 | `data/names.txt` | Training data (one name per line, ~32k names) |
 | `CMakeLists.txt` | CMake build (C99, Release, optional SIMD / INT8) |
+
+---
+
+## Single-File Build
+
+`microgpt_amalgamated.c` is a self-contained single file containing the full GPT algorithm — data loading, training, and inference. No header file needed:
+
+```bash
+# Compile directly (no CMake required)
+cc -O2 -o microgpt microgpt_amalgamated.c -lm
+cp data/names.txt . && ./microgpt
+
+# Or via CMake
+cmake --build build --config Release --target microgpt_amalgamated
+./build/microgpt_amalgamated
+```
 
 ---
 

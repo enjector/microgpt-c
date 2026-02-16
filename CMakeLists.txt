@@ -31,6 +31,18 @@ if(NOT MSVC)
   target_link_libraries(microgpt PRIVATE m)
 endif()
 
+# Single-file amalgamation (~350 lines, no header needed)
+add_executable(microgpt_amalgamated microgpt_amalgamated.c)
+if(NOT MSVC)
+  target_link_libraries(microgpt_amalgamated PRIVATE m)
+endif()
+add_custom_command(TARGET microgpt_amalgamated POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    "${CMAKE_CURRENT_SOURCE_DIR}/data/names.txt"
+    "$<TARGET_FILE_DIR:microgpt_amalgamated>/names.txt"
+  COMMENT "Copying names.txt to amalgamated build output"
+)
+
 # Optional: INT8 weight quantization (smaller memory, same training; good for demo / embedded)
 # cmake -DQUANTIZATION_INT8=ON ..
 option(QUANTIZATION_INT8 "Store weights as 8-bit integers with per-matrix scales" OFF)
