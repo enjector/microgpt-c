@@ -1,3 +1,7 @@
+# Build
+build/
+build_quantised/
+
 # Prerequisites
 *.d
 
