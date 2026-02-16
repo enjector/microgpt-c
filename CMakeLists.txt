@@ -21,7 +21,7 @@ target_include_directories(microgpt PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 # Copy training data next to the executable so it can be found at runtime
 add_custom_command(TARGET microgpt POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    "${CMAKE_CURRENT_SOURCE_DIR}/data/names.txt"
+    "${CMAKE_CURRENT_SOURCE_DIR}/names.txt"
     "$<TARGET_FILE_DIR:microgpt>/names.txt"
   COMMENT "Copying names.txt to build output"
 )
@@ -38,7 +38,7 @@ if(NOT MSVC)
 endif()
 add_custom_command(TARGET microgpt_amalgamated POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    "${CMAKE_CURRENT_SOURCE_DIR}/data/names.txt"
+    "${CMAKE_CURRENT_SOURCE_DIR}/names.txt"
     "$<TARGET_FILE_DIR:microgpt_amalgamated>/names.txt"
   COMMENT "Copying names.txt to amalgamated build output"
 )
