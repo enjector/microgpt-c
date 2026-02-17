@@ -64,12 +64,11 @@ jobs:
     # Added: A manual step to run the executable and verify it doesn't crash
     - name: Run MicroGPT Smoke Test
       shell: bash
-      working-directory: ${{ steps.strings.outputs.build-output-dir }}
       run: |
         if [ "${{ matrix.os }}" = "windows-latest" ]; then
-          ./${{ matrix.build_type }}/microgpt.exe
+          cd build/Release && ./microgpt.exe
         else
-          ./microgpt
+          cd build && ./microgpt
         fi
 
     - name: Test
