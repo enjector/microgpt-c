@@ -52,7 +52,35 @@ add_custom_command(TARGET names_demo POST_BUILD
 )
 
 # ---- Example: Word-level Shakespeare generation ----
-add_executable(shakespeare_demo examples/shakespeare/main.c $<TARGET_OBJECTS:microgpt_lib>)
+# A separate OBJECT library is needed because the Shakespeare demo overrides
+# architecture defines (N_LAYER, N_HEAD, etc.) that change struct layout.
+# Both the library and the demo must be compiled with the same defines.
+add_library(microgpt_lib_shakespeare OBJECT src/microgpt.c)
+target_include_directories(microgpt_lib_shakespeare PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_compile_definitions(microgpt_lib_shakespeare PRIVATE
+  N_EMBD=32
+  N_HEAD=2
+  N_LAYER=1
+  BLOCK_SIZE=32
+  BATCH_SIZE=16
+  NUM_STEPS=5000
+  LEARNING_RATE=0.01
+  MAX_VOCAB=8500
+  MAX_DOCS=200000
+  MAX_DOC_LEN=128
+)
+if(MICROGPT_SIMD)
+  if(MSVC)
+    target_compile_options(microgpt_lib_shakespeare PRIVATE $<$<CONFIG:Release>:/arch:AVX2>)
+  else()
+    target_compile_options(microgpt_lib_shakespeare PRIVATE $<$<CONFIG:Release>:-march=native>)
+  endif()
+endif()
+if(QUANTIZATION_INT8)
+  target_compile_definitions(microgpt_lib_shakespeare PRIVATE QUANTIZATION_INT8=1 QUANTISATION_INT8=1)
+endif()
+
+add_executable(shakespeare_demo examples/shakespeare/main.c $<TARGET_OBJECTS:microgpt_lib_shakespeare>)
 target_include_directories(shakespeare_demo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_compile_definitions(shakespeare_demo PRIVATE
   N_EMBD=32
