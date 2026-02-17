@@ -12,7 +12,7 @@ endif()
 if(MSVC)
   set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /O2 /Ot" CACHE STRING "" FORCE)
 else()
-  set(CMAKE_C_FLAGS_RELEASE "-O3 -ffast-math -funroll-loops -DNDEBUG" CACHE STRING "" FORCE)
+  set(CMAKE_C_FLAGS_RELEASE "-O3 -march=native -ffast-math -funroll-loops -DNDEBUG" CACHE STRING "" FORCE)
 endif()
 
 # ---- Core library (object library for shared compilation) ----
@@ -58,14 +58,15 @@ add_custom_command(TARGET names_demo POST_BUILD
 add_library(microgpt_lib_shakespeare OBJECT src/microgpt.c)
 target_include_directories(microgpt_lib_shakespeare PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_compile_definitions(microgpt_lib_shakespeare PRIVATE
-  N_EMBD=32
-  N_HEAD=2
-  N_LAYER=1
-  BLOCK_SIZE=16
+  N_EMBD=64
+  N_HEAD=4
+  MLP_DIM=256
+  N_LAYER=2
+  BLOCK_SIZE=32
   BATCH_SIZE=16
-  NUM_STEPS=10000
-  LEARNING_RATE=0.01
-  MAX_VOCAB=7000
+  NUM_STEPS=20000
+  LEARNING_RATE=0.001
+  MAX_VOCAB=12000
   MAX_DOCS=200000
   MAX_DOC_LEN=128
 )
@@ -83,19 +84,21 @@ endif()
 add_executable(shakespeare_demo examples/shakespeare/main.c $<TARGET_OBJECTS:microgpt_lib_shakespeare>)
 target_include_directories(shakespeare_demo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_compile_definitions(shakespeare_demo PRIVATE
-  N_EMBD=32
-  N_HEAD=2
-  N_LAYER=1
-  BLOCK_SIZE=16
+  N_EMBD=64
+  N_HEAD=4
+  MLP_DIM=256
+  N_LAYER=2
+  BLOCK_SIZE=32
   BATCH_SIZE=16
-  NUM_STEPS=10000
-  LEARNING_RATE=0.01
-  MAX_VOCAB=7000
+  NUM_STEPS=20000
+  LEARNING_RATE=0.001
+  MAX_VOCAB=12000
   MAX_DOCS=200000
   MAX_DOC_LEN=128
 )
 if(NOT MSVC)
-  target_link_libraries(shakespeare_demo PRIVATE m)
+  find_package(Threads REQUIRED)
+  target_link_libraries(shakespeare_demo PRIVATE m Threads::Threads)
 endif()
 add_custom_command(TARGET shakespeare_demo POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different

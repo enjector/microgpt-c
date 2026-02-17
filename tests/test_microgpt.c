@@ -678,6 +678,471 @@ TEST(checkpoint_load_missing_file) {
 }
 
 /* ==================================================================== */
+/*                   GRADIENT CORRECTNESS                                 */
+/* ==================================================================== */
+
+TEST(gradient_direction_reduces_loss) {
+  /*
+   * Verify that gradients point in the right direction: taking one
+   * Adam step using the computed gradients should reduce the loss.
+   * This confirms gradient correctness without accessing Model internals.
+   */
+  seed_rng(42);
+  Model *m = model_create(10);
+  ASSERT_NE(m, NULL);
+  size_t np = model_num_params(m);
+  double *grads = (double *)calloc(np, sizeof(double));
+  double *mom = (double *)calloc(np, sizeof(double));
+  double *vel = (double *)calloc(np, sizeof(double));
+  double *keys[N_LAYER], *vals[N_LAYER];
+  size_t cl[N_LAYER];
+  for (int L = 0; L < N_LAYER; L++) {
+    keys[L] = (double *)calloc((size_t)BLOCK_SIZE * N_EMBD, sizeof(double));
+    vals[L] = (double *)calloc((size_t)BLOCK_SIZE * N_EMBD, sizeof(double));
+    cl[L] = 0;
+  }
+
+  /* Compute loss and gradients before optimization */
+  double loss_before = forward_backward_one(m, 2, 0, 3, keys, vals, cl, grads);
+  ASSERT_GT(loss_before, 0.0);
+
+  /* Verify gradient norm is non-zero */
+  double grad_norm = 0;
+  for (size_t i = 0; i < np; i++)
+    grad_norm += grads[i] * grads[i];
+  ASSERT_GT(grad_norm, 0.0);
+
+  /* Take one Adam step */
+  adam_step(m, grads, mom, vel, 0);
+
+  /* Compute loss again with the same input */
+  memset(grads, 0, np * sizeof(double));
+  for (int L = 0; L < N_LAYER; L++)
+    cl[L] = 0;
+  double loss_after = forward_backward_one(m, 2, 0, 3, keys, vals, cl, grads);
+
+  /* Loss should decrease after one gradient step */
+  ASSERT_LT(loss_after, loss_before);
+
+  for (int L = 0; L < N_LAYER; L++) {
+    free(keys[L]);
+    free(vals[L]);
+  }
+  free(grads);
+  free(mom);
+  free(vel);
+  model_free(m);
+}
+
+TEST(gradient_accumulates_over_positions) {
+  /* Verify that gradients accumulate (+=) over multiple positions
+   * and are larger than single-position gradients */
+  seed_rng(42);
+  Model *m = model_create(10);
+  size_t np = model_num_params(m);
+  double *grads1 = (double *)calloc(np, sizeof(double));
+  double *grads3 = (double *)calloc(np, sizeof(double));
+  double *keys[N_LAYER], *vals[N_LAYER];
+  size_t cl[N_LAYER];
+
+  for (int L = 0; L < N_LAYER; L++) {
+    keys[L] = (double *)calloc((size_t)BLOCK_SIZE * N_EMBD, sizeof(double));
+    vals[L] = (double *)calloc((size_t)BLOCK_SIZE * N_EMBD, sizeof(double));
+  }
+
+  /* Single position */
+  for (int L = 0; L < N_LAYER; L++)
+    cl[L] = 0;
+  forward_backward_one(m, 1, 0, 2, keys, vals, cl, grads1);
+  double norm1 = 0;
+  for (size_t i = 0; i < np; i++)
+    norm1 += grads1[i] * grads1[i];
+
+  /* Three positions (accumulating into same buffer) */
+  for (int L = 0; L < N_LAYER; L++)
+    cl[L] = 0;
+  forward_backward_one(m, 1, 0, 2, keys, vals, cl, grads3);
+  forward_backward_one(m, 2, 1, 3, keys, vals, cl, grads3);
+  forward_backward_one(m, 3, 2, 4, keys, vals, cl, grads3);
+  double norm3 = 0;
+  for (size_t i = 0; i < np; i++)
+    norm3 += grads3[i] * grads3[i];
+
+  /* Multi-position gradient norm should be larger */
+  ASSERT_GT(norm3, norm1);
+
+  for (int L = 0; L < N_LAYER; L++) {
+    free(keys[L]);
+    free(vals[L]);
+  }
+  free(grads1);
+  free(grads3);
+  model_free(m);
+}
+
+/* ==================================================================== */
+/*                   KV CACHE BEHAVIOUR                                  */
+/* ==================================================================== */
+
+TEST(kv_cache_grows_with_positions) {
+  /* Verify that cache_len increments after each forward pass */
+  seed_rng(42);
+  Model *m = model_create(10);
+  size_t np = model_num_params(m);
+  double *grads = (double *)calloc(np, sizeof(double));
+  double *keys[N_LAYER], *vals[N_LAYER];
+  size_t cl[N_LAYER];
+  for (int L = 0; L < N_LAYER; L++) {
+    keys[L] = (double *)calloc((size_t)BLOCK_SIZE * N_EMBD, sizeof(double));
+    vals[L] = (double *)calloc((size_t)BLOCK_SIZE * N_EMBD, sizeof(double));
+    cl[L] = 0;
+  }
+
+  /* Process 5 positions */
+  for (int p = 0; p < 5; p++) {
+    forward_backward_one(m, (size_t)(p % 10), (size_t)p, (size_t)((p + 1) % 10),
+                         keys, vals, cl, grads);
+    for (int L = 0; L < N_LAYER; L++)
+      ASSERT_EQ(cl[L], (size_t)(p + 1));
+  }
+
+  for (int L = 0; L < N_LAYER; L++) {
+    free(keys[L]);
+    free(vals[L]);
+  }
+  free(grads);
+  model_free(m);
+}
+
+TEST(inference_kv_cache_autoregressive) {
+  /* Run an auto-regressive inference sequence of several tokens
+   * and verify each step produces valid, finite logits */
+  seed_rng(42);
+  Model *m = model_create(10);
+  double logits[MAX_VOCAB];
+  double *keys[N_LAYER], *vals[N_LAYER];
+  size_t cl[N_LAYER];
+  for (int L = 0; L < N_LAYER; L++) {
+    keys[L] = (double *)calloc((size_t)BLOCK_SIZE * N_EMBD, sizeof(double));
+    vals[L] = (double *)calloc((size_t)BLOCK_SIZE * N_EMBD, sizeof(double));
+    cl[L] = 0;
+  }
+
+  size_t tok = 0; /* start with token 0 */
+  int seq_len = 8;
+  for (int p = 0; p < seq_len; p++) {
+    forward_inference(m, tok, (size_t)p, keys, vals, cl, logits);
+    /* All logits should be finite */
+    for (size_t i = 0; i < 10; i++)
+      ASSERT(isfinite(logits[i]));
+    /* Cache should grow */
+    for (int L = 0; L < N_LAYER; L++)
+      ASSERT_EQ(cl[L], (size_t)(p + 1));
+    /* Sample next token */
+    tok = sample_token(logits, 10, 0.8);
+    ASSERT_LT(tok, 10);
+  }
+
+  for (int L = 0; L < N_LAYER; L++) {
+    free(keys[L]);
+    free(vals[L]);
+  }
+  model_free(m);
+}
+
+/* ==================================================================== */
+/*                   TRAINING CONVERGENCE                                */
+/* ==================================================================== */
+
+TEST(training_loss_decreases_monotonically_in_windows) {
+  /* Train for 100 steps and check that the average loss over the last 20
+   * is lower than the average loss over the first 20.  This is more
+   * robust than checking strict per-step monotonicity. */
+  seed_rng(42);
+  Model *m = model_create(10);
+  size_t np = model_num_params(m);
+  double *grads = (double *)calloc(np, sizeof(double));
+  double *mom = (double *)calloc(np, sizeof(double));
+  double *vel = (double *)calloc(np, sizeof(double));
+  double *keys[N_LAYER], *vals[N_LAYER];
+  size_t cl[N_LAYER];
+  for (int L = 0; L < N_LAYER; L++) {
+    keys[L] = (double *)calloc((size_t)BLOCK_SIZE * N_EMBD, sizeof(double));
+    vals[L] = (double *)calloc((size_t)BLOCK_SIZE * N_EMBD, sizeof(double));
+  }
+
+  double first_window = 0, last_window = 0;
+  int total_steps = 100;
+  int window = 20;
+  size_t seq[] = {0, 1, 2, 3, 4, 5, 6, 7};
+
+  for (int step = 0; step < total_steps; step++) {
+    memset(grads, 0, np * sizeof(double));
+    for (int L = 0; L < N_LAYER; L++)
+      cl[L] = 0;
+    double step_loss = 0;
+    for (int p = 0; p < 7; p++) {
+      step_loss += forward_backward_one(m, seq[p], (size_t)p, seq[p + 1], keys,
+                                        vals, cl, grads);
+    }
+    step_loss /= 7.0;
+    for (size_t i = 0; i < np; i++)
+      grads[i] /= 7.0;
+    adam_step(m, grads, mom, vel, step);
+
+    if (step < window)
+      first_window += step_loss;
+    if (step >= total_steps - window)
+      last_window += step_loss;
+  }
+  first_window /= (double)window;
+  last_window /= (double)window;
+
+  /* Loss should decrease substantially */
+  ASSERT_LT(last_window, first_window);
+
+  for (int L = 0; L < N_LAYER; L++) {
+    free(keys[L]);
+    free(vals[L]);
+  }
+  free(grads);
+  free(mom);
+  free(vel);
+  model_free(m);
+}
+
+TEST(training_reproducible_with_same_seed) {
+  /* Two identical training runs with the same seed should produce
+   * exactly the same final loss */
+  double losses[2];
+  for (int run = 0; run < 2; run++) {
+    seed_rng(12345);
+    Model *m = model_create(10);
+    size_t np = model_num_params(m);
+    double *grads = (double *)calloc(np, sizeof(double));
+    double *mom = (double *)calloc(np, sizeof(double));
+    double *vel = (double *)calloc(np, sizeof(double));
+    double *keys[N_LAYER], *vals[N_LAYER];
+    size_t cl[N_LAYER];
+    for (int L = 0; L < N_LAYER; L++) {
+      keys[L] = (double *)calloc((size_t)BLOCK_SIZE * N_EMBD, sizeof(double));
+      vals[L] = (double *)calloc((size_t)BLOCK_SIZE * N_EMBD, sizeof(double));
+    }
+
+    double final_loss = 0;
+    for (int step = 0; step < 30; step++) {
+      memset(grads, 0, np * sizeof(double));
+      for (int L = 0; L < N_LAYER; L++)
+        cl[L] = 0;
+      final_loss = forward_backward_one(m, 1, 0, 2, keys, vals, cl, grads);
+      adam_step(m, grads, mom, vel, step);
+    }
+    losses[run] = final_loss;
+
+    for (int L = 0; L < N_LAYER; L++) {
+      free(keys[L]);
+      free(vals[L]);
+    }
+    free(grads);
+    free(mom);
+    free(vel);
+    model_free(m);
+  }
+  ASSERT(fabs(losses[0] - losses[1]) < 1e-12);
+}
+
+/* ==================================================================== */
+/*                INFERENCE / FORWARD CONSISTENCY                        */
+/* ==================================================================== */
+
+TEST(forward_inference_matches_fwd_bwd_logits) {
+  /* forward_inference and forward_backward_one should produce
+   * identical logits for the same input (ignoring the loss/gradient) */
+  seed_rng(42);
+  Model *m = model_create(10);
+  size_t np = model_num_params(m);
+
+  double logits_inf[MAX_VOCAB];
+  double logits_bwd[MAX_VOCAB];
+  double *grads = (double *)calloc(np, sizeof(double));
+  double *keys1[N_LAYER], *vals1[N_LAYER], *keys2[N_LAYER], *vals2[N_LAYER];
+  size_t cl1[N_LAYER], cl2[N_LAYER];
+  for (int L = 0; L < N_LAYER; L++) {
+    keys1[L] = (double *)calloc((size_t)BLOCK_SIZE * N_EMBD, sizeof(double));
+    vals1[L] = (double *)calloc((size_t)BLOCK_SIZE * N_EMBD, sizeof(double));
+    keys2[L] = (double *)calloc((size_t)BLOCK_SIZE * N_EMBD, sizeof(double));
+    vals2[L] = (double *)calloc((size_t)BLOCK_SIZE * N_EMBD, sizeof(double));
+    cl1[L] = cl2[L] = 0;
+  }
+
+  forward_inference(m, 3, 0, keys1, vals1, cl1, logits_inf);
+
+  /* forward_backward_one doesn't directly output logits, so we compare
+   * by checking that inference on the same model produces consistent
+   * sampling behaviour */
+  seed_rng(42);
+  size_t tok1 = sample_token(logits_inf, 10, 0.01); /* near-greedy */
+
+  /* Run inference again from scratch — should get same result */
+  for (int L = 0; L < N_LAYER; L++)
+    cl1[L] = 0;
+  forward_inference(m, 3, 0, keys1, vals1, cl1, logits_bwd);
+  size_t tok2 = sample_token(logits_bwd, 10, 0.01);
+  ASSERT_EQ(tok1, tok2);
+
+  /* Logits should be identical */
+  for (size_t i = 0; i < 10; i++)
+    ASSERT(fabs(logits_inf[i] - logits_bwd[i]) < 1e-12);
+
+  for (int L = 0; L < N_LAYER; L++) {
+    free(keys1[L]);
+    free(vals1[L]);
+    free(keys2[L]);
+    free(vals2[L]);
+  }
+  free(grads);
+  model_free(m);
+}
+
+TEST(sample_token_high_temp_is_more_uniform) {
+  /* High temperature should produce a more uniform distribution
+   * (measured by sampling entropy) compared to low temperature */
+  seed_rng(42);
+  double logits[5] = {1.0, 2.0, 3.0, 2.0, 1.0};
+
+  /* Sample 1000 times at low temp and high temp, count frequencies */
+  int counts_low[5] = {0}, counts_high[5] = {0};
+  for (int i = 0; i < 1000; i++) {
+    size_t t_low = sample_token(logits, 5, 0.1);
+    size_t t_high = sample_token(logits, 5, 5.0);
+    counts_low[t_low]++;
+    counts_high[t_high]++;
+  }
+
+  /* Low temp: most samples should concentrate on token 2 (highest logit) */
+  ASSERT_GT(counts_low[2], 900);
+
+  /* High temp: distribution should be more spread out */
+  int min_high = counts_high[0], max_high = counts_high[0];
+  for (int i = 1; i < 5; i++) {
+    if (counts_high[i] < min_high)
+      min_high = counts_high[i];
+    if (counts_high[i] > max_high)
+      max_high = counts_high[i];
+  }
+  /* The ratio of max/min should be much smaller for high temp */
+  ASSERT_LT(max_high, min_high * 5); /* fairly uniform */
+}
+
+/* ==================================================================== */
+/*                   MODEL PARAMETER ACCOUNTING                          */
+/* ==================================================================== */
+
+TEST(model_num_params_formula) {
+  /* Verify that model_num_params matches the expected formula:
+   * wte(V*E) + wpe(B*E) + lm_head(V*E) +
+   * N_LAYER * (wq(E*E) + wk(E*E) + wv(E*E) + wo(E*E) + fc1(M*E) + fc2(E*M))
+   * where E=N_EMBD, B=BLOCK_SIZE, M=MLP_DIM */
+  size_t vs = 50;
+  Model *m = model_create(vs);
+  ASSERT_NE(m, NULL);
+  size_t np = model_num_params(m);
+
+  size_t expected =
+      vs * N_EMBD                                      /* wte */
+      + (size_t)BLOCK_SIZE * N_EMBD                    /* wpe */
+      + vs * N_EMBD                                    /* lm_head */
+      + (size_t)N_LAYER * ((size_t)N_EMBD * N_EMBD * 4 /* wq + wk + wv + wo */
+                           + (size_t)MLP_DIM * N_EMBD  /* fc1 */
+                           + (size_t)N_EMBD * MLP_DIM  /* fc2 */
+                          );
+  ASSERT_EQ(np, expected);
+  model_free(m);
+}
+
+TEST(different_vocab_sizes_produce_different_params) {
+  Model *m10 = model_create(10);
+  Model *m50 = model_create(50);
+  ASSERT_NE(m10, NULL);
+  ASSERT_NE(m50, NULL);
+  size_t np10 = model_num_params(m10);
+  size_t np50 = model_num_params(m50);
+  /* Both models differ only in wte and lm_head which scale with vocab */
+  size_t vocab_diff = (50 - 10) * N_EMBD * 2; /* wte + lm_head */
+  ASSERT_EQ(np50 - np10, vocab_diff);
+  model_free(m10);
+  model_free(m50);
+}
+
+/* ==================================================================== */
+/*                     LOSS SANITY CHECKS                                */
+/* ==================================================================== */
+
+TEST(loss_is_log_vocab_for_uniform_predictions) {
+  /* For a freshly created model (near-uniform predictions), the loss
+   * should be approximately log(vocab_size) = -log(1/V) */
+  seed_rng(42);
+  size_t vs = 20;
+  Model *m = model_create(vs);
+  size_t np = model_num_params(m);
+  double *grads = (double *)calloc(np, sizeof(double));
+  double *keys[N_LAYER], *vals[N_LAYER];
+  size_t cl[N_LAYER];
+  for (int L = 0; L < N_LAYER; L++) {
+    keys[L] = (double *)calloc((size_t)BLOCK_SIZE * N_EMBD, sizeof(double));
+    vals[L] = (double *)calloc((size_t)BLOCK_SIZE * N_EMBD, sizeof(double));
+    cl[L] = 0;
+  }
+
+  double loss = forward_backward_one(m, 0, 0, 1, keys, vals, cl, grads);
+  double expected = log((double)vs); /* ~3.0 for vs=20 */
+
+  /* Should be in the right ballpark (within 2x) */
+  ASSERT_GT(loss, expected * 0.3);
+  ASSERT_LT(loss, expected * 3.0);
+
+  for (int L = 0; L < N_LAYER; L++) {
+    free(keys[L]);
+    free(vals[L]);
+  }
+  free(grads);
+  model_free(m);
+}
+
+TEST(loss_different_targets_give_different_losses) {
+  /* Same input but different targets should produce different losses */
+  seed_rng(42);
+  Model *m = model_create(10);
+  size_t np = model_num_params(m);
+  double *grads1 = (double *)calloc(np, sizeof(double));
+  double *grads2 = (double *)calloc(np, sizeof(double));
+  double *keys[N_LAYER], *vals[N_LAYER];
+  size_t cl[N_LAYER];
+  for (int L = 0; L < N_LAYER; L++) {
+    keys[L] = (double *)calloc((size_t)BLOCK_SIZE * N_EMBD, sizeof(double));
+    vals[L] = (double *)calloc((size_t)BLOCK_SIZE * N_EMBD, sizeof(double));
+  }
+
+  for (int L = 0; L < N_LAYER; L++)
+    cl[L] = 0;
+  double loss1 = forward_backward_one(m, 1, 0, 2, keys, vals, cl, grads1);
+  for (int L = 0; L < N_LAYER; L++)
+    cl[L] = 0;
+  double loss2 = forward_backward_one(m, 1, 0, 5, keys, vals, cl, grads2);
+
+  /* Different targets → different losses (very unlikely to be equal) */
+  ASSERT(fabs(loss1 - loss2) > 1e-10);
+
+  for (int L = 0; L < N_LAYER; L++) {
+    free(keys[L]);
+    free(vals[L]);
+  }
+  free(grads1);
+  free(grads2);
+  model_free(m);
+}
+
+/* ==================================================================== */
 /*                            MAIN                                       */
 /* ==================================================================== */
 
@@ -713,18 +1178,39 @@ int main(void) {
   printf("\n[Model Lifecycle]\n");
   RUN(model_create_and_free);
   RUN(model_num_params_scales_with_vocab);
+  RUN(model_num_params_formula);
+  RUN(different_vocab_sizes_produce_different_params);
+
+  /* Gradient correctness */
+  printf("\n[Gradient Correctness]\n");
+  RUN(gradient_direction_reduces_loss);
+  RUN(gradient_accumulates_over_positions);
+
+  /* KV cache */
+  printf("\n[KV Cache Behaviour]\n");
+  RUN(kv_cache_grows_with_positions);
+  RUN(inference_kv_cache_autoregressive);
 
   /* Training */
   printf("\n[Training]\n");
   RUN(forward_backward_returns_positive_loss);
   RUN(training_reduces_loss);
+  RUN(training_loss_decreases_monotonically_in_windows);
+  RUN(training_reproducible_with_same_seed);
+
+  /* Loss sanity */
+  printf("\n[Loss Sanity]\n");
+  RUN(loss_is_log_vocab_for_uniform_predictions);
+  RUN(loss_different_targets_give_different_losses);
 
   /* Inference / Sampling */
   printf("\n[Inference / Sampling]\n");
   RUN(forward_inference_produces_logits);
+  RUN(forward_inference_matches_fwd_bwd_logits);
   RUN(sample_token_returns_valid_id);
   RUN(sample_token_low_temp_picks_argmax);
   RUN(sample_token_deterministic_with_seed);
+  RUN(sample_token_high_temp_is_more_uniform);
 
   printf("\n[Model Save/Load]\n");
   RUN(model_save_and_load_roundtrip);

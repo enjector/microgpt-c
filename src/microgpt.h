@@ -23,22 +23,146 @@
  *
  * Algorithm matches ref/microgpt.py (Karpathy).
  *
+ * ============================================================================
+ *                    MicroGPT-C — Architecture Overview
+ * ============================================================================
+ *
  * This file declares the public API for a minimal GPT-style language model
- * implemented entirely in C99.  Supports both character-level and word-level
- * tokenisation.  The architecture follows the
- * standard decoder-only Transformer design:
+ * implemented entirely in C99.  It supports both character-level and word-level
+ * tokenisation.
  *
- *   Token + Positional Embedding
- *       -> N_LAYER x (RMSNorm -> Multi-Head Self-Attention -> Residual
- *                      -> RMSNorm -> MLP [fc1 -> ReLU -> fc2] -> Residual)
- *       -> Linear (lm_head) -> Softmax -> next-token probabilities
  *
- * Training uses a per-position forward+backward pass with cross-entropy loss
- * and an Adam optimiser with linear learning-rate warm-down.
+ *  TRANSFORMER ARCHITECTURE (Decoder-Only, GPT-2 Style)
+ *  =====================================================
  *
- * Optional: define QUANTIZATION_INT8 (or QUANTISATION_INT8) to store weights
- * as 8-bit integers with per-matrix scales (smaller memory, same
- * training/inference).
+ *  The model predicts the next token given a sequence of past tokens.
+ *  It processes one token at a time, caching Key/Value vectors for
+ *  efficient autoregressive generation.
+ *
+ *     Input token_id ─────────────────────────────────────────────┐
+ *     Input pos_id   ─────────────────────────────────────────┐   │
+ *                                                             │   │
+ *                                                             v   v
+ *                                                    ┌────────────────────┐
+ *                                                    │   x = wte[tok]     │
+ *                                                    │     + wpe[pos]     │
+ *                                                    │                    │
+ *                                                    │  (Embed: lookup    │
+ *                                                    │   token & position │
+ *                                                    │   vectors, add     │
+ *                                                    │   them together)   │
+ *                                                    └────────┬───────────┘
+ *                                                             │
+ *                                                             v
+ *                                                    ┌────────────────────┐
+ *                                                    │     RMSNorm(x)     │
+ *                                                    │                    │
+ *                                                    │  x_i / sqrt(       │
+ *                                                    │   mean(x^2) + eps) │
+ *                                                    └────────┬───────────┘
+ *                                                             │
+ *                          ┌──────────────────────────────────-┤
+ *                          │          x N_LAYER times          │
+ *                          │   ┌───────────────────────────────┤
+ *                          │   │                               v
+ *                          │   │                      ┌────────────────────┐
+ *                          │   │                      │  Multi-Head Causal │
+ *                          │   │                      │    Attention       │
+ *                          │   │                      │                    │
+ *                          │   │                      │  Q = Wq @ x_norm  │
+ *                          │   │                      │  K = Wk @ x_norm  │
+ *                          │   │                      │  V = Wv @ x_norm  │
+ *                          │   │                      │                    │
+ *                          │   │                      │  Split into heads  │
+ *                          │   │                      │  Score = Q·K^T /   │
+ *                          │   │                      │         sqrt(d_k)  │
+ *                          │   │                      │  Mask future pos   │
+ *                          │   │                      │  Attn = softmax    │
+ *                          │   │                      │  Out = Attn · V    │
+ *                          │   │                      │  Concat heads      │
+ *                          │   │                      │  y = Wo @ concat   │
+ *                          │   │                      └────────┬───────────┘
+ *                          │   │                               │
+ *                          │   │       ┌─────────────────┐     │
+ *                          │   │       │  + (residual)   │◄────┘
+ *                          │   │       └────────┬────────┘
+ *                          │   │                │
+ *                          │   │                v
+ *                          │   │       ┌────────────────────┐
+ *                          │   │       │     RMSNorm        │
+ *                          │   │       └────────┬───────────┘
+ *                          │   │                │
+ *                          │   │                v
+ *                          │   │       ┌────────────────────┐
+ *                          │   │       │   MLP (2-layer)    │
+ *                          │   │       │                    │
+ *                          │   │       │ h = ReLU(fc1 @ x)  │
+ *                          │   │       │ y = fc2 @ h        │
+ *                          │   │       │                    │
+ *                          │   │       │ (fc1 expands to    │
+ *                          │   │       │  4× width, fc2     │
+ *                          │   │       │  projects back)    │
+ *                          │   │       └────────┬───────────┘
+ *                          │   │                │
+ *                          │   │       ┌─────────────────┐
+ *                          │   └──────►│  + (residual)   │
+ *                          │           └────────┬────────┘
+ *                          │                    │
+ *                          └────────────────────┘  (loop back for next layer)
+ *                                               │
+ *                                               v
+ *                                      ┌────────────────────┐
+ *                                      │   lm_head          │
+ *                                      │                    │
+ *                                      │  logits = W @ x    │
+ *                                      │  (project N_EMBD   │
+ *                                      │   → vocab_size)    │
+ *                                      └────────┬───────────┘
+ *                                               │
+ *                                               v
+ *                                      ┌────────────────────┐
+ *                                      │   Softmax          │
+ *                                      │                    │
+ *                                      │  p_i = exp(z_i)    │
+ *                                      │        / Σ exp(z)  │
+ *                                      └────────┬───────────┘
+ *                                               │
+ *                                               v
+ *                                      next-token probabilities
+ *
+ *
+ *  TRAINING PIPELINE
+ *  =================
+ *
+ *  The training loop processes one token position at a time:
+ *
+ *    ┌─────────┐    ┌──────────────┐    ┌────────────┐    ┌───────────┐
+ *    │ Tokenize │───►│   Forward     │───►│  CE Loss    │───►│ Backward  │
+ *    │ text     │    │   Pass        │    │ -log(p[y])  │    │ (accum    │
+ *    │          │    │   (above)     │    │             │    │  grads)   │
+ *    └─────────┘    └──────────────┘    └────────────┘    └─────┬─────┘
+ *                                                               │
+ *                                                               v
+ *                                                        ┌───────────┐
+ *                                                        │   Adam    │
+ *                                                        │ Optimiser │
+ *                                                        │           │
+ *                                                        │ w -= lr * │
+ *                                                        │  m / √v   │
+ *                                                        └───────────┘
+ *
+ *  LR SCHEDULE (Cosine with Warmup):
+ *
+ *    lr │  /‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾\
+ *       │ /                     \
+ *       │/                       \
+ *       │                         \___
+ *       └─────────────────────────────── step
+ *         ↑ warmup       cosine decay →
+ *
+ *  Optional: define QUANTIZATION_INT8 (or QUANTISATION_INT8) to store weights
+ *  as 8-bit integers with per-matrix scales (smaller memory, same
+ *  training/inference).
  */
 
 #ifndef MICROGPT_H
@@ -52,14 +176,43 @@
 /* ========================== Model Architecture ========================== */
 
 /*
- * N_EMBD   - Embedding dimension (width of every hidden vector).
- * N_HEAD   - Number of attention heads.  Each head operates on HEAD_DIM dims.
- * N_LAYER  - Number of Transformer blocks stacked sequentially.
- * BLOCK_SIZE - Maximum context length (number of token positions the model
- *              can attend to).  Also doubles as the KV-cache capacity.
- * HEAD_DIM - Per-head dimension = N_EMBD / N_HEAD.
- * MLP_RATIO - Expansion ratio for the feed-forward (MLP) block.
- * MLP_DIM  - Hidden dimension inside the MLP = N_EMBD * MLP_RATIO.
+ * MODEL DIMENSIONS — How everything fits together:
+ *
+ *   ┌──────────────────────────────────────────────────────────────────────┐
+ *   │                         N_EMBD = 32                                 │
+ *   │  Every token is represented as a vector of N_EMBD floating-point    │
+ *   │  numbers.  This vector flows through every layer of the network.    │
+ *   └──────────────────────────────────────────────────────────────────────┘
+ *
+ *   Multi-Head Attention splits the embedding into N_HEAD independent heads:
+ *
+ *     N_EMBD = 32
+ *     ├───────┼───────┼───────┼───────┤
+ *     │ Head0 │ Head1 │ Head2 │ Head3 │    N_HEAD = 4
+ *     │ (8d)  │ (8d)  │ (8d)  │ (8d)  │    HEAD_DIM = N_EMBD / N_HEAD = 8
+ *     └───────┴───────┴───────┴───────┘
+ *
+ *     Each head can learn to attend to different types of relationships
+ *     (e.g. one head might track the previous word, another tracks the
+ *     subject of the sentence).
+ *
+ *   MLP expands the embedding to a wider hidden layer, then projects back:
+ *
+ *     N_EMBD = 32 ──fc1──► MLP_DIM = 128 ──fc2──► N_EMBD = 32
+ *                    (expand 4×)            (shrink back)
+ *
+ *     MLP_RATIO controls this expansion factor (default 4×).
+ *     The expansion lets the network learn richer non-linear transformations.
+ *
+ *   Context window:
+ *
+ *     Token positions:  [0] [1] [2] ... [BLOCK_SIZE-1]
+ *                        ◄───── BLOCK_SIZE = 32 ─────►
+ *
+ *     The model can "see" this many tokens into the past.  Larger values
+ *     let the model capture longer-range dependencies but use more memory
+ *     and compute (the KV cache grows linearly with BLOCK_SIZE).
+ *
  *
  * All defines are wrapped in #ifndef so they can be overridden via compiler
  * flags (-DN_EMBD=64) or before #include, allowing different demo binaries
@@ -81,14 +234,16 @@
 #ifndef MLP_RATIO
 #define MLP_RATIO 4
 #endif
+#ifndef MLP_DIM
 #define MLP_DIM (N_EMBD * MLP_RATIO)
+#endif
 
 /* ======================== Training Hyperparameters ======================== */
 
 /*
  * NUM_STEPS     - Total number of optimiser steps (one doc per step).
- * LEARNING_RATE - Peak learning rate for Adam; linearly decays to 0 over
- *                 NUM_STEPS.
+ * LEARNING_RATE - Peak learning rate for Adam; cosine-annealed with warmup.
+ * WARMUP_STEPS  - Number of linear-warmup steps before cosine decay begins.
  * BATCH_SIZE    - Number of documents to accumulate gradients over per step.
  * BETA1, BETA2  - Exponential decay rates for Adam's first and second moment
  *                 estimates.
@@ -103,6 +258,9 @@
 #endif
 #ifndef LEARNING_RATE
 #define LEARNING_RATE 0.01
+#endif
+#ifndef WARMUP_STEPS
+#define WARMUP_STEPS (NUM_STEPS / 10)
 #endif
 #ifndef BATCH_SIZE
 #define BATCH_SIZE 8

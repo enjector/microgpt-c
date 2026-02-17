@@ -22,15 +22,82 @@
  * SOFTWARE.
  *
  *
- * This file contains the full implementation of:
- *   - Data loading and character-level tokenisation
- *   - Model allocation with Gaussian-random weight initialisation
- *   - Forward pass (embedding -> Transformer blocks -> lm_head -> softmax)
- *   - Backward pass (gradient accumulation through cross-entropy + lm_head)
- *   - Adam optimiser with linear learning-rate decay
- *   - Autoregressive inference with temperature-controlled sampling
+ * ============================================================================
+ *                  MicroGPT-C  —  Implementation Guide
+ * ============================================================================
  *
- * Two build modes are supported:
+ * This file contains the full implementation of a GPT-style language model.
+ * Reading top-to-bottom, the code is organised as follows:
+ *
+ *   SECTION 1: Data Loading & Tokenisation (line ~130)
+ *   ─────────────────────────────────────────────────
+ *   load_docs()     — Read text file, split into lines ("documents")
+ *   build_vocab()   — Collect unique characters, assign numeric IDs
+ *   tokenize()      — Convert text → [BOS, char_0, char_1, ..., BOS]
+ *
+ *   SECTION 2: Model Allocation (line ~270)
+ *   ─────────────────────────────────────────
+ *   count_params()  — Total scalar count across all weight matrices
+ *   model_create()  — Heap-allocate all weights, Gaussian init
+ *   model_free()    — Release all memory
+ *
+ *   SECTION 3: Serialisation (line ~540)
+ *   ────────────────────────────────────
+ *   model_save/load()      — Binary weight I/O
+ *   checkpoint_save/load()  — Weights + Adam state + step counter
+ *
+ *   SECTION 4: Neural Network Primitives (line ~818)
+ *   ────────────────────────────────────────────────
+ *   lin_fwd()       — Dense layer: y = W @ x (matrix-vector multiply)
+ *   lin_bwd()       — Backward: compute dx, dW from upstream dy
+ *   rmsnorm_fwd()   — RMS normalisation: x / sqrt(mean(x²) + eps)
+ *   rmsnorm_bwd()   — Backward pass for RMSNorm
+ *
+ *   SECTION 5: Forward + Backward Pass (line ~922)
+ *   ──────────────────────────────────────────────
+ *   forward_backward_one() — The heart of training.  Runs one token
+ *       through the full Transformer, computes cross-entropy loss,
+ *       then backpropagates gradients through every layer.
+ *
+ *   SECTION 6: Inference (line ~1295)
+ *   ────────────────────────────────
+ *   forward_inference() — Forward-only pass for text generation.
+ *       Uses KV cache for O(1) per-token work.
+ *
+ *   SECTION 7: Adam Optimiser (line ~1456)
+ *   ──────────────────────────────────────
+ *   adam_step()     — Update weights using accumulated gradients.
+ *       Cosine LR schedule with linear warmup.
+ *
+ *   SECTION 8: Sampling (line ~1675)
+ *   ───────────────────────────────
+ *   sample_token()  — Temperature-scaled softmax → random draw.
+ *
+ *   SECTION 9: Word-Level Tokenisation (line ~1744)
+ *   ──────────────────────────────────────────────
+ *   build_word_vocab() — Frequency-ranked word vocabulary with hash table
+ *   word_to_id()       — O(1) hash lookup for word → token ID
+ *   tokenize_words()   — Split text on whitespace → token ID sequence
+ *
+ *
+ * MEMORY LAYOUT (flat gradient / Adam buffers)
+ * ────────────────────────────────────────────
+ * All trainable parameters are stored in per-matrix allocations inside the
+ * Model struct.  But the gradient buffer, Adam m[] and v[] arrays, and the
+ * INT8 master copy are *flat* arrays with this layout:
+ *
+ *   ┌──────────┬──────────┬───────────┬─────┬─────┬─────┬─────┬──────┬──────┐
+ *   │   wte    │   wpe    │  lm_head  │ wq₀ │ wk₀ │ wv₀ │ wo₀ │ fc1₀ │ fc2₀ │
+ *   ├──────────┼──────────┼───────────┼─────┼─────┼─────┼─────┼──────┼──────┤
+ *   │ V×E      │ B×E      │   V×E     │ E×E │ E×E │ E×E │ E×E │ M×E  │ E×M  │
+ *   └──────────┴──────────┴───────────┴─────┴─────┴─────┴─────┴──────┴──────┘
+ *   │◄── global matrices ──────────►│  │◄── repeated × N_LAYER ──────────────►│
+ *
+ *   V = vocab_size, E = N_EMBD, B = BLOCK_SIZE, M = MLP_DIM
+ *
+ *
+ * BUILD MODES
+ * ───────────
  *   FP64 (default)  - all weights stored as double precision.
  *   INT8 (optional)  - weights stored as int8_t with per-matrix fp64 scales.
  *                       A fp64 master copy is maintained for Adam updates;
@@ -47,31 +114,52 @@
 
 #if defined(QUANTIZATION_INT8) || defined(QUANTISATION_INT8)
 /*
- * INT8 Model Layout
- * -----------------
- * Weights are stored as int8_t arrays with one fp64 scale factor per matrix
- * (symmetric quantisation: scale = max(|W|)/127, W_i8 = round(W/scale)).
+ * ┌─────────────────────────────────────────────────────────────────────┐
+ * │      INT8 QUANTISATION MODE  (disabled by default)                 │
+ * │                                                                    │
+ * │  Enable with:  -DQUANTIZATION_INT8  or  -DQUANTISATION_INT8        │
+ * │                                                                    │
+ * │  Purpose: Reduce memory usage by ~8× and enable integer SIMD.      │
+ * │  Trades tiny accuracy loss for major memory & potential speed wins. │
+ * └─────────────────────────────────────────────────────────────────────┘
  *
- * N_SCALES counts the total number of scale factors:
- *   3 global matrices (wte, wpe, lm_head) + 6 per layer (wq, wk, wv, wo, fc1,
- * fc2).
+ * SYMMETRIC PER-MATRIX QUANTISATION:
  *
- * 'master' is the full-precision fp64 copy of all parameters.  Adam updates
- * are applied to 'master'; afterwards the int8 tensors are requantised so
- * that forward passes use the cheap integer arithmetic path.
+ *   fp64 weight:  [-3.2, 0.5, 1.7, -2.0]   (range: -3.2 .. 1.7)
+ *   scale = max(|W|) / 127 = 3.2/127 ≈ 0.0252
+ *   int8:         [-127,  20,  67,  -79]    (W / scale, rounded, clamped)
+ *
+ *   To recover fp64:  W_approx = scale × int8_value
+ *
+ * TRAINING WORKFLOW (master copy pattern):
+ *
+ *   ┌──────────┐    requantise    ┌──────────┐    forward     ┌──────┐
+ *   │  master  │  ───────────►    │  int8    │  ──────────►   │ loss │
+ *   │  (fp64)  │                  │ weights  │  (cheap ints)  └──┬───┘
+ *   └────▲─────┘                  └──────────┘                   │
+ *        │                                                  backward
+ *   Adam update                                                  │
+ *        │        ◄──────── gradients (fp64) ◄────────────────────┘
+ *
+ *   Adam updates the fp64 master copy (full precision needed for
+ *   small gradient steps).  After each step the master is requantised
+ *   to int8 so the next forward pass uses cheap integer arithmetic.
+ *
+ * N_SCALES counts the total number of per-matrix scale factors:
+ *   3 global (wte, wpe, lm_head) + 6 per layer (wq, wk, wv, wo, fc1, fc2)
  */
 #define N_SCALES (3 + 6 * N_LAYER)
 struct Model {
   size_t vocab_size;        /* number of character tokens + BOS            */
-  int8_t *wte;              /* token embedding      [vocab_size x N_EMBD] */
-  int8_t *wpe;              /* position embedding   [BLOCK_SIZE x N_EMBD] */
-  int8_t *lm_head;          /* output projection    [vocab_size x N_EMBD] */
-  int8_t *attn_wq[N_LAYER]; /* query   weight       [N_EMBD x N_EMBD]     */
-  int8_t *attn_wk[N_LAYER]; /* key     weight       [N_EMBD x N_EMBD]     */
-  int8_t *attn_wv[N_LAYER]; /* value   weight       [N_EMBD x N_EMBD]     */
-  int8_t *attn_wo[N_LAYER]; /* output  weight       [N_EMBD x N_EMBD]     */
-  int8_t *mlp_fc1[N_LAYER]; /* MLP up-projection    [MLP_DIM x N_EMBD]    */
-  int8_t *mlp_fc2[N_LAYER]; /* MLP down-projection  [N_EMBD x MLP_DIM]    */
+  int8_t *wte;              /* token embedding      [vocab_size × N_EMBD] */
+  int8_t *wpe;              /* position embedding   [BLOCK_SIZE × N_EMBD] */
+  int8_t *lm_head;          /* output projection    [vocab_size × N_EMBD] */
+  int8_t *attn_wq[N_LAYER]; /* query   weight       [N_EMBD × N_EMBD]     */
+  int8_t *attn_wk[N_LAYER]; /* key     weight       [N_EMBD × N_EMBD]     */
+  int8_t *attn_wv[N_LAYER]; /* value   weight       [N_EMBD × N_EMBD]     */
+  int8_t *attn_wo[N_LAYER]; /* output  weight       [N_EMBD × N_EMBD]     */
+  int8_t *mlp_fc1[N_LAYER]; /* MLP up-projection    [MLP_DIM × N_EMBD]    */
+  int8_t *mlp_fc2[N_LAYER]; /* MLP down-projection  [N_EMBD × MLP_DIM]    */
   double scale[N_SCALES];   /* per-matrix quantisation scales              */
   double *master;           /* fp64 master weights for Adam updates        */
 };
@@ -82,18 +170,34 @@ struct Model {
  * Every weight matrix is a heap-allocated double array.
  * Weight layouts follow row-major [output_dim x input_dim] convention so
  * that y = W @ x is computed as: y[j] = sum_i W[j*nin + i] * x[i].
+ *
+ * Why row-major [output_dim × input_dim]?
+ *
+ *   Each row of W corresponds to one output neuron.  Computing one output
+ *   value means dotting a row of W with the input vector x:
+ *
+ *     W  (nout × nin)            x  (nin × 1)         y (nout × 1)
+ *   ┌────────────────┐        ┌────┐               ┌────┐
+ *   │ w00 w01 w02 w03│        │ x0 │               │ y0 │  y0 = w00·x0 + w01·x1
+ * + ... │ w10 w11 w12 w13│   @    │ x1 │       =       │ y1 │  y1 = w10·x0 +
+ * w11·x1 + ... │ w20 w21 w22 w23│        │ x2 │               │ y2 │  y2 =
+ * w20·x0 + w21·x1 + ... └────────────────┘        │ x3 │               └────┘
+ *                             └────┘
+ *
+ *   The key insight: reading W row-by-row is sequential in memory,
+ *   which is cache-friendly.  Each row gives us one output element.
  */
 struct Model {
   size_t vocab_size;        /* number of character tokens + BOS            */
-  double *wte;              /* token embedding      [vocab_size x N_EMBD] */
-  double *wpe;              /* position embedding   [BLOCK_SIZE x N_EMBD] */
-  double *lm_head;          /* output projection    [vocab_size x N_EMBD] */
-  double *attn_wq[N_LAYER]; /* query   weight       [N_EMBD x N_EMBD]     */
-  double *attn_wk[N_LAYER]; /* key     weight       [N_EMBD x N_EMBD]     */
-  double *attn_wv[N_LAYER]; /* value   weight       [N_EMBD x N_EMBD]     */
-  double *attn_wo[N_LAYER]; /* output  weight       [N_EMBD x N_EMBD]     */
-  double *mlp_fc1[N_LAYER]; /* MLP up-projection    [MLP_DIM x N_EMBD]    */
-  double *mlp_fc2[N_LAYER]; /* MLP down-projection  [N_EMBD x MLP_DIM]    */
+  double *wte;              /* token embedding      [vocab_size × N_EMBD] */
+  double *wpe;              /* position embedding   [BLOCK_SIZE × N_EMBD] */
+  double *lm_head;          /* output projection    [vocab_size × N_EMBD] */
+  double *attn_wq[N_LAYER]; /* query   weight       [N_EMBD × N_EMBD]     */
+  double *attn_wk[N_LAYER]; /* key     weight       [N_EMBD × N_EMBD]     */
+  double *attn_wv[N_LAYER]; /* value   weight       [N_EMBD × N_EMBD]     */
+  double *attn_wo[N_LAYER]; /* output  weight       [N_EMBD × N_EMBD]     */
+  double *mlp_fc1[N_LAYER]; /* MLP up-projection    [MLP_DIM × N_EMBD]    */
+  double *mlp_fc2[N_LAYER]; /* MLP down-projection  [N_EMBD × MLP_DIM]    */
 };
 #endif
 
@@ -287,14 +391,23 @@ static size_t count_params(size_t vs) {
   return n;
 }
 
+/* ── INT8 quantisation helpers (only compiled when INT8 mode is enabled) ── */
 #if defined(QUANTIZATION_INT8) || defined(QUANTISATION_INT8)
 /*
- * Symmetric per-matrix INT8 quantisation:
- *   scale = max(|W|) / 127
- *   W_i8[i] = clamp(round(W[i] / scale), -127, 127)
+ * quantize_fp64_to_int8 — Convert an fp64 weight matrix to int8.
  *
- * This preserves the dynamic range of each matrix individually while
- * mapping values to the int8 representable range [-127, 127].
+ *   SYMMETRIC PER-MATRIX quantisation:
+ *     1. Find the absolute-maximum value in the matrix: max_abs
+ *     2. Compute scale = max_abs / 127  (maps max_abs ↔ ±127)
+ *     3. For each element: int8_val = clamp(round(fp64_val / scale), -127, 127)
+ *
+ *   Why symmetric?  The int8 range [-127, +127] is symmetric around zero,
+ *   so we don't need a separate zero-point bias.  This keeps dequantisation
+ *   a single multiply:  fp64_approx = scale × int8_val.
+ *
+ *   Why per-matrix (not per-tensor or per-channel)?  Per-matrix is a good
+ *   balance: per-tensor loses too much precision when different layers have
+ *   very different weight ranges; per-channel adds complexity.
  */
 static void quantize_fp64_to_int8(const double *src, size_t n, int8_t *dst,
                                   double *scale_out) {
@@ -315,13 +428,23 @@ static void quantize_fp64_to_int8(const double *src, size_t n, int8_t *dst,
     dst[i] = (int8_t)v;
   }
 }
+
+/*
+ * dequantize_int8_to_fp64 — Recover fp64 approximation from int8.
+ *   fp64_val ≈ scale × int8_val
+ *   Used during backward pass (gradients must be computed in fp64).
+ */
 static void dequantize_int8_to_fp64(const int8_t *src, double scale, size_t n,
                                     double *dst) {
   for (size_t i = 0; i < n; i++)
     dst[i] = scale * (double)src[i];
 }
-/* Quantize double vector to int8; scale_x = max(|x|)/127, x_i8 =
- * round(x/scale_x) clamped to [-127,127] */
+
+/*
+ * quantize_vec_to_int8 — Quantize an activation vector (not weights).
+ *   Same algorithm as weight quantisation, but returns the scale factor
+ *   (needed for the caller to rescale the int8 matmul result).
+ */
 static double quantize_vec_to_int8(const double *x, size_t n, int8_t *x_i8) {
   double mx = 0;
   for (size_t i = 0; i < n; i++) {
@@ -340,8 +463,19 @@ static double quantize_vec_to_int8(const double *x, size_t n, int8_t *x_i8) {
   }
   return scale_x;
 }
-/* int8 matmul: acc[j] = sum_i x_i8[i] * W_i8[j*nin+i]; W layout [nout, nin]
- * Uses int64 accumulators for overflow safety at larger embedding dims. */
+
+/*
+ * lin_fwd_int8 — Integer-only matrix-vector multiply.
+ *
+ *   Computes acc[j] = Σ_i  x_i8[i] × W_i8[j×nin + i]
+ *
+ *   The result is accumulated into int64 to avoid overflow:
+ *   worst case each product is 127×127=16129, summed over nin elements.
+ *   For nin=256: max_acc = 256×16129 ≈ 4M, well within int64 range.
+ *
+ *   The caller must rescale the result:  y_fp64[j] = sx × sw × acc[j]
+ *   where sx = activation scale, sw = weight scale.
+ */
 static void lin_fwd_int8(const int8_t *x_i8, const int8_t *W_i8, size_t nin,
                          size_t nout, int64_t *acc) {
   for (size_t j = 0; j < nout; j++) {
@@ -351,14 +485,19 @@ static void lin_fwd_int8(const int8_t *x_i8, const int8_t *W_i8, size_t nin,
     acc[j] = s;
   }
 }
-/* Return double* for a weight tensor (dequantize into tmp when INT8); used for
- * backward only */
+
+/*
+ * get_W — Return fp64 weights for backward pass.
+ *   In INT8 mode: dequantises from int8 into a temporary fp64 buffer.
+ *   In FP64 mode: simply casts the pointer (no copy needed).
+ */
 static const double *get_W(const Model *m, const void *ptr, int scale_idx,
                            size_t n, double *tmp) {
   dequantize_int8_to_fp64((const int8_t *)ptr, m->scale[scale_idx], n, tmp);
   return tmp;
 }
 #else
+/* FP64 mode: get_W is a no-op that returns the pointer unchanged. */
 static const double *get_W(const Model *m, const void *ptr, int scale_idx,
                            size_t n, double *tmp) {
   (void)m;
@@ -816,65 +955,152 @@ Model *checkpoint_load(const char *path, size_t vocab_size, double *m,
 #endif
 
 /* ===================== Neural Network Primitives ========================= */
+/*
+ * These are the two fundamental building blocks of neural networks:
+ *
+ *   1. Linear (Dense) Layer:  y = W @ x     (matrix × vector)
+ *   2. RMSNorm:               y = x / RMS(x)  (normalisation)
+ *
+ * Every other operation in the Transformer (attention, MLP, lm_head)
+ * is built from combinations of these two primitives plus element-wise
+ * operations (add, multiply, ReLU, softmax, exp).
+ */
 
 /*
- * lin_fwd - Dense (fully-connected) linear layer forward pass.
- *   Computes y = x @ W^T  (i.e. y[j] = sum_i x[i] * W[j * nin + i]).
- *   W is stored in row-major [nout x nin] layout.
+ * lin_fwd - Dense (fully-connected) linear layer FORWARD pass.
+ *
+ *   Computes y = W @ x   (matrix-vector product)
+ *   More precisely: y[j] = Σ_i  W[j·nin + i] · x[i]
+ *
+ *   W is stored in row-major layout [nout × nin]:
+ *
+ *     x  (input, nin elements)            W  (nout rows × nin cols)
+ *     ┌──┐                               ┌──────────────────────┐
+ *     │x₀│                          row 0 │ w₀₀  w₀₁  w₀₂  ... │ → dot with x →
+ * y₀ │x₁│                          row 1 │ w₁₀  w₁₁  w₁₂  ... │ → dot with x →
+ * y₁ │x₂│                          row 2 │ w₂₀  w₂₁  w₂₂  ... │ → dot with x →
+ * y₂ │..│                            ... │ ...                 │ └──┘
+ * └──────────────────────┘
+ *
+ *   The inner loop (over i) computes one dot product = one output element.
+ *   The outer loop (over j) iterates across rows = all output elements.
+ *
+ *   Performance notes:
+ *   - `restrict` tells the compiler x, W, y don't alias → better vectorisation
+ *   - Clang pragma enables SIMD auto-vectorisation of the dot product
+ *   - Wrow pointer avoids recomputing j*nin every inner iteration
  */
-static void lin_fwd(const double *x, const double *W, size_t nin, size_t nout,
-                    double *y) {
+static void lin_fwd(const double *restrict x, const double *restrict W,
+                    size_t nin, size_t nout, double *restrict y) {
   for (size_t j = 0; j < nout; j++) {
     double s = 0;
-    for (size_t i = 0; i < nin; i++)
-      s += x[i] * W[j * nin + i];
+    const double *restrict Wrow = W + j * nin;
+#if defined(__clang__)
+    _Pragma("clang loop vectorize(enable) interleave(enable)")
+#endif
+        for (size_t i = 0; i < nin; i++) s += x[i] * Wrow[i];
     y[j] = s;
   }
 }
 
 /*
- * lin_bwd - Backward pass for the linear layer.
- *   Given upstream gradient dy (size nout):
- *     dx[i] += sum_j dy[j] * W[j*nin+i]   (gradient w.r.t. input x)
- *     dW[j*nin+i] += dy[j] * x[i]         (gradient w.r.t. weight W)
- *   Either dx or dW may be NULL to skip that gradient.
- *   Gradients are *accumulated* (+=), not overwritten.
+ * lin_bwd - BACKWARD pass for the linear layer.
+ *
+ *   Backpropagation computes how much each input and each weight
+ *   contributed to the loss.  Given the upstream gradient dy (how much
+ *   each output element affected the loss), we derive two gradients:
+ *
+ *   GRADIENT W.R.T. INPUT (dx):
+ *   ──────────────────────────
+ *   Since y = W @ x, by the chain rule:
+ *     dx = W^T @ dy   →   dx[i] += Σ_j  dy[j] · W[j·nin + i]
+ *
+ *   This is like "running the layer backwards" — projecting the error
+ *   signal back through the transpose of W.
+ *
+ *   GRADIENT W.R.T. WEIGHTS (dW):
+ *   ──────────────────────────────
+ *   Each weight w_ji contributes to y[j] proportionally to x[i]:
+ *     dW[j·nin + i] += dy[j] · x[i]   (outer product of dy and x)
+ *
+ *   ┌─ CACHE OPTIMISATION ────────────────────────────────────────────┐
+ *   │ The dx computation uses ROW-MAJOR traversal of W:               │
+ *   │                                                                 │
+ *   │   for each row j:                                               │
+ *   │     dyj = dy[j]          (scalar, stays in register)            │
+ *   │     for each col i:                                             │
+ *   │       dx[i] += dyj * W[j*nin + i]   (sequential W read!)        │
+ *   │                                                                 │
+ *   │ The naive alternative (loop i then j) would stride through W    │
+ *   │ in column-major order, causing cache misses when nout >> nin     │
+ *   │ (e.g. lm_head backward with vocab_size=6000, N_EMBD=32).        │
+ *   └─────────────────────────────────────────────────────────────────┘
+ *
+ *   Gradients are *accumulated* (+=), not overwritten, because multiple
+ *   positions in a sequence contribute gradients to the same weights.
  */
-static void lin_bwd(const double *x, const double *W, const double *dy,
-                    size_t nin, size_t nout, double *dx, double *dW) {
+static void lin_bwd(const double *restrict x, const double *restrict W,
+                    const double *restrict dy, size_t nin, size_t nout,
+                    double *restrict dx, double *restrict dW) {
   if (dx)
     /* Row-major traversal: read W sequentially, scatter into small dx[].
      * Much more cache-friendly than column-major when nout >> nin
      * (e.g. lm_head backward with vocab=6000, nin=32). */
     for (size_t j = 0; j < nout; j++) {
       double dyj = dy[j];
-      const double *Wrow = W + j * nin;
-      for (size_t i = 0; i < nin; i++)
-        dx[i] += dyj * Wrow[i];
+      const double *restrict Wrow = W + j * nin;
+#if defined(__clang__)
+      _Pragma("clang loop vectorize(enable) interleave(enable)")
+#endif
+          for (size_t i = 0; i < nin; i++) dx[i] += dyj * Wrow[i];
     }
   if (dW)
     for (size_t j = 0; j < nout; j++) {
       double dyj = dy[j];
-      double *dWrow = dW + j * nin;
-      for (size_t i = 0; i < nin; i++)
-        dWrow[i] += dyj * x[i];
+      double *restrict dWrow = dW + j * nin;
+#if defined(__clang__)
+      _Pragma("clang loop vectorize(enable) interleave(enable)")
+#endif
+          for (size_t i = 0; i < nin; i++) dWrow[i] += dyj * x[i];
     }
 }
 
 /*
  * rmsnorm_fwd - Root Mean Square Layer Normalisation (forward).
- *   out[i] = x[i] / sqrt(mean(x^2) + eps)
- *   Unlike LayerNorm, RMSNorm does not subtract the mean and has no
- *   learnable gamma/beta parameters in this minimal implementation.
- *   eps = 1e-5 for numerical stability.
+ *
+ *   RMSNorm stabilises training by keeping activations at a consistent
+ *   scale, preventing them from growing or shrinking as they flow
+ *   through many layers.
+ *
+ *   Formula:
+ *     rms = sqrt( (1/d) · Σ x[i]² + ε )
+ *     out[i] = x[i] / rms
+ *
+ *   Example with d=4:
+ *     x = [3.0, 4.0, 0.0, 0.0]
+ *     rms = sqrt((9+16+0+0)/4 + 1e-5) = sqrt(6.25) = 2.5
+ *     out = [1.2, 1.6, 0.0, 0.0]    ← unit "energy" scale
+ *
+ *   vs. LayerNorm:
+ *   - LayerNorm subtracts the mean first, then divides by std.
+ *   - RMSNorm skips the mean subtraction — simpler, fewer operations,
+ *     and empirically works just as well for Transformers.
+ *   - No learnable gamma/beta parameters in this implementation.
+ *
+ *   eps (1e-5) prevents division by zero when all x values are near 0.
  */
-static void rmsnorm_fwd(const double *x, size_t d, double *out) {
+static void rmsnorm_fwd(const double *restrict x, size_t d,
+                        double *restrict out) {
   double sum = 0;
-  for (size_t i = 0; i < d; i++)
-    sum += x[i] * x[i];
+#if defined(__clang__)
+  _Pragma("clang loop vectorize(enable)")
+#endif
+      for (size_t i = 0; i < d; i++) sum += x[i] * x[i];
   double scale = 1.0 / sqrt(sum / (double)d + 1e-5);
-  for (size_t i = 0; i < d; i++)
-    out[i] = x[i] * scale;
+#if defined(__clang__)
+  _Pragma("clang loop vectorize(enable)")
+#endif
+      for (size_t i = 0; i < d; i++) out[i] = x[i] * scale;
 }
 
 /*
@@ -885,35 +1111,95 @@ static void rmsnorm_fwd(const double *x, size_t d, double *out) {
  *   where out[i] = x[i] / rms.
  *   Gradients are accumulated (+=) into dx.
  */
-static void rmsnorm_bwd(const double *x, const double *dy, size_t d,
-                        double *dx) {
+static void rmsnorm_bwd(const double *restrict x, const double *restrict dy,
+                        size_t d, double *restrict dx) {
   double sum_sq = 0;
-  for (size_t i = 0; i < d; i++)
-    sum_sq += x[i] * x[i];
+#if defined(__clang__)
+  _Pragma("clang loop vectorize(enable)")
+#endif
+      for (size_t i = 0; i < d; i++) sum_sq += x[i] * x[i];
   double rms = sqrt(sum_sq / (double)d + 1e-5);
   double inv_rms = 1.0 / rms;
   /* Compute dot(dy, x) / (d * rms^2) */
   double dot = 0;
-  for (size_t i = 0; i < d; i++)
-    dot += dy[i] * x[i];
+#if defined(__clang__)
+  _Pragma("clang loop vectorize(enable)")
+#endif
+      for (size_t i = 0; i < d; i++) dot += dy[i] * x[i];
   double coeff = dot / ((double)d * rms * rms);
-  for (size_t i = 0; i < d; i++)
-    dx[i] += inv_rms * dy[i] - coeff * x[i];
+#if defined(__clang__)
+  _Pragma("clang loop vectorize(enable)")
+#endif
+      for (size_t i = 0; i < d; i++) dx[i] += inv_rms * dy[i] - coeff * x[i];
 }
 
 /* ================== Forward + Backward (Training) ======================== */
 
 /*
- * forward_backward_one - Full Transformer forward + backward for one position.
+ * forward_backward_one - Full Transformer forward + backward for ONE position.
  *
- * Pipeline:
- *   1. Embed: x0 = wte[token_id] + wpe[pos_id]
- *   2. RMSNorm(x0)
- *   3. For each layer:
- *      a. RMSNorm -> Q, K, V -> causal attention -> Wo -> residual
- *      b. RMSNorm -> MLP(fc1 -> ReLU -> fc2) -> residual
- *   4. lm_head -> softmax -> cross-entropy loss
- *   5. Full backward: gradients for ALL weights accumulated into grad_buffer.
+ * This is the HEART of training.  It does everything needed to process
+ * a single token position: run the token forward through the network,
+ * compare the prediction to the true next token, compute the loss,
+ * and backpropagate gradients to every weight.
+ *
+ * ┌──────────────────────── FORWARD PASS ─────────────────────────────┐
+ * │                                                                   │
+ * │  Step 1: EMBED                                                    │
+ * │    x = wte[token_id] + wpe[pos_id]                                │
+ * │    (Look up the token's learned vector + its position vector)     │
+ * │                                                                   │
+ * │  Step 2: INITIAL RMSNORM                                          │
+ * │    x = RMSNorm(x)                                                 │
+ * │    (Normalise the embedding to unit scale)                        │
+ * │                                                                   │
+ * │  Step 3: TRANSFORMER BLOCKS (× N_LAYER)                           │
+ * │    For each layer L:                                              │
+ * │      3a. ATTENTION SUB-BLOCK:                                     │
+ * │          x_norm = RMSNorm(x)                                      │
+ * │          Q = Wq @ x_norm                                          │
+ * │          K = Wk @ x_norm  → append to KV cache                   │
+ * │          V = Wv @ x_norm  → append to KV cache                   │
+ * │          attn = softmax(Q · K^T / √d_k) · V   (per head)         │
+ * │          x = x + Wo @ attn              (residual connection)     │
+ * │                                                                   │
+ * │      3b. MLP SUB-BLOCK:                                           │
+ * │          x_norm = RMSNorm(x)                                      │
+ * │          x = x + fc2 @ ReLU(fc1 @ x_norm)   (residual)           │
+ * │                                                                   │
+ * │  Step 4: LM HEAD                                                  │
+ * │    logits = lm_head @ x   (project to vocab-size scores)         │
+ * │    probs = softmax(logits)                                        │
+ * │    loss = -log(probs[target_id])  (cross-entropy: how surprised?) │
+ * │                                                                   │
+ * └───────────────────────────────────────────────────────────────────┘
+ *
+ * ┌──────────────────────── BACKWARD PASS ─────────────────────────────┐
+ * │                                                                    │
+ * │  The backward pass runs in REVERSE order through the same layers.  │
+ * │  At each step, it uses the chain rule to compute:                  │
+ * │    ∂Loss/∂weight = ∂Loss/∂output × ∂output/∂weight                │
+ * │                                                                    │
+ * │  Starting from dL/d_logits = probs - one_hot(target):              │
+ * │    → backprop through lm_head (lin_bwd)                            │
+ * │    → backprop through MLP (fc2, ReLU, fc1)                         │
+ * │    → backprop through attention (Wo, Q·K^T·V attention, Wq/Wk/Wv) │
+ * │    → backprop through RMSNorm                                      │
+ * │    → backprop through embedding lookup (scatter into wte/wpe rows) │
+ * │                                                                    │
+ * │  All gradients ACCUMULATE (+=) into grad_buffer, which has the     │
+ * │  same flat layout as the model parameters.                         │
+ * │                                                                    │
+ * └────────────────────────────────────────────────────────────────────┘
+ *
+ * KEY DESIGN CHOICES:
+ *   - Processes ONE position at a time (not batched), which keeps memory
+ *     usage minimal.  Batch parallelism is handled at the caller level.
+ *   - Saves all intermediate activations (sv_*) during forward pass so
+ *     they're available during backward — this is the classic memory vs
+ *     compute tradeoff of neural network training.
+ *   - The KV cache (keys/values arrays) enables efficient autoregressive
+ *     training where each new position attends to all previous positions.
  */
 double forward_backward_one(const Model *model, size_t token_id, size_t pos_id,
                             size_t target_id, double **keys, double **values,
@@ -947,13 +1233,20 @@ double forward_backward_one(const Model *model, size_t token_id, size_t pos_id,
   memset(d_x, 0, sizeof(d_x));
   memset(d_logits, 0, sizeof(d_logits));
 
+  /* INT8 mode buffers: x_i8 holds quantised activations, acc_buf holds
+   * integer matmul results before rescaling back to fp64.
+   * These are only allocated when INT8 quantisation is enabled. */
 #if defined(QUANTIZATION_INT8) || defined(QUANTISATION_INT8)
   int8_t x_i8[MLP_DIM];
   int64_t acc_buf[MAX_VOCAB];
 #endif
 
-  /* Embed + rmsnorm */
+  /* ── Step 1: EMBEDDING ──────────────────────────────────────────────── */
+  /* Look up the token's embedding vector and add its position encoding.
+   * INT8: embeddings are stored as int8 → must dequantise (scale × int8)
+   * FP64: direct double lookup, no conversion needed. */
 #if defined(QUANTIZATION_INT8) || defined(QUANTISATION_INT8)
+  /* INT8 embedding: dequantise by multiplying scale × int8 value */
   for (size_t i = 0; i < ne; i++)
     x0[i] = model->scale[0] * (double)model->wte[token_id * ne + i] +
             model->scale[1] * (double)model->wpe[pos_id * ne + i];
@@ -968,9 +1261,15 @@ double forward_backward_one(const Model *model, size_t token_id, size_t pos_id,
   for (int L = 0; L < N_LAYER; L++) {
     memcpy(sv_x_pre[L], x0, ne * sizeof(double));
     sv_T[L] = T;
-    /* Attention */
+    /* ── Step 3a: ATTENTION SUB-BLOCK ───────────────────────────────────── */
     rmsnorm_fwd(x0, ne, x_norm1);
     memcpy(sv_x_norm1[L], x_norm1, ne * sizeof(double));
+    /* Project normalised input into Q, K, V vectors.
+     * INT8: quantise x_norm1 → int8, do integer matmul with int8 weights,
+     *   then rescale: q[j] = scale_x × scale_w × int_accumulator[j]
+     *   Scale indices: wq=3+L*6, wk=4+L*6, wv=5+L*6, wo=6+L*6,
+     *                  fc1=7+L*6, fc2=8+L*6  (3 global + 6 per layer)
+     * FP64: standard double-precision matrix multiply. */
 #if defined(QUANTIZATION_INT8) || defined(QUANTISATION_INT8)
     {
       double sx = quantize_vec_to_int8(x_norm1, ne, x_i8);
@@ -1004,12 +1303,44 @@ double forward_backward_one(const Model *model, size_t token_id, size_t pos_id,
     memcpy(keys[L] + cache_len[L] * ne, k, ne * sizeof(double));
     memcpy(values[L] + cache_len[L] * ne, v, ne * sizeof(double));
 
-    /* Multi-head attention: N_HEAD independent heads, each over HEAD_DIM dims
+    /*
+     * MULTI-HEAD CAUSAL SELF-ATTENTION
+     * ================================
+     *
+     * The attention mechanism lets the model decide how much each
+     * previous token (and the current one) should influence the current
+     * output.  Multi-head means we do this N_HEAD times in parallel,
+     * each head operating on a different HEAD_DIM-sized slice.
+     *
+     *   Full Q vector (N_EMBD = 32):
+     *   ┌────────┬────────┬────────┬────────┐
+     *   │ Head 0 │ Head 1 │ Head 2 │ Head 3 │
+     *   │ 8 dims │ 8 dims │ 8 dims │ 8 dims │
+     *   └────────┴────────┴────────┴────────┘
+     *
+     * For each head h:
+     *
+     *   1. SCORE: dot(Q_h, K_h[t]) / sqrt(HEAD_DIM)  for each past position t
+     *      ─ How relevant is position t to the current position?
+     *      ─ Divide by sqrt(d_k) to prevent dot products from growing too
+     *        large (which would make softmax saturate to one-hot).
+     *
+     *   2. SOFTMAX: normalise scores to probabilities that sum to 1
+     *      ─ Subtract max for numerical stability (prevents exp overflow)
+     *
+     *   3. WEIGHTED SUM: output_h = Σ_t  attn_weight[t] × V_h[t]
+     *      ─ Blend all value vectors according to the attention weights
+     *
+     *   Causal masking: the model only attends to positions ≤ current.
+     *   This is achieved implicitly because the KV cache only contains
+     *   positions 0..T-1 (no future positions).
      */
     double scale = 1.0 / sqrt((double)HEAD_DIM);
     for (int h = 0; h < N_HEAD; h++) {
-      size_t hoff = (size_t)h * HEAD_DIM;
-      size_t hw = (size_t)h * BLOCK_SIZE;
+      size_t hoff =
+          (size_t)h * HEAD_DIM; /* offset into the full N_EMBD vector */
+      size_t hw = (size_t)h * BLOCK_SIZE; /* offset into attn_weights storage */
+      /* Step 1: Compute attention scores (Q · K for each cached position) */
       for (size_t t = 0; t < T; t++) {
         const double *kt =
             (t < cache_len[L]) ? (keys[L] + t * ne + hoff) : (k + hoff);
@@ -1018,6 +1349,7 @@ double forward_backward_one(const Model *model, size_t token_id, size_t pos_id,
           s += q[hoff + d] * kt[d];
         attn_weights[hw + t] = s * scale;
       }
+      /* Step 2: Softmax with numerical stability trick (subtract max) */
       double max_s = attn_weights[hw];
       for (size_t t = 1; t < T; t++)
         if (attn_weights[hw + t] > max_s)
@@ -1029,6 +1361,7 @@ double forward_backward_one(const Model *model, size_t token_id, size_t pos_id,
       }
       for (size_t t = 0; t < T; t++)
         attn_weights[hw + t] /= sum;
+      /* Step 3: Weighted sum of value vectors → attention output */
       for (size_t d = 0; d < HEAD_DIM; d++) {
         double s = 0;
         for (size_t t = 0; t < T; t++) {
@@ -1042,6 +1375,10 @@ double forward_backward_one(const Model *model, size_t token_id, size_t pos_id,
     memcpy(sv_attn_w[L], attn_weights,
            (size_t)N_HEAD * BLOCK_SIZE * sizeof(double));
     memcpy(sv_x_attn[L], x_attn, ne * sizeof(double));
+    /* Project attention output through Wo.
+     * INT8: quantise x_attn → int8, do integer matmul, rescale result.
+     *   y_fp64 = scale_x × scale_w × int_accumulator
+     * FP64: standard double-precision matrix multiply. */
 #if defined(QUANTIZATION_INT8) || defined(QUANTISATION_INT8)
     {
       double sx = quantize_vec_to_int8(x_attn, ne, x_i8);
@@ -1058,9 +1395,13 @@ double forward_backward_one(const Model *model, size_t token_id, size_t pos_id,
     memcpy(x0, x1, ne * sizeof(double));
     memcpy(sv_x_post_attn[L], x0, ne * sizeof(double));
 
-    /* MLP */
+    /* ── Step 3b: MLP SUB-BLOCK ──────────────────────────────────────── */
     rmsnorm_fwd(x0, ne, x_norm2);
     memcpy(sv_x_norm2[L], x_norm2, ne * sizeof(double));
+    /* MLP: expand to MLP_DIM via fc1, apply ReLU, then project back via fc2.
+     * INT8: each matmul is quantise → int8 multiply → rescale.
+     *   fc1 uses scale index 7+L*6, fc2 uses 8+L*6.
+     * FP64: standard double-precision matrix multiply. */
 #if defined(QUANTIZATION_INT8) || defined(QUANTISATION_INT8)
     {
       double sx = quantize_vec_to_int8(x_norm2, ne, x_i8);
@@ -1071,7 +1412,7 @@ double forward_backward_one(const Model *model, size_t token_id, size_t pos_id,
     }
     memcpy(sv_mlp_pre[L], mlp1, MLP_DIM * sizeof(double));
     for (size_t i = 0; i < MLP_DIM; i++)
-      mlp1[i] = mlp1[i] > 0 ? mlp1[i] : 0;
+      mlp1[i] = mlp1[i] > 0 ? mlp1[i] : 0; /* ReLU activation */
     memcpy(sv_mlp_post[L], mlp1, MLP_DIM * sizeof(double));
     {
       double sx = quantize_vec_to_int8(mlp1, MLP_DIM, x_i8);
@@ -1314,6 +1655,8 @@ void forward_inference(const Model *model, size_t token_id, size_t pos_id,
 
   for (int L = 0; L < N_LAYER; L++) {
     rmsnorm_fwd(x0, ne, x_norm1);
+    /* Project normalised input \u2192 Q, K, V (same as training, no saved activations).
+     * INT8: quantise \u2192 int8 matmul \u2192 rescale.  FP64: direct double matmul. */
 #if defined(QUANTIZATION_INT8) || defined(QUANTISATION_INT8)
     {
       double sx = quantize_vec_to_int8(x_norm1, ne, x_i8);
@@ -1391,7 +1734,9 @@ void forward_inference(const Model *model, size_t token_id, size_t pos_id,
     for (size_t i = 0; i < ne; i++)
       x1[i] += x0[i];
     memcpy(x0, x1, ne * sizeof(double));
+    /* ── MLP forward (inference) ── */
     rmsnorm_fwd(x0, ne, x_norm2);
+    /* INT8: quantise → int8 matmul → rescale for both fc1 and fc2. */
 #if defined(QUANTIZATION_INT8) || defined(QUANTISATION_INT8)
     {
       double sx = quantize_vec_to_int8(x_norm2, ne, x_i8);
@@ -1420,6 +1765,8 @@ void forward_inference(const Model *model, size_t token_id, size_t pos_id,
     memcpy(x0, x2, ne * sizeof(double));
     T = cache_len[L] + 1;
   }
+  /* ── LM head: project final hidden state to vocabulary logits ── */
+  /* INT8: final quantise → int8 matmul → rescale.  scale[2] = lm_head scale. */
 #if defined(QUANTIZATION_INT8) || defined(QUANTISATION_INT8)
   {
     double sx = quantize_vec_to_int8(x0, ne, x_i8);
@@ -1438,31 +1785,73 @@ void forward_inference(const Model *model, size_t token_id, size_t pos_id,
 /* ========================= Adam Optimiser ================================ */
 
 /*
- * adam_step - One step of the Adam optimiser with linear LR warm-down.
+ * adam_step - One step of the Adam optimiser with cosine LR schedule.
  *
- *   For each parameter w_i:
- *     m_i = beta1 * m_i + (1 - beta1) * g_i          (1st moment / mean)
- *     v_i = beta2 * v_i + (1 - beta2) * g_i^2        (2nd moment / variance)
- *     m_hat = m_i / (1 - beta1^t)                     (bias correction)
- *     v_hat = v_i / (1 - beta2^t)
- *     w_i -= lr * m_hat / (sqrt(v_hat) + eps)
+ * ADAM UPDATE RULE (per parameter w_i):
+ * ─────────────────────────────────────
+ *   m_i = β₁·m_i + (1-β₁)·g_i          (1st moment: exponential moving average)
+ *   v_i = β₂·v_i + (1-β₂)·g_i²         (2nd moment: tracks gradient variance)
+ *   m̂ = m_i / (1 - β₁^t)                (bias correction for early steps)
+ *   v̂ = v_i / (1 - β₂^t)
+ *   w_i -= lr · m̂ / (√v̂ + ε)
  *
- *   The learning rate decays linearly: lr = LR_PEAK * (1 - step / NUM_STEPS).
+ *   Intuition: Adam adapts the learning rate PER PARAMETER.
+ *   - Parameters with small, consistent gradients get larger effective LR
+ *   - Parameters with large, noisy gradients get smaller effective LR
+ *   - The √v̂ in the denominator is what provides this adaptation
  *
- *   INT8 mode: updates are applied to the fp64 master copy; afterwards all
- *   weight matrices are requantised to int8 with fresh per-matrix scales.
+ * LEARNING RATE SCHEDULE:
+ * ─────────────────────────
+ *   LR │ peak
+ *      │ ╱╲
+ *      │╱  ╲  ╌ ╌ cosine decay
+ *      │     ╲
+ *      │      ╲
+ *      │       ╲
+ *      │╱       ╲───
+ *      └──────────────── step
+ *      │warmup│    decay phase
+ *
+ *   Phase 1 (warmup): LR ramps linearly from 0 to LEARNING_RATE
+ *   Phase 2 (decay):  LR follows cos(progress·π) from LEARNING_RATE to ~0
+ *
+ *   Why warmup?  Early gradients are noisy (random weights),
+ *   so large LR could push the model to bad regions. Ramping gives
+ *   the moment estimates (m, v) time to stabilize.
+ *
+ *   Why cosine decay?  Smoother than linear, avoids the sudden drop at
+ *   the end that can destabilize training.
+ *
+ * INT8 MODE:
+ * ──────────
+ *   Updates are applied to the fp64 master copy (not to int8 weights
+ *   directly — that would lose precision).  After all parameters are
+ *   updated, the master copy is requantised to int8 with fresh scales.
  */
 void adam_step(Model *model, const double *grads, double *m, double *v,
                int step) {
-  double lr = LEARNING_RATE * (1.0 - (double)step / (double)NUM_STEPS);
+  /* ── Cosine LR schedule with linear warmup ─────────────────────────── */
+  double lr;
+  if (step < WARMUP_STEPS)
+    /* Warmup: linearly ramp from 0 → LEARNING_RATE */
+    lr = LEARNING_RATE * ((double)(step + 1) / (double)WARMUP_STEPS);
+  else {
+    /* Cosine decay: LEARNING_RATE → ~0 following a half-cosine curve */
+    double progress =
+        (double)(step - WARMUP_STEPS) / (double)(NUM_STEPS - WARMUP_STEPS);
+    lr = LEARNING_RATE * 0.5 * (1.0 + cos(progress * 3.14159265358979323846));
+  }
   double b1 = BETA1, b2 = BETA2, eps = EPS_ADAM;
-  /* Pre-compute bias-correction denominators once per step (not per weight!) */
+  /* Pre-compute bias-correction denominators once per step (not per weight!
+   * — these only depend on step number, not on individual gradients). */
   double bc1 = 1.0 - pow(b1, (double)(step + 1));
   double bc2 = 1.0 - pow(b2, (double)(step + 1));
   size_t vs = model->vocab_size;
   size_t idx = 0; /* flat index into the gradient / moment arrays */
+  /* ── INT8 path: update the fp64 master copy, then requantise later ── */
 #if defined(QUANTIZATION_INT8) || defined(QUANTISATION_INT8)
   double *master = model->master;
+  /* Update wte (token embeddings) in the master copy */
   for (size_t i = 0; i < vs * N_EMBD; i++, idx++) {
     double g = grads[idx];
     m[idx] = b1 * m[idx] + (1 - b1) * g;
@@ -1717,6 +2106,32 @@ char *load_file(const char *path, size_t *out_len) {
 }
 
 /* =================== Word-Level Tokenisation ============================= */
+/*
+ * WORD-LEVEL TOKENISATION (alternative to character-level)
+ * ────────────────────────────────────────────────────────
+ * Instead of treating each character as a token, we treat each whitespace-
+ * delimited word as a token.  This dramatically reduces sequence length
+ * (and thus the number of forward/backward passes per training sample).
+ *
+ * The vocabulary is built by:
+ *   1. Scan all documents, counting word frequencies (hash table)
+ *   2. Sort by frequency (descending)
+ *   3. Keep the top MAX_VOCAB words; out-of-vocabulary words map to <UNK>
+ *
+ * For word lookup we use a HASH TABLE with OPEN ADDRESSING:
+ *
+ *   Hash table (capacity = MAX_VOCAB * 2):
+ *   ┌───────┬───────┬───────┬───────┬───────┬───────┬─── ─ ─
+ *   │ empty │ "the" │ empty │ "and" │ empty │  "of" │ ...
+ *   │       │ id=3  │       │ id=7  │       │ id=5  │
+ *   └───────┴───────┴───────┴───────┴───────┴───────┴─── ─ ─
+ *               ▲               ▲
+ *               │               │
+ *     hash("the") % cap   hash("and") % cap  → if slot taken, probe next
+ *
+ *   Lookup is O(1) average case (vs O(V) linear scan without the table).
+ *   This matters for Shakespeare-scale vocabularies (6000+ words).
+ */
 
 /* Internal: hash table entry for word frequency counting */
 typedef struct {
@@ -1724,6 +2139,11 @@ typedef struct {
   size_t count;
 } WordFreqEntry;
 
+/*
+ * word_hash — DJB2 hash function (Daniel J. Bernstein).
+ *   h = h×33 + c  for each character.  Simple, fast, good distribution.
+ *   The magic number 5381 is a well-chosen starting value.
+ */
 static unsigned int word_hash(const char *s) {
   unsigned int h = 5381;
   while (*s)
@@ -1731,13 +2151,18 @@ static unsigned int word_hash(const char *s) {
   return h;
 }
 
+/*
+ * word_ht_find_or_insert — Open-addressing hash table probe.
+ *   Finds an existing entry for 'word', or inserts a new one.
+ *   Collision resolution: linear probing (check next slot if taken).
+ */
 static size_t word_ht_find_or_insert(WordFreqEntry *table, size_t cap,
                                      size_t *n, const char *word) {
   unsigned int h = word_hash(word) % (unsigned int)cap;
   while (table[h].count > 0 || table[h].word[0] != '\0') {
     if (strcmp(table[h].word, word) == 0)
       return h;
-    h = (h + 1) % (unsigned int)cap;
+    h = (h + 1) % (unsigned int)cap; /* linear probe: try next slot */
   }
   strncpy(table[h].word, word, MAX_WORD_LEN - 1);
   table[h].word[MAX_WORD_LEN - 1] = '\0';
