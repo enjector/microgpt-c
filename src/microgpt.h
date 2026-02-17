@@ -66,16 +66,16 @@
  * to use different model configurations from the same engine code.
  */
 #ifndef N_EMBD
-#define N_EMBD 32
+#define N_EMBD 16
 #endif
 #ifndef N_HEAD
 #define N_HEAD 4
 #endif
 #ifndef N_LAYER
-#define N_LAYER 2
+#define N_LAYER 1
 #endif
 #ifndef BLOCK_SIZE
-#define BLOCK_SIZE 32
+#define BLOCK_SIZE 16
 #endif
 #define HEAD_DIM (N_EMBD / N_HEAD)
 #ifndef MLP_RATIO
@@ -99,7 +99,7 @@
  *                 produce more deterministic output.
  */
 #ifndef NUM_STEPS
-#define NUM_STEPS 10000
+#define NUM_STEPS 1000
 #endif
 #ifndef LEARNING_RATE
 #define LEARNING_RATE 0.01

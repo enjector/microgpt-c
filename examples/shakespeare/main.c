@@ -22,7 +22,7 @@
 
 #define SHAKES_SAMPLES 5
 #define SHAKES_TEMP 0.7
-#define KEEP_TOP_WORDS 8000
+#define KEEP_TOP_WORDS 6000
 
 int main(void) {
   srand(42);
