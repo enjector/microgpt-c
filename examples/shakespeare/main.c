@@ -108,8 +108,10 @@ static void shuffle_docs(Docs *docs) {
 }
 
 int main(void) {
-  srand(42);
-  seed_rng(42);
+  unsigned int train_seed = 42; /* deterministic training */
+  unsigned int infer_seed = (unsigned int)time(NULL); /* varied inference */
+  srand(train_seed);
+  seed_rng(train_seed);
 
   /* ---- Load Shakespeare as line-per-doc ---- */
   Docs docs = {0};
@@ -289,6 +291,7 @@ int main(void) {
   }
 
   /* ---- Generate Shakespeare ---- */
+  seed_rng(infer_seed); /* re-seed so each run generates different text */
   printf("\n--- generated Shakespeare (character-level) ---\n");
   double logits_buf[MAX_VOCAB];
 
