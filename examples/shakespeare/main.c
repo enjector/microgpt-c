@@ -1,10 +1,15 @@
 /*
- * MicroGPT-C — Shakespeare Word-Level Generation Example
+ * MicroGPT-C — Shakespeare Character-Level Generation Example
  * Copyright (c) 2026 Ajay Soni, Enjector Software Ltd. MIT License.
  *
- * Demonstrates word-level text generation using the MicroGPT library's
- * WordVocab API.  Trains a small GPT on Shakespeare's complete works and
- * generates new Shakespearean text.
+ * Demonstrates character-level text generation using the MicroGPT library.
+ * Trains a small GPT on Shakespeare's complete works and generates new
+ * Shakespearean text character by character — no <unk> tokens, no missing
+ * words.
+ *
+ * Each line of Shakespeare becomes a training document. The model learns
+ * spelling, punctuation, verse meter, and dialogue structure at the
+ * character level.
  *
  * Build:
  *   cmake --build build --target shakespeare_demo
@@ -14,42 +19,43 @@
 #define _CRT_SECURE_NO_WARNINGS 1
 
 #include "microgpt.h"
+#include "microgpt_thread.h"
 
-#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <unistd.h>
 
 #define SHAKES_SAMPLES 5
 #define SHAKES_TEMP 0.7
-#define KEEP_TOP_WORDS 10000
+#define GEN_LEN 300 /* characters to generate per sample */
 #define CHECKPOINT_FILE "shakespeare.ckpt"
 
-/* Number of worker threads for batch parallelism */
-#ifndef NUM_THREADS
-#define NUM_THREADS 4
+/* Max threads (actual count is auto-detected at runtime) */
+#ifndef MAX_THREADS
+#define MAX_THREADS 64
 #endif
 
 /* ---- Per-thread work descriptor ---- */
 typedef struct {
   /* Shared (read-only during batch) */
   const Model *model;
-  const size_t *all_tokens;
-  size_t num_chunks;
+  const Docs *docs;
+  const Vocab *vocab;
   /* Per-thread owned */
   double *grads; /* thread-local gradient buffer */
   double *keys[N_LAYER];
   double *values[N_LAYER];
   size_t cache_len[N_LAYER];
+  size_t token_buf[BLOCK_SIZE + 2];
   /* Work assignment */
-  int batch_start; /* first batch index for this thread */
-  int batch_end;   /* one past last batch index */
+  int batch_start;
+  int batch_end;
   /* Results */
   double loss;
   size_t positions;
-  unsigned int rng_seed; /* thread-local RNG seed */
+  unsigned int rng_seed;
+  size_t doc_start; /* starting doc index for this thread's batch */
 } WorkerArg;
 
 static void *train_batch_worker(void *arg) {
@@ -63,75 +69,79 @@ static void *train_batch_worker(void *arg) {
     for (int L = 0; L < N_LAYER; L++)
       w->cache_len[L] = 0;
 
-    size_t offset = (size_t)rand_r(&w->rng_seed) % w->num_chunks;
-    size_t n = BLOCK_SIZE;
+    /* Pick a random document (line of Shakespeare) */
+    size_t di = (size_t)rand_r(&w->rng_seed) % w->docs->num_docs;
+    const char *doc = w->docs->lines[di];
+    size_t doc_len = w->docs->doc_lens[di];
+
+    /* Tokenize: [BOS] chars... [BOS/EOS] */
+    size_t n_tok =
+        tokenize(doc, doc_len, w->vocab, w->token_buf, BLOCK_SIZE + 2);
+    size_t n = n_tok - 1;
+    if (n > BLOCK_SIZE)
+      n = BLOCK_SIZE;
+    if (n == 0)
+      continue;
     w->positions += n;
 
     for (size_t pos = 0; pos < n; pos++) {
-      double loss =
-          forward_backward_one(w->model, w->all_tokens[offset + pos], pos,
-                               w->all_tokens[offset + pos + 1], w->keys,
-                               w->values, w->cache_len, w->grads);
+      double loss = forward_backward_one(w->model, w->token_buf[pos], pos,
+                                         w->token_buf[pos + 1], w->keys,
+                                         w->values, w->cache_len, w->grads);
       w->loss += loss;
     }
   }
   return NULL;
 }
 
+/* Utility: shuffle docs using Fisher-Yates */
+static void shuffle_docs(Docs *docs) {
+  for (size_t i = docs->num_docs; i > 1; i--) {
+    size_t j = (size_t)rand() % i;
+    char *tmp_line = docs->lines[j];
+    size_t tmp_len = docs->doc_lens[j];
+    docs->lines[j] = docs->lines[i - 1];
+    docs->doc_lens[j] = docs->doc_lens[i - 1];
+    docs->lines[i - 1] = tmp_line;
+    docs->doc_lens[i - 1] = tmp_len;
+  }
+}
+
 int main(void) {
   srand(42);
   seed_rng(42);
 
-  /* ---- Load Shakespeare ---- */
-  size_t text_len;
-  char *text = load_file("shakespeare.txt", &text_len);
-  if (!text) {
+  /* ---- Load Shakespeare as line-per-doc ---- */
+  Docs docs = {0};
+  if (load_docs("shakespeare.txt", &docs) != 0) {
     fprintf(stderr, "Cannot open shakespeare.txt\n");
     return 1;
   }
-  printf("loaded %.1f KB of Shakespeare\n", (double)text_len / 1024.0);
+  shuffle_docs(&docs);
+  printf("loaded %zu lines of Shakespeare\n", docs.num_docs);
 
-  /* ---- Build word vocabulary using library API ---- */
-  WordVocab wv;
-  memset(&wv, 0, sizeof(wv));
-  if (build_word_vocab(text, text_len, KEEP_TOP_WORDS, &wv) != 0) {
-    fprintf(stderr, "build_word_vocab failed\n");
-    free(text);
+  /* Count total characters */
+  size_t total_chars = 0;
+  for (size_t i = 0; i < docs.num_docs; i++)
+    total_chars += docs.doc_lens[i];
+  printf("total characters: %zu (%.1f KB)\n", total_chars,
+         (double)total_chars / 1024.0);
+
+  /* Build character-level vocabulary */
+  Vocab vocab = {0};
+  build_vocab(&docs, &vocab);
+  printf("vocab: %zu characters (no <unk>!)\n", vocab.vocab_size);
+
+  if (vocab.vocab_size > MAX_VOCAB) {
+    fprintf(stderr, "vocab_size %zu exceeds MAX_VOCAB %d\n", vocab.vocab_size,
+            MAX_VOCAB);
+    free_docs(&docs);
+    free(vocab.chars);
     return 1;
   }
 
-  if (wv.vocab_size > MAX_VOCAB) {
-    fprintf(stderr,
-            "vocab_size %zu exceeds MAX_VOCAB %d — increase MAX_VOCAB\n",
-            wv.vocab_size, MAX_VOCAB);
-    free_word_vocab(&wv);
-    free(text);
-    return 1;
-  }
-
-  printf("word vocab: %zu words kept | vocab_size %zu (incl. specials)\n",
-         wv.num_words, wv.vocab_size);
-  printf("N_EMBD=%d BLOCK_SIZE=%d N_LAYER=%d MAX_VOCAB=%d\n\n", N_EMBD,
-         BLOCK_SIZE, N_LAYER, MAX_VOCAB);
-
-  /* ---- Tokenize entire text into word token IDs ---- */
-  size_t max_tokens = text_len;
-  size_t *all_tokens = (size_t *)malloc(max_tokens * sizeof(size_t));
-  if (!all_tokens) {
-    fprintf(stderr, "OOM (tokenizing)\n");
-    return 1;
-  }
-  size_t total_tokens =
-      tokenize_words(text, text_len, &wv, all_tokens, max_tokens);
-  printf("tokenized: %zu word tokens\n", total_tokens);
-  free(text);
-
-  /* ---- Create sliding-window chunks for training ---- */
-  size_t num_chunks = 0;
-  if (total_tokens > BLOCK_SIZE)
-    num_chunks = total_tokens - BLOCK_SIZE;
-  printf("training chunks: %zu (sliding window of %d tokens)\n\n", num_chunks,
-         BLOCK_SIZE + 1);
+  printf("N_EMBD=%d BLOCK_SIZE=%d N_LAYER=%d N_HEAD=%d\n\n", N_EMBD, BLOCK_SIZE,
+         N_LAYER, N_HEAD);
 
   /* ---- Create or load model ---- */
   size_t nparams;
@@ -139,9 +149,8 @@ int main(void) {
   Model *model = NULL;
   int trained = 0;
 
-  /* Try loading a saved checkpoint first */
   {
-    Model *tmp = model_create(wv.vocab_size);
+    Model *tmp = model_create(vocab.vocab_size);
     if (!tmp) {
       fprintf(stderr, "OOM\n");
       return 1;
@@ -158,39 +167,44 @@ int main(void) {
     return 1;
   }
 
+  /* Try loading checkpoint */
   int resume_step = 0;
-  model = checkpoint_load(CHECKPOINT_FILE, wv.vocab_size, m_buf, v_buf,
+  model = checkpoint_load(CHECKPOINT_FILE, vocab.vocab_size, m_buf, v_buf,
                           &resume_step);
   if (model) {
     printf("loaded checkpoint '%s' (trained %d steps) — skipping training\n\n",
            CHECKPOINT_FILE, resume_step);
     trained = 1;
   } else {
-    model = model_create(wv.vocab_size);
+    model = model_create(vocab.vocab_size);
     if (!model) {
       fprintf(stderr, "OOM\n");
       return 1;
     }
   }
 
+  int nthreads = mgpt_default_threads(BATCH_SIZE);
   printf("params: %zu | batch %d | steps %d | lr %.4f | threads %d\n\n",
-         nparams, BATCH_SIZE, NUM_STEPS, (double)LEARNING_RATE, NUM_THREADS);
+         nparams, BATCH_SIZE, NUM_STEPS, (double)LEARNING_RATE, nthreads);
 
   /* ---- Allocate per-thread resources ---- */
-  int nthreads = NUM_THREADS;
-  if (nthreads > BATCH_SIZE)
-    nthreads = BATCH_SIZE;
-
-  WorkerArg workers[NUM_THREADS];
-  pthread_t threads[NUM_THREADS];
+  WorkerArg *workers = (WorkerArg *)calloc((size_t)nthreads, sizeof(WorkerArg));
+  mgpt_thread_t *threads =
+      (mgpt_thread_t *)calloc((size_t)nthreads, sizeof(mgpt_thread_t));
+  mgpt_thread_trampoline_t *tramps = (mgpt_thread_trampoline_t *)calloc(
+      (size_t)nthreads, sizeof(mgpt_thread_trampoline_t));
+  if (!workers || !threads || !tramps) {
+    fprintf(stderr, "OOM\n");
+    return 1;
+  }
 
   for (int t = 0; t < nthreads; t++) {
     workers[t].model = model;
-    workers[t].all_tokens = all_tokens;
-    workers[t].num_chunks = num_chunks;
+    workers[t].docs = &docs;
+    workers[t].vocab = &vocab;
     workers[t].grads = (double *)calloc(nparams, sizeof(double));
     if (!workers[t].grads) {
-      fprintf(stderr, "OOM (thread grads)\n");
+      fprintf(stderr, "OOM\n");
       return 1;
     }
     for (int L = 0; L < N_LAYER; L++) {
@@ -205,7 +219,7 @@ int main(void) {
     }
   }
 
-  /* KV cache for inference (single-threaded) */
+  /* KV cache for inference */
   double *inf_keys[N_LAYER], *inf_values[N_LAYER];
   size_t inf_cache_len[N_LAYER];
   for (int L = 0; L < N_LAYER; L++) {
@@ -215,13 +229,12 @@ int main(void) {
         (double *)malloc((size_t)BLOCK_SIZE * N_EMBD * sizeof(double));
   }
 
-  /* ---- Training (skipped if checkpoint loaded) ---- */
+  /* ---- Training ---- */
   if (!trained) {
     size_t tokens_trained = 0;
     time_t t0 = time(NULL);
 
     for (int step = 0; step < NUM_STEPS; step++) {
-      /* Distribute batches across threads */
       int batches_per_thread = BATCH_SIZE / nthreads;
       int remainder = BATCH_SIZE % nthreads;
       int cursor = 0;
@@ -234,15 +247,12 @@ int main(void) {
         workers[t].rng_seed = (unsigned int)(step * nthreads + t + 1);
       }
 
-      /* Launch threads */
       for (int t = 0; t < nthreads; t++)
-        pthread_create(&threads[t], NULL, train_batch_worker, &workers[t]);
-
-      /* Wait for all threads */
+        mgpt_thread_create(&threads[t], &tramps[t], train_batch_worker,
+                           &workers[t]);
       for (int t = 0; t < nthreads; t++)
-        pthread_join(threads[t], NULL);
+        mgpt_thread_join(threads[t]);
 
-      /* Sum thread-local gradients and losses */
       double batch_loss = 0;
       size_t batch_positions = 0;
       memset(grad_buffer, 0, nparams * sizeof(double));
@@ -272,43 +282,52 @@ int main(void) {
            (double)NUM_STEPS / train_sec,
            (double)tokens_trained / train_sec / 1000.0);
 
-    /* Save checkpoint for next run */
     if (checkpoint_save(model, m_buf, v_buf, NUM_STEPS, CHECKPOINT_FILE) == 0)
       printf("checkpoint saved to '%s'\n", CHECKPOINT_FILE);
     else
       fprintf(stderr, "warning: failed to save checkpoint\n");
   }
 
-  /* ---- Generate Shakespeare-style text ---- */
-  printf("\n--- generated Shakespeare (word-level) ---\n");
+  /* ---- Generate Shakespeare ---- */
+  printf("\n--- generated Shakespeare (character-level) ---\n");
   double logits_buf[MAX_VOCAB];
 
-  const char *seeds[] = {"The", "O", "What", "My", "How"};
+  /* Seed prompts: just the first character */
+  const char seeds[] = {'T', 'O', 'W', 'M', 'H'};
+  const char *seed_names[] = {"T(he)", "O", "W(hat)", "M(y)", "H(ow)"};
 
   for (int s = 0; s < SHAKES_SAMPLES; s++) {
     for (int L = 0; L < N_LAYER; L++)
       inf_cache_len[L] = 0;
 
-    size_t token = word_to_id(&wv, seeds[s]);
-    printf("\n[sample %d]\n%s", s + 1, seeds[s]);
+    /* Find the token ID for the seed character */
+    size_t token = vocab.bos_id; /* fallback */
+    for (size_t c = 0; c < vocab.vocab_size; c++) {
+      if (vocab.chars[c] == (unsigned char)seeds[s]) {
+        token = c;
+        break;
+      }
+    }
 
-    for (int pos = 0; pos < BLOCK_SIZE - 1; pos++) {
+    printf("\n[sample %d — seed: '%c']\n%c", s + 1, seeds[s], seeds[s]);
+
+    /* Generate up to GEN_LEN characters but stay within BLOCK_SIZE */
+    int gen_count = GEN_LEN;
+    if (gen_count > BLOCK_SIZE - 1)
+      gen_count = BLOCK_SIZE - 1;
+
+    for (int pos = 0; pos < gen_count; pos++) {
       forward_inference(model, token, (size_t)pos, inf_keys, inf_values,
                         inf_cache_len, logits_buf);
-      token = sample_token(logits_buf, wv.vocab_size, SHAKES_TEMP);
-      if (token == wv.bos_id)
+      token = sample_token(logits_buf, vocab.vocab_size, SHAKES_TEMP);
+      if (token == vocab.bos_id)
         break;
-
-      const char *w = wv.words[token];
-      if (token == wv.newline_id)
-        printf("%s", w);
-      else
-        printf(" %s", w);
+      putchar((char)vocab.chars[token]);
     }
     printf("\n");
   }
 
-  /* Cleanup */
+  /* ---- Cleanup ---- */
   for (int t = 0; t < nthreads; t++) {
     for (int L = 0; L < N_LAYER; L++) {
       free(workers[t].keys[L]);
@@ -316,6 +335,9 @@ int main(void) {
     }
     free(workers[t].grads);
   }
+  free(workers);
+  free(threads);
+  free(tramps);
   for (int L = 0; L < N_LAYER; L++) {
     free(inf_keys[L]);
     free(inf_values[L]);
@@ -324,7 +346,7 @@ int main(void) {
   free(m_buf);
   free(v_buf);
   model_free(model);
-  free(all_tokens);
-  free_word_vocab(&wv);
+  free_docs(&docs);
+  free(vocab.chars);
   return 0;
 }

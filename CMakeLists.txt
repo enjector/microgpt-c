@@ -58,17 +58,17 @@ add_custom_command(TARGET names_demo POST_BUILD
 add_library(microgpt_lib_shakespeare OBJECT src/microgpt.c)
 target_include_directories(microgpt_lib_shakespeare PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_compile_definitions(microgpt_lib_shakespeare PRIVATE
-  N_EMBD=64
-  N_HEAD=4
-  MLP_DIM=256
-  N_LAYER=2
-  BLOCK_SIZE=32
+  N_EMBD=128
+  N_HEAD=8
+  MLP_DIM=512
+  N_LAYER=4
+  BLOCK_SIZE=256
   BATCH_SIZE=16
-  NUM_STEPS=20000
+  NUM_STEPS=30000
   LEARNING_RATE=0.001
-  MAX_VOCAB=12000
+  MAX_VOCAB=200
   MAX_DOCS=200000
-  MAX_DOC_LEN=128
+  MAX_DOC_LEN=512
 )
 if(MICROGPT_SIMD)
   if(MSVC)
@@ -84,17 +84,17 @@ endif()
 add_executable(shakespeare_demo examples/shakespeare/main.c $<TARGET_OBJECTS:microgpt_lib_shakespeare>)
 target_include_directories(shakespeare_demo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_compile_definitions(shakespeare_demo PRIVATE
-  N_EMBD=64
-  N_HEAD=4
-  MLP_DIM=256
-  N_LAYER=2
-  BLOCK_SIZE=32
+  N_EMBD=128
+  N_HEAD=8
+  MLP_DIM=512
+  N_LAYER=4
+  BLOCK_SIZE=256
   BATCH_SIZE=16
-  NUM_STEPS=20000
+  NUM_STEPS=30000
   LEARNING_RATE=0.001
-  MAX_VOCAB=12000
+  MAX_VOCAB=200
   MAX_DOCS=200000
-  MAX_DOC_LEN=128
+  MAX_DOC_LEN=512
 )
 if(NOT MSVC)
   find_package(Threads REQUIRED)

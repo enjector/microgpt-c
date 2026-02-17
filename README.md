@@ -12,12 +12,13 @@ MicroGPT-C is a **serious, production-quality implementation** of a GPT (Generat
 
 It is **not a toy**. While the model architecture is intentionally minimal (suitable for learning and experimentation), the C implementation is robust:
 
-- **Full training pipeline** — forward pass, backward pass, Adam optimiser with resumable checkpoints
+- **Full training pipeline** — forward pass, backward pass, Adam optimiser with cosine LR + warmup
 - **27 unit tests** covering every public API function
 - **10 performance benchmarks** with measured throughput
-- **Two tokenisation strategies** — character-level and word-level
+- **Two tokenisation strategies** — character-level and word-level (with O(1) hash lookup)
 - **INT8 quantisation** support for memory-constrained devices
 - **SIMD auto-vectorisation** enabled by default
+- **Multi-threaded training** via pthreads (Shakespeare demo)
 
 | Use Case | Why MicroGPT-C |
 |----------|----------------|
@@ -62,7 +63,7 @@ Input → Token Embedding + Position Embedding
       → Linear (lm_head) → Softmax → next-token probabilities
 ```
 
-**Training** uses cross-entropy loss with the Adam optimiser and linear learning-rate decay. The entire forward + backward pass is implemented manually — no autograd, no computational graph.
+**Training** uses cross-entropy loss with the Adam optimiser and cosine learning-rate schedule (linear warmup → cosine decay). The entire forward + backward pass is implemented manually — no autograd, no computational graph.
 
 All architecture parameters are compile-time configurable:
 
@@ -72,6 +73,8 @@ All architecture parameters are compile-time configurable:
 | `N_HEAD` | 4 | `-DN_HEAD=8` | Attention heads |
 | `N_LAYER` | 2 | `-DN_LAYER=4` | Transformer blocks |
 | `BLOCK_SIZE` | 32 | `-DBLOCK_SIZE=64` | Maximum sequence length |
+| `MLP_DIM` | `N_EMBD × 4` | `-DMLP_DIM=256` | MLP hidden dimension |
+| `WARMUP_STEPS` | `NUM_STEPS / 10` | `-DWARMUP_STEPS=500` | LR warmup duration |
 
 ---
 
@@ -107,14 +110,14 @@ model_free(model);
 
 ### Word-Level Pipeline
 
-Best for prose, dialogue, poetry.
+Best for prose, dialogue, poetry. Uses O(1) hash-based `word_to_id` lookup.
 
 ```c
 size_t len;
 char *text = load_file("shakespeare.txt", &len);
 
 WordVocab wv;
-build_word_vocab(text, len, 4000, &wv);  // Keep top 4000 words
+build_word_vocab(text, len, 10000, &wv);  // Keep top 10,000 words
 
 size_t ids[8192];
 size_t n = tokenize_words(text, len, &wv, ids, 8192);
@@ -136,12 +139,12 @@ checkpoint_save(model, m_adam, v_adam, step, "checkpoint.bin");
 // Resume: restores everything needed to continue training
 Model *model = checkpoint_load("checkpoint.bin", vocab_size,
                                m_adam, v_adam, &step);
-// Continue training from 'step' onwards — momentum and LR decay are preserved
+// Continue training from 'step' onwards — momentum and LR schedule are preserved
 ```
 
 ### Complete Examples
 
-See [`examples/names/main.c`](examples/names/main.c) (character-level) and [`examples/shakespeare/main.c`](examples/shakespeare/main.c) (word-level) for full working programs.
+See [`examples/names/main.c`](examples/names/main.c) (character-level) and [`examples/shakespeare/main.c`](examples/shakespeare/main.c) (word-level, multi-threaded) for full working programs.
 
 Detailed guides:
 - [Character-level tokenisation](docs/character-level.md)
@@ -156,11 +159,21 @@ Detailed guides:
 Measured on the **character-level name generation** workload (1,000 training steps, 20 inference samples) — MicroGPT-C vs [Karpathy's `microgpt.py`](https://gist.github.com/karpathy/8627fe009c40f57531cb18360106ce95):
 
 | Metric | Python (microgpt.py) | C (fp64) | Speedup |
-|--------|--------|----------|---------|
-| **Training time** | ~93 s | **0.02 s** | **~4,600×** |
-| **Training throughput** | ~0.1 k tok/s | **~289 k tok/s** | **~2,800×** |
-| **Steps/sec** | ~11 | **~40,000** | **~3,600×** |
+|--------|--------|----------|---------| 
+| **Training time** | ~93 s | **0.09 s** | **~1,000×** |
+| **Training throughput** | ~0.1 k tok/s | **~616 k tok/s** | **~6,000×** |
+| **Steps/sec** | ~11 | **~10,800** | **~1,000×** |
 | **Inference time** | ~0.74 s | **< 1 ms** | **~700×+** |
+
+### Shakespeare Word-Level (N_EMBD=64, N_LAYER=2, vocab=10003)
+
+Multi-threaded training with 4 pthreads workers:
+
+| Metric | Value |
+|--------|-------|
+| **Model parameters** | 1,380,736 |
+| **Throughput** | 32 steps/s, ~8k tok/s |
+| **CPU utilisation** | ~140% (multi-core) |
 
 ### Benchmarks (N_EMBD=32, N_LAYER=2)
 
@@ -178,6 +191,19 @@ Run `./bench_microgpt` to reproduce on your machine:
 | Full training step (seq=8) | 0.08 ms | **82.6k tok/s** |
 
 > **INT8 quantised build:** ~25% slower training than fp64 on this tiny model, but **~8× smaller** weight storage — ideal for constrained devices.
+
+---
+
+## Performance Optimisations
+
+The engine includes several optimisations for training throughput:
+
+- **Cache-friendly `lin_bwd`** — backward gradient accumulation uses row-major weight traversal, eliminating L1 cache thrashing for large output layers (e.g. lm_head with vocab=10003)
+- **Hash-based `word_to_id`** — O(1) DJB2 hash lookup instead of O(n) linear scan across the vocabulary
+- **Cosine LR with warmup** — linear warmup for `WARMUP_STEPS` followed by cosine annealing, avoiding premature LR decay
+- **`restrict` + vectorisation hints** — C99 `restrict` qualifiers and Clang loop pragmas on all hot-path functions (`lin_fwd`, `lin_bwd`, `rmsnorm_fwd/bwd`) to enable full auto-vectorisation
+- **Compiler flags** — `-O3 -march=native -ffast-math -funroll-loops` for Release builds
+- **Multi-threaded batches** — Shakespeare demo parallelises batch processing across `NUM_THREADS` pthreads workers
 
 ---
 
@@ -199,6 +225,14 @@ Weights stored as 8-bit integers with per-matrix scales:
 cmake -DQUANTIZATION_INT8=ON ..
 ```
 
+### Custom architecture (Shakespeare example)
+
+Override compile-time parameters for larger models:
+
+```bash
+cmake -DN_EMBD=64 -DN_HEAD=4 -DN_LAYER=2 -DBLOCK_SIZE=32 ..
+```
+
 ---
 
 ## Project Layout
@@ -206,10 +240,10 @@ cmake -DQUANTIZATION_INT8=ON ..
 ```
 src/
   microgpt.h         Public API — all functions documented
-  microgpt.c         Core engine (~1,500 lines)
+  microgpt.c         Core engine (~1,900 lines)
 examples/
   names/main.c       Character-level name generation demo
-  shakespeare/main.c Word-level Shakespeare generation demo
+  shakespeare/main.c Word-level Shakespeare generation (multi-threaded)
 tests/
   test_microgpt.c    Unit tests (27 tests, zero dependencies)
   bench_microgpt.c   Performance benchmarks (10 benchmarks)
@@ -225,6 +259,7 @@ CMakeLists.txt       Build system (C99, SIMD default ON)
 
 - **C99 compiler** (GCC, Clang, MSVC)
 - **CMake 3.10+**
+- **pthreads** (for Shakespeare demo — standard on macOS/Linux)
 - No other dependencies
 
 ---
