@@ -13,12 +13,12 @@ MicroGPT-C is a **serious, production-quality implementation** of a GPT (Generat
 It is **not a toy**. While the model architecture is intentionally minimal (suitable for learning and experimentation), the C implementation is robust:
 
 - **Full training pipeline** — forward pass, backward pass, Adam optimiser with cosine LR + warmup
-- **27 unit tests** covering every public API function
-- **10 performance benchmarks** with measured throughput
+- **39 unit tests** covering every public API function
+- **15 performance benchmarks** with measured throughput
 - **Two tokenisation strategies** — character-level and word-level (with O(1) hash lookup)
 - **INT8 quantisation** support for memory-constrained devices
 - **SIMD auto-vectorisation** enabled by default
-- **Multi-threaded training** via pthreads (Shakespeare demo)
+- **Cross-platform multi-threaded training** (auto-detected threads; pthread on Linux/macOS, Win32 on Windows)
 
 | Use Case | Why MicroGPT-C |
 |----------|----------------|
@@ -39,13 +39,13 @@ cmake --build . --config Release
 # Character-level name generation
 ./names_demo
 
-# Word-level Shakespeare generation
+# Character-level Shakespeare generation (multi-threaded)
 ./shakespeare_demo
 
-# Run unit tests (27 tests)
+# Run unit tests (39 tests)
 ./test_microgpt
 
-# Run benchmarks (10 benchmarks)
+# Run benchmarks (15 benchmarks)
 ./bench_microgpt
 ```
 
@@ -144,7 +144,7 @@ Model *model = checkpoint_load("checkpoint.bin", vocab_size,
 
 ### Complete Examples
 
-See [`examples/names/main.c`](examples/names/main.c) (character-level) and [`examples/shakespeare/main.c`](examples/shakespeare/main.c) (word-level, multi-threaded) for full working programs.
+See [`examples/names/main.c`](examples/names/main.c) (character-level) and [`examples/shakespeare/main.c`](examples/shakespeare/main.c) (character-level, multi-threaded) for full working programs.
 
 Detailed guides:
 - [Character-level tokenisation](docs/character-level.md)
@@ -165,15 +165,15 @@ Measured on the **character-level name generation** workload (1,000 training ste
 | **Steps/sec** | ~11 | **~10,800** | **~1,000×** |
 | **Inference time** | ~0.74 s | **< 1 ms** | **~700×+** |
 
-### Shakespeare Word-Level (N_EMBD=64, N_LAYER=2, vocab=10003)
+### Shakespeare Character-Level (N_EMBD=128, N_LAYER=4, vocab≈84)
 
-Multi-threaded training with 4 pthreads workers:
+Multi-threaded training with auto-detected workers (uses all available CPU cores):
 
 | Metric | Value |
 |--------|-------|
-| **Model parameters** | 1,380,736 |
-| **Throughput** | 32 steps/s, ~8k tok/s |
-| **CPU utilisation** | ~140% (multi-core) |
+| **Model parameters** | ~1M |
+| **Vocab** | ~84 characters (zero `<unk>`) |
+| **Throughput** | ~85 steps/s, ~64k tok/s (12 threads) |
 
 ### Benchmarks (N_EMBD=32, N_LAYER=2)
 
@@ -203,7 +203,7 @@ The engine includes several optimisations for training throughput:
 - **Cosine LR with warmup** — linear warmup for `WARMUP_STEPS` followed by cosine annealing, avoiding premature LR decay
 - **`restrict` + vectorisation hints** — C99 `restrict` qualifiers and Clang loop pragmas on all hot-path functions (`lin_fwd`, `lin_bwd`, `rmsnorm_fwd/bwd`) to enable full auto-vectorisation
 - **Compiler flags** — `-O3 -march=native -ffast-math -funroll-loops` for Release builds
-- **Multi-threaded batches** — Shakespeare demo parallelises batch processing across `NUM_THREADS` pthreads workers
+- **Cross-platform multi-threaded batches** — Shakespeare demo auto-detects CPU count and parallelises batch processing via portable `microgpt_thread.h` (pthread on Linux/macOS, Win32 threads on Windows)
 
 ---
 
@@ -235,22 +235,39 @@ cmake -DN_EMBD=64 -DN_HEAD=4 -DN_LAYER=2 -DBLOCK_SIZE=32 ..
 
 ---
 
+## Amalgamated Demo
+
+[`microgpt_amalgamated.c`](microgpt_amalgamated.c) is the **entire GPT** — training, inference, multi-head attention, Adam optimiser — in a single ~50-line C99 file. Just a fun exercise to see how small a working Transformer can be:
+
+```bash
+cc -O2 -o microgpt_amalgamated microgpt_amalgamated.c -lm
+./microgpt_amalgamated    # expects names.txt in current directory
+```
+
+> **Note:** This is a compressed demo for curiosity and portability. For real work — configurable architecture, multi-layer support, word-level tokenisation, INT8 quantisation, threading, checkpoints, tests, and benchmarks — use the full library in `src/`.
+
+---
+
 ## Project Layout
 
 ```
 src/
-  microgpt.h         Public API — all functions documented
-  microgpt.c         Core engine (~1,900 lines)
+  microgpt.h              Public API — all functions documented
+  microgpt.c              Core engine (~1,900 lines)
+  microgpt_thread.h       Portable threading (pthread / Win32)
 examples/
-  names/main.c       Character-level name generation demo
-  shakespeare/main.c Word-level Shakespeare generation (multi-threaded)
+  names/main.c            Character-level name generation demo
+  shakespeare/main.c      Character-level Shakespeare generation (multi-threaded)
 tests/
-  test_microgpt.c    Unit tests (27 tests, zero dependencies)
-  bench_microgpt.c   Performance benchmarks (10 benchmarks)
+  test_microgpt.c         Unit tests (39 tests, zero dependencies)
+  bench_microgpt.c        Performance benchmarks (15 benchmarks)
+tools/
+  vocab_analysis.c        Vocabulary coverage analysis utility
 docs/
-  character-level.md Character-level tokenisation guide
-  word-level.md      Word-level tokenisation guide
-CMakeLists.txt       Build system (C99, SIMD default ON)
+  character-level.md      Character-level tokenisation guide
+  word-level.md           Word-level tokenisation guide
+microgpt_amalgamated.c    Single-file demo (see above)
+CMakeLists.txt            Build system (C99, SIMD default ON)
 ```
 
 ---
@@ -259,7 +276,7 @@ CMakeLists.txt       Build system (C99, SIMD default ON)
 
 - **C99 compiler** (GCC, Clang, MSVC)
 - **CMake 3.10+**
-- **pthreads** (for Shakespeare demo — standard on macOS/Linux)
+- **pthreads** (Linux/macOS) or **Win32 threads** (Windows) — for Shakespeare demo
 - No other dependencies
 
 ---
