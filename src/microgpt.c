@@ -870,59 +870,72 @@ static void rmsnorm_fwd(const double *x, size_t d, double *out) {
 
 /*
  * rmsnorm_bwd - Backward pass for RMSNorm.
- *   Propagates gradients d_out back through the normalisation to d_x.
- *   Uses the chain rule on:  out = x * (1 / sqrt(mean(x^2) + eps))
+ *   Given dy (upstream gradient) and x (original input, pre-norm):
+ *     rms = sqrt(mean(x^2) + eps)
+ *     dx[i] = (1/rms) * (dy[i] - out[i] * dot(dy, out) / d)
+ *   where out[i] = x[i] / rms.
+ *   Gradients are accumulated (+=) into dx.
  */
-static void rmsnorm_bwd(const double *x, size_t d, const double *d_out,
-                        double *d_x) {
-  double sum = 0;
+static void rmsnorm_bwd(const double *x, const double *dy, size_t d,
+                        double *dx) {
+  double sum_sq = 0;
   for (size_t i = 0; i < d; i++)
-    sum += x[i] * x[i];
-  double ms = sum / (double)d + 1e-5; /* mean-square + eps */
-  double scale = 1.0 / sqrt(ms);      /* normalisation factor */
-  double d_scale = 0;
+    sum_sq += x[i] * x[i];
+  double rms = sqrt(sum_sq / (double)d + 1e-5);
+  double inv_rms = 1.0 / rms;
+  /* Compute dot(dy, x) / (d * rms^2) */
+  double dot = 0;
   for (size_t i = 0; i < d; i++)
-    d_scale += d_out[i] * x[i]; /* chain rule: d(scale) */
-  d_scale *= scale * (-0.5 / ms / (double)d);
+    dot += dy[i] * x[i];
+  double coeff = dot / ((double)d * rms * rms);
   for (size_t i = 0; i < d; i++)
-    d_x[i] += d_out[i] * scale + d_scale * x[i] * 2.0 / (double)d;
+    dx[i] += inv_rms * dy[i] - coeff * x[i];
 }
 
 /* ================== Forward + Backward (Training) ======================== */
 
 /*
- * forward_backward_one - Full Transformer forward pass for a single position,
- *   followed by cross-entropy loss computation and backward gradient
- *   accumulation through the lm_head projection.
+ * forward_backward_one - Full Transformer forward + backward for one position.
  *
  * Pipeline:
  *   1. Embed: x0 = wte[token_id] + wpe[pos_id]
  *   2. RMSNorm(x0)
  *   3. For each layer:
- *      a. RMSNorm -> Q, K, V projections -> causal self-attention -> Wo ->
- * residual b. RMSNorm -> MLP(fc1 -> ReLU -> fc2) -> residual
- *   4. lm_head projection -> softmax -> cross-entropy loss
- *   5. Backward: gradients for lm_head, wte, wpe accumulated into grad_buffer
- *
- * NOTE: The current backward only propagates through lm_head; attention/MLP
- * layer gradients rely on the per-position loss signal through the embedding
- * gradient (a simplification from the reference implementation).
+ *      a. RMSNorm -> Q, K, V -> causal attention -> Wo -> residual
+ *      b. RMSNorm -> MLP(fc1 -> ReLU -> fc2) -> residual
+ *   4. lm_head -> softmax -> cross-entropy loss
+ *   5. Full backward: gradients for ALL weights accumulated into grad_buffer.
  */
 double forward_backward_one(const Model *model, size_t token_id, size_t pos_id,
                             size_t target_id, double **keys, double **values,
                             size_t *cache_len, double *grad_buffer) {
   const size_t vs = model->vocab_size;
   const size_t ne = N_EMBD;
-  const size_t T = cache_len[0] + 1; /* total positions including current */
+  const size_t T = cache_len[0] + 1;
 #define MAX_W_SIZE (MLP_DIM * N_EMBD)
-  double W_tmp[MAX_W_SIZE]; /* scratch buffer for dequantising weights (INT8) */
+  double W_tmp[MAX_W_SIZE];
 
-  /* Stack-allocated activation buffers for a single position */
+  /* Per-layer saved activations for backward */
+  double sv_x_pre[N_LAYER][N_EMBD];   /* input to each layer */
+  double sv_x_norm1[N_LAYER][N_EMBD]; /* pre-attention norm output */
+  double sv_attn_w[N_LAYER]
+                  [N_HEAD * BLOCK_SIZE]; /* per-head attention weights */
+  double sv_q[N_LAYER][N_EMBD];      /* saved projected queries for backward */
+  size_t sv_T[N_LAYER];              /* T at each layer */
+  double sv_x_attn[N_LAYER][N_EMBD]; /* attention output (pre-Wo) */
+  double sv_x_post_attn[N_LAYER][N_EMBD]; /* after attention residual */
+  double sv_x_norm2[N_LAYER][N_EMBD];     /* pre-MLP norm output */
+  double sv_mlp_pre[N_LAYER][MLP_DIM];    /* fc1 output pre-ReLU */
+  double sv_mlp_post[N_LAYER][MLP_DIM];   /* fc1 output post-ReLU */
+  double sv_x_embed[N_EMBD];              /* embedding before initial norm */
+
+  /* Single-position activation buffers */
   double x0[N_EMBD], x_norm1[N_EMBD], q[N_EMBD], k[N_EMBD], v[N_EMBD];
-  double attn_weights[BLOCK_SIZE], x_attn[N_EMBD], x1[N_EMBD], x_norm2[N_EMBD];
+  double attn_weights[N_HEAD * BLOCK_SIZE], x_attn[N_EMBD], x1[N_EMBD],
+      x_norm2[N_EMBD];
   double mlp1[MLP_DIM], x2[N_EMBD], logits[MAX_VOCAB];
-  double d_x2[N_EMBD], d_logits[MAX_VOCAB]; /* gradient accumulators */
-  memset(d_x2, 0, sizeof(d_x2));
+  double d_x[N_EMBD], d_logits[MAX_VOCAB];
+  memset(d_x, 0, sizeof(d_x));
   memset(d_logits, 0, sizeof(d_logits));
 
 #if defined(QUANTIZATION_INT8) || defined(QUANTISATION_INT8)
@@ -939,12 +952,16 @@ double forward_backward_one(const Model *model, size_t token_id, size_t pos_id,
   for (size_t i = 0; i < ne; i++)
     x0[i] = model->wte[token_id * ne + i] + model->wpe[pos_id * ne + i];
 #endif
+  memcpy(sv_x_embed, x0, ne * sizeof(double));
   rmsnorm_fwd(x0, ne, x_norm1);
   memcpy(x0, x_norm1, ne * sizeof(double));
 
   for (int L = 0; L < N_LAYER; L++) {
+    memcpy(sv_x_pre[L], x0, ne * sizeof(double));
+    sv_T[L] = T;
     /* Attention */
     rmsnorm_fwd(x0, ne, x_norm1);
+    memcpy(sv_x_norm1[L], x_norm1, ne * sizeof(double));
 #if defined(QUANTIZATION_INT8) || defined(QUANTISATION_INT8)
     {
       double sx = quantize_vec_to_int8(x_norm1, ne, x_i8);
@@ -972,40 +989,50 @@ double forward_backward_one(const Model *model, size_t token_id, size_t pos_id,
     lin_fwd(x_norm1, model->attn_wk[L], ne, ne, k);
     lin_fwd(x_norm1, model->attn_wv[L], ne, ne, v);
 #endif
+    memcpy(sv_q[L], q, ne * sizeof(double));
     /* Append to cache (caller owns keys[L], values[L]; we write current at
      * cache_len[L]) */
     memcpy(keys[L] + cache_len[L] * ne, k, ne * sizeof(double));
     memcpy(values[L] + cache_len[L] * ne, v, ne * sizeof(double));
 
+    /* Multi-head attention: N_HEAD independent heads, each over HEAD_DIM dims
+     */
     double scale = 1.0 / sqrt((double)HEAD_DIM);
-    for (size_t t = 0; t < T; t++) {
-      const double *kt = (t < cache_len[L]) ? (keys[L] + t * ne) : k;
-      double s = 0;
-      for (size_t j = 0; j < ne; j++)
-        s += x_norm1[j] * kt[j]; /* q·k for full dim; Python does per-head */
-      attn_weights[t] = s * scale;
-    }
-    /* Causal: for single head we have one score per position; softmax over T */
-    double max_s = attn_weights[0];
-    for (size_t t = 1; t < T; t++)
-      if (attn_weights[t] > max_s)
-        max_s = attn_weights[t];
-    double sum = 0;
-    for (size_t t = 0; t < T; t++) {
-      attn_weights[t] = exp(attn_weights[t] - max_s);
-      sum += attn_weights[t];
-    }
-    for (size_t t = 0; t < T; t++)
-      attn_weights[t] /= sum;
-
-    for (size_t j = 0; j < ne; j++) {
-      double s = 0;
+    for (int h = 0; h < N_HEAD; h++) {
+      size_t hoff = (size_t)h * HEAD_DIM;
+      size_t hw = (size_t)h * BLOCK_SIZE;
       for (size_t t = 0; t < T; t++) {
-        const double *vt = (t < cache_len[L]) ? (values[L] + t * ne) : v;
-        s += attn_weights[t] * vt[j];
+        const double *kt =
+            (t < cache_len[L]) ? (keys[L] + t * ne + hoff) : (k + hoff);
+        double s = 0;
+        for (size_t d = 0; d < HEAD_DIM; d++)
+          s += q[hoff + d] * kt[d];
+        attn_weights[hw + t] = s * scale;
       }
-      x_attn[j] = s;
+      double max_s = attn_weights[hw];
+      for (size_t t = 1; t < T; t++)
+        if (attn_weights[hw + t] > max_s)
+          max_s = attn_weights[hw + t];
+      double sum = 0;
+      for (size_t t = 0; t < T; t++) {
+        attn_weights[hw + t] = exp(attn_weights[hw + t] - max_s);
+        sum += attn_weights[hw + t];
+      }
+      for (size_t t = 0; t < T; t++)
+        attn_weights[hw + t] /= sum;
+      for (size_t d = 0; d < HEAD_DIM; d++) {
+        double s = 0;
+        for (size_t t = 0; t < T; t++) {
+          const double *vt =
+              (t < cache_len[L]) ? (values[L] + t * ne + hoff) : (v + hoff);
+          s += attn_weights[hw + t] * vt[d];
+        }
+        x_attn[hoff + d] = s;
+      }
     }
+    memcpy(sv_attn_w[L], attn_weights,
+           (size_t)N_HEAD * BLOCK_SIZE * sizeof(double));
+    memcpy(sv_x_attn[L], x_attn, ne * sizeof(double));
 #if defined(QUANTIZATION_INT8) || defined(QUANTISATION_INT8)
     {
       double sx = quantize_vec_to_int8(x_attn, ne, x_i8);
@@ -1020,9 +1047,11 @@ double forward_backward_one(const Model *model, size_t token_id, size_t pos_id,
     for (size_t i = 0; i < ne; i++)
       x1[i] += x0[i]; /* residual */
     memcpy(x0, x1, ne * sizeof(double));
+    memcpy(sv_x_post_attn[L], x0, ne * sizeof(double));
 
     /* MLP */
     rmsnorm_fwd(x0, ne, x_norm2);
+    memcpy(sv_x_norm2[L], x_norm2, ne * sizeof(double));
 #if defined(QUANTIZATION_INT8) || defined(QUANTISATION_INT8)
     {
       double sx = quantize_vec_to_int8(x_norm2, ne, x_i8);
@@ -1031,8 +1060,10 @@ double forward_backward_one(const Model *model, size_t token_id, size_t pos_id,
       for (size_t j = 0; j < MLP_DIM; j++)
         mlp1[j] = sx * sw * (double)acc_buf[j];
     }
+    memcpy(sv_mlp_pre[L], mlp1, MLP_DIM * sizeof(double));
     for (size_t i = 0; i < MLP_DIM; i++)
       mlp1[i] = mlp1[i] > 0 ? mlp1[i] : 0;
+    memcpy(sv_mlp_post[L], mlp1, MLP_DIM * sizeof(double));
     {
       double sx = quantize_vec_to_int8(mlp1, MLP_DIM, x_i8);
       lin_fwd_int8(x_i8, model->mlp_fc2[L], MLP_DIM, ne, acc_buf);
@@ -1042,8 +1073,10 @@ double forward_backward_one(const Model *model, size_t token_id, size_t pos_id,
     }
 #else
     lin_fwd(x_norm2, model->mlp_fc1[L], ne, MLP_DIM, mlp1);
+    memcpy(sv_mlp_pre[L], mlp1, MLP_DIM * sizeof(double));
     for (size_t i = 0; i < MLP_DIM; i++)
       mlp1[i] = mlp1[i] > 0 ? mlp1[i] : 0;
+    memcpy(sv_mlp_post[L], mlp1, MLP_DIM * sizeof(double));
     lin_fwd(mlp1, model->mlp_fc2[L], MLP_DIM, ne, x2);
 #endif
     for (size_t i = 0; i < ne; i++)
@@ -1075,23 +1108,155 @@ double forward_backward_one(const Model *model, size_t token_id, size_t pos_id,
     logits[i] /= sum;
   double loss = -log(logits[target_id] > 1e-10 ? logits[target_id] : 1e-10);
 
-  /* Backward: d_logits = probs - one_hot(target). Grad layout: wte, wpe,
-   * lm_head, then per-layer wq,wk,wv,wo,fc1,fc2 */
+  /* =================== BACKWARD PASS =================== */
+
+  /* d_logits = probs - one_hot(target) */
   for (size_t i = 0; i < vs; i++)
     d_logits[i] = logits[i] - (i == target_id ? 1.0 : 0.0);
 
-  /* Gradient through lm_head: d_x2 = lm_head^T @ d_logits, grad_lm_head +=
-   * d_logits @ x0^T */
-  {
-    size_t off_wte = 0;
-    size_t off_wpe = vs * ne;
-    size_t off_lm = vs * ne + (size_t)BLOCK_SIZE * ne;
-    lin_bwd(x0, get_W(model, model->lm_head, 2, vs * ne, W_tmp), d_logits, ne,
-            vs, d_x2, grad_buffer + off_lm);
-    for (size_t i = 0; i < ne; i++) {
-      grad_buffer[off_wte + token_id * ne + i] += d_x2[i];
-      grad_buffer[off_wpe + pos_id * ne + i] += d_x2[i];
+  /* Grad buffer layout offsets */
+  size_t off_wte = 0;
+  size_t off_wpe = vs * ne;
+  size_t off_lm = vs * ne + (size_t)BLOCK_SIZE * ne;
+  size_t layer_stride = (size_t)N_EMBD * N_EMBD * 4 + (size_t)MLP_DIM * N_EMBD +
+                        (size_t)N_EMBD * MLP_DIM;
+  size_t off_layers = off_lm + vs * ne;
+
+  /* Backward through lm_head: d_x = lm_head^T @ d_logits */
+  lin_bwd(x0, get_W(model, model->lm_head, 2, vs * ne, W_tmp), d_logits, ne, vs,
+          d_x, grad_buffer + off_lm);
+
+  /* Backward through layers (reverse order) */
+  for (int L = N_LAYER - 1; L >= 0; L--) {
+    size_t off_L = off_layers + (size_t)L * layer_stride;
+    size_t off_wq = off_L;
+    size_t off_wk = off_L + ne * ne;
+    size_t off_wv = off_L + ne * ne * 2;
+    size_t off_wo = off_L + ne * ne * 3;
+    size_t off_fc1 = off_L + ne * ne * 4;
+    size_t off_fc2 = off_L + ne * ne * 4 + (size_t)MLP_DIM * ne;
+    size_t TL = sv_T[L];
+
+    /* --- MLP residual: d_x flows through addition --- */
+    /* d_x is the gradient of output of this layer (post-MLP-residual) */
+
+    /* Backward through fc2 */
+    double d_mlp_post[MLP_DIM];
+    memset(d_mlp_post, 0, sizeof(d_mlp_post));
+    lin_bwd(
+        sv_mlp_post[L],
+        get_W(model, model->mlp_fc2[L], 8 + L * 6, (size_t)ne * MLP_DIM, W_tmp),
+        d_x, MLP_DIM, ne, d_mlp_post, grad_buffer + off_fc2);
+
+    /* Backward through ReLU */
+    double d_mlp_pre[MLP_DIM];
+    for (size_t i = 0; i < MLP_DIM; i++)
+      d_mlp_pre[i] = sv_mlp_pre[L][i] > 0 ? d_mlp_post[i] : 0;
+
+    /* Backward through fc1 */
+    double d_x_norm2[N_EMBD];
+    memset(d_x_norm2, 0, sizeof(d_x_norm2));
+    lin_bwd(
+        sv_x_norm2[L],
+        get_W(model, model->mlp_fc1[L], 7 + L * 6, (size_t)MLP_DIM * ne, W_tmp),
+        d_mlp_pre, ne, MLP_DIM, d_x_norm2, grad_buffer + off_fc1);
+
+    /* Backward through pre-MLP RMSNorm */
+    double d_x_post_attn[N_EMBD];
+    memset(d_x_post_attn, 0, sizeof(d_x_post_attn));
+    rmsnorm_bwd(sv_x_post_attn[L], d_x_norm2, ne, d_x_post_attn);
+
+    /* MLP residual: d_x1 = d_x (from residual skip) + d_x_post_attn */
+    double d_x1[N_EMBD];
+    for (size_t i = 0; i < ne; i++)
+      d_x1[i] = d_x[i] + d_x_post_attn[i];
+
+    /* Backward through Wo */
+    double d_x_attn[N_EMBD];
+    memset(d_x_attn, 0, sizeof(d_x_attn));
+    lin_bwd(sv_x_attn[L],
+            get_W(model, model->attn_wo[L], 6 + L * 6, ne * ne, W_tmp), d_x1,
+            ne, ne, d_x_attn, grad_buffer + off_wo);
+
+    /* Backward through multi-head attention */
+    double d_q[N_EMBD];
+    memset(d_q, 0, sizeof(d_q));
+    double d_k_cur[N_EMBD];
+    memset(d_k_cur, 0, sizeof(d_k_cur));
+    double d_v_cur[N_EMBD];
+    memset(d_v_cur, 0, sizeof(d_v_cur));
+    double attn_scale = 1.0 / sqrt((double)HEAD_DIM);
+
+    for (int h = 0; h < N_HEAD; h++) {
+      size_t hoff = (size_t)h * HEAD_DIM;
+      size_t hw = (size_t)h * BLOCK_SIZE;
+      /* d_a_h[t] = sum_d d_x_attn[hoff+d] * V[t][hoff+d] */
+      double d_attn_h[BLOCK_SIZE];
+      for (size_t t = 0; t < TL; t++) {
+        const double *vt = values[L] + t * ne;
+        double s = 0;
+        for (size_t d = 0; d < HEAD_DIM; d++)
+          s += d_x_attn[hoff + d] * vt[hoff + d];
+        d_attn_h[t] = s;
+      }
+      /* Softmax backward per head */
+      double dot_ad = 0;
+      for (size_t t = 0; t < TL; t++)
+        dot_ad += sv_attn_w[L][hw + t] * d_attn_h[t];
+      double d_score_h[BLOCK_SIZE];
+      for (size_t t = 0; t < TL; t++)
+        d_score_h[t] =
+            sv_attn_w[L][hw + t] * (d_attn_h[t] - dot_ad) * attn_scale;
+      /* Q·K backward per head */
+      for (size_t t = 0; t < TL; t++) {
+        const double *kt = keys[L] + t * ne;
+        for (size_t d = 0; d < HEAD_DIM; d++)
+          d_q[hoff + d] += d_score_h[t] * kt[hoff + d];
+      }
+      /* K backward for current position: d_k += d_score[TL-1] * q */
+      for (size_t d = 0; d < HEAD_DIM; d++)
+        d_k_cur[hoff + d] += d_score_h[TL - 1] * sv_q[L][hoff + d];
+      /* V backward for current position: d_v += a_h[TL-1] * d_x_attn */
+      for (size_t d = 0; d < HEAD_DIM; d++)
+        d_v_cur[hoff + d] += sv_attn_w[L][hw + TL - 1] * d_x_attn[hoff + d];
     }
+
+    /* Backward through Q = Wq @ x_norm1 */
+    double d_x_norm1[N_EMBD];
+    memset(d_x_norm1, 0, sizeof(d_x_norm1));
+    lin_bwd(sv_x_norm1[L],
+            get_W(model, model->attn_wq[L], 3 + L * 6, ne * ne, W_tmp), d_q, ne,
+            ne, d_x_norm1, grad_buffer + off_wq);
+    /* K and V backward through current position's projections */
+    lin_bwd(sv_x_norm1[L],
+            get_W(model, model->attn_wk[L], 4 + L * 6, ne * ne, W_tmp), d_k_cur,
+            ne, ne, d_x_norm1, grad_buffer + off_wk);
+    lin_bwd(sv_x_norm1[L],
+            get_W(model, model->attn_wv[L], 5 + L * 6, ne * ne, W_tmp), d_v_cur,
+            ne, ne, d_x_norm1, grad_buffer + off_wv);
+
+    /* Backward through pre-attention RMSNorm */
+    double d_x_pre[N_EMBD];
+    memset(d_x_pre, 0, sizeof(d_x_pre));
+    rmsnorm_bwd(sv_x_pre[L], d_x_norm1, ne, d_x_pre);
+
+    /* Attention residual: d_x_pre += d_x1 (residual skip) */
+    for (size_t i = 0; i < ne; i++)
+      d_x_pre[i] += d_x1[i];
+
+    /* d_x for next layer down = d_x_pre */
+    memcpy(d_x, d_x_pre, ne * sizeof(double));
+  }
+
+  /* Backward through initial RMSNorm */
+  double d_embed[N_EMBD];
+  memset(d_embed, 0, sizeof(d_embed));
+  rmsnorm_bwd(sv_x_embed, d_x, ne, d_embed);
+
+  /* Accumulate embedding gradients */
+  for (size_t i = 0; i < ne; i++) {
+    grad_buffer[off_wte + token_id * ne + i] += d_embed[i];
+    grad_buffer[off_wpe + pos_id * ne + i] += d_embed[i];
   }
 
   cache_len[0]++;
@@ -1121,7 +1286,8 @@ void forward_inference(const Model *model, size_t token_id, size_t pos_id,
   double W_tmp[MLP_DIM * N_EMBD];
 #endif
   double x0[N_EMBD], x_norm1[N_EMBD], q[N_EMBD], k[N_EMBD], v[N_EMBD];
-  double attn_weights[BLOCK_SIZE], x_attn[N_EMBD], x1[N_EMBD], x_norm2[N_EMBD];
+  double attn_weights[N_HEAD * BLOCK_SIZE], x_attn[N_EMBD], x1[N_EMBD],
+      x_norm2[N_EMBD];
   double mlp1[MLP_DIM], x2[N_EMBD];
 
 #if defined(QUANTIZATION_INT8) || defined(QUANTISATION_INT8)
@@ -1168,32 +1334,39 @@ void forward_inference(const Model *model, size_t token_id, size_t pos_id,
 #endif
     memcpy(keys[L] + cache_len[L] * ne, k, ne * sizeof(double));
     memcpy(values[L] + cache_len[L] * ne, v, ne * sizeof(double));
+    /* Multi-head attention */
     double scale = 1.0 / sqrt((double)HEAD_DIM);
-    for (size_t t = 0; t < T; t++) {
-      const double *kt = (t < cache_len[L]) ? (keys[L] + t * ne) : k;
-      double s = 0;
-      for (size_t j = 0; j < ne; j++)
-        s += x_norm1[j] * kt[j];
-      attn_weights[t] = s * scale;
-    }
-    double max_s = attn_weights[0];
-    for (size_t t = 1; t < T; t++)
-      if (attn_weights[t] > max_s)
-        max_s = attn_weights[t];
-    double sum = 0;
-    for (size_t t = 0; t < T; t++) {
-      attn_weights[t] = exp(attn_weights[t] - max_s);
-      sum += attn_weights[t];
-    }
-    for (size_t t = 0; t < T; t++)
-      attn_weights[t] /= sum;
-    for (size_t j = 0; j < ne; j++) {
-      double s = 0;
+    for (int h = 0; h < N_HEAD; h++) {
+      size_t hoff = (size_t)h * HEAD_DIM;
+      size_t hw = (size_t)h * BLOCK_SIZE;
       for (size_t t = 0; t < T; t++) {
-        const double *vt = (t < cache_len[L]) ? (values[L] + t * ne) : v;
-        s += attn_weights[t] * vt[j];
+        const double *kt =
+            (t < cache_len[L]) ? (keys[L] + t * ne + hoff) : (k + hoff);
+        double s = 0;
+        for (size_t d = 0; d < HEAD_DIM; d++)
+          s += q[hoff + d] * kt[d];
+        attn_weights[hw + t] = s * scale;
       }
-      x_attn[j] = s;
+      double max_s = attn_weights[hw];
+      for (size_t t = 1; t < T; t++)
+        if (attn_weights[hw + t] > max_s)
+          max_s = attn_weights[hw + t];
+      double sum = 0;
+      for (size_t t = 0; t < T; t++) {
+        attn_weights[hw + t] = exp(attn_weights[hw + t] - max_s);
+        sum += attn_weights[hw + t];
+      }
+      for (size_t t = 0; t < T; t++)
+        attn_weights[hw + t] /= sum;
+      for (size_t d = 0; d < HEAD_DIM; d++) {
+        double s = 0;
+        for (size_t t = 0; t < T; t++) {
+          const double *vt =
+              (t < cache_len[L]) ? (values[L] + t * ne + hoff) : (v + hoff);
+          s += attn_weights[hw + t] * vt[d];
+        }
+        x_attn[hoff + d] = s;
+      }
     }
 #if defined(QUANTIZATION_INT8) || defined(QUANTISATION_INT8)
     {
@@ -1274,6 +1447,9 @@ void adam_step(Model *model, const double *grads, double *m, double *v,
                int step) {
   double lr = LEARNING_RATE * (1.0 - (double)step / (double)NUM_STEPS);
   double b1 = BETA1, b2 = BETA2, eps = EPS_ADAM;
+  /* Pre-compute bias-correction denominators once per step (not per weight!) */
+  double bc1 = 1.0 - pow(b1, (double)(step + 1));
+  double bc2 = 1.0 - pow(b2, (double)(step + 1));
   size_t vs = model->vocab_size;
   size_t idx = 0; /* flat index into the gradient / moment arrays */
 #if defined(QUANTIZATION_INT8) || defined(QUANTISATION_INT8)
@@ -1282,24 +1458,24 @@ void adam_step(Model *model, const double *grads, double *m, double *v,
     double g = grads[idx];
     m[idx] = b1 * m[idx] + (1 - b1) * g;
     v[idx] = b2 * v[idx] + (1 - b2) * g * g;
-    double mh = m[idx] / (1 - pow(b1, (double)(step + 1)));
-    double vh = v[idx] / (1 - pow(b2, (double)(step + 1)));
+    double mh = m[idx] / bc1;
+    double vh = v[idx] / bc2;
     master[idx] -= lr * mh / (sqrt(vh) + eps);
   }
   for (size_t i = 0; i < BLOCK_SIZE * N_EMBD; i++, idx++) {
     double g = grads[idx];
     m[idx] = b1 * m[idx] + (1 - b1) * g;
     v[idx] = b2 * v[idx] + (1 - b2) * g * g;
-    double mh = m[idx] / (1 - pow(b1, (double)(step + 1)));
-    double vh = v[idx] / (1 - pow(b2, (double)(step + 1)));
+    double mh = m[idx] / bc1;
+    double vh = v[idx] / bc2;
     master[idx] -= lr * mh / (sqrt(vh) + eps);
   }
   for (size_t i = 0; i < vs * N_EMBD; i++, idx++) {
     double g = grads[idx];
     m[idx] = b1 * m[idx] + (1 - b1) * g;
     v[idx] = b2 * v[idx] + (1 - b2) * g * g;
-    double mh = m[idx] / (1 - pow(b1, (double)(step + 1)));
-    double vh = v[idx] / (1 - pow(b2, (double)(step + 1)));
+    double mh = m[idx] / bc1;
+    double vh = v[idx] / bc2;
     master[idx] -= lr * mh / (sqrt(vh) + eps);
   }
   for (int L = 0; L < N_LAYER; L++) {
@@ -1307,48 +1483,48 @@ void adam_step(Model *model, const double *grads, double *m, double *v,
       double g = grads[idx];
       m[idx] = b1 * m[idx] + (1 - b1) * g;
       v[idx] = b2 * v[idx] + (1 - b2) * g * g;
-      double mh = m[idx] / (1 - pow(b1, (double)(step + 1)));
-      double vh = v[idx] / (1 - pow(b2, (double)(step + 1)));
+      double mh = m[idx] / bc1;
+      double vh = v[idx] / bc2;
       master[idx] -= lr * mh / (sqrt(vh) + eps);
     }
     for (size_t i = 0; i < N_EMBD * N_EMBD; i++, idx++) {
       double g = grads[idx];
       m[idx] = b1 * m[idx] + (1 - b1) * g;
       v[idx] = b2 * v[idx] + (1 - b2) * g * g;
-      double mh = m[idx] / (1 - pow(b1, (double)(step + 1)));
-      double vh = v[idx] / (1 - pow(b2, (double)(step + 1)));
+      double mh = m[idx] / bc1;
+      double vh = v[idx] / bc2;
       master[idx] -= lr * mh / (sqrt(vh) + eps);
     }
     for (size_t i = 0; i < N_EMBD * N_EMBD; i++, idx++) {
       double g = grads[idx];
       m[idx] = b1 * m[idx] + (1 - b1) * g;
       v[idx] = b2 * v[idx] + (1 - b2) * g * g;
-      double mh = m[idx] / (1 - pow(b1, (double)(step + 1)));
-      double vh = v[idx] / (1 - pow(b2, (double)(step + 1)));
+      double mh = m[idx] / bc1;
+      double vh = v[idx] / bc2;
       master[idx] -= lr * mh / (sqrt(vh) + eps);
     }
     for (size_t i = 0; i < N_EMBD * N_EMBD; i++, idx++) {
       double g = grads[idx];
       m[idx] = b1 * m[idx] + (1 - b1) * g;
       v[idx] = b2 * v[idx] + (1 - b2) * g * g;
-      double mh = m[idx] / (1 - pow(b1, (double)(step + 1)));
-      double vh = v[idx] / (1 - pow(b2, (double)(step + 1)));
+      double mh = m[idx] / bc1;
+      double vh = v[idx] / bc2;
       master[idx] -= lr * mh / (sqrt(vh) + eps);
     }
     for (size_t i = 0; i < MLP_DIM * N_EMBD; i++, idx++) {
       double g = grads[idx];
       m[idx] = b1 * m[idx] + (1 - b1) * g;
       v[idx] = b2 * v[idx] + (1 - b2) * g * g;
-      double mh = m[idx] / (1 - pow(b1, (double)(step + 1)));
-      double vh = v[idx] / (1 - pow(b2, (double)(step + 1)));
+      double mh = m[idx] / bc1;
+      double vh = v[idx] / bc2;
       master[idx] -= lr * mh / (sqrt(vh) + eps);
     }
     for (size_t i = 0; i < N_EMBD * MLP_DIM; i++, idx++) {
       double g = grads[idx];
       m[idx] = b1 * m[idx] + (1 - b1) * g;
       v[idx] = b2 * v[idx] + (1 - b2) * g * g;
-      double mh = m[idx] / (1 - pow(b1, (double)(step + 1)));
-      double vh = v[idx] / (1 - pow(b2, (double)(step + 1)));
+      double mh = m[idx] / bc1;
+      double vh = v[idx] / bc2;
       master[idx] -= lr * mh / (sqrt(vh) + eps);
     }
   }
@@ -1388,24 +1564,24 @@ void adam_step(Model *model, const double *grads, double *m, double *v,
     double g = grads[idx];
     m[idx] = b1 * m[idx] + (1 - b1) * g;
     v[idx] = b2 * v[idx] + (1 - b2) * g * g;
-    double mh = m[idx] / (1 - pow(b1, (double)(step + 1)));
-    double vh = v[idx] / (1 - pow(b2, (double)(step + 1)));
+    double mh = m[idx] / bc1;
+    double vh = v[idx] / bc2;
     model->wte[i] -= lr * mh / (sqrt(vh) + eps);
   }
   for (size_t i = 0; i < BLOCK_SIZE * N_EMBD; i++, idx++) {
     double g = grads[idx];
     m[idx] = b1 * m[idx] + (1 - b1) * g;
     v[idx] = b2 * v[idx] + (1 - b2) * g * g;
-    double mh = m[idx] / (1 - pow(b1, (double)(step + 1)));
-    double vh = v[idx] / (1 - pow(b2, (double)(step + 1)));
+    double mh = m[idx] / bc1;
+    double vh = v[idx] / bc2;
     model->wpe[i] -= lr * mh / (sqrt(vh) + eps);
   }
   for (size_t i = 0; i < vs * N_EMBD; i++, idx++) {
     double g = grads[idx];
     m[idx] = b1 * m[idx] + (1 - b1) * g;
     v[idx] = b2 * v[idx] + (1 - b2) * g * g;
-    double mh = m[idx] / (1 - pow(b1, (double)(step + 1)));
-    double vh = v[idx] / (1 - pow(b2, (double)(step + 1)));
+    double mh = m[idx] / bc1;
+    double vh = v[idx] / bc2;
     model->lm_head[i] -= lr * mh / (sqrt(vh) + eps);
   }
   for (int L = 0; L < N_LAYER; L++) {
@@ -1413,48 +1589,48 @@ void adam_step(Model *model, const double *grads, double *m, double *v,
       double g = grads[idx];
       m[idx] = b1 * m[idx] + (1 - b1) * g;
       v[idx] = b2 * v[idx] + (1 - b2) * g * g;
-      double mh = m[idx] / (1 - pow(b1, (double)(step + 1)));
-      double vh = v[idx] / (1 - pow(b2, (double)(step + 1)));
+      double mh = m[idx] / bc1;
+      double vh = v[idx] / bc2;
       model->attn_wq[L][i] -= lr * mh / (sqrt(vh) + eps);
     }
     for (size_t i = 0; i < N_EMBD * N_EMBD; i++, idx++) {
       double g = grads[idx];
       m[idx] = b1 * m[idx] + (1 - b1) * g;
       v[idx] = b2 * v[idx] + (1 - b2) * g * g;
-      double mh = m[idx] / (1 - pow(b1, (double)(step + 1)));
-      double vh = v[idx] / (1 - pow(b2, (double)(step + 1)));
+      double mh = m[idx] / bc1;
+      double vh = v[idx] / bc2;
       model->attn_wk[L][i] -= lr * mh / (sqrt(vh) + eps);
     }
     for (size_t i = 0; i < N_EMBD * N_EMBD; i++, idx++) {
       double g = grads[idx];
       m[idx] = b1 * m[idx] + (1 - b1) * g;
       v[idx] = b2 * v[idx] + (1 - b2) * g * g;
-      double mh = m[idx] / (1 - pow(b1, (double)(step + 1)));
-      double vh = v[idx] / (1 - pow(b2, (double)(step + 1)));
+      double mh = m[idx] / bc1;
+      double vh = v[idx] / bc2;
       model->attn_wv[L][i] -= lr * mh / (sqrt(vh) + eps);
     }
     for (size_t i = 0; i < N_EMBD * N_EMBD; i++, idx++) {
       double g = grads[idx];
       m[idx] = b1 * m[idx] + (1 - b1) * g;
       v[idx] = b2 * v[idx] + (1 - b2) * g * g;
-      double mh = m[idx] / (1 - pow(b1, (double)(step + 1)));
-      double vh = v[idx] / (1 - pow(b2, (double)(step + 1)));
+      double mh = m[idx] / bc1;
+      double vh = v[idx] / bc2;
       model->attn_wo[L][i] -= lr * mh / (sqrt(vh) + eps);
     }
     for (size_t i = 0; i < MLP_DIM * N_EMBD; i++, idx++) {
       double g = grads[idx];
       m[idx] = b1 * m[idx] + (1 - b1) * g;
       v[idx] = b2 * v[idx] + (1 - b2) * g * g;
-      double mh = m[idx] / (1 - pow(b1, (double)(step + 1)));
-      double vh = v[idx] / (1 - pow(b2, (double)(step + 1)));
+      double mh = m[idx] / bc1;
+      double vh = v[idx] / bc2;
       model->mlp_fc1[L][i] -= lr * mh / (sqrt(vh) + eps);
     }
     for (size_t i = 0; i < N_EMBD * MLP_DIM; i++, idx++) {
       double g = grads[idx];
       m[idx] = b1 * m[idx] + (1 - b1) * g;
       v[idx] = b2 * v[idx] + (1 - b2) * g * g;
-      double mh = m[idx] / (1 - pow(b1, (double)(step + 1)));
-      double vh = v[idx] / (1 - pow(b2, (double)(step + 1)));
+      double mh = m[idx] / bc1;
+      double vh = v[idx] / bc2;
       model->mlp_fc2[L][i] -= lr * mh / (sqrt(vh) + eps);
     }
   }
