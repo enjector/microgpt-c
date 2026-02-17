@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(microgpt C CXX)
+project(microgpt C)
 
 set(CMAKE_C_STANDARD 99)
 
@@ -15,53 +15,81 @@ else()
   set(CMAKE_C_FLAGS_RELEASE "-O3 -DNDEBUG" CACHE STRING "" FORCE)
 endif()
 
-add_executable(microgpt main.c microgpt.c)
-target_include_directories(microgpt PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+# ---- Core library (object library for shared compilation) ----
+add_library(microgpt_lib OBJECT src/microgpt.c)
+target_include_directories(microgpt_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
-# Copy training data next to the executable so it can be found at runtime
-add_custom_command(TARGET microgpt POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    "${CMAKE_CURRENT_SOURCE_DIR}/names.txt"
-    "$<TARGET_FILE_DIR:microgpt>/names.txt"
-  COMMENT "Copying names.txt to build output"
-)
-
-# Link math library on non-MSVC platforms
-if(NOT MSVC)
-  target_link_libraries(microgpt PRIVATE m)
+# ---- SIMD auto-vectorisation (ON by default) ----
+# Disable with: cmake -DMICROGPT_SIMD=OFF ..
+option(MICROGPT_SIMD "Enable SIMD/vectorized codegen for faster training/inference" ON)
+if(MICROGPT_SIMD)
+  if(MSVC)
+    target_compile_options(microgpt_lib PRIVATE $<$<CONFIG:Release>:/arch:AVX2>)
+  else()
+    target_compile_options(microgpt_lib PRIVATE $<$<CONFIG:Release>:-march=native>)
+  endif()
+  target_compile_definitions(microgpt_lib PRIVATE MICROGPT_SIMD=1)
 endif()
 
-# Single-file amalgamation (~350 lines, no header needed)
-add_executable(microgpt_amalgamated microgpt_amalgamated.c)
-if(NOT MSVC)
-  target_link_libraries(microgpt_amalgamated PRIVATE m)
-endif()
-add_custom_command(TARGET microgpt_amalgamated POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    "${CMAKE_CURRENT_SOURCE_DIR}/names.txt"
-    "$<TARGET_FILE_DIR:microgpt_amalgamated>/names.txt"
-  COMMENT "Copying names.txt to amalgamated build output"
-)
-
-# Optional: INT8 weight quantization (smaller memory, same training; good for demo / embedded)
+# ---- Optional: INT8 weight quantisation ----
 # cmake -DQUANTIZATION_INT8=ON ..
 option(QUANTIZATION_INT8 "Store weights as 8-bit integers with per-matrix scales" OFF)
 if(QUANTIZATION_INT8)
-  target_compile_definitions(microgpt PRIVATE QUANTIZATION_INT8=1)
-  target_compile_definitions(microgpt PRIVATE QUANTISATION_INT8=1)  # British spelling alias
+  target_compile_definitions(microgpt_lib PRIVATE QUANTIZATION_INT8=1 QUANTISATION_INT8=1)
 endif()
 
-# Optional: SIMD-friendly codegen (auto-vectorization of dot products, norms, etc.)
-# cmake -DMICROGPT_SIMD=ON ..
-option(MICROGPT_SIMD "Enable SIMD/vectorized codegen (e.g. AVX2) for faster training/inference" OFF)
-if(MICROGPT_SIMD)
-  if(MSVC)
-    target_compile_options(microgpt PRIVATE $<$<CONFIG:Release>:/arch:AVX2>)
-  else()
-    # -march=native uses best ISA on build host (SSE/AVX/AVX2); use -march=haswell etc. for portability
-    target_compile_options(microgpt PRIVATE $<$<CONFIG:Release>:-march=native>)
-  endif()
-  target_compile_definitions(microgpt PRIVATE MICROGPT_SIMD=1)
+# ---- Example: Character-level name generation ----
+add_executable(names_demo examples/names/main.c $<TARGET_OBJECTS:microgpt_lib>)
+target_include_directories(names_demo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+if(NOT MSVC)
+  target_link_libraries(names_demo PRIVATE m)
 endif()
+add_custom_command(TARGET names_demo POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    "${CMAKE_CURRENT_SOURCE_DIR}/examples/names/names.txt"
+    "$<TARGET_FILE_DIR:names_demo>/names.txt"
+  COMMENT "Copying names.txt to build output"
+)
 
-# Run from project root so names.txt is found, or pass path via argv in future.
+# ---- Example: Word-level Shakespeare generation ----
+add_executable(shakespeare_demo examples/shakespeare/main.c $<TARGET_OBJECTS:microgpt_lib>)
+target_include_directories(shakespeare_demo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_compile_definitions(shakespeare_demo PRIVATE
+  N_EMBD=32
+  N_HEAD=2
+  N_LAYER=1
+  BLOCK_SIZE=32
+  BATCH_SIZE=16
+  NUM_STEPS=5000
+  LEARNING_RATE=0.01
+  MAX_VOCAB=8500
+  MAX_DOCS=200000
+  MAX_DOC_LEN=128
+)
+if(NOT MSVC)
+  target_link_libraries(shakespeare_demo PRIVATE m)
+endif()
+add_custom_command(TARGET shakespeare_demo POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    "${CMAKE_CURRENT_SOURCE_DIR}/examples/shakespeare/shakespeare.txt"
+    "$<TARGET_FILE_DIR:shakespeare_demo>/shakespeare.txt"
+  COMMENT "Copying shakespeare.txt to build output"
+)
+
+# Run from project root so data files are found, or pass path via argv in future.
+
+# ---- Tests ----
+enable_testing()
+add_executable(test_microgpt tests/test_microgpt.c $<TARGET_OBJECTS:microgpt_lib>)
+target_include_directories(test_microgpt PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+if(NOT MSVC)
+  target_link_libraries(test_microgpt PRIVATE m)
+endif()
+add_test(NAME microgpt_tests COMMAND test_microgpt WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+# ---- Benchmarks ----
+add_executable(bench_microgpt tests/bench_microgpt.c $<TARGET_OBJECTS:microgpt_lib>)
+target_include_directories(bench_microgpt PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+if(NOT MSVC)
+  target_link_libraries(bench_microgpt PRIVATE m)
+endif()

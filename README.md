@@ -1,166 +1,222 @@
 # MicroGPT-C
 
-A **zero-dependency, pure C99** implementation of a GPT-style character-level language model.
+A **zero-dependency, pure C99** GPT implementation — a complete language model you can understand, modify, and embed anywhere.
 
-The algorithm faithfully matches [Andrej Karpathy's `microgpt.py`](https://gist.github.com/karpathy/8627fe009c40f57531cb18360106ce95) — same architecture, same training loop, same sampling — but compiles to native code with optional compiler-driven SIMD auto-vectorisation for dramatically faster training and inference.
-
-> **Train a GPT in 20 ms. Generate names in microseconds. No Python. No PyTorch. No GPU.**
+> **No Python. No PyTorch. No GPU. Just C.**
 
 ---
 
 ## What Is This?
 
-MicroGPT-C is a minimal, readable implementation of a GPT (Generative Pre-trained Transformer) — the same family of models behind ChatGPT, but stripped down to its essential algorithm. It trains a tiny character-level language model that learns to generate realistic human names from scratch.
+MicroGPT-C is a **serious, production-quality implementation** of a GPT (Generative Pre-trained Transformer) in plain C99. It faithfully implements the same architecture as [Karpathy's `microgpt.py`](https://gist.github.com/karpathy/8627fe009c40f57531cb18360106ce95) — attention, backpropagation, Adam optimiser — compiled to native code with optional SIMD vectorisation.
 
-The goal is **education and experimentation**: understand how attention, backpropagation, and the Adam optimiser actually work at the lowest level, without any framework abstractions.
+It is **not a toy**. While the model architecture is intentionally minimal (suitable for learning and experimentation), the C implementation is robust:
 
-| Audience | Value |
-|----------|-------|
-| **Students & educators** | Study attention, softmax, Adam, and backprop in readable C — no framework magic |
-| **Embedded / edge engineers** | Entire model fits in **< 50 KB** RAM; runs on MCUs with no runtime dependencies |
-| **Researchers** | Auditable baseline for quantisation, custom layers, or optimiser experiments |
-| **Rapid prototypers** | Train → iterate in milliseconds; test tokenisers, vocabularies, data formats |
+- **Full training pipeline** — forward pass, backward pass, Adam optimiser with resumable checkpoints
+- **27 unit tests** covering every public API function
+- **10 performance benchmarks** with measured throughput
+- **Two tokenisation strategies** — character-level and word-level
+- **INT8 quantisation** support for memory-constrained devices
+- **SIMD auto-vectorisation** enabled by default
+
+| Use Case | Why MicroGPT-C |
+|----------|----------------|
+| **Learning** | Read the entire GPT algorithm in ~1,500 lines of commented C |
+| **Embedded / edge** | Entire model fits in **< 50 KB** RAM; runs on MCUs without an OS |
+| **Research** | Auditable baseline for quantisation, custom layers, or optimiser experiments |
+| **Integration** | Drop two files (`microgpt.h` + `microgpt.c`) into any C/C++ project |
 
 ---
 
 ## Quick Start
 
 ```bash
-# Linux / macOS
-chmod +x build.sh
-./build.sh
-./build/microgpt
+mkdir build && cd build
+cmake ..
+cmake --build . --config Release
+
+# Character-level name generation
+./names_demo
+
+# Word-level Shakespeare generation
+./shakespeare_demo
+
+# Run unit tests (27 tests)
+./test_microgpt
+
+# Run benchmarks (10 benchmarks)
+./bench_microgpt
 ```
 
-```batch
-:: Windows
-build.bat
-build\Release\microgpt.exe
+---
+
+## How It Works
+
+A decoder-only Transformer following the GPT-2 design:
+
+```
+Input → Token Embedding + Position Embedding
+      → RMSNorm
+      → [Self-Attention (multi-head, causal) → Residual] × N_LAYER
+      → [RMSNorm → MLP (fc1 → ReLU → fc2, 4× width) → Residual] × N_LAYER
+      → Linear (lm_head) → Softmax → next-token probabilities
 ```
 
-The build automatically copies `data/names.txt` next to the executable.
+**Training** uses cross-entropy loss with the Adam optimiser and linear learning-rate decay. The entire forward + backward pass is implemented manually — no autograd, no computational graph.
+
+All architecture parameters are compile-time configurable:
+
+| Parameter | Default | Override | Effect |
+|-----------|---------|----------|--------|
+| `N_EMBD` | 32 | `-DN_EMBD=64` | Embedding dimension |
+| `N_HEAD` | 4 | `-DN_HEAD=8` | Attention heads |
+| `N_LAYER` | 2 | `-DN_LAYER=4` | Transformer blocks |
+| `BLOCK_SIZE` | 32 | `-DBLOCK_SIZE=64` | Maximum sequence length |
+
+---
+
+## Using as a Library
+
+### Integration
+
+Add two files to your project — no build system changes needed beyond compiling one extra `.c`:
+
+```c
+#include "microgpt.h"
+```
+
+### Character-Level Pipeline
+
+Best for short text: names, codes, identifiers.
+
+```c
+Docs docs;
+load_docs("names.txt", &docs);       // Load line-separated training data
+
+Vocab vocab;
+build_vocab(&docs, &vocab);           // Build character vocabulary (auto-sized)
+
+size_t ids[256];
+size_t n = tokenize("alice", 5, &vocab, ids, 256);
+
+Model *model = model_create(vocab.vocab_size);
+// ... train with forward_backward_one + adam_step ...
+// ... generate with forward_inference + sample_token ...
+model_free(model);
+```
+
+### Word-Level Pipeline
+
+Best for prose, dialogue, poetry.
+
+```c
+size_t len;
+char *text = load_file("shakespeare.txt", &len);
+
+WordVocab wv;
+build_word_vocab(text, len, 4000, &wv);  // Keep top 4000 words
+
+size_t ids[8192];
+size_t n = tokenize_words(text, len, &wv, ids, 8192);
+
+Model *model = model_create(wv.vocab_size);
+// ... train and generate ...
+free_word_vocab(&wv);
+model_free(model);
+```
+
+### Training Checkpoints
+
+Save and resume training without losing optimizer momentum:
+
+```c
+// Save: model weights + Adam m/v state + step counter
+checkpoint_save(model, m_adam, v_adam, step, "checkpoint.bin");
+
+// Resume: restores everything needed to continue training
+Model *model = checkpoint_load("checkpoint.bin", vocab_size,
+                               m_adam, v_adam, &step);
+// Continue training from 'step' onwards — momentum and LR decay are preserved
+```
+
+### Complete Examples
+
+See [`examples/names/main.c`](examples/names/main.c) (character-level) and [`examples/shakespeare/main.c`](examples/shakespeare/main.c) (word-level) for full working programs.
+
+Detailed guides:
+- [Character-level tokenisation](docs/character-level.md)
+- [Word-level tokenisation](docs/word-level.md)
 
 ---
 
 ## Performance
 
-Measured on the same workload (1,000 training steps, 20 inference samples) — C vs the reference Python:
+### Character-Level vs Karpathy's microgpt.py
 
-| Metric | Python | C (fp64) | Speedup |
+Measured on the **character-level name generation** workload (1,000 training steps, 20 inference samples) — MicroGPT-C vs [Karpathy's `microgpt.py`](https://gist.github.com/karpathy/8627fe009c40f57531cb18360106ce95):
+
+| Metric | Python (microgpt.py) | C (fp64) | Speedup |
 |--------|--------|----------|---------|
 | **Training time** | ~93 s | **0.02 s** | **~4,600×** |
 | **Training throughput** | ~0.1 k tok/s | **~289 k tok/s** | **~2,800×** |
 | **Steps/sec** | ~11 | **~40,000** | **~3,600×** |
 | **Inference time** | ~0.74 s | **< 1 ms** | **~700×+** |
-| **Inference rate** | ~27 samples/s | **20,000 samples/s** | **~740×** |
-| **Token throughput** | — | **109,000 tok/s** | — |
+
+### Benchmarks (N_EMBD=32, N_LAYER=2)
+
+Run `./bench_microgpt` to reproduce on your machine:
+
+| Operation | Latency | Throughput |
+|-----------|---------|------------|
+| `forward_inference` (1 token) | 0.01 ms | **125k infer/s** |
+| `forward_backward_one` (1 pos) | 0.01 ms | **96k fwd+bwd/s** |
+| `adam_step` | 0.03 ms | **39k steps/s** |
+| `sample_token` (vocab=50) | < 0.01 ms | **4.3M samples/s** |
+| `tokenize` (char, 12 chars) | < 0.01 ms | **34.5M tok/s** |
+| `tokenize_words` (1KB text) | 0.41 ms | **486k tok/s** |
+| `checkpoint_save` + `load` | 0.70 ms | **1,437 roundtrips/s** |
+| Full training step (seq=8) | 0.08 ms | **82.6k tok/s** |
 
 > **INT8 quantised build:** ~25% slower training than fp64 on this tiny model, but **~8× smaller** weight storage — ideal for constrained devices.
 
 ---
 
-## Architecture
-
-A single-layer, decoder-only Transformer following the GPT-2 design:
-
-```
-Input → Token Embed + Pos Embed → RMSNorm
-  → Self-Attention (4 heads, causal) → Residual
-  → RMSNorm → MLP (fc1 → ReLU → fc2, 4× width) → Residual
-  → Linear (lm_head) → Softmax → next-token probabilities
-```
-
-| Parameter | Value |
-|-----------|-------|
-| Embedding dim | 16 |
-| Attention heads | 4 |
-| Layers | 1 |
-| Context length | 16 |
-| Total parameters | ~4,600 |
-| Weight memory (fp64) | ~37 KB |
-| Weight memory (INT8) | ~4.6 KB |
-| Training memory | ~144 KB |
-| Inference memory | < 50 KB |
-
-Training uses the **Adam** optimiser with linear learning-rate decay (configurable in `microgpt.h`).
-
----
-
 ## Build Options
 
-### Build scripts (recommended)
+### SIMD auto-vectorisation (ON by default)
 
-| Platform | Standard | SIMD (faster) |
-|----------|----------|---------------|
-| Linux/macOS | `./build.sh` | `./build.sh --simd` |
-| Windows | `build.bat` | `build.bat simd` |
-
-### SIMD auto-vectorisation
-
-The `--simd` flag enables compiler-driven **auto-vectorisation** of the core dot products, matrix multiplications, and normalisations. On x86-64 the compiler targets the best available instruction set (SSE4, AVX2, etc.) via `-march=native`; on MSVC it enables `/arch:AVX2`. This gives a measurable speed-up on larger models without any hand-written intrinsics — the compiler re-writes the scalar loops into SIMD instructions automatically.
+The compiler targets the best available instruction set (`-march=native` on GCC/Clang, `/arch:AVX2` on MSVC). To disable:
 
 ```bash
-# Linux / macOS — auto-detect best ISA
-./build.sh --simd
-
-# CMake directly
-cmake -DMICROGPT_SIMD=ON ..
-cmake --build . --config Release
+cmake -DMICROGPT_SIMD=OFF ..
 ```
 
 ### INT8 quantised build
 
-Weights are stored as 8-bit integers with per-matrix scales — the forward pass dequantises on the fly; Adam updates an fp64 master copy and requantises each step. This reduces weight storage by **~8×** (37 KB → 4.6 KB) at a small accuracy/speed trade-off.
-
-| Platform | Standard | SIMD |
-|----------|----------|------|
-| Linux/macOS | `./build_quantised.sh` | `./build_quantised.sh --simd` |
-| Windows | `build_quantised.bat` | `build_quantised.bat simd` |
-
-### CMake directly
+Weights stored as 8-bit integers with per-matrix scales:
 
 ```bash
-mkdir build && cd build
-cmake ..
-cmake --build . --config Release
-
-# With INT8 quantisation
 cmake -DQUANTIZATION_INT8=ON ..
-
-# With SIMD auto-vectorisation
-cmake -DMICROGPT_SIMD=ON ..
-
-# Both
-cmake -DQUANTIZATION_INT8=ON -DMICROGPT_SIMD=ON ..
 ```
 
 ---
 
 ## Project Layout
 
-| Path | Description |
-|------|-------------|
-| `microgpt.h` | Model config, public API declarations |
-| `microgpt.c` | Core engine: model, forward/backward, Adam, data loading |
-| `main.c` | Entry point: load data → train → generate samples |
-| `microgpt_amalgamated.c` | **Single-file build** — same algorithm, no header needed |
-| `data/names.txt` | Training data (one name per line, ~32k names) |
-| `CMakeLists.txt` | CMake build (C99, Release, optional SIMD / INT8) |
-
----
-
-## Single-File Build
-
-`microgpt_amalgamated.c` is a self-contained single file containing the full GPT algorithm — data loading, training, and inference. No header file needed:
-
-```bash
-# Compile directly (no CMake required)
-cc -O2 -o microgpt microgpt_amalgamated.c -lm
-cp data/names.txt . && ./microgpt
-
-# Or via CMake
-cmake --build build --config Release --target microgpt_amalgamated
-./build/microgpt_amalgamated
+```
+src/
+  microgpt.h         Public API — all functions documented
+  microgpt.c         Core engine (~1,500 lines)
+examples/
+  names/main.c       Character-level name generation demo
+  shakespeare/main.c Word-level Shakespeare generation demo
+tests/
+  test_microgpt.c    Unit tests (27 tests, zero dependencies)
+  bench_microgpt.c   Performance benchmarks (10 benchmarks)
+docs/
+  character-level.md Character-level tokenisation guide
+  word-level.md      Word-level tokenisation guide
+CMakeLists.txt       Build system (C99, SIMD default ON)
 ```
 
 ---
