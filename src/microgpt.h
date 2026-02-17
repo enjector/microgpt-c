@@ -405,6 +405,10 @@ typedef struct {
   size_t unk_id;
   size_t newline_id;
   size_t bos_id;
+  /* Hash table for O(1) word_to_id lookup (populated by build_word_vocab) */
+  char **ht_keys; /* hash table keys (word strings, not owned)          */
+  size_t *ht_ids; /* hash table values (token IDs)                      */
+  size_t ht_cap;  /* hash table capacity                                */
 } WordVocab;
 
 /*

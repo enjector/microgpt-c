@@ -843,16 +843,22 @@ static void lin_fwd(const double *x, const double *W, size_t nin, size_t nout,
 static void lin_bwd(const double *x, const double *W, const double *dy,
                     size_t nin, size_t nout, double *dx, double *dW) {
   if (dx)
-    for (size_t i = 0; i < nin; i++) {
-      double s = 0;
-      for (size_t j = 0; j < nout; j++)
-        s += dy[j] * W[j * nin + i];
-      dx[i] += s;
+    /* Row-major traversal: read W sequentially, scatter into small dx[].
+     * Much more cache-friendly than column-major when nout >> nin
+     * (e.g. lm_head backward with vocab=6000, nin=32). */
+    for (size_t j = 0; j < nout; j++) {
+      double dyj = dy[j];
+      const double *Wrow = W + j * nin;
+      for (size_t i = 0; i < nin; i++)
+        dx[i] += dyj * Wrow[i];
     }
   if (dW)
-    for (size_t j = 0; j < nout; j++)
+    for (size_t j = 0; j < nout; j++) {
+      double dyj = dy[j];
+      double *dWrow = dW + j * nin;
       for (size_t i = 0; i < nin; i++)
-        dW[j * nin + i] += dy[j] * x[i];
+        dWrow[i] += dyj * x[i];
+    }
 }
 
 /*
@@ -1831,6 +1837,23 @@ int build_word_vocab(const char *text, size_t text_len, size_t max_words,
   if (!wv->words[wv->bos_id])
     goto err_words;
   strcpy(wv->words[wv->bos_id], "<bos>");
+  /* Build lookup hash table for O(1) word_to_id */
+  wv->ht_cap = wv->vocab_size * 4;
+  if (wv->ht_cap < 64)
+    wv->ht_cap = 64;
+  wv->ht_keys = (char **)calloc(wv->ht_cap, sizeof(char *));
+  wv->ht_ids = (size_t *)calloc(wv->ht_cap, sizeof(size_t));
+  if (!wv->ht_keys || !wv->ht_ids)
+    goto err_words;
+  for (size_t i = 0; i < wv->vocab_size; i++) {
+    if (!wv->words[i])
+      continue;
+    unsigned int h = word_hash(wv->words[i]) % (unsigned int)wv->ht_cap;
+    while (wv->ht_keys[h])
+      h = (h + 1) % (unsigned int)wv->ht_cap;
+    wv->ht_keys[h] = wv->words[i]; /* points into words[], not owned */
+    wv->ht_ids[h] = i;
+  }
 
   free(sorted);
   return 0;
@@ -1850,10 +1873,23 @@ void free_word_vocab(WordVocab *wv) {
       free(wv->words[i]);
     free(wv->words);
   }
+  free(wv->ht_keys);
+  free(wv->ht_ids);
   memset(wv, 0, sizeof(*wv));
 }
 
 size_t word_to_id(const WordVocab *wv, const char *word) {
+  /* O(1) amortised lookup via hash table (populated by build_word_vocab) */
+  if (wv->ht_keys && wv->ht_cap > 0) {
+    unsigned int h = word_hash(word) % (unsigned int)wv->ht_cap;
+    while (wv->ht_keys[h]) {
+      if (strcmp(wv->ht_keys[h], word) == 0)
+        return wv->ht_ids[h];
+      h = (h + 1) % (unsigned int)wv->ht_cap;
+    }
+    return wv->unk_id;
+  }
+  /* Fallback: linear scan (should not happen after build_word_vocab) */
   for (size_t i = 0; i < wv->num_words; i++)
     if (wv->words[i] && strcmp(wv->words[i], word) == 0)
       return i;
