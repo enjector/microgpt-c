@@ -1,0 +1,48 @@
+name: "CodeQL Advanced"
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  analyze:
+    name: Analyze C (CMake Manual)
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      packages: read
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # CodeQL uses 'c-cpp' for both C and C++
+        language: [ 'c-cpp' ]
+        # Manual mode tells CodeQL to wait for your build commands
+        build-mode: [ 'manual' ]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v4
+      with:
+        languages: ${{ matrix.language }}
+        build-mode: ${{ matrix.build-mode }}
+
+    # Manual Build Steps: These are the commands CodeQL will "trace"
+    - name: Configure and Build
+      shell: bash
+      run: |
+        mkdir build && cd build
+        # Configure with SIMD enabled for the most accurate trace
+        cmake -DCMAKE_BUILD_TYPE=Release ..
+        cmake --build .
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v4
+      with:
+        category: "/language:${{matrix.language}}"
