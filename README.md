@@ -49,6 +49,44 @@ cmake --build . --config Release
 ./bench_microgpt
 ```
 
+### Example Output — Name Generation
+
+```
+docs:32033 vocab:27 embd:16 heads:4
+params:4192
+step    1/1000 loss 3.4468
+step  500/1000 loss 2.1334
+step 1000/1000 loss 2.4463
+
+Train: 0.12s
+--- names ---
+   1: sarey          6: kenian         11: gamaren
+   2: canal          7: zaynna         12: aleliy
+   3: aninan         8: sanari         13: rarian
+   4: aniel          9: ararinn        14: jaylan
+   5: kanana        10: amaria         15: mariah
+```
+
+### Example Output — Shakespeare Generation
+
+Trained with `N_EMBD=128 N_LAYER=4 N_HEAD=8` (840K params, ~37 min on 12 threads):
+
+```
+--- generated Shakespeare (character-level) ---
+
+[sample — seed: 'O']
+O    That may one is the stand's hanget stronger,
+
+[sample — seed: 'W']
+Whe win O the Luce of my find lifest a stance,
+
+[sample — seed: 'M']
+M    Reposs you find in have to see a man; as all eyes him.
+
+[sample — seed: 'H']
+Hand her calas to the satime of she for hear.
+```
+
 ---
 
 ## How It Works
