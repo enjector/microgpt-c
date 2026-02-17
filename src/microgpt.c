@@ -256,6 +256,8 @@ static size_t char_to_id(const Vocab *v, char c) {
  */
 size_t tokenize(const char *doc, size_t doc_len, const Vocab *vocab,
                 size_t *ids, size_t max_len) {
+  if (max_len < 2)
+    return 0; /* need room for at least BOS + one token */
   size_t k = 0;
   if (k >= max_len)
     return k;
@@ -278,7 +280,7 @@ size_t tokenize(const char *doc, size_t doc_len, const Vocab *vocab,
  */
 static size_t count_params(size_t vs) {
   /* wte: vs*N_EMBD, wpe: BLOCK_SIZE*N_EMBD, lm_head: vs*N_EMBD */
-  size_t n = vs * N_EMBD * 2 + vs * N_EMBD + BLOCK_SIZE * N_EMBD;
+  size_t n = vs * N_EMBD * 2 + BLOCK_SIZE * N_EMBD;
   /* Per-layer: 4 attention matrices (N_EMBD²) + 2 MLP matrices */
   for (int L = 0; L < N_LAYER; L++)
     n += N_EMBD * N_EMBD * 4 + MLP_DIM * N_EMBD + N_EMBD * MLP_DIM;
@@ -338,13 +340,14 @@ static double quantize_vec_to_int8(const double *x, size_t n, int8_t *x_i8) {
   }
   return scale_x;
 }
-/* int8 matmul: acc[j] = sum_i x_i8[i] * W_i8[j*nin+i]; W layout [nout, nin] */
+/* int8 matmul: acc[j] = sum_i x_i8[i] * W_i8[j*nin+i]; W layout [nout, nin]
+ * Uses int64 accumulators for overflow safety at larger embedding dims. */
 static void lin_fwd_int8(const int8_t *x_i8, const int8_t *W_i8, size_t nin,
-                         size_t nout, int32_t *acc) {
+                         size_t nout, int64_t *acc) {
   for (size_t j = 0; j < nout; j++) {
-    int32_t s = 0;
+    int64_t s = 0;
     for (size_t i = 0; i < nin; i++)
-      s += (int32_t)x_i8[i] * (int32_t)W_i8[j * nin + i];
+      s += (int64_t)x_i8[i] * (int64_t)W_i8[j * nin + i];
     acc[j] = s;
   }
 }
@@ -371,7 +374,7 @@ Model *model_create(size_t vocab_size) {
   if (!m)
     return NULL;
   m->vocab_size = vocab_size;
-  double std = 0.08;
+  double std = INIT_STD;
 #if defined(QUANTIZATION_INT8) || defined(QUANTISATION_INT8)
   /* Allocate master (fp64) and int8 weight buffers */
   size_t np = count_params(vocab_size);
@@ -940,7 +943,7 @@ double forward_backward_one(const Model *model, size_t token_id, size_t pos_id,
 
 #if defined(QUANTIZATION_INT8) || defined(QUANTISATION_INT8)
   int8_t x_i8[MLP_DIM];
-  int32_t acc_buf[MAX_VOCAB];
+  int64_t acc_buf[MAX_VOCAB];
 #endif
 
   /* Embed + rmsnorm */
@@ -1292,7 +1295,7 @@ void forward_inference(const Model *model, size_t token_id, size_t pos_id,
 
 #if defined(QUANTIZATION_INT8) || defined(QUANTISATION_INT8)
   int8_t x_i8[MLP_DIM];
-  int32_t acc_buf[MAX_VOCAB];
+  int64_t acc_buf[MAX_VOCAB];
   for (size_t i = 0; i < ne; i++)
     x0[i] = model->scale[0] * (double)model->wte[token_id * ne + i] +
             model->scale[1] * (double)model->wpe[pos_id * ne + i];
@@ -1656,6 +1659,9 @@ void adam_step(Model *model, const double *grads, double *m, double *v,
 size_t sample_token(const double *logits, size_t vocab_size,
                     double temperature) {
   double buf[MAX_VOCAB];
+  /* Clamp temperature to prevent underflow in exp() */
+  if (temperature < 1e-4)
+    temperature = 1e-4;
   /* Find max logit for numerical stability in exp() */
   double max_val = logits[0];
   for (size_t i = 1; i < vocab_size; i++)
@@ -1808,22 +1814,34 @@ int build_word_vocab(const char *text, size_t text_len, size_t max_words,
   }
   for (size_t i = 0; i < keep; i++) {
     wv->words[i] = (char *)malloc(strlen(sorted[i].word) + 1);
-    if (wv->words[i])
-      strcpy(wv->words[i], sorted[i].word);
+    if (!wv->words[i])
+      goto err_words;
+    strcpy(wv->words[i], sorted[i].word);
   }
   /* Special tokens — strdup-like for uniform free() */
   wv->words[wv->unk_id] = (char *)malloc(6);
-  if (wv->words[wv->unk_id])
-    strcpy(wv->words[wv->unk_id], "<unk>");
+  if (!wv->words[wv->unk_id])
+    goto err_words;
+  strcpy(wv->words[wv->unk_id], "<unk>");
   wv->words[wv->newline_id] = (char *)malloc(2);
-  if (wv->words[wv->newline_id])
-    strcpy(wv->words[wv->newline_id], "\n");
+  if (!wv->words[wv->newline_id])
+    goto err_words;
+  strcpy(wv->words[wv->newline_id], "\n");
   wv->words[wv->bos_id] = (char *)malloc(6);
-  if (wv->words[wv->bos_id])
-    strcpy(wv->words[wv->bos_id], "<bos>");
+  if (!wv->words[wv->bos_id])
+    goto err_words;
+  strcpy(wv->words[wv->bos_id], "<bos>");
 
   free(sorted);
   return 0;
+
+err_words:
+  for (size_t i = 0; i < wv->vocab_size; i++)
+    free(wv->words[i]);
+  free(wv->words);
+  wv->words = NULL;
+  free(sorted);
+  return -1;
 }
 
 void free_word_vocab(WordVocab *wv) {

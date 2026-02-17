@@ -63,7 +63,7 @@ target_compile_definitions(microgpt_lib_shakespeare PRIVATE
   N_LAYER=1
   BLOCK_SIZE=16
   BATCH_SIZE=16
-  NUM_STEPS=1000
+  NUM_STEPS=10000
   LEARNING_RATE=0.01
   MAX_VOCAB=7000
   MAX_DOCS=200000
@@ -88,7 +88,7 @@ target_compile_definitions(shakespeare_demo PRIVATE
   N_LAYER=1
   BLOCK_SIZE=16
   BATCH_SIZE=16
-  NUM_STEPS=1000
+  NUM_STEPS=10000
   LEARNING_RATE=0.01
   MAX_VOCAB=7000
   MAX_DOCS=200000

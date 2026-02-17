@@ -122,6 +122,9 @@
 #ifndef TEMPERATURE
 #define TEMPERATURE 0.5
 #endif
+#ifndef INIT_STD
+#define INIT_STD 0.08
+#endif
 
 /* ============================ Data Limits ================================ */
 
