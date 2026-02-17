@@ -166,6 +166,22 @@ free_word_vocab(&wv);
 model_free(model);
 ```
 
+### Character-Level vs Word-Level — Which to Use?
+
+Both tokenisation strategies are available, but they suit different model scales:
+
+| Factor | Character-level | Word-level |
+|--------|----------------|-----------|
+| **Vocab size** | ~50–100 tokens | ~5,000–10,000+ tokens |
+| **`<unk>` tokens** | **Zero** — every byte is in vocab | Common for rare words |
+| **lm_head cost** | ~100 × N_EMBD ≈ tiny | ~10,000 × N_EMBD ≈ dominates model |
+| **Training signal** | Every character seen thousands of times | Rare words get few examples |
+| **Best for** | Small models (\< 1M params) | Large models (millions of params) |
+
+**Why character-level wins at this scale:** Shakespeare has ~20,000 unique words. Even keeping the top 8,000, the output layer (`lm_head`) alone would consume more parameters than the rest of the model combined. The model can't learn meaningful distinctions between thousands of words, so output floods with `<unk>`. With character-level (~84 tokens), the entire vocabulary fits comfortably and the model masters every symbol.
+
+**Rule of thumb:** Use character-level unless your model has enough capacity (N_EMBD ≥ 256, N_LAYER ≥ 4) to handle a large word vocabulary.
+
 ### Training Checkpoints
 
 Save and resume training without losing optimizer momentum:

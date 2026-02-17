@@ -50,19 +50,9 @@ free(text);
 
 ## Example
 
-See [examples/shakespeare/main.c](../examples/shakespeare/main.c) for a complete working example.
+The word-level API is available in `microgpt.h` for use in your own programs. See the API section above for a complete usage pattern.
 
-```bash
-cmake --build build --target shakespeare_demo
-./build/shakespeare_demo
-```
-
-Sample output:
-```
-My lord,
- Should ... and his ...
- And I, for ... and I upon the same ...
-```
+> **Note:** The bundled Shakespeare demo (`examples/shakespeare/main.c`) uses **character-level** tokenisation for better quality at this model scale. Word-level tokenisation is most effective with larger models and vocabularies.
 
 ## Vocabulary Sizing
 
