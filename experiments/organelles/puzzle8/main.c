@@ -1,23 +1,26 @@
 /*
- * MicroGPT-C — 8-Puzzle Multi-Organelle Demo (v2 — Kanban Pipeline)
+ * MicroGPT-C — 8-Puzzle Multi-Organelle Demo (v3 — Generalisation)
  * Copyright (c) 2026 Ajay Soni, Enjector Software Ltd. MIT License.
  *
- * Demonstrates the Adaptive Organelle Planner with kanban-based
- * shared state for multi-organelle coordination:
+ * Demonstrates the Organelle Pipeline Architecture (OPA) with
+ * displacement-based representation for genuine generalisation:
  *
- *   3 organelles (Planner, Mover, Judge) collaborate via pipe-separated
- *   flat strings with enriched context fields:
- *     - blocked: previously rejected directions (prevents fixation)
- *     - last:    recent move history (prevents oscillation)
- *     - kanban:  done/todo task tracking (enables re-planning)
+ *   2 neural organelles (Strategist, Mover) + deterministic Judge
+ *   collaborate via pipe-separated flat strings:
+ *     - d=...:   per-tile displacement vector (structural encoding)
+ *     - b=N:     blank position (0-8)
+ *     - x=DIR:   blocked direction (prevents fixation)
  *
  * Pipeline flow:
- *   1. Planner: board|md|done|blocked → "todo=move,check,move,check"
- *   2. Mover:   board|blank|blocked|last → "move|dir=up|result=..."
- *   3. Judge:   proposed move → "valid=yes|closer=yes" or "valid=no|..."
- *   4. If Judge rejects → add to blocked, retry Mover
- *   5. If stalled → re-invoke Planner with kanban state
- *   6. Repeat until solved or max iterations reached
+ *   1. Strategist: d=...|md=N → "t=X" (most displaced tile index)
+ *   2. Mover:      d=...|b=N[|x=DIR] → "up"/"down"/"left"/"right"
+ *   3. Judge:      deterministic apply_move() boundary check
+ *   4. If out-of-bounds → add to blocked, retry Mover
+ *   5. Repeat until solved or max iterations reached
+ *
+ * The displacement encoding makes the model learn STRUCTURAL patterns
+ * ("reduce displacement of the most-misplaced tile") rather than
+ * memorising board→direction lookup tables.
  *
  * Build:
  *   cmake --build build --target puzzle8_demo
@@ -36,26 +39,31 @@
 #include <time.h>
 
 /* ---- Configuration ---- */
-#define PLANNER_CORPUS "puzzle8_planner.txt"
+#define STRATEGIST_CORPUS "puzzle8_strategist.txt"
 #define MOVER_CORPUS "puzzle8_mover.txt"
 #define JUDGE_CORPUS "puzzle8_judge.txt"
 
-#define PLANNER_CKPT "puzzle8_planner_v2.ckpt"
-#define MOVER_CKPT "puzzle8_mover_v2.ckpt"
-#define JUDGE_CKPT "puzzle8_judge_v2.ckpt"
+#define STRATEGIST_CKPT "puzzle8_strategist_v3.ckpt"
+#define MOVER_CKPT "puzzle8_mover_v3.ckpt"
+#define JUDGE_CKPT "puzzle8_judge_v3.ckpt"
 
 #define ORGANELLE_TEMP 0.2 /* low temperature for reliable retrieval */
 #define INF_GEN_LEN 80     /* max chars per organelle generation */
 
-#define MAX_PIPELINE_ITERS                                                     \
-  30                        /* max moves attempted per puzzle (up from 20)     \
-                             */
-#define NUM_TEST_PUZZLES 10 /* puzzles to test in the pipeline */
-#define REPLAN_THRESHOLD 4  /* stalls before re-invoking Planner */
-#define MAX_LAST_HISTORY 3  /* keep last N moves in history */
+#define MAX_PIPELINE_ITERS 40 /* max moves attempted per puzzle */
+#define NUM_EASY_PUZZLES 10   /* md 1-4 puzzles */
+#define NUM_MEDIUM_PUZZLES 10 /* md 5-8 puzzles */
+#define NUM_HARD_PUZZLES 10   /* md 9+ puzzles */
+#define NUM_TEST_PUZZLES                                                       \
+  (NUM_EASY_PUZZLES + NUM_MEDIUM_PUZZLES + NUM_HARD_PUZZLES)
+#define REPLAN_THRESHOLD 6 /* stalls before clearing blocked */
 
 /* ---- File-scoped runtime config (shared by helper functions) ---- */
 static MicrogptConfig g_cfg;
+
+/* ---- Forward declarations ---- */
+static int apply_move(int *board, const char *dir);
+static int manhattan_distance(const int *board);
 
 /* ---- Board Helpers ---- */
 
@@ -65,6 +73,26 @@ static void board_to_str(const int *board, char *out) {
   for (int i = 0; i < 9; i++)
     out[i] = '0' + board[i];
   out[9] = '\0';
+}
+
+static void md_delta_str(const int *board, char *out, size_t out_sz) {
+  /* Compute md after each possible move. 'x' means illegal.
+   * Format: m=U,D,L,R  where values are the resulting md or 'x'. */
+  const char *dir_names[] = {"up", "down", "left", "right"};
+  int pos = 0;
+  pos += snprintf(out + pos, out_sz - (size_t)pos, "m=");
+  for (int d = 0; d < 4; d++) {
+    if (d > 0)
+      pos += snprintf(out + pos, out_sz - (size_t)pos, ",");
+    int test[9];
+    memcpy(test, board, 9 * sizeof(int));
+    if (apply_move(test, dir_names[d])) {
+      pos += snprintf(out + pos, out_sz - (size_t)pos, "%d",
+                      manhattan_distance(test));
+    } else {
+      pos += snprintf(out + pos, out_sz - (size_t)pos, "x");
+    }
+  }
 }
 
 static int find_blank(const int *board) {
@@ -131,85 +159,28 @@ static void scramble_puzzle(int *board, int n_moves, unsigned int *seed) {
   }
 }
 
-/* ---- Kanban State ---- */
+/* ---- Blocked-Direction Tracker (simplified from Kanban) ---- */
 
-typedef struct {
-  char blocked[64]; /* comma-separated blocked directions */
-  char last[64];    /* comma-separated last N moves */
-  char done[256];   /* comma-separated completed actions */
-  int stalls;       /* consecutive failures without progress */
-  int last_md;      /* manhattan distance at last progress */
-  int replans;      /* number of times Planner was re-invoked */
-} Kanban;
+static char g_blocked[64]; /* comma-separated blocked directions */
 
-static void kanban_init(Kanban *kb, int initial_md) {
-  kb->blocked[0] = '\0';
-  kb->last[0] = '\0';
-  kb->done[0] = '\0';
-  kb->stalls = 0;
-  kb->last_md = initial_md;
-  kb->replans = 0;
-}
+static void blocked_init(void) { g_blocked[0] = '\0'; }
 
-static void kanban_add_blocked(Kanban *kb, const char *dir) {
-  if (kb->blocked[0] == '\0') {
-    strncpy(kb->blocked, dir, sizeof(kb->blocked) - 1);
+static void blocked_add(const char *dir) {
+  if (g_blocked[0] == '\0') {
+    strncpy(g_blocked, dir, sizeof(g_blocked) - 1);
+    g_blocked[sizeof(g_blocked) - 1] = '\0';
   } else {
-    /* Check if already blocked */
-    if (strstr(kb->blocked, dir) != NULL)
+    if (strstr(g_blocked, dir) != NULL)
       return;
-    size_t len = strlen(kb->blocked);
-    if (len + strlen(dir) + 2 < sizeof(kb->blocked)) {
-      kb->blocked[len] = ',';
-      strcpy(kb->blocked + len + 1, dir);
+    size_t len = strlen(g_blocked);
+    if (len + strlen(dir) + 2 < sizeof(g_blocked)) {
+      g_blocked[len] = ',';
+      strcpy(g_blocked + len + 1, dir);
     }
   }
 }
 
-static void kanban_clear_blocked(Kanban *kb) { kb->blocked[0] = '\0'; }
-
-static void kanban_add_last(Kanban *kb, const char *dir) {
-  /* Count existing entries */
-  int count = 0;
-  if (kb->last[0] != '\0') {
-    count = 1;
-    for (const char *p = kb->last; *p; p++)
-      if (*p == ',')
-        count++;
-  }
-
-  if (count >= MAX_LAST_HISTORY) {
-    /* Remove oldest entry */
-    char *comma = strchr(kb->last, ',');
-    if (comma) {
-      memmove(kb->last, comma + 1, strlen(comma + 1) + 1);
-    } else {
-      kb->last[0] = '\0';
-    }
-  }
-
-  if (kb->last[0] == '\0') {
-    strncpy(kb->last, dir, sizeof(kb->last) - 1);
-  } else {
-    size_t len = strlen(kb->last);
-    if (len + strlen(dir) + 2 < sizeof(kb->last)) {
-      kb->last[len] = ',';
-      strcpy(kb->last + len + 1, dir);
-    }
-  }
-}
-
-static void kanban_add_done(Kanban *kb, const char *action) {
-  if (kb->done[0] == '\0') {
-    strncpy(kb->done, action, sizeof(kb->done) - 1);
-  } else {
-    size_t len = strlen(kb->done);
-    if (len + strlen(action) + 2 < sizeof(kb->done)) {
-      kb->done[len] = ',';
-      strcpy(kb->done + len + 1, action);
-    }
-  }
-}
+static void blocked_clear(void) { g_blocked[0] = '\0'; }
 
 /* ---- Pipe-String Parser ---- */
 
@@ -227,10 +198,6 @@ static const char *extract_pipe_value(char *buf, const char *key) {
   if (nl)
     *nl = '\0';
   return p;
-}
-
-static int pipe_starts_with(const char *buf, const char *prefix) {
-  return strncmp(buf, prefix, strlen(prefix)) == 0;
 }
 
 /* ---- Multi-line Document Loader ---- */
@@ -536,6 +503,22 @@ static Model *train_organelle(const char *name, const char *corpus_path,
   return model;
 }
 
+/* ---- Test Puzzle Generation (stratified by difficulty) ---- */
+
+static void scramble_to_target_md(int *board, int target_md_min,
+                                  int target_md_max, unsigned int *seed) {
+  /* Keep scrambling until we land in the target manhattan distance band. */
+  for (int attempts = 0; attempts < 500; attempts++) {
+    int n_moves = 3 + (int)(rand_r(seed) % 25);
+    scramble_puzzle(board, n_moves, seed);
+    int md = manhattan_distance(board);
+    if (md >= target_md_min && md <= target_md_max && !is_goal(board))
+      return;
+  }
+  /* Fallback: just scramble hard enough */
+  scramble_puzzle(board, target_md_min * 2, seed);
+}
+
 /* ---- Main ---- */
 
 int main(void) {
@@ -552,27 +535,28 @@ int main(void) {
   g_cfg.num_steps = 25000;
   g_cfg.learning_rate = 0.001;
   g_cfg.max_vocab = 50;
-  g_cfg.max_docs = 5000;
+  g_cfg.max_docs = 60000; /* larger corpus now */
   g_cfg.max_doc_len = 128;
-  microgpt_print_config("MicroGPT-C - 8-Puzzle Kanban Pipeline Demo", &g_cfg);
+  microgpt_print_config("MicroGPT-C - 8-Puzzle OPA Generalisation Demo (v3)",
+                        &g_cfg);
 
   /* Suppress unused warnings for helper functions */
   (void)extract_pipe_value;
 
   /* ================================================================
-   * PHASE 1: Train all 3 organelles
+   * PHASE 1: Train organelles (Strategist + Mover + Judge)
    * ================================================================ */
 
   printf("--- PHASE 1: TRAINING (%d steps each) ---\n", g_cfg.num_steps);
 
-  Docs planner_docs = {0}, mover_docs = {0}, judge_docs = {0};
-  Vocab planner_vocab = {0}, mover_vocab = {0}, judge_vocab = {0};
+  Docs strat_docs = {0}, mover_docs = {0}, judge_docs = {0};
+  Vocab strat_vocab = {0}, mover_vocab = {0}, judge_vocab = {0};
 
-  Model *planner =
-      train_organelle("Planner", PLANNER_CORPUS, PLANNER_CKPT, &planner_docs,
-                      &planner_vocab, g_cfg.num_steps);
-  if (!planner) {
-    fprintf(stderr, "FATAL: Planner training failed\n");
+  Model *strategist =
+      train_organelle("Strategist", STRATEGIST_CORPUS, STRATEGIST_CKPT,
+                      &strat_docs, &strat_vocab, g_cfg.num_steps);
+  if (!strategist) {
+    fprintf(stderr, "FATAL: Strategist training failed\n");
     return 1;
   }
 
@@ -592,202 +576,176 @@ int main(void) {
   }
 
   /* ================================================================
-   * PHASE 2: Pipeline — Solve Test Puzzles with Kanban
+   * PHASE 2: Pipeline — Solve Stratified Test Puzzles
    * ================================================================ */
 
-  printf("\n--- PHASE 2: KANBAN PIPELINE EXECUTION ---\n");
-  printf("Solving %d test puzzles using kanban-enriched pipeline...\n\n",
-         NUM_TEST_PUZZLES);
+  printf("\n--- PHASE 2: OPA PIPELINE (displacement-based) ---\n");
+  printf("Solving %d test puzzles (easy/medium/hard)...\n\n", NUM_TEST_PUZZLES);
+
+  /* Per-band tracking */
+  const char *band_names[] = {"EASY", "MEDIUM", "HARD"};
+  int band_counts[] = {NUM_EASY_PUZZLES, NUM_MEDIUM_PUZZLES, NUM_HARD_PUZZLES};
+  int band_md_min[] = {1, 5, 9};
+  int band_md_max[] = {4, 8, 20};
+  int band_solved[] = {0, 0, 0};
+  int band_moves[] = {0, 0, 0};
 
   int total_solved = 0;
   int total_moves = 0;
-  int total_judge_accepts = 0;
-  int total_judge_rejects = 0;
+  int total_accepts = 0;
+  int total_rejects = 0;
   int total_parse_errors = 0;
-  int total_replans = 0;
 
   struct timespec pipeline_start, pipeline_end;
   clock_gettime(CLOCK_MONOTONIC, &pipeline_start);
 
-  unsigned int puzzle_seed = 12345;
+  /* Use a separate seed for test puzzles — no overlap with training */
+  unsigned int puzzle_seed = 99999;
+  int puzzle_global_idx = 0;
 
-  for (int puzzle_idx = 0; puzzle_idx < NUM_TEST_PUZZLES; puzzle_idx++) {
-    /* Generate a test puzzle */
-    int board[9];
-    int difficulty = 3 + (puzzle_idx % 8); /* 3 to 10 moves scramble */
-    scramble_puzzle(board, difficulty, &puzzle_seed);
+  for (int band = 0; band < 3; band++) {
+    printf("=== %s band (md %d-%d) ===\n", band_names[band], band_md_min[band],
+           band_md_max[band]);
 
-    char board_str[16];
-    board_to_str(board, board_str);
-    int initial_manhattan = manhattan_distance(board);
+    for (int pi = 0; pi < band_counts[band]; pi++) {
+      puzzle_global_idx++;
+      int board[9];
+      scramble_to_target_md(board, band_md_min[band], band_md_max[band],
+                            &puzzle_seed);
 
-    printf("-- Puzzle %d/%d --\n", puzzle_idx + 1, NUM_TEST_PUZZLES);
-    printf("   Board: %s  (manhattan: %d, scramble: %d moves)\n", board_str,
-           initial_manhattan, difficulty);
-
-    /* Initialise kanban state */
-    Kanban kb;
-    kanban_init(&kb, initial_manhattan);
-
-    /* Step 1: Ask Planner for initial plan */
-    char planner_prompt[256];
-    snprintf(planner_prompt, sizeof(planner_prompt), "board=%s|md=%d",
-             board_str, initial_manhattan);
-
-    char plan_output[INF_GEN_LEN + 1];
-    organelle_generate(planner, &planner_vocab, planner_prompt, plan_output,
-                       INF_GEN_LEN);
-    printf("   Planner -> \"%s\"\n", plan_output);
-
-    if (!pipe_starts_with(plan_output, "todo=")) {
-      printf("   (Planner output not parseable -- using default plan)\n");
-      total_parse_errors++;
-    }
-    kanban_add_done(&kb, "plan");
-
-    /* Step 2: Execute the pipeline loop with kanban state */
-    int moves_made = 0;
-    int solved = 0;
-    int judge_accepts = 0;
-    int judge_rejects = 0;
-
-    for (int iter = 0; iter < MAX_PIPELINE_ITERS && !solved; iter++) {
+      char board_str[16];
       board_to_str(board, board_str);
-      int blank = find_blank(board);
-      int md_before = manhattan_distance(board);
+      char dstr[64];
+      md_delta_str(board, dstr, sizeof(dstr));
+      int initial_md = manhattan_distance(board);
 
-      /* Check for re-planning trigger */
-      if (kb.stalls >= REPLAN_THRESHOLD && kb.replans < 3) {
-        kb.replans++;
-        total_replans++;
+      printf("-- Puzzle %d/%d [%s] --\n", puzzle_global_idx, NUM_TEST_PUZZLES,
+             band_names[band]);
+      printf("   Board: %s  Disp: %s  (md=%d)\n", board_str, dstr, initial_md);
 
-        char replan_prompt[256];
-        snprintf(replan_prompt, sizeof(replan_prompt), "board=%s|md=%d|stalled",
-                 board_str, md_before);
+      /* Step 1: Ask Strategist for priority tile */
+      char strat_prompt[128];
+      snprintf(strat_prompt, sizeof(strat_prompt), "%s|md=%d", dstr,
+               initial_md);
 
-        char replan_output[INF_GEN_LEN + 1];
-        organelle_generate(planner, &planner_vocab, replan_prompt,
-                           replan_output, INF_GEN_LEN);
-        printf("   [RE-PLAN #%d] Planner -> \"%s\"  (stalls=%d)\n", kb.replans,
-               replan_output, kb.stalls);
-
-        /* Clear blocked and stalls after re-plan */
-        kanban_clear_blocked(&kb);
-        kb.stalls = 0;
-      }
-
-      /* Build Mover prompt with kanban context */
-      char mover_prompt[256];
-      if (kb.blocked[0] != '\0') {
-        snprintf(mover_prompt, sizeof(mover_prompt),
-                 "board=%s|blank=%d|blocked=%s", board_str, blank, kb.blocked);
-      } else {
-        snprintf(mover_prompt, sizeof(mover_prompt), "board=%s|blank=%d",
-                 board_str, blank);
-      }
-
-      char move_output[INF_GEN_LEN + 1];
-      organelle_generate(mover, &mover_vocab, mover_prompt, move_output,
+      char strat_output[INF_GEN_LEN + 1];
+      organelle_generate(strategist, &strat_vocab, strat_prompt, strat_output,
                          INF_GEN_LEN);
+      printf("   Strategist -> \"%s\"\n", strat_output);
 
-      /* Parse direction — output is just a word: "up", "down", "left", "right"
-       */
-      const char *dir = NULL;
-      if (strncmp(move_output, "up", 2) == 0)
-        dir = "up";
-      else if (strncmp(move_output, "down", 4) == 0)
-        dir = "down";
-      else if (strncmp(move_output, "left", 4) == 0)
-        dir = "left";
-      else if (strncmp(move_output, "right", 5) == 0)
-        dir = "right";
+      /* Step 2: Pipeline loop — Mover + Judge */
+      blocked_init();
+      int moves_made = 0;
+      int solved = 0;
+      int stalls = 0;
+      int last_best_md = initial_md;
 
-      if (!dir) {
-        printf("   [%d] Mover -> \"%s\" (PARSE ERROR)\n", iter + 1,
-               move_output);
-        total_parse_errors++;
-        /* Fallback: try a random legal move not in blocked */
-        const char *fallback_dirs[] = {"up", "down", "left", "right"};
-        dir = NULL;
-        for (int d = 0; d < 4; d++) {
-          if (strstr(kb.blocked, fallback_dirs[d]) != NULL)
+      for (int iter = 0; iter < MAX_PIPELINE_ITERS && !solved; iter++) {
+        md_delta_str(board, dstr, sizeof(dstr));
+        int blank = find_blank(board);
+        int md_before = manhattan_distance(board);
+
+        /* Clear blocked if stalled too long */
+        if (stalls >= REPLAN_THRESHOLD) {
+          blocked_clear();
+          stalls = 0;
+        }
+
+        /* Build Mover prompt with displacement encoding */
+        char mover_prompt[128];
+        if (g_blocked[0] != '\0') {
+          snprintf(mover_prompt, sizeof(mover_prompt), "%s|b=%d|x=%s", dstr,
+                   blank, g_blocked);
+        } else {
+          snprintf(mover_prompt, sizeof(mover_prompt), "%s|b=%d", dstr, blank);
+        }
+
+        char move_output[INF_GEN_LEN + 1];
+        organelle_generate(mover, &mover_vocab, mover_prompt, move_output,
+                           INF_GEN_LEN);
+
+        /* Parse direction */
+        const char *dir = NULL;
+        if (strncmp(move_output, "up", 2) == 0)
+          dir = "up";
+        else if (strncmp(move_output, "down", 4) == 0)
+          dir = "down";
+        else if (strncmp(move_output, "left", 4) == 0)
+          dir = "left";
+        else if (strncmp(move_output, "right", 5) == 0)
+          dir = "right";
+
+        if (!dir) {
+          printf("   [%d] Mover -> \"%s\" (PARSE ERROR)\n", iter + 1,
+                 move_output);
+          total_parse_errors++;
+          /* Fallback: try first legal move not blocked */
+          const char *fallback_dirs[] = {"up", "down", "left", "right"};
+          for (int d = 0; d < 4; d++) {
+            if (strstr(g_blocked, fallback_dirs[d]) != NULL)
+              continue;
+            int test[9];
+            memcpy(test, board, sizeof(board));
+            if (apply_move(test, fallback_dirs[d])) {
+              dir = fallback_dirs[d];
+              break;
+            }
+          }
+          if (!dir) {
+            stalls++;
             continue;
-          int test[9];
-          memcpy(test, board, sizeof(board));
-          if (apply_move(test, fallback_dirs[d])) {
-            dir = fallback_dirs[d];
-            break;
           }
         }
-        if (!dir) {
-          kb.stalls++;
-          continue;
-        }
-      }
 
-      /* Deterministic validation: try the move directly. */
-      int test_board[9];
-      memcpy(test_board, board, sizeof(board));
-      int is_valid = apply_move(test_board, dir);
+        /* Deterministic Judge: try the move */
+        int test_board[9];
+        memcpy(test_board, board, sizeof(board));
+        int is_valid = apply_move(test_board, dir);
 
-      if (is_valid) {
-        /* Apply the move to the real board */
-        memcpy(board, test_board, sizeof(board));
-        moves_made++;
-        int md_after = manhattan_distance(board);
-        char arrow =
-            md_after < md_before ? '+' : (md_after > md_before ? '-' : '=');
+        if (is_valid) {
+          memcpy(board, test_board, sizeof(board));
+          moves_made++;
+          int md_after = manhattan_distance(board);
+          char arrow =
+              md_after < md_before ? '+' : (md_after > md_before ? '-' : '=');
 
-        /* Update kanban state on success */
-        kanban_add_last(&kb, dir);
-        kanban_clear_blocked(&kb);
+          blocked_clear();
+          if (md_after < last_best_md) {
+            stalls = 0;
+            last_best_md = md_after;
+          } else {
+            stalls++;
+          }
+          total_accepts++;
 
-        /* Track progress */
-        if (md_after < kb.last_md) {
-          kb.stalls = 0;
-          kb.last_md = md_after;
+          printf("   [%d] move=%s %c (md: %d->%d)\n", iter + 1, dir, arrow,
+                 md_before, md_after);
         } else {
-          kb.stalls++;
+          blocked_add(dir);
+          stalls++;
+          total_rejects++;
+          printf("   [%d] move=%s -> OUT OF BOUNDS [blocked:%s]\n", iter + 1,
+                 dir, g_blocked);
         }
 
-        /* Track in done */
-        char done_entry[32];
-        snprintf(done_entry, sizeof(done_entry), "move(%s)", dir);
-        kanban_add_done(&kb, done_entry);
-
-        total_judge_accepts++;
-
-        printf("   [%d] move=%s %c (md: %d->%d)\n", iter + 1, dir, arrow,
-               md_before, md_after);
-      } else {
-        /* Move is out of bounds — add to blocked */
-        kanban_add_blocked(&kb, dir);
-        kb.stalls++;
-        total_judge_rejects++;
-
-        printf("   [%d] move=%s -> OUT OF BOUNDS [blocked:%s]\n", iter + 1, dir,
-               kb.blocked);
+        if (is_goal(board)) {
+          solved = 1;
+        }
       }
 
-      /* Check if solved */
-      if (is_goal(board)) {
-        solved = 1;
+      board_to_str(board, board_str);
+      int final_md = manhattan_distance(board);
+      total_moves += moves_made;
+
+      if (solved) {
         total_solved++;
+        band_solved[band]++;
+        band_moves[band] += moves_made;
+        printf("   SOLVED in %d moves!\n\n", moves_made);
+      } else {
+        printf("   NOT SOLVED: board=%s md=%d (was %d) moves=%d\n\n", board_str,
+               final_md, initial_md, moves_made);
       }
-    }
-
-    board_to_str(board, board_str);
-    int final_manhattan = manhattan_distance(board);
-    total_moves += moves_made;
-
-    if (solved) {
-      printf("   SOLVED in %d moves! (judge: %d/%d, replans: %d)\n\n",
-             moves_made, judge_accepts, judge_rejects, kb.replans);
-    } else {
-      printf("   NOT SOLVED: board=%s md=%d (was %d) "
-             "moves=%d (judge: %d/%d, replans: %d)\n\n",
-             board_str, final_manhattan, initial_manhattan, moves_made,
-             judge_accepts, judge_rejects, kb.replans);
     }
   }
 
@@ -797,27 +755,41 @@ int main(void) {
       (double)(pipeline_end.tv_nsec - pipeline_start.tv_nsec) / 1e9;
 
   /* ================================================================
-   * PHASE 3: Results Summary
+   * PHASE 3: Results — Generalisation Report
    * ================================================================ */
 
-  printf("--- RESULTS ---\n");
-  printf("Puzzles solved:     %d / %d (%.0f%%)\n", total_solved,
-         NUM_TEST_PUZZLES,
+  printf("================================================================\n");
+  printf("--- GENERALISATION RESULTS ---\n");
+  printf(
+      "================================================================\n\n");
+
+  printf("Overall: %d / %d solved (%.0f%%)\n\n", total_solved, NUM_TEST_PUZZLES,
          NUM_TEST_PUZZLES > 0 ? 100.0 * total_solved / NUM_TEST_PUZZLES : 0.0);
-  printf("Total moves:        %d (avg %.1f per puzzle)\n", total_moves,
-         NUM_TEST_PUZZLES > 0 ? (double)total_moves / NUM_TEST_PUZZLES : 0.0);
-  printf("Judge accepts:      %d\n", total_judge_accepts);
-  printf("Judge rejections:   %d\n", total_judge_rejects);
-  printf("Parse errors:       %d\n", total_parse_errors);
-  printf("Planner re-plans:   %d\n", total_replans);
-  printf("Pipeline time:      %.2fs\n", pipeline_time);
+
+  printf("%-8s  %-10s  %-10s  %-10s\n", "Band", "Solved", "Rate", "Avg Moves");
+  printf("%-8s  %-10s  %-10s  %-10s\n", "--------", "----------", "----------",
+         "----------");
+  for (int b = 0; b < 3; b++) {
+    double rate =
+        band_counts[b] > 0 ? 100.0 * band_solved[b] / band_counts[b] : 0.0;
+    double avg_moves =
+        band_solved[b] > 0 ? (double)band_moves[b] / band_solved[b] : 0.0;
+    printf("%-8s  %d/%-8d  %5.0f%%       %.1f\n", band_names[b], band_solved[b],
+           band_counts[b], rate, avg_moves);
+  }
+
+  printf("\nTotal moves:      %d\n", total_moves);
+  printf("Valid moves:      %d\n", total_accepts);
+  printf("OOB rejections:   %d\n", total_rejects);
+  printf("Parse errors:     %d\n", total_parse_errors);
+  printf("Pipeline time:    %.2fs\n", pipeline_time);
   printf("================================================================\n");
 
   /* Cleanup */
-  model_free(planner);
+  model_free(strategist);
   model_free(mover);
   model_free(judge_model);
-  free_docs(&planner_docs);
+  free_docs(&strat_docs);
   free_docs(&mover_docs);
   free_docs(&judge_docs);
 

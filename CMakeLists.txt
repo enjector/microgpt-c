@@ -278,12 +278,12 @@ add_demo(
   NAME    puzzle8_demo
   SOURCE  experiments/organelles/puzzle8/main.c
   THREADS
-  COPY    experiments/organelles/puzzle8/puzzle8_planner.txt
+  COPY    experiments/organelles/puzzle8/puzzle8_strategist.txt
           experiments/organelles/puzzle8/puzzle8_mover.txt
           experiments/organelles/puzzle8/puzzle8_judge.txt
   DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=2 BLOCK_SIZE=128 MLP_DIM=192
           NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
-          MAX_VOCAB=50 MAX_DOCS=5000 MAX_DOC_LEN=128
+          MAX_VOCAB=50 MAX_DOCS=60000 MAX_DOC_LEN=128
 )
 
 # ==================================================================

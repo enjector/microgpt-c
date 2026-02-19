@@ -1,6374 +1,5120 @@
-board=742153806|blank=7
-up
+m=11,x,13,x|b=8
+left
 
-board=742153806|blank=7|blocked=left
-up
+m=11,x,13,x|b=8|x=up
+left
 
-board=742153806|blank=7|blocked=right
+m=11,x,13,x|b=8|x=left
 up
 
-board=742153806|blank=7|blocked=up
+m=14,x,12,12|b=7
 left
 
-board=742103856|blank=4
+m=14,x,12,12|b=7|x=up
 left
 
-board=742103856|blank=4|blocked=up
+m=14,x,12,12|b=7|x=right
 left
 
-board=742103856|blank=4|blocked=down
-left
+m=14,x,12,12|b=7|x=left
+right
 
-board=742103856|blank=4|blocked=right
-left
+m=11,x,x,13|b=6
+up
 
-board=742103856|blank=4|blocked=left
+m=11,x,x,13|b=6|x=right
 up
 
-board=742013856|blank=3
+m=11,x,x,13|b=6|x=up
+right
+
+m=10,12,x,12|b=3
 up
 
-board=742013856|blank=3|blocked=down
+m=10,12,x,12|b=3|x=down
 up
 
-board=742013856|blank=3|blocked=right
+m=10,12,x,12|b=3|x=right
 up
 
-board=742013856|blank=3|blocked=up
-right
+m=10,12,x,12|b=3|x=up
+down
 
-board=042713856|blank=0
+m=x,11,x,9|b=0
 right
 
-board=042713856|blank=0|blocked=down
+m=x,11,x,9|b=0|x=down
 right
 
-board=042713856|blank=0|blocked=right
+m=x,11,x,9|b=0|x=right
 down
 
-board=402713856|blank=1
+m=x,8,10,10|b=1
 down
 
-board=402713856|blank=1|blocked=left
+m=x,8,10,10|b=1|x=left
 down
 
-board=402713856|blank=1|blocked=right
+m=x,8,10,10|b=1|x=right
 down
 
-board=402713856|blank=1|blocked=down
-right
+m=x,8,10,10|b=1|x=down
+left
+
+m=9,7,7,7|b=4
+left
 
-board=412703856|blank=4
+m=9,7,7,7|b=4|x=up
+left
+
+m=9,7,7,7|b=4|x=down
+left
+
+m=9,7,7,7|b=4|x=right
+left
+
+m=9,7,7,7|b=4|x=left
 down
 
-board=412703856|blank=4|blocked=up
+m=8,8,x,8|b=3
 down
 
-board=412703856|blank=4|blocked=left
+m=8,8,x,8|b=3|x=up
 down
 
-board=412703856|blank=4|blocked=right
+m=8,8,x,8|b=3|x=right
 down
 
-board=412703856|blank=4|blocked=down
+m=8,8,x,8|b=3|x=down
 up
-
-board=412753806|blank=7
-left
 
-board=412753806|blank=7|blocked=up
-left
+m=7,x,x,9|b=6
+right
 
-board=412753806|blank=7|blocked=right
-left
+m=7,x,x,9|b=6|x=up
+right
 
-board=412753806|blank=7|blocked=left
+m=7,x,x,9|b=6|x=right
 up
 
-board=412753086|blank=6
-up
+m=10,x,8,8|b=7
+right
 
-board=412753086|blank=6|blocked=right
-up
+m=10,x,8,8|b=7|x=up
+right
 
-board=412753086|blank=6|blocked=up
+m=10,x,8,8|b=7|x=left
 right
 
-board=412053786|blank=3
-up
+m=10,x,8,8|b=7|x=right
+left
 
-board=412053786|blank=3|blocked=down
+m=7,x,9,x|b=8
 up
 
-board=412053786|blank=3|blocked=right
+m=7,x,9,x|b=8|x=left
 up
-
-board=412053786|blank=3|blocked=up
-down
-
-board=012453786|blank=0
-right
-
-board=012453786|blank=0|blocked=down
-right
 
-board=012453786|blank=0|blocked=right
-down
-
-board=102453786|blank=1
-right
+m=7,x,9,x|b=8|x=up
+left
 
-board=102453786|blank=1|blocked=down
-right
+m=8,8,6,x|b=5
+left
 
-board=102453786|blank=1|blocked=left
-right
+m=8,8,6,x|b=5|x=up
+left
 
-board=102453786|blank=1|blocked=right
-down
+m=8,8,6,x|b=5|x=down
+left
 
-board=120453786|blank=2
-down
+m=8,8,6,x|b=5|x=left
+up
 
-board=120453786|blank=2|blocked=left
+m=7,5,7,7|b=4
 down
 
-board=120453786|blank=2|blocked=down
-left
-
-board=123450786|blank=5
+m=7,5,7,7|b=4|x=up
 down
 
-board=123450786|blank=5|blocked=up
+m=7,5,7,7|b=4|x=left
 down
 
-board=123450786|blank=5|blocked=left
+m=7,5,7,7|b=4|x=right
 down
 
-board=123450786|blank=5|blocked=down
+m=7,5,7,7|b=4|x=down
 up
 
-board=275413806|blank=7
+m=6,x,4,4|b=7
 left
 
-board=275413806|blank=7|blocked=up
+m=6,x,4,4|b=7|x=up
 left
 
-board=275413806|blank=7|blocked=right
+m=6,x,4,4|b=7|x=right
 left
 
-board=275413806|blank=7|blocked=left
-up
+m=6,x,4,4|b=7|x=left
+right
 
-board=275413086|blank=6
+m=3,x,x,5|b=6
 up
 
-board=275413086|blank=6|blocked=right
+m=3,x,x,5|b=6|x=right
 up
 
-board=275413086|blank=6|blocked=up
+m=3,x,x,5|b=6|x=up
 right
 
-board=275013486|blank=3
+m=4,4,x,2|b=3
 right
 
-board=275013486|blank=3|blocked=up
+m=4,4,x,2|b=3|x=up
 right
 
-board=275013486|blank=3|blocked=down
+m=4,4,x,2|b=3|x=down
 right
 
-board=275013486|blank=3|blocked=right
-down
-
-board=275103486|blank=4
+m=4,4,x,2|b=3|x=right
 up
 
-board=275103486|blank=4|blocked=down
-up
+m=3,1,3,3|b=4
+down
 
-board=275103486|blank=4|blocked=left
-up
+m=3,1,3,3|b=4|x=up
+down
 
-board=275103486|blank=4|blocked=right
-up
+m=3,1,3,3|b=4|x=left
+down
 
-board=275103486|blank=4|blocked=up
+m=3,1,3,3|b=4|x=right
 down
 
-board=205173486|blank=1
-right
+m=3,1,3,3|b=4|x=down
+up
 
-board=205173486|blank=1|blocked=down
+m=2,x,2,0|b=7
 right
 
-board=205173486|blank=1|blocked=left
+m=2,x,2,0|b=7|x=up
 right
 
-board=205173486|blank=1|blocked=right
-left
+m=2,x,2,0|b=7|x=left
+right
 
-board=250173486|blank=2
-down
+m=2,x,2,0|b=7|x=right
+up
 
-board=250173486|blank=2|blocked=left
-down
+m=x,9,9,x|b=2
+left
 
-board=250173486|blank=2|blocked=down
+m=x,9,9,x|b=2|x=down
 left
 
-board=253170486|blank=5
+m=x,9,9,x|b=2|x=left
 down
 
-board=253170486|blank=5|blocked=up
+m=x,10,8,10|b=1
 down
 
-board=253170486|blank=5|blocked=left
+m=x,10,8,10|b=1|x=left
 down
 
-board=253170486|blank=5|blocked=down
-up
+m=x,10,8,10|b=1|x=right
+down
 
-board=253176480|blank=8
+m=x,10,8,10|b=1|x=down
 left
 
-board=253176480|blank=8|blocked=up
+m=9,11,9,9|b=4
 left
-
-board=253176480|blank=8|blocked=left
-up
 
-board=253176408|blank=7
-up
-
-board=253176408|blank=7|blocked=left
-up
+m=9,11,9,9|b=4|x=up
+left
 
-board=253176408|blank=7|blocked=right
-up
+m=9,11,9,9|b=4|x=down
+left
 
-board=253176408|blank=7|blocked=up
-right
+m=9,11,9,9|b=4|x=right
+left
 
-board=253106478|blank=4
+m=9,11,9,9|b=4|x=left
 up
 
-board=253106478|blank=4|blocked=down
+m=8,10,x,10|b=3
 up
 
-board=253106478|blank=4|blocked=left
+m=8,10,x,10|b=3|x=down
 up
 
-board=253106478|blank=4|blocked=right
+m=8,10,x,10|b=3|x=right
 up
 
-board=253106478|blank=4|blocked=up
+m=8,10,x,10|b=3|x=up
 down
-
-board=203156478|blank=1
-left
-
-board=203156478|blank=1|blocked=down
-left
 
-board=203156478|blank=1|blocked=right
-left
-
-board=203156478|blank=1|blocked=left
-down
+m=x,9,x,7|b=0
+right
 
-board=023156478|blank=0
-down
+m=x,9,x,7|b=0|x=down
+right
 
-board=023156478|blank=0|blocked=right
+m=x,9,x,7|b=0|x=right
 down
-
-board=023156478|blank=0|blocked=down
-right
 
-board=123056478|blank=3
+m=x,6,8,8|b=1
 down
 
-board=123056478|blank=3|blocked=up
+m=x,6,8,8|b=1|x=left
 down
 
-board=123056478|blank=3|blocked=right
+m=x,6,8,8|b=1|x=right
 down
 
-board=123056478|blank=3|blocked=down
-up
+m=x,6,8,8|b=1|x=down
+left
 
-board=123456078|blank=6
+m=7,7,5,5|b=4
 right
 
-board=123456078|blank=6|blocked=up
+m=7,7,5,5|b=4|x=up
 right
-
-board=123456078|blank=6|blocked=right
-up
 
-board=123456708|blank=7
+m=7,7,5,5|b=4|x=down
 right
 
-board=123456708|blank=7|blocked=up
+m=7,7,5,5|b=4|x=left
 right
 
-board=123456708|blank=7|blocked=left
-right
+m=7,7,5,5|b=4|x=right
+left
 
-board=123456708|blank=7|blocked=right
+m=6,4,6,x|b=5
 up
 
-board=413702586|blank=4
-right
+m=6,4,6,x|b=5|x=down
+up
 
-board=413702586|blank=4|blocked=up
-right
+m=6,4,6,x|b=5|x=left
+up
 
-board=413702586|blank=4|blocked=down
-right
+m=6,4,6,x|b=5|x=up
+down
 
-board=413702586|blank=4|blocked=left
-right
+m=x,5,7,x|b=2
+left
 
-board=413702586|blank=4|blocked=right
-up
+m=x,5,7,x|b=2|x=down
+left
 
-board=413720586|blank=5
+m=x,5,7,x|b=2|x=left
 down
 
-board=413720586|blank=5|blocked=up
+m=x,6,8,6|b=1
 down
 
-board=413720586|blank=5|blocked=left
+m=x,6,8,6|b=1|x=left
 down
 
-board=413720586|blank=5|blocked=down
-up
+m=x,6,8,6|b=1|x=right
+down
 
-board=413726580|blank=8
-left
+m=x,6,8,6|b=1|x=down
+right
 
-board=413726580|blank=8|blocked=up
+m=7,7,5,7|b=4
 left
 
-board=413726580|blank=8|blocked=left
-up
-
-board=413726508|blank=7
+m=7,7,5,7|b=4|x=up
 left
 
-board=413726508|blank=7|blocked=up
+m=7,7,5,7|b=4|x=down
 left
 
-board=413726508|blank=7|blocked=right
+m=7,7,5,7|b=4|x=right
 left
-
-board=413726508|blank=7|blocked=left
-right
 
-board=413726058|blank=6
+m=7,7,5,7|b=4|x=left
 up
 
-board=413726058|blank=6|blocked=right
+m=4,6,x,6|b=3
 up
 
-board=413726058|blank=6|blocked=up
-right
-
-board=413026758|blank=3
-up
-
-board=413026758|blank=3|blocked=down
+m=4,6,x,6|b=3|x=down
 up
 
-board=413026758|blank=3|blocked=right
+m=4,6,x,6|b=3|x=right
 up
 
-board=413026758|blank=3|blocked=up
+m=4,6,x,6|b=3|x=up
 down
 
-board=013426758|blank=0
+m=x,5,x,3|b=0
 right
 
-board=013426758|blank=0|blocked=down
+m=x,5,x,3|b=0|x=down
 right
 
-board=013426758|blank=0|blocked=right
+m=x,5,x,3|b=0|x=right
 down
+
+m=x,4,4,2|b=1
+right
+
+m=x,4,4,2|b=1|x=down
+right
 
-board=103426758|blank=1
+m=x,4,4,2|b=1|x=left
+right
+
+m=x,4,4,2|b=1|x=right
 down
 
-board=103426758|blank=1|blocked=left
+m=x,1,3,x|b=2
 down
 
-board=103426758|blank=1|blocked=right
+m=x,1,3,x|b=2|x=left
 down
 
-board=103426758|blank=1|blocked=down
+m=x,1,3,x|b=2|x=down
 left
-
-board=123406758|blank=4
-down
 
-board=123406758|blank=4|blocked=up
+m=2,0,2,x|b=5
 down
 
-board=123406758|blank=4|blocked=left
+m=2,0,2,x|b=5|x=up
 down
 
-board=123406758|blank=4|blocked=right
+m=2,0,2,x|b=5|x=left
 down
 
-board=123406758|blank=4|blocked=down
+m=2,0,2,x|b=5|x=down
 up
-
-board=412653780|blank=8
-left
-
-board=412653780|blank=8|blocked=up
-left
 
-board=412653780|blank=8|blocked=left
+m=10,8,10,x|b=5
 up
 
-board=412653708|blank=7
+m=10,8,10,x|b=5|x=down
 up
 
-board=412653708|blank=7|blocked=left
+m=10,8,10,x|b=5|x=left
 up
 
-board=412653708|blank=7|blocked=right
-up
+m=10,8,10,x|b=5|x=up
+down
 
-board=412653708|blank=7|blocked=up
-right
+m=x,10,10,10|b=1
+down
+
+m=x,10,10,10|b=1|x=left
+down
+
+m=x,10,10,10|b=1|x=right
+down
 
-board=412603758|blank=4
+m=x,10,10,10|b=1|x=down
 left
 
-board=412603758|blank=4|blocked=up
+m=9,9,11,9|b=4
 left
 
-board=412603758|blank=4|blocked=down
+m=9,9,11,9|b=4|x=up
 left
 
-board=412603758|blank=4|blocked=right
+m=9,9,11,9|b=4|x=down
 left
 
-board=412603758|blank=4|blocked=left
-down
+m=9,9,11,9|b=4|x=right
+left
 
-board=412063758|blank=3
+m=9,9,11,9|b=4|x=left
 up
 
-board=412063758|blank=3|blocked=down
+m=10,12,x,10|b=3
 up
 
-board=412063758|blank=3|blocked=right
+m=10,12,x,10|b=3|x=down
 up
 
-board=412063758|blank=3|blocked=up
-down
+m=10,12,x,10|b=3|x=right
+up
 
-board=012463758|blank=0
+m=10,12,x,10|b=3|x=up
 right
 
-board=012463758|blank=0|blocked=down
+m=x,11,x,11|b=0
 right
+
+m=x,11,x,11|b=0|x=down
+right
+
+m=x,11,x,11|b=0|x=right
+down
 
-board=012463758|blank=0|blocked=right
+m=x,10,10,12|b=1
 down
 
-board=102463758|blank=1
+m=x,10,10,12|b=1|x=left
+down
+
+m=x,10,10,12|b=1|x=right
+down
+
+m=x,10,10,12|b=1|x=down
+left
+
+m=11,9,11,9|b=4
 right
 
-board=102463758|blank=1|blocked=down
+m=11,9,11,9|b=4|x=up
 right
 
-board=102463758|blank=1|blocked=left
+m=11,9,11,9|b=4|x=down
 right
 
-board=102463758|blank=1|blocked=right
-down
+m=11,9,11,9|b=4|x=left
+right
 
-board=120463758|blank=2
+m=11,9,11,9|b=4|x=right
 down
 
-board=120463758|blank=2|blocked=left
-down
+m=9,x,7,x|b=8
+left
 
-board=120463758|blank=2|blocked=down
+m=9,x,7,x|b=8|x=up
 left
+
+m=9,x,7,x|b=8|x=left
+up
 
-board=123460758|blank=5
+m=8,x,8,8|b=7
 left
 
-board=123460758|blank=5|blocked=up
+m=8,x,8,8|b=7|x=up
 left
 
-board=123460758|blank=5|blocked=down
+m=8,x,8,8|b=7|x=right
 left
 
-board=123460758|blank=5|blocked=left
+m=8,x,8,8|b=7|x=left
 up
 
-board=136485720|blank=8
+m=9,x,x,7|b=6
 up
 
-board=136485720|blank=8|blocked=left
+m=9,x,x,7|b=6|x=right
 up
 
-board=136485720|blank=8|blocked=up
-left
-
-board=136480725|blank=5
-left
+m=9,x,x,7|b=6|x=up
+right
 
-board=136480725|blank=5|blocked=up
-left
+m=8,8,x,10|b=3
+up
 
-board=136480725|blank=5|blocked=down
-left
+m=8,8,x,10|b=3|x=down
+up
 
-board=136480725|blank=5|blocked=left
+m=8,8,x,10|b=3|x=right
 up
 
-board=136408725|blank=4
+m=8,8,x,10|b=3|x=up
 down
 
-board=136408725|blank=4|blocked=up
+m=6,4,x,6|b=3
 down
 
-board=136408725|blank=4|blocked=left
+m=6,4,x,6|b=3|x=up
 down
 
-board=136408725|blank=4|blocked=right
+m=6,4,x,6|b=3|x=right
 down
 
-board=136408725|blank=4|blocked=down
-right
+m=6,4,x,6|b=3|x=down
+up
 
-board=136428705|blank=7
+m=5,x,x,3|b=6
 right
 
-board=136428705|blank=7|blocked=up
+m=5,x,x,3|b=6|x=up
 right
 
-board=136428705|blank=7|blocked=left
-right
+m=5,x,x,3|b=6|x=right
+up
 
-board=136428705|blank=7|blocked=right
+m=2,x,4,4|b=7
 up
 
-board=136428750|blank=8
+m=2,x,4,4|b=7|x=left
 up
 
-board=136428750|blank=8|blocked=left
+m=2,x,4,4|b=7|x=right
 up
 
-board=136428750|blank=8|blocked=up
+m=2,x,4,4|b=7|x=up
 left
 
-board=136420758|blank=5
-up
+m=3,3,3,1|b=4
+right
 
-board=136420758|blank=5|blocked=down
-up
+m=3,3,3,1|b=4|x=up
+right
+
+m=3,3,3,1|b=4|x=down
+right
+
+m=3,3,3,1|b=4|x=left
+right
 
-board=136420758|blank=5|blocked=left
+m=3,3,3,1|b=4|x=right
 up
 
-board=136420758|blank=5|blocked=up
+m=x,11,x,13|b=0
 down
 
-board=130426758|blank=2
-left
+m=x,11,x,13|b=0|x=right
+down
 
-board=130426758|blank=2|blocked=down
-left
+m=x,11,x,13|b=0|x=down
+right
 
-board=130426758|blank=2|blocked=left
+m=12,10,x,12|b=3
 down
 
-board=130486725|blank=2
+m=12,10,x,12|b=3|x=up
 down
 
-board=130486725|blank=2|blocked=left
+m=12,10,x,12|b=3|x=right
 down
 
-board=130486725|blank=2|blocked=down
-left
+m=12,10,x,12|b=3|x=down
+up
+
+m=11,x,x,9|b=6
+right
 
-board=123485706|blank=7
+m=11,x,x,9|b=6|x=up
+right
+
+m=11,x,x,9|b=6|x=right
 up
 
-board=123485706|blank=7|blocked=left
+m=10,x,10,10|b=7
 up
 
-board=123485706|blank=7|blocked=right
+m=10,x,10,10|b=7|x=left
 up
 
-board=123485706|blank=7|blocked=up
-left
+m=10,x,10,10|b=7|x=right
+up
 
-board=123405786|blank=4
-right
+m=10,x,10,10|b=7|x=up
+left
 
-board=123405786|blank=4|blocked=up
-right
+m=8,8,10,x|b=5
+down
 
-board=123405786|blank=4|blocked=down
-right
+m=8,8,10,x|b=5|x=up
+down
 
-board=123405786|blank=4|blocked=left
-right
+m=8,8,10,x|b=5|x=left
+down
 
-board=123405786|blank=4|blocked=right
+m=8,8,10,x|b=5|x=down
 up
 
-board=345716208|blank=7
+m=9,x,9,x|b=8
 left
 
-board=345716208|blank=7|blocked=up
+m=9,x,9,x|b=8|x=up
 left
 
-board=345716208|blank=7|blocked=right
-left
+m=9,x,9,x|b=8|x=left
+up
 
-board=345716208|blank=7|blocked=left
-right
+m=10,x,10,8|b=7
+left
 
-board=345716028|blank=6
-up
+m=10,x,10,8|b=7|x=up
+left
 
-board=345716028|blank=6|blocked=right
-up
+m=10,x,10,8|b=7|x=right
+left
 
-board=345716028|blank=6|blocked=up
+m=10,x,10,8|b=7|x=left
 right
 
-board=345016728|blank=3
+m=12,10,x,10|b=3
 right
 
-board=345016728|blank=3|blocked=up
+m=12,10,x,10|b=3|x=up
 right
 
-board=345016728|blank=3|blocked=down
+m=12,10,x,10|b=3|x=down
 right
 
-board=345016728|blank=3|blocked=right
-up
+m=12,10,x,10|b=3|x=right
+down
 
-board=345106728|blank=4
+m=9,11,11,11|b=4
 up
 
-board=345106728|blank=4|blocked=down
+m=9,11,11,11|b=4|x=down
 up
 
-board=345106728|blank=4|blocked=left
+m=9,11,11,11|b=4|x=left
 up
 
-board=345106728|blank=4|blocked=right
+m=9,11,11,11|b=4|x=right
 up
 
-board=345106728|blank=4|blocked=up
+m=9,11,11,11|b=4|x=up
 down
 
-board=305146728|blank=1
-left
+m=9,11,11,9|b=4
+up
 
-board=305146728|blank=1|blocked=down
-left
+m=9,11,11,9|b=4|x=down
+up
 
-board=305146728|blank=1|blocked=right
-left
+m=9,11,11,9|b=4|x=left
+up
 
-board=305146728|blank=1|blocked=left
+m=9,11,11,9|b=4|x=right
+up
+
+m=9,11,11,9|b=4|x=up
 right
 
-board=035146728|blank=0
+m=x,7,x,9|b=0
 down
 
-board=035146728|blank=0|blocked=right
+m=x,7,x,9|b=0|x=right
 down
-
-board=035146728|blank=0|blocked=down
-right
 
-board=135046728|blank=3
+m=x,7,x,9|b=0|x=down
 right
 
-board=135046728|blank=3|blocked=up
-right
-
-board=135046728|blank=3|blocked=down
-right
-
-board=135046728|blank=3|blocked=right
-up
-
-board=135406728|blank=4
-down
-
-board=135406728|blank=4|blocked=up
+m=8,6,x,8|b=3
 down
 
-board=135406728|blank=4|blocked=left
+m=8,6,x,8|b=3|x=up
 down
 
-board=135406728|blank=4|blocked=right
+m=8,6,x,8|b=3|x=right
 down
 
-board=135406728|blank=4|blocked=down
+m=8,6,x,8|b=3|x=down
 up
 
-board=135426708|blank=7
+m=7,x,x,5|b=6
 right
 
-board=135426708|blank=7|blocked=up
+m=7,x,x,5|b=6|x=up
 right
 
-board=135426708|blank=7|blocked=left
-right
-
-board=135426708|blank=7|blocked=right
+m=7,x,x,5|b=6|x=right
 up
 
-board=135426780|blank=8
-up
+m=6,x,6,4|b=7
+right
 
-board=135426780|blank=8|blocked=left
-up
+m=6,x,6,4|b=7|x=up
+right
 
-board=135426780|blank=8|blocked=up
-left
+m=6,x,6,4|b=7|x=left
+right
 
-board=135420786|blank=5
+m=6,x,6,4|b=7|x=right
 up
 
-board=135420786|blank=5|blocked=down
+m=3,x,5,x|b=8
 up
 
-board=135420786|blank=5|blocked=left
+m=3,x,5,x|b=8|x=left
 up
 
-board=135420786|blank=5|blocked=up
-down
-
-board=130425786|blank=2
+m=3,x,5,x|b=8|x=up
 left
 
-board=130425786|blank=2|blocked=down
+m=4,4,2,x|b=5
 left
-
-board=130425786|blank=2|blocked=left
-down
-
-board=103425786|blank=1
-down
-
-board=103425786|blank=1|blocked=left
-down
 
-board=103425786|blank=1|blocked=right
-down
+m=4,4,2,x|b=5|x=up
+left
 
-board=103425786|blank=1|blocked=down
+m=4,4,2,x|b=5|x=down
 left
+
+m=4,4,2,x|b=5|x=left
+up
 
-board=103476528|blank=1
+m=x,12,12,12|b=1
 left
 
-board=103476528|blank=1|blocked=down
+m=x,12,12,12|b=1|x=down
 left
 
-board=103476528|blank=1|blocked=right
+m=x,12,12,12|b=1|x=right
 left
 
-board=103476528|blank=1|blocked=left
+m=x,12,12,12|b=1|x=left
 down
 
-board=013476528|blank=0
+m=x,13,x,13|b=0
 down
 
-board=013476528|blank=0|blocked=right
+m=x,13,x,13|b=0|x=right
 down
 
-board=013476528|blank=0|blocked=down
+m=x,13,x,13|b=0|x=down
 right
 
-board=413076528|blank=3
+m=12,12,x,12|b=3
 right
 
-board=413076528|blank=3|blocked=up
+m=12,12,x,12|b=3|x=up
 right
 
-board=413076528|blank=3|blocked=down
+m=12,12,x,12|b=3|x=down
 right
 
-board=413076528|blank=3|blocked=right
+m=12,12,x,12|b=3|x=right
 up
 
-board=413706528|blank=4
-down
+m=13,13,13,11|b=4
+up
 
-board=413706528|blank=4|blocked=up
-down
+m=13,13,13,11|b=4|x=down
+up
 
-board=413706528|blank=4|blocked=left
-down
-
-board=413706528|blank=4|blocked=right
-down
+m=13,13,13,11|b=4|x=left
+up
 
-board=413706528|blank=4|blocked=down
+m=13,13,13,11|b=4|x=right
 up
+
+m=13,13,13,11|b=4|x=up
+right
 
-board=120753846|blank=2
+m=x,11,13,x|b=2
 down
 
-board=120753846|blank=2|blocked=left
+m=x,11,13,x|b=2|x=left
 down
 
-board=120753846|blank=2|blocked=down
+m=x,11,13,x|b=2|x=down
 left
 
-board=123750846|blank=5
+m=12,10,10,x|b=5
 left
 
-board=123750846|blank=5|blocked=up
+m=12,10,10,x|b=5|x=up
 left
 
-board=123750846|blank=5|blocked=down
+m=12,10,10,x|b=5|x=down
 left
-
-board=123750846|blank=5|blocked=left
-down
-
-board=123705846|blank=4
-down
-
-board=123705846|blank=4|blocked=up
-down
-
-board=123705846|blank=4|blocked=left
-down
 
-board=123705846|blank=4|blocked=right
+m=12,10,10,x|b=5|x=left
 down
-
-board=123705846|blank=4|blocked=down
-right
 
-board=123745806|blank=7
+m=x,10,8,8|b=1
 left
 
-board=123745806|blank=7|blocked=up
+m=x,10,8,8|b=1|x=down
 left
 
-board=123745806|blank=7|blocked=right
+m=x,10,8,8|b=1|x=right
 left
 
-board=123745806|blank=7|blocked=left
-up
+m=x,10,8,8|b=1|x=left
+right
 
-board=123745086|blank=6
+m=4,x,6,6|b=7
 up
 
-board=123745086|blank=6|blocked=right
+m=4,x,6,6|b=7|x=left
 up
-
-board=123745086|blank=6|blocked=up
-right
-
-board=123045786|blank=3
-right
 
-board=123045786|blank=3|blocked=up
-right
+m=4,x,6,6|b=7|x=right
+up
 
-board=123045786|blank=3|blocked=down
-right
+m=4,x,6,6|b=7|x=up
+left
 
-board=123045786|blank=3|blocked=right
+m=3,5,5,5|b=4
 up
 
-board=273148605|blank=7
+m=3,5,5,5|b=4|x=down
 up
 
-board=273148605|blank=7|blocked=left
+m=3,5,5,5|b=4|x=left
 up
 
-board=273148605|blank=7|blocked=right
+m=3,5,5,5|b=4|x=right
 up
-
-board=273148605|blank=7|blocked=up
-left
 
-board=273108645|blank=4
-up
+m=3,5,5,5|b=4|x=up
+down
 
-board=273108645|blank=4|blocked=down
+m=14,14,14,x|b=5
 up
 
-board=273108645|blank=4|blocked=left
+m=14,14,14,x|b=5|x=down
 up
 
-board=273108645|blank=4|blocked=right
+m=14,14,14,x|b=5|x=left
 up
 
-board=273108645|blank=4|blocked=up
+m=14,14,14,x|b=5|x=up
 down
 
-board=203178645|blank=1
+m=x,15,13,x|b=2
 left
 
-board=203178645|blank=1|blocked=down
+m=x,15,13,x|b=2|x=down
 left
 
-board=203178645|blank=1|blocked=right
-left
+m=x,15,13,x|b=2|x=left
+down
 
-board=203178645|blank=1|blocked=left
+m=x,12,14,14|b=1
 down
 
-board=023178645|blank=0
+m=x,12,14,14|b=1|x=left
 down
 
-board=023178645|blank=0|blocked=right
+m=x,12,14,14|b=1|x=right
 down
 
-board=023178645|blank=0|blocked=down
-right
+m=x,12,14,14|b=1|x=down
+left
 
-board=123078645|blank=3
+m=13,11,13,11|b=4
 down
 
-board=123078645|blank=3|blocked=up
+m=13,11,13,11|b=4|x=up
 down
 
-board=123078645|blank=3|blocked=right
+m=13,11,13,11|b=4|x=left
 down
-
-board=123078645|blank=3|blocked=down
-right
-
-board=123678045|blank=6
-right
-
-board=123678045|blank=6|blocked=up
-right
-
-board=123678045|blank=6|blocked=right
-up
-
-board=123678405|blank=7
-up
-
-board=123678405|blank=7|blocked=left
-up
 
-board=123678405|blank=7|blocked=right
-up
+m=13,11,13,11|b=4|x=right
+down
 
-board=123678405|blank=7|blocked=up
+m=13,11,13,11|b=4|x=down
 right
-
-board=123608475|blank=4
-left
 
-board=123608475|blank=4|blocked=up
+m=12,x,10,10|b=7
 left
 
-board=123608475|blank=4|blocked=down
+m=12,x,10,10|b=7|x=up
 left
 
-board=123608475|blank=4|blocked=right
+m=12,x,10,10|b=7|x=right
 left
 
-board=123608475|blank=4|blocked=left
+m=12,x,10,10|b=7|x=left
 right
-
-board=123068475|blank=3
-down
-
-board=123068475|blank=3|blocked=up
-down
-
-board=123068475|blank=3|blocked=right
-down
 
-board=123068475|blank=3|blocked=down
+m=9,x,x,11|b=6
 up
-
-board=123468075|blank=6
-right
-
-board=123468075|blank=6|blocked=up
-right
 
-board=123468075|blank=6|blocked=right
+m=9,x,x,11|b=6|x=right
 up
 
-board=123468705|blank=7
+m=9,x,x,11|b=6|x=up
 right
 
-board=123468705|blank=7|blocked=up
+m=10,10,x,8|b=3
 right
 
-board=123468705|blank=7|blocked=left
+m=10,10,x,8|b=3|x=up
 right
-
-board=123468705|blank=7|blocked=right
-up
-
-board=123468750|blank=8
-up
-
-board=123468750|blank=8|blocked=left
-up
-
-board=123468750|blank=8|blocked=up
-left
 
-board=042715863|blank=0
+m=10,10,x,8|b=3|x=down
 right
 
-board=042715863|blank=0|blocked=down
-right
+m=10,10,x,8|b=3|x=right
+up
 
-board=042715863|blank=0|blocked=right
+m=9,7,9,7|b=4
 down
 
-board=402715863|blank=1
+m=9,7,9,7|b=4|x=up
 down
 
-board=402715863|blank=1|blocked=left
+m=9,7,9,7|b=4|x=left
 down
 
-board=402715863|blank=1|blocked=right
+m=9,7,9,7|b=4|x=right
 down
 
-board=402715863|blank=1|blocked=down
+m=9,7,9,7|b=4|x=down
 right
 
-board=412705863|blank=4
+m=8,x,8,6|b=7
 right
 
-board=412705863|blank=4|blocked=up
+m=8,x,8,6|b=7|x=up
 right
 
-board=412705863|blank=4|blocked=down
+m=8,x,8,6|b=7|x=left
 right
 
-board=412705863|blank=4|blocked=left
-right
+m=8,x,8,6|b=7|x=right
+up
 
-board=412705863|blank=4|blocked=right
-down
+m=5,x,7,x|b=8
+up
 
-board=412750863|blank=5
-down
+m=5,x,7,x|b=8|x=left
+up
 
-board=412750863|blank=5|blocked=up
-down
+m=5,x,7,x|b=8|x=up
+left
 
-board=412750863|blank=5|blocked=left
-down
+m=4,6,6,x|b=5
+up
+
+m=4,6,6,x|b=5|x=down
+up
 
-board=412750863|blank=5|blocked=down
+m=4,6,6,x|b=5|x=left
 up
+
+m=4,6,6,x|b=5|x=up
+down
 
-board=412753860|blank=8
+m=x,5,3,x|b=2
 left
 
-board=412753860|blank=8|blocked=up
+m=x,5,3,x|b=2|x=down
 left
 
-board=412753860|blank=8|blocked=left
-up
+m=x,5,3,x|b=2|x=left
+down
 
-board=206138574|blank=1
+m=x,2,4,4|b=1
 down
 
-board=206138574|blank=1|blocked=left
+m=x,2,4,4|b=1|x=left
 down
 
-board=206138574|blank=1|blocked=right
+m=x,2,4,4|b=1|x=right
 down
 
-board=206138574|blank=1|blocked=down
+m=x,2,4,4|b=1|x=down
 left
-
-board=236108574|blank=4
-down
 
-board=236108574|blank=4|blocked=up
+m=12,12,x,14|b=3
 down
 
-board=236108574|blank=4|blocked=left
+m=12,12,x,14|b=3|x=up
 down
 
-board=236108574|blank=4|blocked=right
+m=12,12,x,14|b=3|x=right
 down
 
-board=236108574|blank=4|blocked=down
-right
+m=12,12,x,14|b=3|x=down
+up
 
-board=236178504|blank=7
+m=13,x,x,11|b=6
 right
 
-board=236178504|blank=7|blocked=up
+m=13,x,x,11|b=6|x=up
 right
 
-board=236178504|blank=7|blocked=left
-right
+m=13,x,x,11|b=6|x=right
+up
 
-board=236178504|blank=7|blocked=right
+m=12,x,12,12|b=7
 up
 
-board=236178540|blank=8
+m=12,x,12,12|b=7|x=left
 up
 
-board=236178540|blank=8|blocked=left
+m=12,x,12,12|b=7|x=right
 up
 
-board=236178540|blank=8|blocked=up
+m=12,x,12,12|b=7|x=up
 left
 
-board=236170548|blank=5
+m=11,11,13,11|b=4
 up
 
-board=236170548|blank=5|blocked=down
+m=11,11,13,11|b=4|x=down
 up
 
-board=236170548|blank=5|blocked=left
+m=11,11,13,11|b=4|x=left
 up
-
-board=236170548|blank=5|blocked=up
-down
-
-board=230176548|blank=2
-left
 
-board=230176548|blank=2|blocked=down
-left
+m=11,11,13,11|b=4|x=right
+up
 
-board=230176548|blank=2|blocked=left
+m=11,11,13,11|b=4|x=up
 down
 
-board=203176548|blank=1
+m=x,12,10,10|b=1
 left
 
-board=203176548|blank=1|blocked=down
+m=x,12,10,10|b=1|x=down
 left
 
-board=203176548|blank=1|blocked=right
+m=x,12,10,10|b=1|x=right
 left
 
-board=203176548|blank=1|blocked=left
-down
+m=x,12,10,10|b=1|x=left
+right
 
-board=023176548|blank=0
+m=x,9,x,11|b=0
 down
 
-board=023176548|blank=0|blocked=right
+m=x,9,x,11|b=0|x=right
 down
+
+m=x,9,x,11|b=0|x=down
+right
+
+m=7,7,9,7|b=4
+right
+
+m=7,7,9,7|b=4|x=up
+right
+
+m=7,7,9,7|b=4|x=down
+right
 
-board=023176548|blank=0|blocked=down
+m=7,7,9,7|b=4|x=left
 right
+
+m=7,7,9,7|b=4|x=right
+up
 
-board=123076548|blank=3
+m=8,6,8,x|b=5
 down
 
-board=123076548|blank=3|blocked=up
+m=8,6,8,x|b=5|x=up
 down
 
-board=123076548|blank=3|blocked=right
+m=8,6,8,x|b=5|x=left
 down
+
+m=8,6,8,x|b=5|x=down
+up
+
+m=7,x,5,x|b=8
+left
+
+m=7,x,5,x|b=8|x=up
+left
+
+m=7,x,5,x|b=8|x=left
+up
 
-board=123076548|blank=3|blocked=down
+m=x,13,x,11|b=0
 right
 
-board=123576048|blank=6
+m=x,13,x,11|b=0|x=down
 right
+
+m=x,13,x,11|b=0|x=right
+down
 
-board=123576048|blank=6|blocked=up
+m=x,10,12,10|b=1
 right
 
-board=123576048|blank=6|blocked=right
-up
+m=x,10,12,10|b=1|x=down
+right
 
-board=123576408|blank=7
-up
+m=x,10,12,10|b=1|x=left
+right
 
-board=123576408|blank=7|blocked=left
-up
+m=x,10,12,10|b=1|x=right
+down
 
-board=123576408|blank=7|blocked=right
-up
+m=x,9,11,x|b=2
+down
 
-board=123576408|blank=7|blocked=up
-right
+m=x,9,11,x|b=2|x=left
+down
 
-board=123506478|blank=4
+m=x,9,11,x|b=2|x=down
 left
 
-board=123506478|blank=4|blocked=up
+m=10,8,8,x|b=5
 left
 
-board=123506478|blank=4|blocked=down
+m=10,8,8,x|b=5|x=up
 left
 
-board=123506478|blank=4|blocked=right
+m=10,8,8,x|b=5|x=down
 left
-
-board=123506478|blank=4|blocked=left
-up
-
-board=236185740|blank=8
-up
 
-board=236185740|blank=8|blocked=left
-up
+m=10,8,8,x|b=5|x=left
+down
 
-board=236185740|blank=8|blocked=up
+m=9,9,9,9|b=4
 left
 
-board=236180745|blank=5
+m=9,9,9,9|b=4|x=up
 left
 
-board=236180745|blank=5|blocked=up
+m=9,9,9,9|b=4|x=down
 left
 
-board=236180745|blank=5|blocked=down
+m=9,9,9,9|b=4|x=right
 left
 
-board=236180745|blank=5|blocked=left
+m=9,9,9,9|b=4|x=left
 up
 
-board=236108745|blank=4
-down
+m=x,8,8,6|b=1
+right
 
-board=236108745|blank=4|blocked=up
-down
+m=x,8,8,6|b=1|x=down
+right
 
-board=236108745|blank=4|blocked=left
-down
+m=x,8,8,6|b=1|x=left
+right
 
-board=236108745|blank=4|blocked=right
+m=x,8,8,6|b=1|x=right
 down
+
+m=5,x,5,x|b=8
+left
+
+m=5,x,5,x|b=8|x=up
+left
+
+m=5,x,5,x|b=8|x=left
+up
 
-board=236108745|blank=4|blocked=down
+m=13,13,13,15|b=4
 right
 
-board=236148705|blank=7
+m=13,13,13,15|b=4|x=up
 right
 
-board=236148705|blank=7|blocked=up
+m=13,13,13,15|b=4|x=down
 right
 
-board=236148705|blank=7|blocked=left
+m=13,13,13,15|b=4|x=left
 right
 
-board=236148705|blank=7|blocked=right
+m=13,13,13,15|b=4|x=right
 up
 
-board=236148750|blank=8
+m=14,16,14,x|b=5
 up
 
-board=236148750|blank=8|blocked=left
+m=14,16,14,x|b=5|x=down
 up
-
-board=236148750|blank=8|blocked=up
-left
 
-board=236140758|blank=5
+m=14,16,14,x|b=5|x=left
 up
 
-board=236140758|blank=5|blocked=down
-up
+m=14,16,14,x|b=5|x=up
+left
 
-board=236140758|blank=5|blocked=left
-up
+m=x,12,12,14|b=1
+down
 
-board=236140758|blank=5|blocked=up
+m=x,12,12,14|b=1|x=left
 down
 
-board=230146758|blank=2
-left
+m=x,12,12,14|b=1|x=right
+down
 
-board=230146758|blank=2|blocked=down
+m=x,12,12,14|b=1|x=down
 left
 
-board=230146758|blank=2|blocked=left
-down
+m=13,11,11,11|b=4
+left
 
-board=203146758|blank=1
+m=13,11,11,11|b=4|x=up
 left
 
-board=203146758|blank=1|blocked=down
+m=13,11,11,11|b=4|x=down
 left
 
-board=203146758|blank=1|blocked=right
+m=13,11,11,11|b=4|x=right
 left
 
-board=203146758|blank=1|blocked=left
+m=13,11,11,11|b=4|x=left
 down
 
-board=023146758|blank=0
-down
+m=6,8,8,x|b=5
+up
 
-board=023146758|blank=0|blocked=right
-down
+m=6,8,8,x|b=5|x=down
+up
 
-board=023146758|blank=0|blocked=down
-right
+m=6,8,8,x|b=5|x=left
+up
 
-board=123046758|blank=3
-right
+m=6,8,8,x|b=5|x=up
+down
 
-board=123046758|blank=3|blocked=up
-right
+m=x,7,5,x|b=2
+left
 
-board=123046758|blank=3|blocked=down
-right
+m=x,7,5,x|b=2|x=down
+left
 
-board=123046758|blank=3|blocked=right
-up
+m=x,7,5,x|b=2|x=left
+down
 
-board=412875603|blank=7
+m=x,6,4,6|b=1
 left
 
-board=412875603|blank=7|blocked=up
+m=x,6,4,6|b=1|x=down
 left
 
-board=412875603|blank=7|blocked=right
+m=x,6,4,6|b=1|x=right
 left
 
-board=412875603|blank=7|blocked=left
-up
+m=x,6,4,6|b=1|x=left
+down
 
-board=412875063|blank=6
-up
+m=x,3,x,5|b=0
+down
 
-board=412875063|blank=6|blocked=right
-up
+m=x,3,x,5|b=0|x=right
+down
 
-board=412875063|blank=6|blocked=up
+m=x,3,x,5|b=0|x=down
 right
 
-board=412075863|blank=3
-right
+m=4,2,x,4|b=3
+down
+
+m=4,2,x,4|b=3|x=up
+down
+
+m=4,2,x,4|b=3|x=right
+down
+
+m=4,2,x,4|b=3|x=down
+up
 
-board=412075863|blank=3|blocked=up
+m=3,x,x,1|b=6
 right
 
-board=412075863|blank=3|blocked=down
+m=3,x,x,1|b=6|x=up
 right
+
+m=3,x,x,1|b=6|x=right
+up
 
-board=412075863|blank=3|blocked=right
+m=16,x,14,14|b=7
 up
 
-board=136478520|blank=8
+m=16,x,14,14|b=7|x=left
 up
 
-board=136478520|blank=8|blocked=left
+m=16,x,14,14|b=7|x=right
 up
 
-board=136478520|blank=8|blocked=up
+m=16,x,14,14|b=7|x=up
 left
+
+m=15,15,15,17|b=4
+up
 
-board=136470528|blank=5
+m=15,15,15,17|b=4|x=down
 up
 
-board=136470528|blank=5|blocked=down
+m=15,15,15,17|b=4|x=left
 up
 
-board=136470528|blank=5|blocked=left
+m=15,15,15,17|b=4|x=right
 up
 
-board=136470528|blank=5|blocked=up
+m=15,15,15,17|b=4|x=up
 down
 
-board=130476528|blank=2
+m=x,16,14,14|b=1
 left
 
-board=130476528|blank=2|blocked=down
+m=x,16,14,14|b=1|x=down
 left
 
-board=130476528|blank=2|blocked=left
-down
+m=x,16,14,14|b=1|x=right
+left
 
-board=513768204|blank=7
+m=x,16,14,14|b=1|x=left
 right
 
-board=513768204|blank=7|blocked=up
-right
+m=x,13,x,15|b=0
+down
 
-board=513768204|blank=7|blocked=left
-right
+m=x,13,x,15|b=0|x=right
+down
 
-board=513768204|blank=7|blocked=right
-left
+m=x,13,x,15|b=0|x=down
+right
 
-board=513768240|blank=8
-up
+m=14,12,x,12|b=3
+down
 
-board=513768240|blank=8|blocked=left
-up
+m=14,12,x,12|b=3|x=up
+down
 
-board=513768240|blank=8|blocked=up
-left
+m=14,12,x,12|b=3|x=right
+down
 
-board=513760248|blank=5
-left
+m=14,12,x,12|b=3|x=down
+right
 
-board=513760248|blank=5|blocked=up
-left
+m=10,x,12,10|b=7
+up
 
-board=513760248|blank=5|blocked=down
-left
+m=10,x,12,10|b=7|x=left
+up
 
-board=513760248|blank=5|blocked=left
+m=10,x,12,10|b=7|x=right
 up
 
-board=513706248|blank=4
-left
+m=10,x,12,10|b=7|x=up
+right
 
-board=513706248|blank=4|blocked=up
+m=9,11,9,11|b=4
 left
 
-board=513706248|blank=4|blocked=down
+m=9,11,9,11|b=4|x=up
 left
 
-board=513706248|blank=4|blocked=right
+m=9,11,9,11|b=4|x=down
 left
-
-board=513706248|blank=4|blocked=left
-down
 
-board=513076248|blank=3
-down
+m=9,11,9,11|b=4|x=right
+left
 
-board=513076248|blank=3|blocked=up
-down
+m=9,11,9,11|b=4|x=left
+up
 
-board=513076248|blank=3|blocked=right
-down
+m=10,8,x,10|b=3
+up
 
-board=513076248|blank=3|blocked=down
+m=10,8,x,10|b=3|x=down
 up
 
-board=513276048|blank=6
-right
+m=10,8,x,10|b=3|x=right
+up
 
-board=513276048|blank=6|blocked=up
-right
+m=10,8,x,10|b=3|x=up
+down
 
-board=513276048|blank=6|blocked=right
-up
+m=10,10,8,x|b=5
+left
 
-board=513276408|blank=7
-up
+m=10,10,8,x|b=5|x=up
+left
 
-board=513276408|blank=7|blocked=left
-up
+m=10,10,8,x|b=5|x=down
+left
 
-board=513276408|blank=7|blocked=right
+m=10,10,8,x|b=5|x=left
 up
-
-board=513276408|blank=7|blocked=up
-right
 
-board=513206478|blank=4
+m=9,9,7,9|b=4
 left
 
-board=513206478|blank=4|blocked=up
+m=9,9,7,9|b=4|x=up
 left
 
-board=513206478|blank=4|blocked=down
+m=9,9,7,9|b=4|x=down
 left
 
-board=513206478|blank=4|blocked=right
+m=9,9,7,9|b=4|x=right
 left
 
-board=513206478|blank=4|blocked=left
+m=9,9,7,9|b=4|x=left
 up
 
-board=513026478|blank=3
+m=6,6,x,8|b=3
 up
 
-board=513026478|blank=3|blocked=down
+m=6,6,x,8|b=3|x=down
 up
 
-board=513026478|blank=3|blocked=right
+m=6,6,x,8|b=3|x=right
 up
 
-board=513026478|blank=3|blocked=up
+m=6,6,x,8|b=3|x=up
 down
 
-board=013526478|blank=0
+m=x,7,x,5|b=0
 right
 
-board=013526478|blank=0|blocked=down
+m=x,7,x,5|b=0|x=down
 right
 
-board=013526478|blank=0|blocked=right
+m=x,7,x,5|b=0|x=right
 down
 
-board=103526478|blank=1
+m=x,4,6,6|b=1
 down
 
-board=103526478|blank=1|blocked=left
+m=x,4,6,6|b=1|x=left
 down
 
-board=103526478|blank=1|blocked=right
+m=x,4,6,6|b=1|x=right
 down
 
-board=103526478|blank=1|blocked=down
+m=x,4,6,6|b=1|x=down
 left
-
-board=136428075|blank=6
-right
-
-board=136428075|blank=6|blocked=up
-right
 
-board=136428075|blank=6|blocked=right
-up
+m=5,5,3,5|b=4
+left
 
-board=203174865|blank=1
+m=5,5,3,5|b=4|x=up
 left
 
-board=203174865|blank=1|blocked=down
+m=5,5,3,5|b=4|x=down
 left
 
-board=203174865|blank=1|blocked=right
+m=5,5,3,5|b=4|x=right
 left
 
-board=203174865|blank=1|blocked=left
-down
+m=5,5,3,5|b=4|x=left
+up
 
-board=023174865|blank=0
+m=9,7,7,9|b=4
 down
 
-board=023174865|blank=0|blocked=right
+m=9,7,7,9|b=4|x=up
 down
 
-board=023174865|blank=0|blocked=down
-right
+m=9,7,7,9|b=4|x=left
+down
 
-board=123074865|blank=3
-right
+m=9,7,7,9|b=4|x=right
+down
 
-board=123074865|blank=3|blocked=up
-right
+m=9,7,7,9|b=4|x=down
+left
 
-board=123074865|blank=3|blocked=down
+m=7,5,7,5|b=4
 right
-
-board=123074865|blank=3|blocked=right
-up
 
-board=123704865|blank=4
+m=7,5,7,5|b=4|x=up
 right
 
-board=123704865|blank=4|blocked=up
+m=7,5,7,5|b=4|x=down
 right
 
-board=123704865|blank=4|blocked=down
+m=7,5,7,5|b=4|x=left
 right
 
-board=123704865|blank=4|blocked=left
-right
+m=7,5,7,5|b=4|x=right
+down
 
-board=123704865|blank=4|blocked=right
+m=15,13,15,13|b=4
 down
 
-board=123740865|blank=5
+m=15,13,15,13|b=4|x=up
 down
 
-board=123740865|blank=5|blocked=up
+m=15,13,15,13|b=4|x=left
 down
 
-board=123740865|blank=5|blocked=left
+m=15,13,15,13|b=4|x=right
 down
 
-board=123740865|blank=5|blocked=down
-up
+m=15,13,15,13|b=4|x=down
+right
+
+m=14,x,12,14|b=7
+left
 
-board=123745860|blank=8
+m=14,x,12,14|b=7|x=up
 left
 
-board=123745860|blank=8|blocked=up
+m=14,x,12,14|b=7|x=right
 left
 
-board=123745860|blank=8|blocked=left
+m=14,x,12,14|b=7|x=left
 up
 
-board=123480765|blank=5
-down
+m=13,x,x,13|b=6
+up
 
-board=123480765|blank=5|blocked=up
-down
+m=13,x,x,13|b=6|x=right
+up
 
-board=123480765|blank=5|blocked=left
-down
+m=13,x,x,13|b=6|x=up
+right
 
-board=123480765|blank=5|blocked=down
-up
+m=11,11,9,9|b=4
+right
+
+m=11,11,9,9|b=4|x=up
+right
+
+m=11,11,9,9|b=4|x=down
+right
 
-board=123485760|blank=8
+m=11,11,9,9|b=4|x=left
+right
+
+m=11,11,9,9|b=4|x=right
+left
+
+m=x,9,7,x|b=2
 left
 
-board=123485760|blank=8|blocked=up
+m=x,9,7,x|b=2|x=down
 left
 
-board=123485760|blank=8|blocked=left
+m=x,9,7,x|b=2|x=left
+down
+
+m=4,x,6,4|b=7
 up
 
-board=236401785|blank=4
-right
+m=4,x,6,4|b=7|x=left
+up
 
-board=236401785|blank=4|blocked=up
-right
+m=4,x,6,4|b=7|x=right
+up
 
-board=236401785|blank=4|blocked=down
+m=4,x,6,4|b=7|x=up
 right
 
-board=236401785|blank=4|blocked=left
-right
+m=7,x,7,x|b=8
+up
 
-board=236401785|blank=4|blocked=right
+m=7,x,7,x|b=8|x=left
 up
 
-board=236410785|blank=5
-down
+m=7,x,7,x|b=8|x=up
+left
 
-board=236410785|blank=5|blocked=up
-down
+m=8,6,6,x|b=5
+left
 
-board=236410785|blank=5|blocked=left
+m=8,6,6,x|b=5|x=up
+left
+
+m=8,6,6,x|b=5|x=down
+left
+
+m=8,6,6,x|b=5|x=left
 down
 
-board=236410785|blank=5|blocked=down
+m=15,x,13,x|b=8
 up
 
-board=236415780|blank=8
+m=15,x,13,x|b=8|x=left
+up
+
+m=15,x,13,x|b=8|x=up
 left
+
+m=14,14,16,x|b=5
+up
 
-board=236415780|blank=8|blocked=up
+m=14,14,16,x|b=5|x=down
+up
+
+m=14,14,16,x|b=5|x=left
+up
+
+m=14,14,16,x|b=5|x=up
+down
+
+m=9,x,11,x|b=8
+up
+
+m=9,x,11,x|b=8|x=left
+up
+
+m=9,x,11,x|b=8|x=up
 left
+
+m=9,7,9,9|b=4
+down
+
+m=9,7,9,9|b=4|x=up
+down
+
+m=9,7,9,9|b=4|x=left
+down
 
-board=236415780|blank=8|blocked=left
+m=9,7,9,9|b=4|x=right
+down
+
+m=9,7,9,9|b=4|x=down
 up
 
-board=236415708|blank=7
+m=8,x,6,6|b=7
 left
 
-board=236415708|blank=7|blocked=up
+m=8,x,6,6|b=7|x=up
 left
 
-board=236415708|blank=7|blocked=right
+m=8,x,6,6|b=7|x=right
 left
 
-board=236415708|blank=7|blocked=left
+m=8,x,6,6|b=7|x=left
 right
 
-board=236415078|blank=6
+m=5,x,x,7|b=6
 up
 
-board=236415078|blank=6|blocked=right
+m=5,x,x,7|b=6|x=right
 up
-
-board=236415078|blank=6|blocked=up
-right
 
-board=236015478|blank=3
+m=5,x,x,7|b=6|x=up
 right
 
-board=236015478|blank=3|blocked=up
-right
+m=x,16,16,14|b=1
+down
 
-board=236015478|blank=3|blocked=down
-right
+m=x,16,16,14|b=1|x=left
+down
 
-board=236015478|blank=3|blocked=right
+m=x,16,16,14|b=1|x=right
 down
 
-board=236105478|blank=4
+m=x,16,16,14|b=1|x=down
 right
 
-board=236105478|blank=4|blocked=up
-right
+m=13,x,x,15|b=6
+up
 
-board=236105478|blank=4|blocked=down
-right
+m=13,x,x,15|b=6|x=right
+up
 
-board=236105478|blank=4|blocked=left
+m=13,x,x,15|b=6|x=up
 right
 
-board=236105478|blank=4|blocked=right
+m=12,14,x,12|b=3
 up
 
-board=236150478|blank=5
+m=12,14,x,12|b=3|x=down
 up
 
-board=236150478|blank=5|blocked=down
+m=12,14,x,12|b=3|x=right
 up
 
-board=236150478|blank=5|blocked=left
-up
+m=12,14,x,12|b=3|x=up
+right
 
-board=236150478|blank=5|blocked=up
+m=12,10,12,x|b=5
 down
-
-board=230156478|blank=2
-left
 
-board=230156478|blank=2|blocked=down
-left
-
-board=230156478|blank=2|blocked=left
+m=12,10,12,x|b=5|x=up
 down
 
-board=510273486|blank=2
+m=12,10,12,x|b=5|x=left
 down
 
-board=510273486|blank=2|blocked=left
-down
+m=12,10,12,x|b=5|x=down
+up
 
-board=510273486|blank=2|blocked=down
+m=11,x,9,x|b=8
 left
-
-board=513270486|blank=5
-down
-
-board=513270486|blank=5|blocked=up
-down
 
-board=513270486|blank=5|blocked=left
-down
+m=11,x,9,x|b=8|x=up
+left
 
-board=513270486|blank=5|blocked=down
+m=11,x,9,x|b=8|x=left
 up
+
+m=10,x,8,10|b=7
+left
 
-board=513276480|blank=8
+m=10,x,8,10|b=7|x=up
 left
 
-board=513276480|blank=8|blocked=up
+m=10,x,8,10|b=7|x=right
 left
 
-board=513276480|blank=8|blocked=left
+m=10,x,8,10|b=7|x=left
 up
 
-board=253018467|blank=3
+m=6,8,x,6|b=3
 right
 
-board=253018467|blank=3|blocked=up
+m=6,8,x,6|b=3|x=up
 right
 
-board=253018467|blank=3|blocked=down
+m=6,8,x,6|b=3|x=down
 right
-
-board=253018467|blank=3|blocked=right
-down
-
-board=253108467|blank=4
-down
 
-board=253108467|blank=4|blocked=up
-down
-
-board=253108467|blank=4|blocked=left
-down
-
-board=253108467|blank=4|blocked=right
-down
-
-board=253108467|blank=4|blocked=down
+m=6,8,x,6|b=3|x=right
 up
 
-board=253168407|blank=7
+m=7,7,7,5|b=4
 right
 
-board=253168407|blank=7|blocked=up
+m=7,7,7,5|b=4|x=up
 right
 
-board=253168407|blank=7|blocked=left
+m=7,7,7,5|b=4|x=down
 right
-
-board=253168407|blank=7|blocked=right
-up
 
-board=253168470|blank=8
-up
+m=7,7,7,5|b=4|x=left
+right
 
-board=253168470|blank=8|blocked=left
+m=7,7,7,5|b=4|x=right
 up
-
-board=253168470|blank=8|blocked=up
-left
 
-board=253160478|blank=5
+m=x,8,6,6|b=1
 left
 
-board=253160478|blank=5|blocked=up
+m=x,8,6,6|b=1|x=down
 left
 
-board=253160478|blank=5|blocked=down
+m=x,8,6,6|b=1|x=right
 left
-
-board=253160478|blank=5|blocked=left
-up
-
-board=541032786|blank=3
-up
 
-board=541032786|blank=3|blocked=down
-up
+m=x,8,6,6|b=1|x=left
+right
 
-board=541032786|blank=3|blocked=right
-up
+m=x,5,x,7|b=0
+down
 
-board=541032786|blank=3|blocked=up
+m=x,5,x,7|b=0|x=right
 down
 
-board=041532786|blank=0
+m=x,5,x,7|b=0|x=down
 right
 
-board=041532786|blank=0|blocked=down
+m=6,6,x,4|b=3
 right
 
-board=041532786|blank=0|blocked=right
-down
-
-board=401532786|blank=1
+m=6,6,x,4|b=3|x=up
 right
 
-board=401532786|blank=1|blocked=down
+m=6,6,x,4|b=3|x=down
 right
 
-board=401532786|blank=1|blocked=left
-right
+m=6,6,x,4|b=3|x=right
+up
 
-board=401532786|blank=1|blocked=right
-down
+m=15,17,15,15|b=4
+up
+
+m=15,17,15,15|b=4|x=down
+up
+
+m=15,17,15,15|b=4|x=left
+up
+
+m=15,17,15,15|b=4|x=right
+up
 
-board=410532786|blank=2
+m=15,17,15,15|b=4|x=up
+left
+
+m=x,13,15,x|b=2
 down
 
-board=410532786|blank=2|blocked=left
+m=x,13,15,x|b=2|x=left
 down
 
-board=410532786|blank=2|blocked=down
+m=x,13,15,x|b=2|x=down
 left
 
-board=412530786|blank=5
+m=14,14,12,x|b=5
 left
 
-board=412530786|blank=5|blocked=up
+m=14,14,12,x|b=5|x=up
 left
 
-board=412530786|blank=5|blocked=down
+m=14,14,12,x|b=5|x=down
 left
 
-board=412530786|blank=5|blocked=left
-down
+m=14,14,12,x|b=5|x=left
+up
 
-board=412503786|blank=4
+m=11,13,11,13|b=4
 left
 
-board=412503786|blank=4|blocked=up
+m=11,13,11,13|b=4|x=up
 left
 
-board=412503786|blank=4|blocked=down
+m=11,13,11,13|b=4|x=down
 left
 
-board=412503786|blank=4|blocked=right
+m=11,13,11,13|b=4|x=right
 left
 
-board=412503786|blank=4|blocked=left
+m=11,13,11,13|b=4|x=left
 up
-
-board=182463075|blank=6
-right
-
-board=182463075|blank=6|blocked=up
-right
 
-board=182463075|blank=6|blocked=right
-up
+m=10,10,x,12|b=3
+down
 
-board=182463705|blank=7
-up
+m=10,10,x,12|b=3|x=up
+down
 
-board=182463705|blank=7|blocked=left
-up
+m=10,10,x,12|b=3|x=right
+down
 
-board=182463705|blank=7|blocked=right
+m=10,10,x,12|b=3|x=down
 up
-
-board=182463705|blank=7|blocked=up
-right
 
-board=182403765|blank=4
+m=7,9,9,9|b=4
 up
 
-board=182403765|blank=4|blocked=down
+m=7,9,9,9|b=4|x=down
 up
 
-board=182403765|blank=4|blocked=left
+m=7,9,9,9|b=4|x=left
 up
 
-board=182403765|blank=4|blocked=right
+m=7,9,9,9|b=4|x=right
 up
 
-board=182403765|blank=4|blocked=up
+m=7,9,9,9|b=4|x=up
 down
 
-board=102483765|blank=1
+m=x,14,12,12|b=1
 right
 
-board=102483765|blank=1|blocked=down
+m=x,14,12,12|b=1|x=down
 right
 
-board=102483765|blank=1|blocked=left
+m=x,14,12,12|b=1|x=left
 right
 
-board=102483765|blank=1|blocked=right
-down
-
-board=120483765|blank=2
-down
-
-board=120483765|blank=2|blocked=left
-down
-
-board=120483765|blank=2|blocked=down
+m=x,14,12,12|b=1|x=right
 left
-
-board=234107865|blank=4
-right
-
-board=234107865|blank=4|blocked=up
-right
-
-board=234107865|blank=4|blocked=down
-right
-
-board=234107865|blank=4|blocked=left
-right
-
-board=234107865|blank=4|blocked=right
-down
 
-board=234170865|blank=5
+m=8,x,10,10|b=7
 up
 
-board=234170865|blank=5|blocked=down
+m=8,x,10,10|b=7|x=left
 up
 
-board=234170865|blank=5|blocked=left
+m=8,x,10,10|b=7|x=right
 up
 
-board=234170865|blank=5|blocked=up
-down
+m=8,x,10,10|b=7|x=up
+left
 
-board=230174865|blank=2
+m=7,9,7,9|b=4
 left
 
-board=230174865|blank=2|blocked=down
+m=7,9,7,9|b=4|x=up
 left
 
-board=230174865|blank=2|blocked=left
-down
+m=7,9,7,9|b=4|x=down
+left
 
-board=123704586|blank=4
-right
+m=7,9,7,9|b=4|x=right
+left
 
-board=123704586|blank=4|blocked=up
-right
+m=7,9,7,9|b=4|x=left
+up
 
-board=123704586|blank=4|blocked=down
+m=x,7,x,7|b=0
 right
 
-board=123704586|blank=4|blocked=left
+m=x,7,x,7|b=0|x=down
 right
+
+m=x,7,x,7|b=0|x=right
+down
+
+m=8,10,10,x|b=5
+left
+
+m=8,10,10,x|b=5|x=up
+left
+
+m=8,10,10,x|b=5|x=down
+left
 
-board=123704586|blank=4|blocked=right
+m=8,10,10,x|b=5|x=left
 up
 
-board=123740586|blank=5
+m=11,9,9,9|b=4
 down
 
-board=123740586|blank=5|blocked=up
+m=11,9,9,9|b=4|x=up
 down
 
-board=123740586|blank=5|blocked=left
+m=11,9,9,9|b=4|x=left
 down
 
-board=123740586|blank=5|blocked=down
-up
+m=11,9,9,9|b=4|x=right
+down
 
-board=123746580|blank=8
+m=11,9,9,9|b=4|x=down
 left
 
-board=123746580|blank=8|blocked=up
-left
+m=6,6,6,x|b=5
+down
+
+m=6,6,6,x|b=5|x=up
+down
+
+m=6,6,6,x|b=5|x=left
+down
 
-board=123746580|blank=8|blocked=left
+m=6,6,6,x|b=5|x=down
 up
 
-board=123746508|blank=7
+m=6,x,4,6|b=7
 left
 
-board=123746508|blank=7|blocked=up
+m=6,x,4,6|b=7|x=up
 left
 
-board=123746508|blank=7|blocked=right
+m=6,x,4,6|b=7|x=right
 left
 
-board=123746508|blank=7|blocked=left
-right
-
-board=123746058|blank=6
+m=6,x,4,6|b=7|x=left
 up
 
-board=123746058|blank=6|blocked=right
+m=5,x,x,5|b=6
 up
-
-board=123746058|blank=6|blocked=up
-right
 
-board=423751806|blank=7
+m=5,x,x,5|b=6|x=right
 up
 
-board=423751806|blank=7|blocked=left
-up
+m=5,x,x,5|b=6|x=up
+right
 
-board=423751806|blank=7|blocked=right
-up
+m=x,19,x,19|b=0
+down
 
-board=423751806|blank=7|blocked=up
-left
+m=x,19,x,19|b=0|x=right
+down
 
-board=423701856|blank=4
+m=x,19,x,19|b=0|x=down
 right
 
-board=423701856|blank=4|blocked=up
+m=18,18,x,18|b=3
 right
 
-board=423701856|blank=4|blocked=down
+m=18,18,x,18|b=3|x=up
 right
 
-board=423701856|blank=4|blocked=left
+m=18,18,x,18|b=3|x=down
 right
 
-board=423701856|blank=4|blocked=right
-down
+m=18,18,x,18|b=3|x=right
+up
 
-board=423710856|blank=5
+m=19,17,19,17|b=4
 up
 
-board=423710856|blank=5|blocked=down
+m=19,17,19,17|b=4|x=down
 up
 
-board=423710856|blank=5|blocked=left
+m=19,17,19,17|b=4|x=left
 up
 
-board=423710856|blank=5|blocked=up
-down
+m=19,17,19,17|b=4|x=right
+up
 
-board=420713856|blank=2
-left
+m=19,17,19,17|b=4|x=up
+down
 
-board=420713856|blank=2|blocked=down
-left
+m=x,18,18,18|b=1
+right
 
-board=420713856|blank=2|blocked=left
-down
+m=x,18,18,18|b=1|x=down
+right
 
-board=513406728|blank=4
-down
+m=x,18,18,18|b=1|x=left
+right
 
-board=513406728|blank=4|blocked=up
+m=x,18,18,18|b=1|x=right
 down
 
-board=513406728|blank=4|blocked=left
+m=x,17,19,x|b=2
 down
 
-board=513406728|blank=4|blocked=right
+m=x,17,19,x|b=2|x=left
 down
 
-board=513406728|blank=4|blocked=down
-up
+m=x,17,19,x|b=2|x=down
+left
 
-board=513426708|blank=7
+m=18,16,16,x|b=5
 left
 
-board=513426708|blank=7|blocked=up
+m=18,16,16,x|b=5|x=up
 left
 
-board=513426708|blank=7|blocked=right
+m=18,16,16,x|b=5|x=down
 left
 
-board=513426708|blank=7|blocked=left
-right
+m=18,16,16,x|b=5|x=left
+down
 
-board=513426078|blank=6
+m=15,15,17,17|b=4
 up
 
-board=513426078|blank=6|blocked=right
+m=15,15,17,17|b=4|x=down
 up
-
-board=513426078|blank=6|blocked=up
-right
 
-board=346278105|blank=7
+m=15,15,17,17|b=4|x=left
 up
 
-board=346278105|blank=7|blocked=left
+m=15,15,17,17|b=4|x=right
 up
 
-board=346278105|blank=7|blocked=right
-up
+m=15,15,17,17|b=4|x=up
+down
 
-board=346278105|blank=7|blocked=up
-right
+m=11,11,13,13|b=4
+down
+
+m=11,11,13,13|b=4|x=up
+down
+
+m=11,11,13,13|b=4|x=left
+down
+
+m=11,11,13,13|b=4|x=right
+down
+
+m=11,11,13,13|b=4|x=down
+up
 
-board=346208175|blank=4
+m=7,7,9,9|b=4
 up
 
-board=346208175|blank=4|blocked=down
+m=7,7,9,9|b=4|x=down
 up
 
-board=346208175|blank=4|blocked=left
+m=7,7,9,9|b=4|x=left
 up
 
-board=346208175|blank=4|blocked=right
+m=7,7,9,9|b=4|x=right
 up
 
-board=346208175|blank=4|blocked=up
+m=7,7,9,9|b=4|x=up
+down
+
+m=5,x,3,x|b=8
 left
 
-board=306248175|blank=1
+m=5,x,3,x|b=8|x=up
 left
+
+m=5,x,3,x|b=8|x=left
+up
 
-board=306248175|blank=1|blocked=down
+m=11,9,9,11|b=4
 left
 
-board=306248175|blank=1|blocked=right
+m=11,9,9,11|b=4|x=up
 left
 
-board=306248175|blank=1|blocked=left
-down
+m=11,9,9,11|b=4|x=down
+left
 
-board=036248175|blank=0
-down
+m=11,9,9,11|b=4|x=right
+left
 
-board=036248175|blank=0|blocked=right
+m=11,9,9,11|b=4|x=left
 down
 
-board=036248175|blank=0|blocked=down
-right
+m=16,18,18,x|b=5
+up
 
-board=236048175|blank=3
-down
+m=16,18,18,x|b=5|x=down
+up
 
-board=236048175|blank=3|blocked=up
-down
+m=16,18,18,x|b=5|x=left
+up
 
-board=236048175|blank=3|blocked=right
+m=16,18,18,x|b=5|x=up
 down
 
-board=236048175|blank=3|blocked=down
-right
+m=x,17,15,x|b=2
+left
 
-board=236148075|blank=6
-right
+m=x,17,15,x|b=2|x=down
+left
 
-board=236148075|blank=6|blocked=up
-right
+m=x,17,15,x|b=2|x=left
+down
 
-board=236148075|blank=6|blocked=right
-up
+m=x,14,14,16|b=1
+down
 
-board=043215786|blank=0
+m=x,14,14,16|b=1|x=left
 down
 
-board=043215786|blank=0|blocked=right
+m=x,14,14,16|b=1|x=right
 down
 
-board=043215786|blank=0|blocked=down
-right
+m=x,14,14,16|b=1|x=down
+left
 
-board=243015786|blank=3
+m=12,x,12,10|b=7
 right
 
-board=243015786|blank=3|blocked=up
+m=12,x,12,10|b=7|x=up
 right
 
-board=243015786|blank=3|blocked=down
+m=12,x,12,10|b=7|x=left
 right
 
-board=243015786|blank=3|blocked=right
+m=12,x,12,10|b=7|x=right
 up
 
-board=243105786|blank=4
+m=8,10,8,x|b=5
 up
 
-board=243105786|blank=4|blocked=down
+m=8,10,8,x|b=5|x=down
 up
 
-board=243105786|blank=4|blocked=left
+m=8,10,8,x|b=5|x=left
 up
 
-board=243105786|blank=4|blocked=right
-up
-
-board=243105786|blank=4|blocked=up
-right
-
-board=203145786|blank=1
+m=8,10,8,x|b=5|x=up
 left
 
-board=203145786|blank=1|blocked=down
+m=x,8,8,8|b=1
 left
 
-board=203145786|blank=1|blocked=right
+m=x,8,8,8|b=1|x=down
 left
-
-board=203145786|blank=1|blocked=left
-down
-
-board=023145786|blank=0
-down
 
-board=023145786|blank=0|blocked=right
-down
-
-board=023145786|blank=0|blocked=down
-right
-
-board=410732856|blank=2
-down
+m=x,8,8,8|b=1|x=right
+left
 
-board=410732856|blank=2|blocked=left
+m=x,8,8,8|b=1|x=left
 down
-
-board=410732856|blank=2|blocked=down
-left
 
-board=412730856|blank=5
+m=6,4,4,x|b=5
 left
 
-board=412730856|blank=5|blocked=up
+m=6,4,4,x|b=5|x=up
 left
 
-board=412730856|blank=5|blocked=down
+m=6,4,4,x|b=5|x=down
 left
 
-board=412730856|blank=5|blocked=left
+m=6,4,4,x|b=5|x=left
 down
 
-board=523418706|blank=7
+m=14,12,12,x|b=5
 left
 
-board=523418706|blank=7|blocked=up
+m=14,12,12,x|b=5|x=up
 left
 
-board=523418706|blank=7|blocked=right
+m=14,12,12,x|b=5|x=down
 left
 
-board=523418706|blank=7|blocked=left
-up
-
-board=523418076|blank=6
-up
-
-board=523418076|blank=6|blocked=right
-up
+m=14,12,12,x|b=5|x=left
+down
 
-board=523418076|blank=6|blocked=up
+m=x,12,12,10|b=1
 right
 
-board=523018476|blank=3
+m=x,12,12,10|b=1|x=down
 right
 
-board=523018476|blank=3|blocked=up
+m=x,12,12,10|b=1|x=left
 right
 
-board=523018476|blank=3|blocked=down
-right
+m=x,12,12,10|b=1|x=right
+down
 
-board=523018476|blank=3|blocked=right
-up
-
-board=523108476|blank=4
-right
-
-board=523108476|blank=4|blocked=up
-right
-
-board=523108476|blank=4|blocked=down
-right
-
-board=523108476|blank=4|blocked=left
-right
-
-board=523108476|blank=4|blocked=right
-up
-
-board=523180476|blank=5
-up
-
-board=523180476|blank=5|blocked=down
-up
-
-board=523180476|blank=5|blocked=left
-up
-
-board=523180476|blank=5|blocked=up
-down
-
-board=520183476|blank=2
-left
-
-board=520183476|blank=2|blocked=down
-left
-
-board=520183476|blank=2|blocked=left
-down
-
-board=502183476|blank=1
-left
-
-board=502183476|blank=1|blocked=down
-left
-
-board=502183476|blank=1|blocked=right
-left
-
-board=502183476|blank=1|blocked=left
-right
-
-board=052183476|blank=0
-down
-
-board=052183476|blank=0|blocked=right
-down
-
-board=052183476|blank=0|blocked=down
-right
-
-board=152083476|blank=3
-down
-
-board=152083476|blank=3|blocked=up
-down
-
-board=152083476|blank=3|blocked=right
-down
-
-board=152083476|blank=3|blocked=down
-up
-
-board=152483076|blank=6
-right
-
-board=152483076|blank=6|blocked=up
-right
-
-board=152483076|blank=6|blocked=right
-up
-
-board=152483706|blank=7
-up
-
-board=152483706|blank=7|blocked=left
-up
-
-board=152483706|blank=7|blocked=right
-up
-
-board=152483706|blank=7|blocked=up
-left
-
-board=152403786|blank=4
-up
-
-board=152403786|blank=4|blocked=down
-up
-
-board=152403786|blank=4|blocked=left
-up
-
-board=152403786|blank=4|blocked=right
-up
-
-board=152403786|blank=4|blocked=up
-down
-
-board=125034786|blank=3
-up
-
-board=125034786|blank=3|blocked=down
-up
-
-board=125034786|blank=3|blocked=right
-up
-
-board=125034786|blank=3|blocked=up
-down
-
-board=025134786|blank=0
-right
-
-board=025134786|blank=0|blocked=down
-right
-
-board=025134786|blank=0|blocked=right
-down
-
-board=205134786|blank=1
-down
-
-board=205134786|blank=1|blocked=left
-down
-
-board=205134786|blank=1|blocked=right
-down
-
-board=205134786|blank=1|blocked=down
-left
-
-board=235104786|blank=4
-right
-
-board=235104786|blank=4|blocked=up
-right
-
-board=235104786|blank=4|blocked=down
-right
-
-board=235104786|blank=4|blocked=left
-right
-
-board=235104786|blank=4|blocked=right
-up
-
-board=235140786|blank=5
-up
-
-board=235140786|blank=5|blocked=down
-up
-
-board=235140786|blank=5|blocked=left
-up
-
-board=235140786|blank=5|blocked=up
-down
-
-board=230145786|blank=2
-left
-
-board=230145786|blank=2|blocked=down
-left
-
-board=230145786|blank=2|blocked=left
-down
-
-board=136028475|blank=3
-down
-
-board=136028475|blank=3|blocked=up
-down
-
-board=136028475|blank=3|blocked=right
-down
-
-board=136028475|blank=3|blocked=down
-up
-
-board=413502876|blank=4
-down
-
-board=413502876|blank=4|blocked=up
-down
-
-board=413502876|blank=4|blocked=left
-down
-
-board=413502876|blank=4|blocked=right
-down
-
-board=413502876|blank=4|blocked=down
-left
-
-board=413572806|blank=7
-left
-
-board=413572806|blank=7|blocked=up
-left
-
-board=413572806|blank=7|blocked=right
-left
-
-board=413572806|blank=7|blocked=left
-up
-
-board=413572086|blank=6
-up
-
-board=413572086|blank=6|blocked=right
-up
-
-board=413572086|blank=6|blocked=up
-right
-
-board=413072586|blank=3
-right
-
-board=413072586|blank=3|blocked=up
-right
-
-board=413072586|blank=3|blocked=down
-right
-
-board=413072586|blank=3|blocked=right
-up
-
-board=123560478|blank=5
-left
-
-board=123560478|blank=5|blocked=up
-left
-
-board=123560478|blank=5|blocked=down
-left
-
-board=123560478|blank=5|blocked=left
-up
-
-board=135026784|blank=3
-down
-
-board=135026784|blank=3|blocked=up
-down
-
-board=135026784|blank=3|blocked=right
-down
-
-board=135026784|blank=3|blocked=down
-up
-
-board=135726084|blank=6
-right
-
-board=135726084|blank=6|blocked=up
-right
-
-board=135726084|blank=6|blocked=right
-up
-
-board=135726804|blank=7
-right
-
-board=135726804|blank=7|blocked=up
-right
-
-board=135726804|blank=7|blocked=left
-right
-
-board=135726804|blank=7|blocked=right
-left
-
-board=135726840|blank=8
-up
-
-board=135726840|blank=8|blocked=left
-up
-
-board=135726840|blank=8|blocked=up
-left
-
-board=135720846|blank=5
-up
-
-board=135720846|blank=5|blocked=down
-up
-
-board=135720846|blank=5|blocked=left
-up
-
-board=135720846|blank=5|blocked=up
-down
-
-board=130725846|blank=2
-left
-
-board=130725846|blank=2|blocked=down
-left
-
-board=130725846|blank=2|blocked=left
-down
-
-board=103725846|blank=1
-down
-
-board=103725846|blank=1|blocked=left
-down
-
-board=103725846|blank=1|blocked=right
-down
-
-board=103725846|blank=1|blocked=down
-left
-
-board=052143786|blank=0
-down
-
-board=052143786|blank=0|blocked=right
-down
-
-board=052143786|blank=0|blocked=down
-right
-
-board=152043786|blank=3
-right
-
-board=152043786|blank=3|blocked=up
-right
-
-board=152043786|blank=3|blocked=down
-right
-
-board=152043786|blank=3|blocked=right
-up
-
-board=253187046|blank=6
-right
-
-board=253187046|blank=6|blocked=up
-right
-
-board=253187046|blank=6|blocked=right
-up
-
-board=253187406|blank=7
-up
-
-board=253187406|blank=7|blocked=left
-up
-
-board=253187406|blank=7|blocked=right
-up
-
-board=253187406|blank=7|blocked=up
-left
-
-board=253107486|blank=4
-right
-
-board=253107486|blank=4|blocked=up
-right
-
-board=253107486|blank=4|blocked=down
-right
-
-board=253107486|blank=4|blocked=left
-right
-
-board=253107486|blank=4|blocked=right
-up
-
-board=413728065|blank=6
-up
-
-board=413728065|blank=6|blocked=right
-up
-
-board=413728065|blank=6|blocked=up
-right
-
-board=413028765|blank=3
-up
-
-board=413028765|blank=3|blocked=down
-up
-
-board=413028765|blank=3|blocked=right
-up
-
-board=413028765|blank=3|blocked=up
-down
-
-board=013428765|blank=0
-right
-
-board=013428765|blank=0|blocked=down
-right
-
-board=013428765|blank=0|blocked=right
-down
-
-board=103428765|blank=1
-down
-
-board=103428765|blank=1|blocked=left
-down
-
-board=103428765|blank=1|blocked=right
-down
-
-board=103428765|blank=1|blocked=down
-left
-
-board=123408765|blank=4
-down
-
-board=123408765|blank=4|blocked=up
-down
-
-board=123408765|blank=4|blocked=left
-down
-
-board=123408765|blank=4|blocked=right
-down
-
-board=123408765|blank=4|blocked=down
-right
-
-board=413725806|blank=7
-left
-
-board=413725806|blank=7|blocked=up
-left
-
-board=413725806|blank=7|blocked=right
-left
-
-board=413725806|blank=7|blocked=left
-up
-
-board=413725086|blank=6
-up
-
-board=413725086|blank=6|blocked=right
-up
-
-board=413725086|blank=6|blocked=up
-right
-
-board=413025786|blank=3
-up
-
-board=413025786|blank=3|blocked=down
-up
-
-board=413025786|blank=3|blocked=right
-up
-
-board=413025786|blank=3|blocked=up
-down
-
-board=013425786|blank=0
-right
-
-board=013425786|blank=0|blocked=down
-right
-
-board=013425786|blank=0|blocked=right
-down
-
-board=152836470|blank=8
-up
-
-board=152836470|blank=8|blocked=left
-up
-
-board=152836470|blank=8|blocked=up
-left
-
-board=152830476|blank=5
-left
-
-board=152830476|blank=5|blocked=up
-left
-
-board=152830476|blank=5|blocked=down
-left
-
-board=152830476|blank=5|blocked=left
-down
-
-board=152803476|blank=4
-left
-
-board=152803476|blank=4|blocked=up
-left
-
-board=152803476|blank=4|blocked=down
-left
-
-board=152803476|blank=4|blocked=right
-left
-
-board=152803476|blank=4|blocked=left
-up
-
-board=120458763|blank=2
-left
-
-board=120458763|blank=2|blocked=down
-left
-
-board=120458763|blank=2|blocked=left
-down
-
-board=102458763|blank=1
-down
-
-board=102458763|blank=1|blocked=left
-down
-
-board=102458763|blank=1|blocked=right
-down
-
-board=102458763|blank=1|blocked=down
-right
-
-board=152408763|blank=4
-right
-
-board=152408763|blank=4|blocked=up
-right
-
-board=152408763|blank=4|blocked=down
-right
-
-board=152408763|blank=4|blocked=left
-right
-
-board=152408763|blank=4|blocked=right
-up
-
-board=152480763|blank=5
-down
-
-board=152480763|blank=5|blocked=up
-down
-
-board=152480763|blank=5|blocked=left
-down
-
-board=152480763|blank=5|blocked=down
-up
-
-board=152483760|blank=8
-left
-
-board=152483760|blank=8|blocked=up
-left
-
-board=152483760|blank=8|blocked=left
-up
-
-board=243156780|blank=8
-up
-
-board=243156780|blank=8|blocked=left
-up
-
-board=243156780|blank=8|blocked=up
-left
-
-board=243150786|blank=5
-left
-
-board=243150786|blank=5|blocked=up
-left
-
-board=243150786|blank=5|blocked=down
-left
-
-board=243150786|blank=5|blocked=left
-down
-
-board=162503478|blank=4
-up
-
-board=162503478|blank=4|blocked=down
-up
-
-board=162503478|blank=4|blocked=left
-up
-
-board=162503478|blank=4|blocked=right
-up
-
-board=162503478|blank=4|blocked=up
-left
-
-board=102563478|blank=1
-right
-
-board=102563478|blank=1|blocked=down
-right
-
-board=102563478|blank=1|blocked=left
-right
-
-board=102563478|blank=1|blocked=right
-down
-
-board=120563478|blank=2
-down
-
-board=120563478|blank=2|blocked=left
-down
-
-board=120563478|blank=2|blocked=down
-left
-
-board=135402786|blank=4
-right
-
-board=135402786|blank=4|blocked=up
-right
-
-board=135402786|blank=4|blocked=down
-right
-
-board=135402786|blank=4|blocked=left
-right
-
-board=135402786|blank=4|blocked=right
-up
-
-board=013724586|blank=0
-right
-
-board=013724586|blank=0|blocked=down
-right
-
-board=013724586|blank=0|blocked=right
-down
-
-board=103724586|blank=1
-down
-
-board=103724586|blank=1|blocked=left
-down
-
-board=103724586|blank=1|blocked=right
-down
-
-board=103724586|blank=1|blocked=down
-left
-
-board=403216758|blank=1
-down
-
-board=403216758|blank=1|blocked=left
-down
-
-board=403216758|blank=1|blocked=right
-down
-
-board=403216758|blank=1|blocked=down
-left
-
-board=413206758|blank=4
-left
-
-board=413206758|blank=4|blocked=up
-left
-
-board=413206758|blank=4|blocked=down
-left
-
-board=413206758|blank=4|blocked=right
-left
-
-board=413206758|blank=4|blocked=left
-down
-
-board=123580467|blank=5
-left
-
-board=123580467|blank=5|blocked=up
-left
-
-board=123580467|blank=5|blocked=down
-left
-
-board=123580467|blank=5|blocked=left
-up
-
-board=123508467|blank=4
-down
-
-board=123508467|blank=4|blocked=up
-down
-
-board=123508467|blank=4|blocked=left
-down
-
-board=123508467|blank=4|blocked=right
-down
-
-board=123508467|blank=4|blocked=down
-left
-
-board=123568407|blank=7
-right
-
-board=123568407|blank=7|blocked=up
-right
-
-board=123568407|blank=7|blocked=left
-right
-
-board=123568407|blank=7|blocked=right
-up
-
-board=123568470|blank=8
-up
-
-board=123568470|blank=8|blocked=left
-up
-
-board=123568470|blank=8|blocked=up
-left
-
-board=203187465|blank=1
-down
-
-board=203187465|blank=1|blocked=left
-down
-
-board=203187465|blank=1|blocked=right
-down
-
-board=203187465|blank=1|blocked=down
-left
-
-board=283107465|blank=4
-right
-
-board=283107465|blank=4|blocked=up
-right
-
-board=283107465|blank=4|blocked=down
-right
-
-board=283107465|blank=4|blocked=left
-right
-
-board=283107465|blank=4|blocked=right
-up
-
-board=283170465|blank=5
-down
-
-board=283170465|blank=5|blocked=up
-down
-
-board=283170465|blank=5|blocked=left
-down
-
-board=283170465|blank=5|blocked=down
-up
-
-board=283175460|blank=8
-left
-
-board=283175460|blank=8|blocked=up
-left
-
-board=283175460|blank=8|blocked=left
-up
-
-board=283175406|blank=7
-up
-
-board=283175406|blank=7|blocked=left
-up
-
-board=283175406|blank=7|blocked=right
-up
-
-board=283175406|blank=7|blocked=up
-left
-
-board=283105476|blank=4
-up
-
-board=283105476|blank=4|blocked=down
-up
-
-board=283105476|blank=4|blocked=left
-up
-
-board=283105476|blank=4|blocked=right
-up
-
-board=283105476|blank=4|blocked=up
-right
-
-board=203185476|blank=1
-left
-
-board=203185476|blank=1|blocked=down
-left
-
-board=203185476|blank=1|blocked=right
-left
-
-board=203185476|blank=1|blocked=left
-down
-
-board=023185476|blank=0
-down
-
-board=023185476|blank=0|blocked=right
-down
-
-board=023185476|blank=0|blocked=down
-right
-
-board=123085476|blank=3
-down
-
-board=123085476|blank=3|blocked=up
-down
-
-board=123085476|blank=3|blocked=right
-down
-
-board=123085476|blank=3|blocked=down
-up
-
-board=123485076|blank=6
-right
-
-board=123485076|blank=6|blocked=up
-right
-
-board=123485076|blank=6|blocked=right
-up
-
-board=403521786|blank=1
-down
-
-board=403521786|blank=1|blocked=left
-down
-
-board=403521786|blank=1|blocked=right
-down
-
-board=403521786|blank=1|blocked=down
-left
-
-board=423501786|blank=4
-right
-
-board=423501786|blank=4|blocked=up
-right
-
-board=423501786|blank=4|blocked=down
-right
-
-board=423501786|blank=4|blocked=left
-right
-
-board=423501786|blank=4|blocked=right
-left
-
-board=423510786|blank=5
-up
-
-board=423510786|blank=5|blocked=down
-up
-
-board=423510786|blank=5|blocked=left
-up
-
-board=423510786|blank=5|blocked=up
-down
-
-board=420513786|blank=2
-left
-
-board=420513786|blank=2|blocked=down
-left
-
-board=420513786|blank=2|blocked=left
-down
-
-board=402513786|blank=1
-down
-
-board=402513786|blank=1|blocked=left
-down
-
-board=402513786|blank=1|blocked=right
-down
-
-board=402513786|blank=1|blocked=down
-right
-
-board=412036578|blank=3
-down
-
-board=412036578|blank=3|blocked=up
-down
-
-board=412036578|blank=3|blocked=right
-down
-
-board=412036578|blank=3|blocked=down
-up
-
-board=412536078|blank=6
-right
-
-board=412536078|blank=6|blocked=up
-right
-
-board=412536078|blank=6|blocked=right
-up
-
-board=412536708|blank=7
-right
-
-board=412536708|blank=7|blocked=up
-right
-
-board=412536708|blank=7|blocked=left
-right
-
-board=412536708|blank=7|blocked=right
-up
-
-board=412536780|blank=8
-up
-
-board=412536780|blank=8|blocked=left
-up
-
-board=412536780|blank=8|blocked=up
-left
-
-board=412583076|blank=6
-right
-
-board=412583076|blank=6|blocked=up
-right
-
-board=412583076|blank=6|blocked=right
-up
-
-board=412583706|blank=7
-up
-
-board=412583706|blank=7|blocked=left
-up
-
-board=412583706|blank=7|blocked=right
-up
-
-board=412583706|blank=7|blocked=up
-left
-
-board=306258147|blank=1
-left
-
-board=306258147|blank=1|blocked=down
-left
-
-board=306258147|blank=1|blocked=right
-left
-
-board=306258147|blank=1|blocked=left
-down
-
-board=036258147|blank=0
-down
-
-board=036258147|blank=0|blocked=right
-down
-
-board=036258147|blank=0|blocked=down
-right
-
-board=236058147|blank=3
-down
-
-board=236058147|blank=3|blocked=up
-down
-
-board=236058147|blank=3|blocked=right
-down
-
-board=236058147|blank=3|blocked=down
-up
-
-board=236158047|blank=6
-right
-
-board=236158047|blank=6|blocked=up
-right
-
-board=236158047|blank=6|blocked=right
-up
-
-board=236158407|blank=7
-right
-
-board=236158407|blank=7|blocked=up
-right
-
-board=236158407|blank=7|blocked=left
-right
-
-board=236158407|blank=7|blocked=right
-up
-
-board=236158470|blank=8
-up
-
-board=236158470|blank=8|blocked=left
-up
-
-board=236158470|blank=8|blocked=up
-left
-
-board=401752863|blank=1
-right
-
-board=401752863|blank=1|blocked=down
-right
-
-board=401752863|blank=1|blocked=left
-right
-
-board=401752863|blank=1|blocked=right
-down
-
-board=410752863|blank=2
-down
-
-board=410752863|blank=2|blocked=left
-down
-
-board=410752863|blank=2|blocked=down
-left
-
-board=136520478|blank=5
-up
-
-board=136520478|blank=5|blocked=down
-up
-
-board=136520478|blank=5|blocked=left
-up
-
-board=136520478|blank=5|blocked=up
-down
-
-board=130526478|blank=2
-left
-
-board=130526478|blank=2|blocked=down
-left
-
-board=130526478|blank=2|blocked=left
-down
-
-board=712043586|blank=3
-up
-
-board=712043586|blank=3|blocked=down
-up
-
-board=712043586|blank=3|blocked=right
-up
-
-board=712043586|blank=3|blocked=up
-down
-
-board=012743586|blank=0
-right
-
-board=012743586|blank=0|blocked=down
-right
-
-board=012743586|blank=0|blocked=right
-down
-
-board=102743586|blank=1
-right
-
-board=102743586|blank=1|blocked=down
-right
-
-board=102743586|blank=1|blocked=left
-right
-
-board=102743586|blank=1|blocked=right
-down
-
-board=120743586|blank=2
-down
-
-board=120743586|blank=2|blocked=left
-down
-
-board=120743586|blank=2|blocked=down
-left
-
-board=412870563|blank=5
-down
-
-board=412870563|blank=5|blocked=up
-down
-
-board=412870563|blank=5|blocked=left
-down
-
-board=412870563|blank=5|blocked=down
-up
-
-board=412873560|blank=8
-left
-
-board=412873560|blank=8|blocked=up
-left
-
-board=412873560|blank=8|blocked=left
-up
-
-board=412873506|blank=7
-up
-
-board=412873506|blank=7|blocked=left
-up
-
-board=412873506|blank=7|blocked=right
-up
-
-board=412873506|blank=7|blocked=up
-left
-
-board=412803576|blank=4
-left
-
-board=412803576|blank=4|blocked=up
-left
-
-board=412803576|blank=4|blocked=down
-left
-
-board=412803576|blank=4|blocked=right
-left
-
-board=412803576|blank=4|blocked=left
-up
-
-board=412083576|blank=3
-down
-
-board=412083576|blank=3|blocked=up
-down
-
-board=412083576|blank=3|blocked=right
-down
-
-board=412083576|blank=3|blocked=down
-up
-
-board=162405783|blank=4
-right
-
-board=162405783|blank=4|blocked=up
-right
-
-board=162405783|blank=4|blocked=down
-right
-
-board=162405783|blank=4|blocked=left
-right
-
-board=162405783|blank=4|blocked=right
-up
-
-board=162450783|blank=5
-down
-
-board=162450783|blank=5|blocked=up
-down
-
-board=162450783|blank=5|blocked=left
+m=10,10,10,x|b=5
 down
-
-board=162450783|blank=5|blocked=down
-up
-
-board=162453780|blank=8
-left
-
-board=162453780|blank=8|blocked=up
-left
-
-board=162453780|blank=8|blocked=left
-up
-
-board=162453708|blank=7
-up
-
-board=162453708|blank=7|blocked=left
-up
-
-board=162453708|blank=7|blocked=right
-up
-
-board=162453708|blank=7|blocked=up
-right
-
-board=162403758|blank=4
-up
-
-board=162403758|blank=4|blocked=down
-up
-
-board=162403758|blank=4|blocked=left
-up
-
-board=162403758|blank=4|blocked=right
-up
 
-board=162403758|blank=4|blocked=up
+m=10,10,10,x|b=5|x=up
 down
-
-board=435721806|blank=7
-up
-
-board=435721806|blank=7|blocked=left
-up
-
-board=435721806|blank=7|blocked=right
-up
-
-board=435721806|blank=7|blocked=up
-left
-
-board=435701826|blank=4
-right
-
-board=435701826|blank=4|blocked=up
-right
-
-board=435701826|blank=4|blocked=down
-right
-
-board=435701826|blank=4|blocked=left
-right
 
-board=435701826|blank=4|blocked=right
+m=10,10,10,x|b=5|x=left
 down
-
-board=435710826|blank=5
-up
-
-board=435710826|blank=5|blocked=down
-up
 
-board=435710826|blank=5|blocked=left
+m=10,10,10,x|b=5|x=down
 up
-
-board=435710826|blank=5|blocked=up
-down
 
-board=430715826|blank=2
+m=7,9,7,7|b=4
 left
 
-board=430715826|blank=2|blocked=down
+m=7,9,7,7|b=4|x=up
 left
 
-board=430715826|blank=2|blocked=left
-down
+m=7,9,7,7|b=4|x=down
+left
 
-board=403715826|blank=1
-down
+m=7,9,7,7|b=4|x=right
+left
 
-board=403715826|blank=1|blocked=left
-down
+m=7,9,7,7|b=4|x=left
+up
 
-board=403715826|blank=1|blocked=right
+m=x,8,8,10|b=1
 down
-
-board=403715826|blank=1|blocked=down
-left
 
-board=413705826|blank=4
+m=x,8,8,10|b=1|x=left
 down
 
-board=413705826|blank=4|blocked=up
+m=x,8,8,10|b=1|x=right
 down
 
-board=413705826|blank=4|blocked=left
-down
+m=x,8,8,10|b=1|x=down
+left
 
-board=413705826|blank=4|blocked=right
-down
+m=9,9,9,7|b=4
+right
 
-board=413705826|blank=4|blocked=down
+m=9,9,9,7|b=4|x=up
 right
 
-board=162573048|blank=6
+m=9,9,9,7|b=4|x=down
 right
 
-board=162573048|blank=6|blocked=up
+m=9,9,9,7|b=4|x=left
 right
 
-board=162573048|blank=6|blocked=right
+m=9,9,9,7|b=4|x=right
 up
 
-board=162573408|blank=7
-up
+m=x,7,9,x|b=2
+left
 
-board=162573408|blank=7|blocked=left
-up
+m=x,7,9,x|b=2|x=down
+left
 
-board=162573408|blank=7|blocked=right
-up
+m=x,7,9,x|b=2|x=left
+down
 
-board=162573408|blank=7|blocked=up
-right
+m=x,14,12,14|b=1
+down
 
-board=012473856|blank=0
+m=x,14,12,14|b=1|x=left
 down
 
-board=012473856|blank=0|blocked=right
+m=x,14,12,14|b=1|x=right
 down
 
-board=012473856|blank=0|blocked=down
+m=x,14,12,14|b=1|x=down
+left
+
+m=13,13,15,13|b=4
 right
 
-board=412073856|blank=3
+m=13,13,15,13|b=4|x=up
 right
 
-board=412073856|blank=3|blocked=up
+m=13,13,15,13|b=4|x=down
 right
 
-board=412073856|blank=3|blocked=down
+m=13,13,15,13|b=4|x=left
 right
 
-board=412073856|blank=3|blocked=right
+m=13,13,15,13|b=4|x=right
 up
 
-board=136528047|blank=6
-right
+m=14,12,14,x|b=5
+down
 
-board=136528047|blank=6|blocked=up
-right
+m=14,12,14,x|b=5|x=up
+down
 
-board=136528047|blank=6|blocked=right
-up
+m=14,12,14,x|b=5|x=left
+down
 
-board=136528407|blank=7
-right
+m=14,12,14,x|b=5|x=down
+up
 
-board=136528407|blank=7|blocked=up
-right
+m=13,x,11,x|b=8
+left
 
-board=136528407|blank=7|blocked=left
-right
+m=13,x,11,x|b=8|x=up
+left
 
-board=136528407|blank=7|blocked=right
+m=13,x,11,x|b=8|x=left
 up
 
-board=136528470|blank=8
-up
+m=12,x,10,12|b=7
+left
 
-board=136528470|blank=8|blocked=left
-up
+m=12,x,10,12|b=7|x=up
+left
 
-board=136528470|blank=8|blocked=up
+m=12,x,10,12|b=7|x=right
 left
 
-board=152743086|blank=6
+m=12,x,10,12|b=7|x=left
 up
 
-board=152743086|blank=6|blocked=right
+m=9,x,x,9|b=6
 up
 
-board=152743086|blank=6|blocked=up
-right
+m=9,x,x,9|b=6|x=right
+up
 
-board=412736805|blank=7
+m=9,x,x,9|b=6|x=up
 right
 
-board=412736805|blank=7|blocked=up
-right
+m=6,6,4,x|b=5
+left
 
-board=412736805|blank=7|blocked=left
-right
+m=6,6,4,x|b=5|x=up
+left
 
-board=412736805|blank=7|blocked=right
+m=6,6,4,x|b=5|x=down
 left
 
-board=412736850|blank=8
+m=6,6,4,x|b=5|x=left
 up
 
-board=412736850|blank=8|blocked=left
-up
+m=x,14,14,14|b=1
+down
 
-board=412736850|blank=8|blocked=up
-left
+m=x,14,14,14|b=1|x=left
+down
 
-board=152430786|blank=5
-left
+m=x,14,14,14|b=1|x=right
+down
 
-board=152430786|blank=5|blocked=up
+m=x,14,14,14|b=1|x=down
 left
 
-board=152430786|blank=5|blocked=down
-left
+m=14,14,x,14|b=3
+up
+
+m=14,14,x,14|b=3|x=down
+up
+
+m=14,14,x,14|b=3|x=right
+up
 
-board=152430786|blank=5|blocked=left
+m=14,14,x,14|b=3|x=up
 down
 
-board=712530846|blank=5
+m=x,15,x,15|b=0
+right
+
+m=x,15,x,15|b=0|x=down
+right
+
+m=x,15,x,15|b=0|x=right
+down
+
+m=x,8,6,8|b=1
 left
 
-board=712530846|blank=5|blocked=up
+m=x,8,6,8|b=1|x=down
 left
 
-board=712530846|blank=5|blocked=down
+m=x,8,6,8|b=1|x=right
 left
+
+m=x,8,6,8|b=1|x=left
+down
 
-board=712530846|blank=5|blocked=left
+m=6,4,x,4|b=3
 down
 
-board=712503846|blank=4
+m=6,4,x,4|b=3|x=up
+down
+
+m=6,4,x,4|b=3|x=right
+down
+
+m=6,4,x,4|b=3|x=down
+right
+
+m=7,5,5,7|b=4
 left
 
-board=712503846|blank=4|blocked=up
+m=7,5,5,7|b=4|x=up
 left
 
-board=712503846|blank=4|blocked=down
+m=7,5,5,7|b=4|x=down
 left
 
-board=712503846|blank=4|blocked=right
+m=7,5,5,7|b=4|x=right
 left
 
-board=712503846|blank=4|blocked=left
+m=7,5,5,7|b=4|x=left
 down
 
-board=712053846|blank=3
-up
+m=6,6,x,6|b=3
+down
 
-board=712053846|blank=3|blocked=down
-up
+m=6,6,x,6|b=3|x=up
+down
+
+m=6,6,x,6|b=3|x=right
+down
 
-board=712053846|blank=3|blocked=right
+m=6,6,x,6|b=3|x=down
 up
 
-board=712053846|blank=3|blocked=up
-down
+m=15,13,13,13|b=4
+right
 
-board=012753846|blank=0
+m=15,13,13,13|b=4|x=up
 right
 
-board=012753846|blank=0|blocked=down
+m=15,13,13,13|b=4|x=down
 right
 
-board=012753846|blank=0|blocked=right
-down
+m=15,13,13,13|b=4|x=left
+right
 
-board=102753846|blank=1
+m=15,13,13,13|b=4|x=right
 down
 
-board=102753846|blank=1|blocked=left
-down
+m=12,14,14,x|b=5
+up
 
-board=102753846|blank=1|blocked=right
-down
+m=12,14,14,x|b=5|x=down
+up
 
-board=102753846|blank=1|blocked=down
-right
+m=12,14,14,x|b=5|x=left
+up
 
-board=152703846|blank=4
+m=12,14,14,x|b=5|x=up
 down
 
-board=152703846|blank=4|blocked=up
-down
+m=x,13,11,x|b=2
+left
 
-board=152703846|blank=4|blocked=left
-down
+m=x,13,11,x|b=2|x=down
+left
 
-board=152703846|blank=4|blocked=right
+m=x,13,11,x|b=2|x=left
 down
-
-board=152703846|blank=4|blocked=down
-up
 
-board=152743806|blank=7
+m=x,12,10,12|b=1
 left
 
-board=152743806|blank=7|blocked=up
+m=x,12,10,12|b=1|x=down
 left
 
-board=152743806|blank=7|blocked=right
+m=x,12,10,12|b=1|x=right
 left
 
-board=152743806|blank=7|blocked=left
-up
-
-board=412703568|blank=4
+m=x,12,10,12|b=1|x=left
 down
 
-board=412703568|blank=4|blocked=up
+m=10,8,x,8|b=3
 down
 
-board=412703568|blank=4|blocked=left
+m=10,8,x,8|b=3|x=up
 down
 
-board=412703568|blank=4|blocked=right
+m=10,8,x,8|b=3|x=right
 down
-
-board=412703568|blank=4|blocked=down
-up
 
-board=412763508|blank=7
-left
-
-board=412763508|blank=7|blocked=up
-left
-
-board=412763508|blank=7|blocked=right
-left
-
-board=412763508|blank=7|blocked=left
+m=10,8,x,8|b=3|x=down
 right
+
+m=6,x,8,6|b=7
+up
 
-board=412763058|blank=6
+m=6,x,8,6|b=7|x=left
 up
 
-board=412763058|blank=6|blocked=right
+m=6,x,8,6|b=7|x=right
 up
 
-board=412763058|blank=6|blocked=up
+m=6,x,8,6|b=7|x=up
 right
 
-board=642018735|blank=3
+m=5,7,7,7|b=4
 up
 
-board=642018735|blank=3|blocked=down
+m=5,7,7,7|b=4|x=down
 up
 
-board=642018735|blank=3|blocked=right
+m=5,7,7,7|b=4|x=left
 up
 
-board=642018735|blank=3|blocked=up
-right
-
-board=042618735|blank=0
-right
-
-board=042618735|blank=0|blocked=down
-right
+m=5,7,7,7|b=4|x=right
+up
 
-board=042618735|blank=0|blocked=right
+m=5,7,7,7|b=4|x=up
 down
 
-board=402618735|blank=1
-down
+m=x,9,x,9|b=0
+right
 
-board=402618735|blank=1|blocked=left
-down
+m=x,9,x,9|b=0|x=down
+right
 
-board=402618735|blank=1|blocked=right
+m=x,9,x,9|b=0|x=right
 down
-
-board=402618735|blank=1|blocked=down
-right
 
-board=412608735|blank=4
+m=5,5,7,7|b=4
 down
 
-board=412608735|blank=4|blocked=up
+m=5,5,7,7|b=4|x=up
 down
 
-board=412608735|blank=4|blocked=left
+m=5,5,7,7|b=4|x=left
 down
 
-board=412608735|blank=4|blocked=right
+m=5,5,7,7|b=4|x=right
 down
 
-board=412608735|blank=4|blocked=down
-left
+m=5,5,7,7|b=4|x=down
+up
 
-board=412638705|blank=7
+m=8,6,x,6|b=3
 right
 
-board=412638705|blank=7|blocked=up
+m=8,6,x,6|b=3|x=up
 right
 
-board=412638705|blank=7|blocked=left
+m=8,6,x,6|b=3|x=down
 right
+
+m=8,6,x,6|b=3|x=right
+down
 
-board=412638705|blank=7|blocked=right
+m=12,14,x,14|b=3
 up
 
-board=412638750|blank=8
+m=12,14,x,14|b=3|x=down
 up
 
-board=412638750|blank=8|blocked=left
+m=12,14,x,14|b=3|x=right
 up
 
-board=412638750|blank=8|blocked=up
-left
+m=12,14,x,14|b=3|x=up
+down
 
-board=412630758|blank=5
-left
+m=11,x,11,x|b=8
+up
 
-board=412630758|blank=5|blocked=up
-left
+m=11,x,11,x|b=8|x=left
+up
 
-board=412630758|blank=5|blocked=down
+m=11,x,11,x|b=8|x=up
 left
 
-board=412630758|blank=5|blocked=left
-up
+m=x,11,9,x|b=2
+left
 
-board=120873465|blank=2
-down
+m=x,11,9,x|b=2|x=down
+left
 
-board=120873465|blank=2|blocked=left
+m=x,11,9,x|b=2|x=left
 down
-
-board=120873465|blank=2|blocked=down
-left
 
-board=123870465|blank=5
+m=10,10,12,x|b=5
 down
 
-board=123870465|blank=5|blocked=up
+m=10,10,12,x|b=5|x=up
 down
 
-board=123870465|blank=5|blocked=left
+m=10,10,12,x|b=5|x=left
 down
 
-board=123870465|blank=5|blocked=down
+m=10,10,12,x|b=5|x=down
 up
+
+m=x,20,20,18|b=1
+right
+
+m=x,20,20,18|b=1|x=down
+right
 
-board=123875460|blank=8
+m=x,20,20,18|b=1|x=left
+right
+
+m=x,20,20,18|b=1|x=right
+down
+
+m=17,x,15,x|b=8
 left
 
-board=123875460|blank=8|blocked=up
+m=17,x,15,x|b=8|x=up
 left
 
-board=123875460|blank=8|blocked=left
+m=17,x,15,x|b=8|x=left
 up
 
-board=123875406|blank=7
+m=16,x,14,16|b=7
 up
 
-board=123875406|blank=7|blocked=left
+m=16,x,14,16|b=7|x=left
 up
 
-board=123875406|blank=7|blocked=right
+m=16,x,14,16|b=7|x=right
 up
 
-board=123875406|blank=7|blocked=up
+m=16,x,14,16|b=7|x=up
 left
 
-board=123805476|blank=4
-left
-
-board=123805476|blank=4|blocked=up
-left
+m=15,15,15,15|b=4
+right
 
-board=123805476|blank=4|blocked=down
-left
+m=15,15,15,15|b=4|x=up
+right
 
-board=123805476|blank=4|blocked=right
-left
+m=15,15,15,15|b=4|x=down
+right
 
-board=123805476|blank=4|blocked=left
+m=15,15,15,15|b=4|x=left
 right
+
+m=15,15,15,15|b=4|x=right
+up
+
+m=16,14,16,x|b=5
+down
 
-board=402813765|blank=1
+m=16,14,16,x|b=5|x=up
 down
 
-board=402813765|blank=1|blocked=left
+m=16,14,16,x|b=5|x=left
 down
 
-board=402813765|blank=1|blocked=right
+m=16,14,16,x|b=5|x=down
+up
+
+m=x,8,10,8|b=1
+down
+
+m=x,8,10,8|b=1|x=left
 down
 
-board=402813765|blank=1|blocked=down
+m=x,8,10,8|b=1|x=right
+down
+
+m=x,8,10,8|b=1|x=down
 right
 
-board=412803765|blank=4
+m=8,x,6,8|b=7
 left
 
-board=412803765|blank=4|blocked=up
+m=8,x,6,8|b=7|x=up
 left
 
-board=412803765|blank=4|blocked=down
+m=8,x,6,8|b=7|x=right
 left
+
+m=8,x,6,8|b=7|x=left
+up
 
-board=412803765|blank=4|blocked=right
+m=15,15,17,15|b=4
+right
+
+m=15,15,17,15|b=4|x=up
+right
+
+m=15,15,17,15|b=4|x=down
+right
+
+m=15,15,17,15|b=4|x=left
+right
+
+m=15,15,17,15|b=4|x=right
+up
+
+m=12,x,12,14|b=7
+up
+
+m=12,x,12,14|b=7|x=left
+up
+
+m=12,x,12,14|b=7|x=right
+up
+
+m=12,x,12,14|b=7|x=up
 left
 
-board=412803765|blank=4|blocked=left
-down
+m=11,13,13,13|b=4
+up
 
-board=412083765|blank=3
+m=11,13,13,13|b=4|x=down
 up
 
-board=412083765|blank=3|blocked=down
+m=11,13,13,13|b=4|x=left
 up
 
-board=412083765|blank=3|blocked=right
+m=11,13,13,13|b=4|x=right
 up
 
-board=412083765|blank=3|blocked=up
+m=11,13,13,13|b=4|x=up
 down
 
-board=012483765|blank=0
+m=11,11,9,11|b=4
 right
 
-board=012483765|blank=0|blocked=down
+m=11,11,9,11|b=4|x=up
 right
-
-board=012483765|blank=0|blocked=right
-down
 
-board=162430758|blank=5
-left
+m=11,11,9,11|b=4|x=down
+right
 
-board=162430758|blank=5|blocked=up
-left
+m=11,11,9,11|b=4|x=left
+right
 
-board=162430758|blank=5|blocked=down
+m=11,11,9,11|b=4|x=right
 left
 
-board=162430758|blank=5|blocked=left
+m=10,12,12,x|b=5
 up
 
-board=243106758|blank=4
+m=10,12,12,x|b=5|x=down
 up
 
-board=243106758|blank=4|blocked=down
+m=10,12,12,x|b=5|x=left
 up
 
-board=243106758|blank=4|blocked=left
-up
+m=10,12,12,x|b=5|x=up
+down
 
-board=243106758|blank=4|blocked=right
+m=6,x,8,8|b=7
 up
 
-board=243106758|blank=4|blocked=up
-down
+m=6,x,8,8|b=7|x=left
+up
 
-board=360248175|blank=2
-left
+m=6,x,8,8|b=7|x=right
+up
 
-board=360248175|blank=2|blocked=down
+m=6,x,8,8|b=7|x=up
 left
-
-board=360248175|blank=2|blocked=left
-down
 
-board=523186470|blank=8
+m=6,8,x,8|b=3
 up
 
-board=523186470|blank=8|blocked=left
+m=6,8,x,8|b=3|x=down
 up
 
-board=523186470|blank=8|blocked=up
-left
+m=6,8,x,8|b=3|x=right
+up
 
-board=240713865|blank=2
+m=6,8,x,8|b=3|x=up
 down
+
+m=x,6,6,6|b=1
+right
+
+m=x,6,6,6|b=1|x=down
+right
+
+m=x,6,6,6|b=1|x=left
+right
 
-board=240713865|blank=2|blocked=left
+m=x,6,6,6|b=1|x=right
 down
 
-board=240713865|blank=2|blocked=down
+m=6,6,8,x|b=5
 left
 
-board=243710865|blank=5
-down
+m=6,6,8,x|b=5|x=up
+left
 
-board=243710865|blank=5|blocked=up
-down
+m=6,6,8,x|b=5|x=down
+left
 
-board=243710865|blank=5|blocked=left
-down
+m=6,6,8,x|b=5|x=left
+up
 
-board=243710865|blank=5|blocked=down
+m=13,x,15,x|b=8
 up
 
-board=243715860|blank=8
-left
+m=13,x,15,x|b=8|x=left
+up
 
-board=243715860|blank=8|blocked=up
+m=13,x,15,x|b=8|x=up
 left
 
-board=243715860|blank=8|blocked=left
-up
+m=11,11,11,11|b=4
+left
 
-board=243715806|blank=7
+m=11,11,11,11|b=4|x=up
 left
 
-board=243715806|blank=7|blocked=up
+m=11,11,11,11|b=4|x=down
 left
 
-board=243715806|blank=7|blocked=right
+m=11,11,11,11|b=4|x=right
 left
+
+m=11,11,11,11|b=4|x=left
+up
 
-board=243715806|blank=7|blocked=left
+m=9,9,9,11|b=4
 up
 
-board=243715086|blank=6
+m=9,9,9,11|b=4|x=down
 up
 
-board=243715086|blank=6|blocked=right
+m=9,9,9,11|b=4|x=left
 up
+
+m=9,9,9,11|b=4|x=right
+up
+
+m=9,9,9,11|b=4|x=up
+down
 
-board=243715086|blank=6|blocked=up
+m=8,8,x,6|b=3
 right
 
-board=136278405|blank=7
+m=8,8,x,6|b=3|x=up
+right
+
+m=8,8,x,6|b=3|x=down
+right
+
+m=8,8,x,6|b=3|x=right
 up
 
-board=136278405|blank=7|blocked=left
+m=7,7,7,7|b=4
 up
 
-board=136278405|blank=7|blocked=right
+m=7,7,7,7|b=4|x=down
 up
 
-board=136278405|blank=7|blocked=up
-right
+m=7,7,7,7|b=4|x=left
+up
 
-board=136208475|blank=4
-left
+m=7,7,7,7|b=4|x=right
+up
 
-board=136208475|blank=4|blocked=up
+m=7,7,7,7|b=4|x=up
+down
+
+m=13,13,13,13|b=4
 left
 
-board=136208475|blank=4|blocked=down
+m=13,13,13,13|b=4|x=up
 left
 
-board=136208475|blank=4|blocked=right
+m=13,13,13,13|b=4|x=down
 left
 
-board=136208475|blank=4|blocked=left
-right
+m=13,13,13,13|b=4|x=right
+left
 
-board=236150847|blank=5
+m=13,13,13,13|b=4|x=left
 up
 
-board=236150847|blank=5|blocked=down
-up
+m=x,12,14,12|b=1
+down
 
-board=236150847|blank=5|blocked=left
-up
+m=x,12,14,12|b=1|x=left
+down
 
-board=236150847|blank=5|blocked=up
+m=x,12,14,12|b=1|x=right
 down
 
-board=230156847|blank=2
-left
+m=x,12,14,12|b=1|x=down
+right
 
-board=230156847|blank=2|blocked=down
-left
+m=13,11,13,13|b=4
+down
 
-board=230156847|blank=2|blocked=left
+m=13,11,13,13|b=4|x=up
 down
 
-board=203156847|blank=1
-left
+m=13,11,13,13|b=4|x=left
+down
+
+m=13,11,13,13|b=4|x=right
+down
 
-board=203156847|blank=1|blocked=down
+m=13,11,13,13|b=4|x=down
+up
+
+m=x,11,11,x|b=2
 left
 
-board=203156847|blank=1|blocked=right
+m=x,11,11,x|b=2|x=down
 left
 
-board=203156847|blank=1|blocked=left
+m=x,11,11,x|b=2|x=left
 down
 
-board=023156847|blank=0
-down
+m=14,x,14,12|b=7
+up
 
-board=023156847|blank=0|blocked=right
-down
+m=14,x,14,12|b=7|x=left
+up
+
+m=14,x,14,12|b=7|x=right
+up
 
-board=023156847|blank=0|blocked=down
+m=14,x,14,12|b=7|x=up
 right
 
-board=123056847|blank=3
+m=14,12,x,14|b=3
 down
 
-board=123056847|blank=3|blocked=up
+m=14,12,x,14|b=3|x=up
 down
 
-board=123056847|blank=3|blocked=right
+m=14,12,x,14|b=3|x=right
 down
 
-board=123056847|blank=3|blocked=down
+m=14,12,x,14|b=3|x=down
 up
 
-board=123856047|blank=6
-right
+m=14,16,x,16|b=3
+up
 
-board=123856047|blank=6|blocked=up
-right
+m=14,16,x,16|b=3|x=down
+up
 
-board=123856047|blank=6|blocked=right
+m=14,16,x,16|b=3|x=right
 up
 
-board=123856407|blank=7
-right
+m=14,16,x,16|b=3|x=up
+down
+
+m=8,10,x,8|b=3
+up
+
+m=8,10,x,8|b=3|x=down
+up
 
-board=123856407|blank=7|blocked=up
-right
+m=8,10,x,8|b=3|x=right
+up
 
-board=123856407|blank=7|blocked=left
+m=8,10,x,8|b=3|x=up
 right
 
-board=123856407|blank=7|blocked=right
+m=4,4,6,x|b=5
 up
 
-board=123856470|blank=8
+m=4,4,6,x|b=5|x=down
 up
 
-board=123856470|blank=8|blocked=left
+m=4,4,6,x|b=5|x=left
 up
 
-board=123856470|blank=8|blocked=up
-left
+m=4,4,6,x|b=5|x=up
+down
 
-board=123850476|blank=5
+m=11,11,11,9|b=4
 left
 
-board=123850476|blank=5|blocked=up
+m=11,11,11,9|b=4|x=up
 left
 
-board=123850476|blank=5|blocked=down
+m=11,11,11,9|b=4|x=down
 left
 
-board=123850476|blank=5|blocked=left
-down
+m=11,11,11,9|b=4|x=right
+left
 
-board=136452078|blank=6
+m=11,11,11,9|b=4|x=left
 right
 
-board=136452078|blank=6|blocked=up
-right
+m=13,x,13,x|b=8
+left
+
+m=13,x,13,x|b=8|x=up
+left
 
-board=136452078|blank=6|blocked=right
+m=13,x,13,x|b=8|x=left
 up
+
+m=18,x,16,18|b=7
+left
+
+m=18,x,16,18|b=7|x=up
+left
+
+m=18,x,16,18|b=7|x=right
+left
 
-board=136452708|blank=7
+m=18,x,16,18|b=7|x=left
 up
 
-board=136452708|blank=7|blocked=left
+m=15,x,x,17|b=6
 up
 
-board=136452708|blank=7|blocked=right
+m=15,x,x,17|b=6|x=right
 up
 
-board=136452708|blank=7|blocked=up
+m=15,x,x,17|b=6|x=up
 right
 
-board=136402758|blank=4
-right
+m=14,16,x,14|b=3
+up
 
-board=136402758|blank=4|blocked=up
-right
+m=14,16,x,14|b=3|x=down
+up
+
+m=14,16,x,14|b=3|x=right
+up
 
-board=136402758|blank=4|blocked=down
+m=14,16,x,14|b=3|x=up
 right
 
-board=136402758|blank=4|blocked=left
+m=x,15,x,13|b=0
 right
 
-board=136402758|blank=4|blocked=right
-down
+m=x,15,x,13|b=0|x=down
+right
 
-board=123708564|blank=4
+m=x,15,x,13|b=0|x=right
 down
 
-board=123708564|blank=4|blocked=up
+m=x,14,14,12|b=1
 down
 
-board=123708564|blank=4|blocked=left
+m=x,14,14,12|b=1|x=left
 down
 
-board=123708564|blank=4|blocked=right
+m=x,14,14,12|b=1|x=right
 down
-
-board=123708564|blank=4|blocked=down
-right
-
-board=123768504|blank=7
-right
-
-board=123768504|blank=7|blocked=up
-right
 
-board=123768504|blank=7|blocked=left
+m=x,14,14,12|b=1|x=down
 right
-
-board=123768504|blank=7|blocked=right
-left
-
-board=123768540|blank=8
-up
-
-board=123768540|blank=8|blocked=left
-up
-
-board=123768540|blank=8|blocked=up
-left
 
-board=123760548|blank=5
+m=10,12,10,x|b=5
 left
 
-board=123760548|blank=5|blocked=up
+m=10,12,10,x|b=5|x=up
 left
 
-board=123760548|blank=5|blocked=down
+m=10,12,10,x|b=5|x=down
 left
 
-board=123760548|blank=5|blocked=left
+m=10,12,10,x|b=5|x=left
 up
-
-board=123706548|blank=4
-down
-
-board=123706548|blank=4|blocked=up
-down
-
-board=123706548|blank=4|blocked=left
-down
-
-board=123706548|blank=4|blocked=right
-down
 
-board=123706548|blank=4|blocked=down
+m=5,7,7,5|b=4
 up
 
-board=512783406|blank=7
+m=5,7,7,5|b=4|x=down
 up
 
-board=512783406|blank=7|blocked=left
+m=5,7,7,5|b=4|x=left
 up
 
-board=512783406|blank=7|blocked=right
+m=5,7,7,5|b=4|x=right
 up
-
-board=512783406|blank=7|blocked=up
-left
 
-board=512703486|blank=4
-left
+m=5,7,7,5|b=4|x=up
+right
 
-board=512703486|blank=4|blocked=up
+m=12,12,10,x|b=5
 left
 
-board=512703486|blank=4|blocked=down
+m=12,12,10,x|b=5|x=up
 left
 
-board=512703486|blank=4|blocked=right
+m=12,12,10,x|b=5|x=down
 left
-
-board=512703486|blank=4|blocked=left
-up
-
-board=512073486|blank=3
-up
-
-board=512073486|blank=3|blocked=down
-up
 
-board=512073486|blank=3|blocked=right
+m=12,12,10,x|b=5|x=left
 up
 
-board=512073486|blank=3|blocked=up
+m=11,9,11,11|b=4
 down
 
-board=012573486|blank=0
-right
+m=11,9,11,11|b=4|x=up
+down
 
-board=012573486|blank=0|blocked=down
-right
+m=11,9,11,11|b=4|x=left
+down
 
-board=012573486|blank=0|blocked=right
+m=11,9,11,11|b=4|x=right
 down
+
+m=11,9,11,11|b=4|x=down
+up
 
-board=102573486|blank=1
+m=x,6,6,4|b=1
 right
 
-board=102573486|blank=1|blocked=down
+m=x,6,6,4|b=1|x=down
 right
 
-board=102573486|blank=1|blocked=left
+m=x,6,6,4|b=1|x=left
 right
 
-board=102573486|blank=1|blocked=right
+m=x,6,6,4|b=1|x=right
 down
 
-board=120573486|blank=2
+m=x,3,5,x|b=2
 down
 
-board=120573486|blank=2|blocked=left
+m=x,3,5,x|b=2|x=left
 down
 
-board=120573486|blank=2|blocked=down
+m=x,3,5,x|b=2|x=down
 left
 
-board=123570486|blank=5
+m=12,12,12,x|b=5
 down
 
-board=123570486|blank=5|blocked=up
+m=12,12,12,x|b=5|x=up
 down
 
-board=123570486|blank=5|blocked=left
+m=12,12,12,x|b=5|x=left
 down
+
+m=12,12,12,x|b=5|x=down
+up
+
+m=11,x,x,11|b=6
+up
 
-board=123570486|blank=5|blocked=down
+m=11,x,x,11|b=6|x=right
 up
+
+m=11,x,x,11|b=6|x=up
+right
 
-board=123576480|blank=8
+m=x,19,19,x|b=2
 left
 
-board=123576480|blank=8|blocked=up
+m=x,19,19,x|b=2|x=down
 left
 
-board=123576480|blank=8|blocked=left
-up
+m=x,19,19,x|b=2|x=left
+down
 
-board=812430756|blank=5
+m=x,20,18,18|b=1
 left
 
-board=812430756|blank=5|blocked=up
+m=x,20,18,18|b=1|x=down
 left
 
-board=812430756|blank=5|blocked=down
+m=x,20,18,18|b=1|x=right
 left
+
+m=x,20,18,18|b=1|x=left
+right
 
-board=812430756|blank=5|blocked=left
+m=x,17,x,19|b=0
 down
 
-board=812403756|blank=4
+m=x,17,x,19|b=0|x=right
 down
+
+m=x,17,x,19|b=0|x=down
+right
 
-board=812403756|blank=4|blocked=up
+m=18,16,x,16|b=3
 down
 
-board=812403756|blank=4|blocked=left
+m=18,16,x,16|b=3|x=up
 down
 
-board=812403756|blank=4|blocked=right
+m=18,16,x,16|b=3|x=right
 down
 
-board=812403756|blank=4|blocked=down
-up
+m=18,16,x,16|b=3|x=down
+right
 
-board=812453706|blank=7
-left
+m=17,x,x,15|b=6
+right
 
-board=812453706|blank=7|blocked=up
-left
+m=17,x,x,15|b=6|x=up
+right
 
-board=812453706|blank=7|blocked=right
-left
+m=17,x,x,15|b=6|x=right
+up
 
-board=812453706|blank=7|blocked=left
+m=16,x,16,14|b=7
 up
 
-board=812453076|blank=6
+m=16,x,16,14|b=7|x=left
 up
 
-board=812453076|blank=6|blocked=right
+m=16,x,16,14|b=7|x=right
 up
 
-board=812453076|blank=6|blocked=up
+m=16,x,16,14|b=7|x=up
 right
 
-board=812053476|blank=3
+m=14,16,16,x|b=5
 up
 
-board=812053476|blank=3|blocked=down
+m=14,16,16,x|b=5|x=down
 up
 
-board=812053476|blank=3|blocked=right
+m=14,16,16,x|b=5|x=left
 up
 
-board=812053476|blank=3|blocked=up
+m=14,16,16,x|b=5|x=up
 down
 
-board=012853476|blank=0
+m=13,15,13,15|b=4
 right
 
-board=012853476|blank=0|blocked=down
+m=13,15,13,15|b=4|x=up
 right
 
-board=012853476|blank=0|blocked=right
-down
+m=13,15,13,15|b=4|x=down
+right
 
-board=102853476|blank=1
-down
+m=13,15,13,15|b=4|x=left
+right
 
-board=102853476|blank=1|blocked=left
-down
+m=13,15,13,15|b=4|x=right
+up
 
-board=102853476|blank=1|blocked=right
-down
+m=15,x,15,x|b=8
+left
+
+m=15,x,15,x|b=8|x=up
+left
+
+m=15,x,15,x|b=8|x=left
+up
+
+m=15,x,x,15|b=6
+up
+
+m=15,x,x,15|b=6|x=right
+up
 
-board=102853476|blank=1|blocked=down
+m=15,x,x,15|b=6|x=up
 right
+
+m=14,14,x,16|b=3
+up
+
+m=14,14,x,16|b=3|x=down
+up
+
+m=14,14,x,16|b=3|x=right
+up
+
+m=14,14,x,16|b=3|x=up
+down
 
-board=715302846|blank=4
+m=13,11,11,13|b=4
 left
 
-board=715302846|blank=4|blocked=up
+m=13,11,11,13|b=4|x=up
 left
 
-board=715302846|blank=4|blocked=down
+m=13,11,11,13|b=4|x=down
 left
 
-board=715302846|blank=4|blocked=right
+m=13,11,11,13|b=4|x=right
 left
 
-board=715302846|blank=4|blocked=left
+m=13,11,11,13|b=4|x=left
 down
 
-board=715032846|blank=3
+m=8,x,10,8|b=7
 up
 
-board=715032846|blank=3|blocked=down
+m=8,x,10,8|b=7|x=left
 up
 
-board=715032846|blank=3|blocked=right
+m=8,x,10,8|b=7|x=right
 up
-
-board=715032846|blank=3|blocked=up
-down
-
-board=015732846|blank=0
-right
 
-board=015732846|blank=0|blocked=down
+m=8,x,10,8|b=7|x=up
 right
 
-board=015732846|blank=0|blocked=right
+m=17,15,17,15|b=4
 down
 
-board=105732846|blank=1
+m=17,15,17,15|b=4|x=up
 down
 
-board=105732846|blank=1|blocked=left
+m=17,15,17,15|b=4|x=left
 down
 
-board=105732846|blank=1|blocked=right
+m=17,15,17,15|b=4|x=right
 down
+
+m=17,15,17,15|b=4|x=down
+right
+
+m=14,14,x,12|b=3
+right
+
+m=14,14,x,12|b=3|x=up
+right
 
-board=105732846|blank=1|blocked=down
+m=14,14,x,12|b=3|x=down
 right
+
+m=14,14,x,12|b=3|x=right
+up
 
-board=135702846|blank=4
+m=9,9,11,11|b=4
 down
 
-board=135702846|blank=4|blocked=up
+m=9,9,11,11|b=4|x=up
 down
 
-board=135702846|blank=4|blocked=left
+m=9,9,11,11|b=4|x=left
 down
 
-board=135702846|blank=4|blocked=right
+m=9,9,11,11|b=4|x=right
 down
 
-board=135702846|blank=4|blocked=down
-right
+m=9,9,11,11|b=4|x=down
+up
 
-board=135742806|blank=7
+m=x,18,16,16|b=1
 left
 
-board=135742806|blank=7|blocked=up
+m=x,18,16,16|b=1|x=down
 left
 
-board=135742806|blank=7|blocked=right
+m=x,18,16,16|b=1|x=right
 left
 
-board=135742806|blank=7|blocked=left
-up
+m=x,18,16,16|b=1|x=left
+right
 
-board=135742086|blank=6
-up
+m=x,15,x,17|b=0
+down
 
-board=135742086|blank=6|blocked=right
-up
+m=x,15,x,17|b=0|x=right
+down
 
-board=135742086|blank=6|blocked=up
+m=x,15,x,17|b=0|x=down
 right
 
-board=135042786|blank=3
+m=16,14,x,14|b=3
 right
 
-board=135042786|blank=3|blocked=up
+m=16,14,x,14|b=3|x=up
 right
 
-board=135042786|blank=3|blocked=down
+m=16,14,x,14|b=3|x=down
 right
-
-board=135042786|blank=3|blocked=right
-up
-
-board=162085473|blank=3
-down
-
-board=162085473|blank=3|blocked=up
-down
 
-board=162085473|blank=3|blocked=right
+m=16,14,x,14|b=3|x=right
 down
 
-board=162085473|blank=3|blocked=down
-up
+m=14,x,16,14|b=7
+right
 
-board=162485073|blank=6
+m=14,x,16,14|b=7|x=up
 right
 
-board=162485073|blank=6|blocked=up
+m=14,x,16,14|b=7|x=left
 right
 
-board=162485073|blank=6|blocked=right
+m=14,x,16,14|b=7|x=right
 up
 
-board=162485703|blank=7
-up
+m=15,17,17,15|b=4
+left
 
-board=162485703|blank=7|blocked=left
-up
+m=15,17,17,15|b=4|x=up
+left
 
-board=162485703|blank=7|blocked=right
-up
+m=15,17,17,15|b=4|x=down
+left
 
-board=162485703|blank=7|blocked=up
+m=15,17,17,15|b=4|x=right
 left
 
-board=253416078|blank=6
+m=15,17,17,15|b=4|x=left
 up
 
-board=253416078|blank=6|blocked=right
+m=16,16,x,16|b=3
 up
-
-board=253416078|blank=6|blocked=up
-right
-
-board=253016478|blank=3
-right
 
-board=253016478|blank=3|blocked=up
-right
+m=16,16,x,16|b=3|x=down
+up
 
-board=253016478|blank=3|blocked=down
-right
+m=16,16,x,16|b=3|x=right
+up
 
-board=253016478|blank=3|blocked=right
+m=16,16,x,16|b=3|x=up
 down
-
-board=102583467|blank=1
-right
 
-board=102583467|blank=1|blocked=down
+m=x,17,x,15|b=0
 right
 
-board=102583467|blank=1|blocked=left
+m=x,17,x,15|b=0|x=down
 right
 
-board=102583467|blank=1|blocked=right
+m=x,17,x,15|b=0|x=right
 down
 
-board=120583467|blank=2
+m=x,14,16,14|b=1
 down
 
-board=120583467|blank=2|blocked=left
+m=x,14,16,14|b=1|x=left
 down
-
-board=120583467|blank=2|blocked=down
-left
-
-board=713250846|blank=5
-left
-
-board=713250846|blank=5|blocked=up
-left
-
-board=713250846|blank=5|blocked=down
-left
 
-board=713250846|blank=5|blocked=left
+m=x,14,16,14|b=1|x=right
 down
+
+m=x,14,16,14|b=1|x=down
+right
 
-board=713205846|blank=4
+m=15,15,13,13|b=4
 left
 
-board=713205846|blank=4|blocked=up
+m=15,15,13,13|b=4|x=up
 left
 
-board=713205846|blank=4|blocked=down
+m=15,15,13,13|b=4|x=down
 left
 
-board=713205846|blank=4|blocked=right
+m=15,15,13,13|b=4|x=right
 left
 
-board=713205846|blank=4|blocked=left
-down
+m=15,15,13,13|b=4|x=left
+right
 
-board=713025846|blank=3
+m=10,x,12,12|b=7
 up
 
-board=713025846|blank=3|blocked=down
+m=10,x,12,12|b=7|x=left
 up
 
-board=713025846|blank=3|blocked=right
+m=10,x,12,12|b=7|x=right
 up
 
-board=713025846|blank=3|blocked=up
-down
+m=10,x,12,12|b=7|x=up
+left
+
+m=x,10,10,8|b=1
+right
 
-board=013725846|blank=0
+m=x,10,10,8|b=1|x=down
 right
 
-board=013725846|blank=0|blocked=down
+m=x,10,10,8|b=1|x=left
 right
 
-board=013725846|blank=0|blocked=right
+m=x,10,10,8|b=1|x=right
 down
 
-board=265013478|blank=3
+m=12,12,x,10|b=3
 right
 
-board=265013478|blank=3|blocked=up
+m=12,12,x,10|b=3|x=up
 right
 
-board=265013478|blank=3|blocked=down
+m=12,12,x,10|b=3|x=down
 right
-
-board=265013478|blank=3|blocked=right
-down
-
-board=265103478|blank=4
-up
-
-board=265103478|blank=4|blocked=down
-up
-
-board=265103478|blank=4|blocked=left
-up
 
-board=265103478|blank=4|blocked=right
+m=12,12,x,10|b=3|x=right
 up
-
-board=265103478|blank=4|blocked=up
-down
 
-board=205163478|blank=1
+m=10,10,x,10|b=3
 right
 
-board=205163478|blank=1|blocked=down
+m=10,10,x,10|b=3|x=up
 right
 
-board=205163478|blank=1|blocked=left
+m=10,10,x,10|b=3|x=down
 right
-
-board=205163478|blank=1|blocked=right
-left
-
-board=250163478|blank=2
-down
-
-board=250163478|blank=2|blocked=left
-down
-
-board=250163478|blank=2|blocked=down
-left
 
-board=253406718|blank=4
-down
+m=10,10,x,10|b=3|x=right
+up
 
-board=253406718|blank=4|blocked=up
-down
+m=13,13,11,11|b=4
+up
 
-board=253406718|blank=4|blocked=left
-down
+m=13,13,11,11|b=4|x=down
+up
 
-board=253406718|blank=4|blocked=right
-down
+m=13,13,11,11|b=4|x=left
+up
 
-board=253406718|blank=4|blocked=down
+m=13,13,11,11|b=4|x=right
 up
+
+m=13,13,11,11|b=4|x=up
+left
 
-board=253416708|blank=7
+m=x,18,18,16|b=1
 left
 
-board=253416708|blank=7|blocked=up
+m=x,18,18,16|b=1|x=down
 left
 
-board=253416708|blank=7|blocked=right
+m=x,18,18,16|b=1|x=right
 left
 
-board=253416708|blank=7|blocked=left
+m=x,18,18,16|b=1|x=left
 right
 
-board=106532478|blank=1
+m=x,17,x,17|b=0
 down
 
-board=106532478|blank=1|blocked=left
+m=x,17,x,17|b=0|x=right
 down
+
+m=x,17,x,17|b=0|x=down
+right
 
-board=106532478|blank=1|blocked=right
+m=18,16,x,18|b=3
 down
 
-board=106532478|blank=1|blocked=down
-left
+m=18,16,x,18|b=3|x=up
+down
 
-board=136502478|blank=4
-right
+m=18,16,x,18|b=3|x=right
+down
 
-board=136502478|blank=4|blocked=up
-right
+m=18,16,x,18|b=3|x=down
+up
 
-board=136502478|blank=4|blocked=down
+m=17,x,x,17|b=6
 right
 
-board=136502478|blank=4|blocked=left
+m=17,x,x,17|b=6|x=up
 right
-
-board=136502478|blank=4|blocked=right
-left
 
-board=743126508|blank=7
+m=17,x,x,17|b=6|x=right
 up
 
-board=743126508|blank=7|blocked=left
+m=16,x,16,18|b=7
 up
 
-board=743126508|blank=7|blocked=right
+m=16,x,16,18|b=7|x=left
 up
-
-board=743126508|blank=7|blocked=up
-left
-
-board=743106528|blank=4
-left
-
-board=743106528|blank=4|blocked=up
-left
 
-board=743106528|blank=4|blocked=down
-left
+m=16,x,16,18|b=7|x=right
+up
 
-board=743106528|blank=4|blocked=right
+m=16,x,16,18|b=7|x=up
 left
-
-board=743106528|blank=4|blocked=left
-up
 
-board=743016528|blank=3
+m=16,14,x,16|b=3
 up
 
-board=743016528|blank=3|blocked=down
+m=16,14,x,16|b=3|x=down
 up
 
-board=743016528|blank=3|blocked=right
+m=16,14,x,16|b=3|x=right
 up
 
-board=743016528|blank=3|blocked=up
+m=16,14,x,16|b=3|x=up
 down
 
-board=043716528|blank=0
-right
+m=12,12,14,x|b=5
+up
 
-board=043716528|blank=0|blocked=down
-right
+m=12,12,14,x|b=5|x=down
+up
+
+m=12,12,14,x|b=5|x=left
+up
 
-board=043716528|blank=0|blocked=right
+m=12,12,14,x|b=5|x=up
 down
 
-board=403716528|blank=1
+m=x,10,12,12|b=1
 down
 
-board=403716528|blank=1|blocked=left
+m=x,10,12,12|b=1|x=left
 down
 
-board=403716528|blank=1|blocked=right
+m=x,10,12,12|b=1|x=right
 down
 
-board=403716528|blank=1|blocked=down
+m=x,10,12,12|b=1|x=down
 left
 
-board=156438702|blank=7
+m=16,16,x,14|b=3
 right
 
-board=156438702|blank=7|blocked=up
+m=16,16,x,14|b=3|x=up
 right
 
-board=156438702|blank=7|blocked=left
+m=16,16,x,14|b=3|x=down
 right
 
-board=156438702|blank=7|blocked=right
+m=16,16,x,14|b=3|x=right
 up
 
-board=156438720|blank=8
-up
+m=8,8,8,x|b=5
+left
 
-board=156438720|blank=8|blocked=left
-up
+m=8,8,8,x|b=5|x=up
+left
 
-board=156438720|blank=8|blocked=up
+m=8,8,8,x|b=5|x=down
 left
 
-board=156430728|blank=5
+m=8,8,8,x|b=5|x=left
 up
+
+m=x,4,4,4|b=1
+right
+
+m=x,4,4,4|b=1|x=down
+right
+
+m=x,4,4,4|b=1|x=left
+right
+
+m=x,4,4,4|b=1|x=right
+down
 
-board=156430728|blank=5|blocked=down
+m=7,9,9,7|b=4
 up
 
-board=156430728|blank=5|blocked=left
+m=7,9,9,7|b=4|x=down
 up
 
-board=156430728|blank=5|blocked=up
-left
+m=7,9,9,7|b=4|x=left
+up
 
-board=150436728|blank=2
-left
+m=7,9,9,7|b=4|x=right
+up
 
-board=150436728|blank=2|blocked=down
-left
+m=7,9,9,7|b=4|x=up
+right
 
-board=150436728|blank=2|blocked=left
+m=x,16,16,16|b=1
 down
 
-board=105436728|blank=1
+m=x,16,16,16|b=1|x=left
 down
 
-board=105436728|blank=1|blocked=left
+m=x,16,16,16|b=1|x=right
 down
 
-board=105436728|blank=1|blocked=right
-down
+m=x,16,16,16|b=1|x=down
+left
 
-board=105436728|blank=1|blocked=down
-right
+m=17,15,15,15|b=4
+down
 
-board=235146078|blank=6
-right
+m=17,15,15,15|b=4|x=up
+down
 
-board=235146078|blank=6|blocked=up
-right
+m=17,15,15,15|b=4|x=left
+down
 
-board=235146078|blank=6|blocked=right
-up
+m=17,15,15,15|b=4|x=right
+down
 
-board=235146708|blank=7
-right
+m=17,15,15,15|b=4|x=down
+left
 
-board=235146708|blank=7|blocked=up
-right
+m=16,16,x,18|b=3
+up
 
-board=235146708|blank=7|blocked=left
-right
+m=16,16,x,18|b=3|x=down
+up
 
-board=235146708|blank=7|blocked=right
+m=16,16,x,18|b=3|x=right
 up
+
+m=16,16,x,18|b=3|x=up
+down
 
-board=235146780|blank=8
-up
+m=x,15,15,x|b=2
+down
 
-board=235146780|blank=8|blocked=left
-up
+m=x,15,15,x|b=2|x=left
+down
 
-board=235146780|blank=8|blocked=up
+m=x,15,15,x|b=2|x=down
 left
 
-board=102473856|blank=1
+m=9,9,7,7|b=4
 left
 
-board=102473856|blank=1|blocked=down
+m=9,9,7,7|b=4|x=up
 left
 
-board=102473856|blank=1|blocked=right
+m=9,9,7,7|b=4|x=down
 left
-
-board=102473856|blank=1|blocked=left
-right
-
-board=162458037|blank=6
-up
 
-board=162458037|blank=6|blocked=right
-up
-
-board=162458037|blank=6|blocked=up
-right
-
-board=162058437|blank=3
-right
-
-board=162058437|blank=3|blocked=up
-right
+m=9,9,7,7|b=4|x=right
+left
 
-board=162058437|blank=3|blocked=down
+m=9,9,7,7|b=4|x=left
 right
 
-board=162058437|blank=3|blocked=right
+m=x,13,13,x|b=2
 down
 
-board=162508437|blank=4
+m=x,13,13,x|b=2|x=left
 down
 
-board=162508437|blank=4|blocked=up
-down
+m=x,13,13,x|b=2|x=down
+left
 
-board=162508437|blank=4|blocked=left
-down
+m=14,x,16,16|b=7
+up
 
-board=162508437|blank=4|blocked=right
-down
+m=14,x,16,16|b=7|x=left
+up
 
-board=162508437|blank=4|blocked=down
+m=14,x,16,16|b=7|x=right
 up
+
+m=14,x,16,16|b=7|x=up
+left
 
-board=162538407|blank=7
+m=13,13,15,15|b=4
 right
 
-board=162538407|blank=7|blocked=up
+m=13,13,15,15|b=4|x=up
 right
 
-board=162538407|blank=7|blocked=left
+m=13,13,15,15|b=4|x=down
 right
 
-board=162538407|blank=7|blocked=right
+m=13,13,15,15|b=4|x=left
+right
+
+m=13,13,15,15|b=4|x=right
 up
 
-board=162538470|blank=8
+m=11,13,11,11|b=4
 up
 
-board=162538470|blank=8|blocked=left
+m=11,13,11,11|b=4|x=down
 up
 
-board=162538470|blank=8|blocked=up
-left
+m=11,13,11,11|b=4|x=left
+up
 
-board=162530478|blank=5
+m=11,13,11,11|b=4|x=right
+up
+
+m=11,13,11,11|b=4|x=up
 left
+
+m=15,x,x,13|b=6
+up
 
-board=162530478|blank=5|blocked=up
+m=15,x,x,13|b=6|x=right
+up
+
+m=15,x,x,13|b=6|x=up
+right
+
+m=17,x,17,x|b=8
 left
 
-board=162530478|blank=5|blocked=down
+m=17,x,17,x|b=8|x=up
 left
 
-board=162530478|blank=5|blocked=left
+m=17,x,17,x|b=8|x=left
 up
 
-board=842130765|blank=5
+m=18,x,16,16|b=7
 left
 
-board=842130765|blank=5|blocked=up
+m=18,x,16,16|b=7|x=up
 left
 
-board=842130765|blank=5|blocked=down
+m=18,x,16,16|b=7|x=right
 left
 
-board=842130765|blank=5|blocked=left
-down
+m=18,x,16,16|b=7|x=left
+right
 
-board=842103765|blank=4
+m=11,11,11,13|b=4
 up
 
-board=842103765|blank=4|blocked=down
+m=11,11,11,13|b=4|x=down
 up
 
-board=842103765|blank=4|blocked=left
+m=11,11,11,13|b=4|x=left
 up
 
-board=842103765|blank=4|blocked=right
+m=11,11,11,13|b=4|x=right
 up
 
-board=842103765|blank=4|blocked=up
+m=11,11,11,13|b=4|x=up
 down
-
-board=802143765|blank=1
-left
 
-board=802143765|blank=1|blocked=down
-left
+m=x,6,6,8|b=1
+right
 
-board=802143765|blank=1|blocked=right
-left
+m=x,6,6,8|b=1|x=down
+right
 
-board=802143765|blank=1|blocked=left
+m=x,6,6,8|b=1|x=left
 right
 
-board=082143765|blank=0
+m=x,6,6,8|b=1|x=right
 down
 
-board=082143765|blank=0|blocked=right
+m=x,7,7,x|b=2
 down
+
+m=x,7,7,x|b=2|x=left
+down
+
+m=x,7,7,x|b=2|x=down
+left
 
-board=082143765|blank=0|blocked=down
+m=13,13,11,13|b=4
 right
 
-board=182043765|blank=3
+m=13,13,11,13|b=4|x=up
 right
 
-board=182043765|blank=3|blocked=up
+m=13,13,11,13|b=4|x=down
 right
 
-board=182043765|blank=3|blocked=down
+m=13,13,11,13|b=4|x=left
 right
 
-board=182043765|blank=3|blocked=right
-up
+m=13,13,11,13|b=4|x=right
+left
+
+m=x,19,x,17|b=0
+right
 
-board=123760854|blank=5
+m=x,19,x,17|b=0|x=down
+right
+
+m=x,19,x,17|b=0|x=right
 down
 
-board=123760854|blank=5|blocked=up
+m=x,16,18,18|b=1
 down
 
-board=123760854|blank=5|blocked=left
+m=x,16,18,18|b=1|x=left
 down
 
-board=123760854|blank=5|blocked=down
-left
+m=x,16,18,18|b=1|x=right
+down
 
-board=123764850|blank=8
+m=x,16,18,18|b=1|x=down
 left
 
-board=123764850|blank=8|blocked=up
-left
+m=10,x,10,12|b=7
+up
 
-board=123764850|blank=8|blocked=left
+m=10,x,10,12|b=7|x=left
 up
 
-board=123764805|blank=7
+m=10,x,10,12|b=7|x=right
 up
+
+m=10,x,10,12|b=7|x=up
+left
 
-board=123764805|blank=7|blocked=left
+m=7,x,x,7|b=6
 up
 
-board=123764805|blank=7|blocked=right
+m=7,x,x,7|b=6|x=right
 up
 
-board=123764805|blank=7|blocked=up
-left
+m=7,x,x,7|b=6|x=up
+right
 
-board=520173846|blank=2
-left
+m=16,16,18,x|b=5
+up
 
-board=520173846|blank=2|blocked=down
-left
+m=16,16,18,x|b=5|x=down
+up
+
+m=16,16,18,x|b=5|x=left
+up
 
-board=520173846|blank=2|blocked=left
+m=16,16,18,x|b=5|x=up
 down
 
-board=502173846|blank=1
+m=x,16,14,16|b=1
 left
 
-board=502173846|blank=1|blocked=down
+m=x,16,14,16|b=1|x=down
 left
 
-board=502173846|blank=1|blocked=right
+m=x,16,14,16|b=1|x=right
 left
-
-board=502173846|blank=1|blocked=left
-right
-
-board=052173846|blank=0
-down
 
-board=052173846|blank=0|blocked=right
+m=x,16,14,16|b=1|x=left
 down
 
-board=052173846|blank=0|blocked=down
+m=20,18,x,18|b=3
 right
 
-board=152073846|blank=3
+m=20,18,x,18|b=3|x=up
 right
 
-board=152073846|blank=3|blocked=up
+m=20,18,x,18|b=3|x=down
 right
 
-board=152073846|blank=3|blocked=down
-right
+m=20,18,x,18|b=3|x=right
+down
 
-board=152073846|blank=3|blocked=right
-up
+m=17,17,19,17|b=4
+down
 
-board=123068547|blank=3
+m=17,17,19,17|b=4|x=up
 down
 
-board=123068547|blank=3|blocked=up
+m=17,17,19,17|b=4|x=left
 down
 
-board=123068547|blank=3|blocked=right
+m=17,17,19,17|b=4|x=right
 down
 
-board=123068547|blank=3|blocked=down
+m=17,17,19,17|b=4|x=down
 up
 
-board=123568047|blank=6
-right
-
-board=123568047|blank=6|blocked=up
-right
+m=15,x,17,x|b=8
+up
 
-board=123568047|blank=6|blocked=right
+m=15,x,17,x|b=8|x=left
 up
 
-board=135802476|blank=4
+m=15,x,17,x|b=8|x=up
 left
 
-board=135802476|blank=4|blocked=up
-left
+m=x,17,17,x|b=2
+down
 
-board=135802476|blank=4|blocked=down
-left
+m=x,17,17,x|b=2|x=left
+down
 
-board=135802476|blank=4|blocked=right
+m=x,17,17,x|b=2|x=down
 left
 
-board=135802476|blank=4|blocked=left
-right
+m=18,16,18,x|b=5
+left
 
-board=135082476|blank=3
-down
+m=18,16,18,x|b=5|x=up
+left
 
-board=135082476|blank=3|blocked=up
-down
+m=18,16,18,x|b=5|x=down
+left
 
-board=135082476|blank=3|blocked=right
+m=18,16,18,x|b=5|x=left
 down
-
-board=135082476|blank=3|blocked=down
-up
 
-board=135482076|blank=6
-right
+m=17,17,19,19|b=4
+left
 
-board=135482076|blank=6|blocked=up
-right
+m=17,17,19,19|b=4|x=up
+left
 
-board=135482076|blank=6|blocked=right
-up
+m=17,17,19,19|b=4|x=down
+left
 
-board=135482706|blank=7
-up
+m=17,17,19,19|b=4|x=right
+left
 
-board=135482706|blank=7|blocked=left
+m=17,17,19,19|b=4|x=left
 up
 
-board=135482706|blank=7|blocked=right
-up
+m=x,16,18,16|b=1
+right
 
-board=135482706|blank=7|blocked=up
-left
+m=x,16,18,16|b=1|x=down
+right
 
-board=513408762|blank=4
-down
+m=x,16,18,16|b=1|x=left
+right
 
-board=513408762|blank=4|blocked=up
+m=x,16,18,16|b=1|x=right
 down
 
-board=513408762|blank=4|blocked=left
+m=x,15,17,x|b=2
 down
 
-board=513408762|blank=4|blocked=right
+m=x,15,17,x|b=2|x=left
 down
 
-board=513408762|blank=4|blocked=down
-right
+m=x,15,17,x|b=2|x=down
+left
 
-board=513468702|blank=7
+m=19,x,x,17|b=6
 right
 
-board=513468702|blank=7|blocked=up
+m=19,x,x,17|b=6|x=up
 right
 
-board=513468702|blank=7|blocked=left
-right
+m=19,x,x,17|b=6|x=right
+up
 
-board=513468702|blank=7|blocked=right
+m=18,x,18,16|b=7
 up
 
-board=513468720|blank=8
+m=18,x,18,16|b=7|x=left
 up
 
-board=513468720|blank=8|blocked=left
+m=18,x,18,16|b=7|x=right
 up
 
-board=513468720|blank=8|blocked=up
-left
+m=18,x,18,16|b=7|x=up
+right
 
-board=513460728|blank=5
-left
+m=17,17,17,17|b=4
+up
 
-board=513460728|blank=5|blocked=up
-left
+m=17,17,17,17|b=4|x=down
+up
 
-board=513460728|blank=5|blocked=down
-left
+m=17,17,17,17|b=4|x=left
+up
 
-board=513460728|blank=5|blocked=left
+m=17,17,17,17|b=4|x=right
 up
 
-board=416732508|blank=7
-left
+m=17,17,17,17|b=4|x=up
+down
 
-board=416732508|blank=7|blocked=up
+m=16,16,16,x|b=5
 left
 
-board=416732508|blank=7|blocked=right
+m=16,16,16,x|b=5|x=up
 left
 
-board=416732508|blank=7|blocked=left
-right
+m=16,16,16,x|b=5|x=down
+left
 
-board=416732058|blank=6
+m=16,16,16,x|b=5|x=left
 up
 
-board=416732058|blank=6|blocked=right
-up
+m=x,5,5,x|b=2
+left
 
-board=416732058|blank=6|blocked=up
-right
+m=x,5,5,x|b=2|x=down
+left
 
-board=416032758|blank=3
-up
+m=x,5,5,x|b=2|x=left
+down
 
-board=416032758|blank=3|blocked=down
+m=16,x,18,16|b=7
 up
 
-board=416032758|blank=3|blocked=right
+m=16,x,18,16|b=7|x=left
 up
 
-board=416032758|blank=3|blocked=up
-down
+m=16,x,18,16|b=7|x=right
+up
 
-board=016432758|blank=0
+m=16,x,18,16|b=7|x=up
 right
 
-board=016432758|blank=0|blocked=down
+m=17,17,15,15|b=4
 right
-
-board=016432758|blank=0|blocked=right
-down
 
-board=106432758|blank=1
-down
+m=17,17,15,15|b=4|x=up
+right
 
-board=106432758|blank=1|blocked=left
-down
+m=17,17,15,15|b=4|x=down
+right
 
-board=106432758|blank=1|blocked=right
-down
+m=17,17,15,15|b=4|x=left
+right
 
-board=106432758|blank=1|blocked=down
+m=17,17,15,15|b=4|x=right
 left
 
-board=103724865|blank=1
-down
+m=16,x,16,16|b=7
+up
 
-board=103724865|blank=1|blocked=left
-down
+m=16,x,16,16|b=7|x=left
+up
 
-board=103724865|blank=1|blocked=right
-down
+m=16,x,16,16|b=7|x=right
+up
 
-board=103724865|blank=1|blocked=down
+m=16,x,16,16|b=7|x=up
 left
 
-board=236704518|blank=4
-down
-
-board=236704518|blank=4|blocked=up
-down
-
-board=236704518|blank=4|blocked=left
-down
+m=12,x,14,14|b=7
+up
 
-board=236704518|blank=4|blocked=right
-down
+m=12,x,14,14|b=7|x=left
+up
 
-board=236704518|blank=4|blocked=down
-right
+m=12,x,14,14|b=7|x=right
+up
 
-board=236714508|blank=7
+m=12,x,14,14|b=7|x=up
 left
 
-board=236714508|blank=7|blocked=up
+m=12,14,12,x|b=5
 left
 
-board=236714508|blank=7|blocked=right
+m=12,14,12,x|b=5|x=up
 left
-
-board=236714508|blank=7|blocked=left
-right
 
-board=236714058|blank=6
-up
+m=12,14,12,x|b=5|x=down
+left
 
-board=236714058|blank=6|blocked=right
+m=12,14,12,x|b=5|x=left
 up
 
-board=236714058|blank=6|blocked=up
+m=13,15,13,13|b=4
 right
 
-board=236014758|blank=3
+m=13,15,13,13|b=4|x=up
 right
 
-board=236014758|blank=3|blocked=up
+m=13,15,13,13|b=4|x=down
 right
 
-board=236014758|blank=3|blocked=down
+m=13,15,13,13|b=4|x=left
 right
 
-board=236014758|blank=3|blocked=right
+m=13,15,13,13|b=4|x=right
 up
 
-board=236104758|blank=4
-right
+m=5,5,7,5|b=4
+up
 
-board=236104758|blank=4|blocked=up
-right
+m=5,5,7,5|b=4|x=down
+up
 
-board=236104758|blank=4|blocked=down
-right
+m=5,5,7,5|b=4|x=left
+up
 
-board=236104758|blank=4|blocked=left
-right
+m=5,5,7,5|b=4|x=right
+up
 
-board=236104758|blank=4|blocked=right
+m=5,5,7,5|b=4|x=up
 down
-
-board=582173046|blank=6
-right
 
-board=582173046|blank=6|blocked=up
-right
-
-board=582173046|blank=6|blocked=right
-up
-
-board=582173406|blank=7
+m=8,x,8,10|b=7
 up
 
-board=582173406|blank=7|blocked=left
+m=8,x,8,10|b=7|x=left
 up
 
-board=582173406|blank=7|blocked=right
+m=8,x,8,10|b=7|x=right
 up
 
-board=582173406|blank=7|blocked=up
+m=8,x,8,10|b=7|x=up
 left
 
-board=582103476|blank=4
+m=15,13,13,15|b=4
 up
 
-board=582103476|blank=4|blocked=down
+m=15,13,13,15|b=4|x=down
 up
 
-board=582103476|blank=4|blocked=left
+m=15,13,13,15|b=4|x=left
 up
 
-board=582103476|blank=4|blocked=right
+m=15,13,13,15|b=4|x=right
 up
 
-board=582103476|blank=4|blocked=up
+m=15,13,13,15|b=4|x=up
 down
 
-board=203756148|blank=1
-down
-
-board=203756148|blank=1|blocked=left
-down
+m=18,18,x,20|b=3
+up
 
-board=203756148|blank=1|blocked=right
-down
+m=18,18,x,20|b=3|x=down
+up
 
-board=203756148|blank=1|blocked=down
-left
+m=18,18,x,20|b=3|x=right
+up
 
-board=253706148|blank=4
-left
+m=18,18,x,20|b=3|x=up
+down
 
-board=253706148|blank=4|blocked=up
+m=16,14,14,x|b=5
 left
 
-board=253706148|blank=4|blocked=down
+m=16,14,14,x|b=5|x=up
 left
 
-board=253706148|blank=4|blocked=right
+m=16,14,14,x|b=5|x=down
 left
 
-board=253706148|blank=4|blocked=left
-up
+m=16,14,14,x|b=5|x=left
+down
 
-board=253076148|blank=3
+m=x,4,6,4|b=1
 down
 
-board=253076148|blank=3|blocked=up
+m=x,4,6,4|b=1|x=left
 down
 
-board=253076148|blank=3|blocked=right
+m=x,4,6,4|b=1|x=right
 down
 
-board=253076148|blank=3|blocked=down
+m=x,4,6,4|b=1|x=down
 right
 
-board=253176048|blank=6
+m=5,5,5,5|b=4
 right
 
-board=253176048|blank=6|blocked=up
+m=5,5,5,5|b=4|x=up
 right
 
-board=253176048|blank=6|blocked=right
+m=5,5,5,5|b=4|x=down
+right
+
+m=5,5,5,5|b=4|x=left
+right
+
+m=5,5,5,5|b=4|x=right
 up
 
-board=206538147|blank=1
-down
+m=4,4,4,x|b=5
+up
 
-board=206538147|blank=1|blocked=left
-down
+m=4,4,4,x|b=5|x=down
+up
 
-board=206538147|blank=1|blocked=right
+m=4,4,4,x|b=5|x=left
+up
+
+m=4,4,4,x|b=5|x=up
 down
+
+m=4,x,4,4|b=7
+left
 
-board=206538147|blank=1|blocked=down
+m=4,x,4,4|b=7|x=up
 left
+
+m=4,x,4,4|b=7|x=right
+left
+
+m=4,x,4,4|b=7|x=left
+up
 
-board=236508147|blank=4
+m=x,5,x,5|b=0
+right
+
+m=x,5,x,5|b=0|x=down
+right
+
+m=x,5,x,5|b=0|x=right
+down
+
+m=15,13,15,15|b=4
 left
 
-board=236508147|blank=4|blocked=up
+m=15,13,15,15|b=4|x=up
 left
 
-board=236508147|blank=4|blocked=down
+m=15,13,15,15|b=4|x=down
 left
 
-board=236508147|blank=4|blocked=right
+m=15,13,15,15|b=4|x=right
 left
 
-board=236508147|blank=4|blocked=left
+m=15,13,15,15|b=4|x=left
 down
 
-board=451762803|blank=7
+m=12,x,14,12|b=7
 up
 
-board=451762803|blank=7|blocked=left
+m=12,x,14,12|b=7|x=left
 up
 
-board=451762803|blank=7|blocked=right
+m=12,x,14,12|b=7|x=right
 up
 
-board=451762803|blank=7|blocked=up
-left
+m=12,x,14,12|b=7|x=up
+right
 
-board=451702863|blank=4
+m=11,13,13,11|b=4
 up
 
-board=451702863|blank=4|blocked=down
+m=11,13,13,11|b=4|x=down
 up
 
-board=451702863|blank=4|blocked=left
+m=11,13,13,11|b=4|x=left
 up
 
-board=451702863|blank=4|blocked=right
+m=11,13,13,11|b=4|x=right
 up
 
-board=451702863|blank=4|blocked=up
+m=11,13,13,11|b=4|x=up
+right
+
+m=x,16,16,18|b=1
+down
+
+m=x,16,16,18|b=1|x=left
 down
+
+m=x,16,16,18|b=1|x=right
+down
+
+m=x,16,16,18|b=1|x=down
+left
 
-board=542713086|blank=6
+m=14,x,14,14|b=7
+right
+
+m=14,x,14,14|b=7|x=up
+right
+
+m=14,x,14,14|b=7|x=left
+right
+
+m=14,x,14,14|b=7|x=right
 up
+
+m=6,8,6,x|b=5
+left
 
-board=542713086|blank=6|blocked=right
+m=6,8,6,x|b=5|x=up
+left
+
+m=6,8,6,x|b=5|x=down
+left
+
+m=6,8,6,x|b=5|x=left
 up
 
-board=542713086|blank=6|blocked=up
-right
+m=19,19,21,19|b=4
+left
+
+m=19,19,21,19|b=4|x=up
+left
 
-board=542013786|blank=3
+m=19,19,21,19|b=4|x=down
+left
+
+m=19,19,21,19|b=4|x=right
+left
+
+m=19,19,21,19|b=4|x=left
 up
 
-board=542013786|blank=3|blocked=down
+m=20,20,x,20|b=3
 up
 
-board=542013786|blank=3|blocked=right
+m=20,20,x,20|b=3|x=down
 up
 
-board=542013786|blank=3|blocked=up
-right
+m=20,20,x,20|b=3|x=right
+up
+
+m=20,20,x,20|b=3|x=up
+down
 
-board=042513786|blank=0
+m=x,21,x,19|b=0
 right
 
-board=042513786|blank=0|blocked=down
+m=x,21,x,19|b=0|x=down
 right
 
-board=042513786|blank=0|blocked=right
+m=x,21,x,19|b=0|x=right
 down
 
-board=023168475|blank=0
+m=x,18,20,18|b=1
 down
 
-board=023168475|blank=0|blocked=right
+m=x,18,20,18|b=1|x=left
 down
 
-board=023168475|blank=0|blocked=down
-right
-
-board=435216708|blank=7
-right
-
-board=435216708|blank=7|blocked=up
-right
+m=x,18,20,18|b=1|x=right
+down
 
-board=435216708|blank=7|blocked=left
+m=x,18,20,18|b=1|x=down
 right
-
-board=435216708|blank=7|blocked=right
-up
 
-board=435216780|blank=8
-up
+m=19,17,17,17|b=4
+down
 
-board=435216780|blank=8|blocked=left
-up
+m=19,17,17,17|b=4|x=up
+down
 
-board=435216780|blank=8|blocked=up
-left
+m=19,17,17,17|b=4|x=left
+down
 
-board=435210786|blank=5
-up
+m=19,17,17,17|b=4|x=right
+down
 
-board=435210786|blank=5|blocked=down
-up
+m=19,17,17,17|b=4|x=down
+left
 
-board=435210786|blank=5|blocked=left
-up
+m=x,14,16,16|b=1
+down
 
-board=435210786|blank=5|blocked=up
+m=x,14,16,16|b=1|x=left
 down
 
-board=430215786|blank=2
-left
+m=x,14,16,16|b=1|x=right
+down
 
-board=430215786|blank=2|blocked=down
+m=x,14,16,16|b=1|x=down
 left
 
-board=430215786|blank=2|blocked=left
+m=7,5,5,5|b=4
 down
 
-board=403215786|blank=1
+m=7,5,5,5|b=4|x=up
 down
 
-board=403215786|blank=1|blocked=left
+m=7,5,5,5|b=4|x=left
 down
 
-board=403215786|blank=1|blocked=right
+m=7,5,5,5|b=4|x=right
 down
 
-board=403215786|blank=1|blocked=down
+m=7,5,5,5|b=4|x=down
 left
 
-board=413205786|blank=4
-left
+m=4,4,x,4|b=3
+down
+
+m=4,4,x,4|b=3|x=up
+down
+
+m=4,4,x,4|b=3|x=right
+down
+
+m=4,4,x,4|b=3|x=down
+up
 
-board=413205786|blank=4|blocked=up
+m=6,x,6,8|b=7
 left
 
-board=413205786|blank=4|blocked=down
+m=6,x,6,8|b=7|x=up
 left
 
-board=413205786|blank=4|blocked=right
+m=6,x,6,8|b=7|x=right
 left
 
-board=413205786|blank=4|blocked=left
-right
+m=6,x,6,8|b=7|x=left
+up
 
-board=185402763|blank=4
+m=15,15,13,15|b=4
 up
 
-board=185402763|blank=4|blocked=down
+m=15,15,13,15|b=4|x=down
 up
 
-board=185402763|blank=4|blocked=left
+m=15,15,13,15|b=4|x=left
 up
 
-board=185402763|blank=4|blocked=right
+m=15,15,13,15|b=4|x=right
 up
+
+m=15,15,13,15|b=4|x=up
+left
 
-board=185402763|blank=4|blocked=up
+m=x,20,20,20|b=1
 down
 
-board=105482763|blank=1
-right
+m=x,20,20,20|b=1|x=left
+down
 
-board=105482763|blank=1|blocked=down
-right
+m=x,20,20,20|b=1|x=right
+down
 
-board=105482763|blank=1|blocked=left
-right
+m=x,20,20,20|b=1|x=down
+left
+
+m=21,19,19,19|b=4
+down
 
-board=105482763|blank=1|blocked=right
+m=21,19,19,19|b=4|x=up
 down
 
-board=150482763|blank=2
+m=21,19,19,19|b=4|x=left
 down
 
-board=150482763|blank=2|blocked=left
+m=21,19,19,19|b=4|x=right
 down
 
-board=150482763|blank=2|blocked=down
+m=21,19,19,19|b=4|x=down
 left
 
-board=401732856|blank=1
+m=20,x,18,18|b=7
 right
 
-board=401732856|blank=1|blocked=down
+m=20,x,18,18|b=7|x=up
 right
 
-board=401732856|blank=1|blocked=left
+m=20,x,18,18|b=7|x=left
 right
-
-board=401732856|blank=1|blocked=right
-down
-
-board=741630528|blank=5
-left
 
-board=741630528|blank=5|blocked=up
+m=20,x,18,18|b=7|x=right
 left
 
-board=741630528|blank=5|blocked=down
-left
+m=17,x,19,x|b=8
+up
 
-board=741630528|blank=5|blocked=left
+m=17,x,19,x|b=8|x=left
 up
 
-board=741603528|blank=4
+m=17,x,19,x|b=8|x=up
 left
 
-board=741603528|blank=4|blocked=up
+m=17,17,17,19|b=4
 left
 
-board=741603528|blank=4|blocked=down
+m=17,17,17,19|b=4|x=up
 left
 
-board=741603528|blank=4|blocked=right
+m=17,17,17,19|b=4|x=down
 left
-
-board=741603528|blank=4|blocked=left
-up
-
-board=741063528|blank=3
-up
 
-board=741063528|blank=3|blocked=down
-up
+m=17,17,17,19|b=4|x=right
+left
 
-board=741063528|blank=3|blocked=right
+m=17,17,17,19|b=4|x=left
 up
-
-board=741063528|blank=3|blocked=up
-down
-
-board=041763528|blank=0
-right
-
-board=041763528|blank=0|blocked=down
-right
 
-board=041763528|blank=0|blocked=right
+m=19,19,19,19|b=4
 down
-
-board=401763528|blank=1
-right
-
-board=401763528|blank=1|blocked=down
-right
-
-board=401763528|blank=1|blocked=left
-right
 
-board=401763528|blank=1|blocked=right
+m=19,19,19,19|b=4|x=up
 down
 
-board=410763528|blank=2
+m=19,19,19,19|b=4|x=left
 down
 
-board=410763528|blank=2|blocked=left
+m=19,19,19,19|b=4|x=right
 down
 
-board=410763528|blank=2|blocked=down
-left
+m=19,19,19,19|b=4|x=down
+up
 
-board=413760528|blank=5
+m=16,16,14,x|b=5
 left
 
-board=413760528|blank=5|blocked=up
+m=16,16,14,x|b=5|x=up
 left
 
-board=413760528|blank=5|blocked=down
+m=16,16,14,x|b=5|x=down
 left
 
-board=413760528|blank=5|blocked=left
+m=16,16,14,x|b=5|x=left
 up
 
-board=538210467|blank=5
+m=17,x,x,19|b=6
 up
 
-board=538210467|blank=5|blocked=down
+m=17,x,x,19|b=6|x=right
 up
 
-board=538210467|blank=5|blocked=left
-up
+m=17,x,x,19|b=6|x=up
+right
 
-board=538210467|blank=5|blocked=up
-down
+m=16,18,x,16|b=3
+right
 
-board=530218467|blank=2
-left
+m=16,18,x,16|b=3|x=up
+right
 
-board=530218467|blank=2|blocked=down
-left
+m=16,18,x,16|b=3|x=down
+right
 
-board=530218467|blank=2|blocked=left
-down
+m=16,18,x,16|b=3|x=right
+up
 
-board=503218467|blank=1
-down
+m=14,x,14,16|b=7
+up
 
-board=503218467|blank=1|blocked=left
-down
+m=14,x,14,16|b=7|x=left
+up
 
-board=503218467|blank=1|blocked=right
-down
+m=14,x,14,16|b=7|x=right
+up
 
-board=503218467|blank=1|blocked=down
+m=14,x,14,16|b=7|x=up
 left
 
-board=513208467|blank=4
+m=x,19,17,x|b=2
 down
 
-board=513208467|blank=4|blocked=up
+m=x,19,17,x|b=2|x=left
 down
 
-board=513208467|blank=4|blocked=left
-down
+m=x,19,17,x|b=2|x=down
+left
 
-board=513208467|blank=4|blocked=right
-down
+m=18,18,20,x|b=5
+left
 
-board=513208467|blank=4|blocked=down
+m=18,18,20,x|b=5|x=up
 left
 
-board=513268407|blank=7
-right
+m=18,18,20,x|b=5|x=down
+left
 
-board=513268407|blank=7|blocked=up
-right
+m=18,18,20,x|b=5|x=left
+up
 
-board=513268407|blank=7|blocked=left
-right
+m=13,15,15,13|b=4
+up
 
-board=513268407|blank=7|blocked=right
+m=13,15,15,13|b=4|x=down
 up
 
-board=513268470|blank=8
+m=13,15,15,13|b=4|x=left
 up
 
-board=513268470|blank=8|blocked=left
+m=13,15,15,13|b=4|x=right
 up
 
-board=513268470|blank=8|blocked=up
-left
+m=13,15,15,13|b=4|x=up
+right
 
-board=513260478|blank=5
+m=18,18,18,x|b=5
 left
 
-board=513260478|blank=5|blocked=up
+m=18,18,18,x|b=5|x=up
 left
 
-board=513260478|blank=5|blocked=down
+m=18,18,18,x|b=5|x=down
 left
 
-board=513260478|blank=5|blocked=left
+m=18,18,18,x|b=5|x=left
 up
 
-board=238157406|blank=7
-right
+m=19,17,17,19|b=4
+up
 
-board=238157406|blank=7|blocked=up
-right
+m=19,17,17,19|b=4|x=down
+up
 
-board=238157406|blank=7|blocked=left
-right
+m=19,17,17,19|b=4|x=left
+up
+
+m=19,17,17,19|b=4|x=right
+up
+
+m=19,17,17,19|b=4|x=up
+down
 
-board=238157406|blank=7|blocked=right
+m=6,x,6,6|b=7
 up
 
-board=238157460|blank=8
+m=6,x,6,6|b=7|x=left
 up
 
-board=238157460|blank=8|blocked=left
+m=6,x,6,6|b=7|x=right
 up
 
-board=238157460|blank=8|blocked=up
+m=6,x,6,6|b=7|x=up
 left
 
-board=238150467|blank=5
+m=18,20,20,x|b=5
 up
 
-board=238150467|blank=5|blocked=down
+m=18,20,20,x|b=5|x=down
 up
 
-board=238150467|blank=5|blocked=left
+m=18,20,20,x|b=5|x=left
 up
 
-board=238150467|blank=5|blocked=up
+m=18,20,20,x|b=5|x=up
 down
 
-board=230158467|blank=2
+m=x,18,16,18|b=1
 left
 
-board=230158467|blank=2|blocked=down
+m=x,18,16,18|b=1|x=down
 left
-
-board=230158467|blank=2|blocked=left
-down
 
-board=203158467|blank=1
-down
+m=x,18,16,18|b=1|x=right
+left
 
-board=203158467|blank=1|blocked=left
+m=x,18,16,18|b=1|x=left
 down
 
-board=203158467|blank=1|blocked=right
-down
+m=7,7,7,9|b=4
+up
 
-board=203158467|blank=1|blocked=down
-left
+m=7,7,7,9|b=4|x=down
+up
 
-board=403712586|blank=1
-down
+m=7,7,7,9|b=4|x=left
+up
 
-board=403712586|blank=1|blocked=left
-down
+m=7,7,7,9|b=4|x=right
+up
 
-board=403712586|blank=1|blocked=right
+m=7,7,7,9|b=4|x=up
 down
 
-board=403712586|blank=1|blocked=down
-left
+m=15,15,15,13|b=4
+right
 
-board=102763548|blank=1
+m=15,15,15,13|b=4|x=up
 right
 
-board=102763548|blank=1|blocked=down
+m=15,15,15,13|b=4|x=down
 right
 
-board=102763548|blank=1|blocked=left
+m=15,15,15,13|b=4|x=left
 right
+
+m=15,15,15,13|b=4|x=right
+up
 
-board=102763548|blank=1|blocked=right
+m=4,6,x,4|b=3
 down
 
-board=120763548|blank=2
+m=4,6,x,4|b=3|x=up
 down
 
-board=120763548|blank=2|blocked=left
+m=4,6,x,4|b=3|x=right
 down
+
+m=4,6,x,4|b=3|x=down
+up
 
-board=120763548|blank=2|blocked=down
+m=13,15,15,15|b=4
 left
 
-board=105832476|blank=1
-down
+m=13,15,15,15|b=4|x=up
+left
+
+m=13,15,15,15|b=4|x=down
+left
+
+m=13,15,15,15|b=4|x=right
+left
+
+m=13,15,15,15|b=4|x=left
+up
 
-board=105832476|blank=1|blocked=left
+m=x,19,x,21|b=0
 down
 
-board=105832476|blank=1|blocked=right
+m=x,19,x,21|b=0|x=right
 down
 
-board=105832476|blank=1|blocked=down
+m=x,19,x,21|b=0|x=down
 right
 
-board=152678043|blank=6
+m=22,x,20,20|b=7
 up
 
-board=152678043|blank=6|blocked=right
+m=22,x,20,20|b=7|x=left
 up
 
-board=152678043|blank=6|blocked=up
-right
+m=22,x,20,20|b=7|x=right
+up
 
-board=152078643|blank=3
-right
+m=22,x,20,20|b=7|x=up
+left
 
-board=152078643|blank=3|blocked=up
-right
+m=21,21,21,21|b=4
+left
 
-board=152078643|blank=3|blocked=down
-right
+m=21,21,21,21|b=4|x=up
+left
 
-board=152078643|blank=3|blocked=right
-down
+m=21,21,21,21|b=4|x=down
+left
 
-board=152708643|blank=4
-down
+m=21,21,21,21|b=4|x=right
+left
 
-board=152708643|blank=4|blocked=up
-down
+m=21,21,21,21|b=4|x=left
+up
 
-board=152708643|blank=4|blocked=left
-down
+m=20,20,x,22|b=3
+up
 
-board=152708643|blank=4|blocked=right
-down
+m=20,20,x,22|b=3|x=down
+up
 
-board=152708643|blank=4|blocked=down
+m=20,20,x,22|b=3|x=right
 up
+
+m=20,20,x,22|b=3|x=up
+down
 
-board=152748603|blank=7
+m=5,7,5,5|b=4
 left
 
-board=152748603|blank=7|blocked=up
+m=5,7,5,5|b=4|x=up
 left
 
-board=152748603|blank=7|blocked=right
+m=5,7,5,5|b=4|x=down
 left
 
-board=152748603|blank=7|blocked=left
-up
+m=5,7,5,5|b=4|x=right
+left
 
-board=152748063|blank=6
+m=5,7,5,5|b=4|x=left
 up
 
-board=152748063|blank=6|blocked=right
-up
+m=15,17,15,17|b=4
+down
 
-board=152748063|blank=6|blocked=up
-right
+m=15,17,15,17|b=4|x=up
+down
 
-board=152048763|blank=3
-right
+m=15,17,15,17|b=4|x=left
+down
 
-board=152048763|blank=3|blocked=up
-right
+m=15,17,15,17|b=4|x=right
+down
 
-board=152048763|blank=3|blocked=down
-right
+m=15,17,15,17|b=4|x=down
+up
 
-board=152048763|blank=3|blocked=right
+m=18,x,18,18|b=7
 up
 
-board=123608547|blank=4
-left
+m=18,x,18,18|b=7|x=left
+up
+
+m=18,x,18,18|b=7|x=right
+up
 
-board=123608547|blank=4|blocked=up
+m=18,x,18,18|b=7|x=up
 left
 
-board=123608547|blank=4|blocked=down
+m=17,19,17,17|b=4
 left
 
-board=123608547|blank=4|blocked=right
+m=17,19,17,17|b=4|x=up
 left
 
-board=123608547|blank=4|blocked=left
-down
+m=17,19,17,17|b=4|x=down
+left
 
-board=423516780|blank=8
-up
+m=17,19,17,17|b=4|x=right
+left
 
-board=423516780|blank=8|blocked=left
+m=17,19,17,17|b=4|x=left
 up
 
-board=423516780|blank=8|blocked=up
-left
+m=19,19,17,17|b=4
+right
 
-board=015438762|blank=0
+m=19,19,17,17|b=4|x=up
 right
 
-board=015438762|blank=0|blocked=down
+m=19,19,17,17|b=4|x=down
 right
 
-board=015438762|blank=0|blocked=right
-down
+m=19,19,17,17|b=4|x=left
+right
 
-board=105438762|blank=1
-down
+m=19,19,17,17|b=4|x=right
+left
 
-board=105438762|blank=1|blocked=left
-down
+m=18,18,16,x|b=5
+left
 
-board=105438762|blank=1|blocked=right
-down
+m=18,18,16,x|b=5|x=up
+left
 
-board=105438762|blank=1|blocked=down
-right
+m=18,18,16,x|b=5|x=down
+left
 
-board=135408762|blank=4
-right
+m=18,18,16,x|b=5|x=left
+up
 
-board=135408762|blank=4|blocked=up
+m=x,4,4,6|b=1
 right
 
-board=135408762|blank=4|blocked=down
+m=x,4,4,6|b=1|x=down
 right
 
-board=135408762|blank=4|blocked=left
+m=x,4,4,6|b=1|x=left
 right
 
-board=135408762|blank=4|blocked=right
+m=x,4,4,6|b=1|x=right
 down
 
-board=135480762|blank=5
-down
+m=19,x,17,x|b=8
+up
+
+m=19,x,17,x|b=8|x=left
+up
+
+m=19,x,17,x|b=8|x=up
+left
 
-board=135480762|blank=5|blocked=up
+m=x,21,x,21|b=0
 down
 
-board=135480762|blank=5|blocked=left
+m=x,21,x,21|b=0|x=right
 down
 
-board=135480762|blank=5|blocked=down
-up
+m=x,21,x,21|b=0|x=down
+right
 
-board=135482760|blank=8
-left
+m=21,x,x,19|b=6
+right
 
-board=135482760|blank=8|blocked=up
-left
+m=21,x,x,19|b=6|x=up
+right
 
-board=135482760|blank=8|blocked=left
+m=21,x,x,19|b=6|x=right
 up
 
-board=306152478|blank=1
-left
+m=20,x,20,18|b=7
+right
 
-board=306152478|blank=1|blocked=down
-left
+m=20,x,20,18|b=7|x=up
+right
 
-board=306152478|blank=1|blocked=right
-left
+m=20,x,20,18|b=7|x=left
+right
 
-board=306152478|blank=1|blocked=left
-down
+m=20,x,20,18|b=7|x=right
+up
 
-board=036152478|blank=0
-down
+m=19,x,x,19|b=6
+up
 
-board=036152478|blank=0|blocked=right
-down
+m=19,x,x,19|b=6|x=right
+up
 
-board=036152478|blank=0|blocked=down
+m=19,x,x,19|b=6|x=up
 right
 
-board=136052478|blank=3
+m=20,18,x,20|b=3
 down
 
-board=136052478|blank=3|blocked=up
+m=20,18,x,20|b=3|x=up
 down
 
-board=136052478|blank=3|blocked=right
+m=20,18,x,20|b=3|x=right
 down
 
-board=136052478|blank=3|blocked=down
+m=20,18,x,20|b=3|x=down
 up
-
-board=053216478|blank=0
-down
-
-board=053216478|blank=0|blocked=right
-down
 
-board=053216478|blank=0|blocked=down
-right
+m=19,x,19,x|b=8
+up
 
-board=412765830|blank=8
-left
+m=19,x,19,x|b=8|x=left
+up
 
-board=412765830|blank=8|blocked=up
+m=19,x,19,x|b=8|x=up
 left
 
-board=412765830|blank=8|blocked=left
+m=17,15,15,17|b=4
 up
 
-board=412765803|blank=7
+m=17,15,15,17|b=4|x=down
 up
 
-board=412765803|blank=7|blocked=left
+m=17,15,15,17|b=4|x=left
 up
 
-board=412765803|blank=7|blocked=right
+m=17,15,15,17|b=4|x=right
 up
 
-board=412765803|blank=7|blocked=up
-left
+m=17,15,15,17|b=4|x=up
+down
 
-board=413768520|blank=8
-up
+m=x,22,20,20|b=1
+right
 
-board=413768520|blank=8|blocked=left
-up
+m=x,22,20,20|b=1|x=down
+right
+
+m=x,22,20,20|b=1|x=left
+right
 
-board=413768520|blank=8|blocked=up
+m=x,22,20,20|b=1|x=right
 left
+
+m=x,19,21,x|b=2
+down
+
+m=x,19,21,x|b=2|x=left
+down
 
-board=136208547|blank=4
+m=x,19,21,x|b=2|x=down
 left
 
-board=136208547|blank=4|blocked=up
+m=20,18,18,x|b=5
 left
 
-board=136208547|blank=4|blocked=down
+m=20,18,18,x|b=5|x=up
 left
 
-board=136208547|blank=4|blocked=right
+m=20,18,18,x|b=5|x=down
 left
 
-board=136208547|blank=4|blocked=left
+m=20,18,18,x|b=5|x=left
 down
 
-board=136028547|blank=3
-down
+m=x,20,18,20|b=1
+left
 
-board=136028547|blank=3|blocked=up
-down
+m=x,20,18,20|b=1|x=down
+left
+
+m=x,20,18,20|b=1|x=right
+left
 
-board=136028547|blank=3|blocked=right
+m=x,20,18,20|b=1|x=left
 down
 
-board=136028547|blank=3|blocked=down
+m=16,18,x,18|b=3
 up
 
-board=235846170|blank=8
+m=16,18,x,18|b=3|x=down
 up
 
-board=235846170|blank=8|blocked=left
+m=16,18,x,18|b=3|x=right
 up
 
-board=235846170|blank=8|blocked=up
-left
+m=16,18,x,18|b=3|x=up
+down
 
-board=235840176|blank=5
+m=16,18,16,x|b=5
 up
 
-board=235840176|blank=5|blocked=down
+m=16,18,16,x|b=5|x=down
 up
 
-board=235840176|blank=5|blocked=left
+m=16,18,16,x|b=5|x=left
 up
-
-board=235840176|blank=5|blocked=up
-down
-
-board=230845176|blank=2
-left
-
-board=230845176|blank=2|blocked=down
-left
-
-board=230845176|blank=2|blocked=left
-down
-
-board=203845176|blank=1
-down
-
-board=203845176|blank=1|blocked=left
-down
-
-board=203845176|blank=1|blocked=right
-down
-
-board=203845176|blank=1|blocked=down
-left
 
-board=243805176|blank=4
+m=16,18,16,x|b=5|x=up
 left
 
-board=243805176|blank=4|blocked=up
-left
+m=5,5,5,7|b=4
+up
 
-board=243805176|blank=4|blocked=down
-left
+m=5,5,5,7|b=4|x=down
+up
 
-board=243805176|blank=4|blocked=right
-left
+m=5,5,5,7|b=4|x=left
+up
 
-board=243805176|blank=4|blocked=left
+m=5,5,5,7|b=4|x=right
 up
 
-board=243085176|blank=3
+m=5,5,5,7|b=4|x=up
 down
 
-board=243085176|blank=3|blocked=up
+m=20,18,20,x|b=5
 down
 
-board=243085176|blank=3|blocked=right
+m=20,18,20,x|b=5|x=up
 down
-
-board=243085176|blank=3|blocked=down
-up
-
-board=243185076|blank=6
-right
 
-board=243185076|blank=6|blocked=up
-right
+m=20,18,20,x|b=5|x=left
+down
 
-board=243185076|blank=6|blocked=right
+m=20,18,20,x|b=5|x=down
 up
 
-board=243185706|blank=7
+m=18,20,x,20|b=3
 up
 
-board=243185706|blank=7|blocked=left
+m=18,20,x,20|b=3|x=down
 up
 
-board=243185706|blank=7|blocked=right
+m=18,20,x,20|b=3|x=right
 up
-
-board=243185706|blank=7|blocked=up
-left
 
-board=043285176|blank=0
+m=18,20,x,20|b=3|x=up
 down
 
-board=043285176|blank=0|blocked=right
-down
+m=4,4,x,6|b=3
+right
+
+m=4,4,x,6|b=3|x=up
+right
 
-board=043285176|blank=0|blocked=down
+m=4,4,x,6|b=3|x=down
 right
+
+m=4,4,x,6|b=3|x=right
+up
