@@ -25,7 +25,6 @@ static MicrogptConfig g_cfg;
 #define MAX_LAYER_VAL 32
 #define MAX_VOCAB_VAL 1024
 
-
 /* ---- Timing helpers ---- */
 
 static scalar_t elapsed_ms(clock_t start) {

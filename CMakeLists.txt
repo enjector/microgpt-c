@@ -339,3 +339,21 @@ target_link_libraries(bench_microgpt PRIVATE microgpt_lib)
 if(NOT MSVC)
   target_link_libraries(bench_microgpt PRIVATE m)
 endif()
+
+# ==================================================================
+#  Organelle Pipeline Tests & Benchmarks
+# ==================================================================
+
+add_executable(test_microgpt_organelle tests/test_microgpt_organelle.c)
+target_link_libraries(test_microgpt_organelle PRIVATE microgpt_lib)
+if(NOT MSVC)
+  target_link_libraries(test_microgpt_organelle PRIVATE m)
+endif()
+add_test(NAME organelle_tests COMMAND test_microgpt_organelle WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+add_executable(bench_microgpt_organelle tests/bench_microgpt_organelle.c)
+target_link_libraries(bench_microgpt_organelle PRIVATE microgpt_lib)
+if(NOT MSVC)
+  target_link_libraries(bench_microgpt_organelle PRIVATE m)
+endif()
+

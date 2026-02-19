@@ -78,8 +78,6 @@ static int g_tests_failed = 0;
   }                                                                            \
   static void test_##name(void)
 
-
-
 #define ASSERT(cond)                                                           \
   do {                                                                         \
     if (!(cond)) {                                                             \
@@ -1828,7 +1826,6 @@ int main(void) {
   /* Utility */
   printf("[Utility]\n");
   RUN(seed_rng_deterministic);
-
 
   RUN(load_file_success);
   RUN(load_file_missing);

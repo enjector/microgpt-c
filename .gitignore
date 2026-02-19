@@ -1,3 +1,7 @@
+# Local Development (not public)
+journals/
+REVIEW.md
+
 # MacOS
 .DS_Store
 .idea
@@ -6,7 +10,6 @@
 build/
 build_*/
 tmp/
-journals/
 
 # Saved models
 models/*.ckpt
