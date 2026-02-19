@@ -39,7 +39,12 @@ of sub-1M parameter models. The flat-string format is a **regular language** (no
 nesting, no balanced delimiters), minimising syntactic overhead and maximising the
 proportion of model capacity available for semantic learning.
 
----
+> [!NOTE]
+> **Implementation Status (Feb 2026):** The core pipeline primitives (`Organelle`,
+> `OpaKanban`, `OpaCycleDetector`, `organelle_train`, `organelle_generate`) are now
+> implemented as a shared C library in [`microgpt_organelle.c|h`](../../src/microgpt_organelle.h).
+> Three game experiments (puzzle8, tictactoe, connect4) validate the architecture
+> with 60–90% success rates using 64K-param organelles.
 
 ### 1. The Communication Problem
 

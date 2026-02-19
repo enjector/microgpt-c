@@ -31,7 +31,7 @@ option(MICROGPT_METAL          "Use Metal GPU acceleration (macOS only)"        
 #  Core library  (single OBJECT library shared by all targets)
 # ==================================================================
 
-add_library(microgpt_lib STATIC src/microgpt.c)
+add_library(microgpt_lib STATIC src/microgpt.c src/microgpt_organelle.c)
 target_include_directories(microgpt_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 # --- Compile-time feature flags ---
@@ -135,7 +135,7 @@ function(_microgpt_lib_for_defines OUT_VAR)
   endif()
 
   # Create a new STATIC library with the same sources + features
-  add_library(${_tgt} STATIC src/microgpt.c)
+  add_library(${_tgt} STATIC src/microgpt.c src/microgpt_organelle.c)
   target_include_directories(${_tgt} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
   # Propagate all feature flags from the base target
@@ -280,6 +280,8 @@ add_demo(
   THREADS
   COPY    experiments/organelles/puzzle8/puzzle8_strategist.txt
           experiments/organelles/puzzle8/puzzle8_mover.txt
+          experiments/organelles/puzzle8/puzzle8_detour_detector.txt
+          experiments/organelles/puzzle8/puzzle8_detour_mover.txt
           experiments/organelles/puzzle8/puzzle8_judge.txt
   DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=2 BLOCK_SIZE=128 MLP_DIM=192
           NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8

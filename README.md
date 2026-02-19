@@ -39,11 +39,11 @@ The breakthrough isn't any single model — it's what happens when they **work t
                                                   │
                                         ┌─────────┘
                                         ▼
-                                  96.7% solve rate
-                                  (29 out of 30 puzzles)
+                                  90% win rate
+                                  (Connect-4 vs random)
 ```
 
-A single model of the same size solves ~60%. Three models cooperating through a shared protocol hit **96.7%**. The coordination is the intelligence.
+A single model of the same size wins ~55%. Two models cooperating through a shared kanban protocol hit **90%**. The coordination is the intelligence.
 
 ---
 
@@ -68,10 +68,23 @@ These aren't aspirational claims. Five experiments have run to completion:
 | [Name Generation](demos/character-level/names/) | A 4K-param model invents plausible names | Trains in **< 1 second** |
 | [Shakespeare](demos/character-level/shakespeare/) | 840K params learns spelling, verse, punctuation | **Zero** unknown tokens |
 | [C Code Generation](experiments/organelles/c_codegen/) | Byte-perfect recall of 2,081 C functions | **0/10** on novel composition |
-| [8-Puzzle Pipeline](experiments/organelles/puzzle8/) | 3 organelles coordinate via kanban protocol | **96.7%** solve rate |
-| [Connect-4 Pipeline](experiments/organelles/connect4/) | System coordination rescues a weak model | **85%** wins vs random |
+| [8-Puzzle Pipeline](experiments/organelles/puzzle8/) | 5 organelles coordinate via kanban protocol | **60%** solve rate (100% easy, 50% med, 30% hard) |
+| [Tic-Tac-Toe Pipeline](experiments/organelles/tictactoe/) | Planner→Player pipeline with kanban | **90%** win+draw vs random |
+| [Connect-4 Pipeline](experiments/organelles/connect4/) | System coordination rescues a weak model | **90%** wins vs random |
 
-> The code generation result is the most telling: one model is a **perfect librarian** but a **terrible inventor**. That's exactly why organelle pipelines exist — a planner decomposes the problem, a retrieval engine finds the pieces, and a judge validates the output. Composition beats capacity.
+> The code generation result is the most telling: one model is a **perfect librarian** but a **terrible inventor**. That's exactly why organelle pipelines exist — a planner decomposes the problem, a retrieval engine finds the pieces, and a judge validates the output. Composition beats capacity. All game experiments share a [generic organelle library](src/microgpt_organelle.h) for training, inference, and kanban coordination.
+
+### The Coordination Funnel
+
+![The pipeline acts as a filter — half the model's moves are illegal but the system still wins 90% of games](docs/organelles/OPA.png)
+
+**Point:** A model that's wrong half the time still wins 90% of games when wrapped in a coordination pipeline.
+
+**Picture:** It's like a chess player who keeps trying to move pieces off the board. Instead of training a better player you hire a referee who says "nope — try again." The player is still bad but the *system* is smart.
+
+**Proof:** Connect-4's player organelle produces ~50% invalid moves. The kanban pipeline catches every one and replans — resulting in a 90% win rate against a random opponent.
+
+**Push:** Don't build a bigger model. Build a pipeline that filters a small model's mistakes.
 
 ---
 
@@ -118,9 +131,9 @@ cmake --build . --config Release
 ./c_codegen
 
 # Multi-organelle experiments
-./puzzle8_demo       # 3-organelle 8-puzzle solver (96.7% solve rate)
-./tictactoe_demo     # 2-organelle tic-tac-toe (82% win+draw)
-./connect4_demo      # 2-organelle Connect-4 (85% wins)
+./puzzle8_demo       # 5-organelle 8-puzzle solver (60% solve rate)
+./tictactoe_demo     # 2-organelle tic-tac-toe (90% win+draw)
+./connect4_demo      # 2-organelle Connect-4 (90% wins)
 
 # Run unit tests (39 tests)
 ./test_microgpt
@@ -481,6 +494,8 @@ cmake -DN_EMBD=128 -DN_HEAD=8 -DN_LAYER=4 -DBLOCK_SIZE=256 ..
 src/                                    FOUNDATION — Core engine
   microgpt.h                            Public API — scalar_t, compile-time macros, all functions
   microgpt.c                            Core engine (~2,700 lines)
+  microgpt_organelle.h                  Organelle Pipeline Architecture (OPA) library API
+  microgpt_organelle.c                  OPA implementation (training, inference, kanban, cycle detection)
   microgpt_thread.h                     Portable threading (pthread / Win32)
   microgpt_metal.h / .m / .metal        Metal GPU acceleration (optional)
 

@@ -1,6 +1,3 @@
-m=11,x,13,x
-left
-
 m=14,x,12,12
 left
 
@@ -21,9 +18,6 @@ left
 
 m=8,8,x,8
 down
-
-m=7,x,x,9
-right
 
 m=10,x,8,8
 right
@@ -55,9 +49,6 @@ right
 m=x,9,9,x
 left
 
-m=x,10,8,10
-down
-
 m=9,11,9,9
 left
 
@@ -72,12 +63,6 @@ down
 
 m=7,7,5,5
 right
-
-m=6,4,6,x
-up
-
-m=x,5,7,x
-left
 
 m=x,6,8,6
 down
@@ -100,14 +85,8 @@ down
 m=2,0,2,x
 down
 
-m=10,8,10,x
-up
-
 m=x,10,10,10
 down
-
-m=9,9,11,9
-left
 
 m=10,12,x,10
 up
@@ -121,14 +100,14 @@ down
 m=11,9,11,9
 right
 
+m=10,8,10,x
+down
+
 m=9,x,7,x
 left
 
 m=8,x,8,8
 left
-
-m=9,x,x,7
-up
 
 m=8,8,x,10
 up
@@ -157,13 +136,13 @@ right
 m=10,x,10,10
 up
 
+m=9,9,11,9
+right
+
 m=8,8,10,x
 down
 
 m=9,x,9,x
-left
-
-m=10,x,10,8
 left
 
 m=12,10,x,10
@@ -174,6 +153,9 @@ up
 
 m=9,11,11,9
 up
+
+m=x,10,8,10
+left
 
 m=x,7,x,9
 down
@@ -201,9 +183,6 @@ down
 
 m=12,12,x,12
 right
-
-m=13,13,13,11
-up
 
 m=x,11,13,x
 down
@@ -304,11 +283,14 @@ left
 m=x,8,8,6
 right
 
+m=x,5,7,x
+down
+
+m=6,4,6,x
+down
+
 m=5,x,5,x
 left
-
-m=13,13,13,15
-right
 
 m=14,16,14,x
 up
@@ -318,6 +300,9 @@ down
 
 m=13,11,11,11
 left
+
+m=10,x,10,8
+right
 
 m=6,8,8,x
 up
@@ -337,9 +322,6 @@ down
 m=3,x,x,1
 right
 
-m=16,x,14,14
-up
-
 m=15,15,15,17
 up
 
@@ -357,9 +339,6 @@ up
 
 m=9,11,9,11
 left
-
-m=10,8,x,10
-up
 
 m=10,10,8,x
 left
@@ -403,14 +382,14 @@ left
 m=4,x,6,4
 up
 
+m=9,x,x,7
+right
+
 m=7,x,7,x
 up
 
 m=8,6,6,x
 left
-
-m=15,x,13,x
-up
 
 m=14,14,16,x
 up
@@ -427,8 +406,8 @@ left
 m=5,x,x,7
 up
 
-m=x,16,16,14
-down
+m=16,x,14,14
+left
 
 m=13,x,x,15
 up
@@ -444,6 +423,9 @@ left
 
 m=10,x,8,10
 left
+
+m=7,x,x,9
+up
 
 m=6,8,x,6
 right
@@ -490,9 +472,6 @@ left
 m=x,7,x,7
 right
 
-m=8,10,10,x
-left
-
 m=11,9,9,9
 down
 
@@ -510,9 +489,6 @@ down
 
 m=18,18,x,18
 right
-
-m=19,17,19,17
-up
 
 m=x,18,18,18
 right
@@ -577,12 +553,6 @@ down
 m=9,9,9,7
 right
 
-m=x,7,9,x
-left
-
-m=x,14,12,14
-down
-
 m=13,13,15,13
 right
 
@@ -622,6 +592,9 @@ left
 m=6,6,x,6
 down
 
+m=8,10,10,x
+up
+
 m=15,13,13,13
 right
 
@@ -645,6 +618,9 @@ up
 
 m=x,9,x,9
 right
+
+m=x,7,9,x
+down
 
 m=5,5,7,7
 down
@@ -670,14 +646,14 @@ right
 m=17,x,15,x
 left
 
-m=16,x,14,16
-up
-
 m=15,15,15,15
 right
 
 m=16,14,16,x
 down
+
+m=15,x,13,x
+left
 
 m=x,8,10,8
 down
@@ -694,9 +670,6 @@ up
 m=11,13,13,13
 up
 
-m=11,11,9,11
-right
-
 m=10,12,12,x
 up
 
@@ -708,9 +681,6 @@ up
 
 m=x,6,6,6
 right
-
-m=6,6,8,x
-left
 
 m=13,x,15,x
 up
@@ -739,9 +709,6 @@ down
 m=x,11,11,x
 left
 
-m=14,x,14,12
-up
-
 m=14,12,x,14
 down
 
@@ -751,14 +718,23 @@ up
 m=8,10,x,8
 up
 
+m=10,8,x,10
+down
+
+m=14,x,14,12
+right
+
+m=11,x,13,x
+up
+
 m=4,4,6,x
 up
 
-m=11,11,11,9
-left
-
 m=13,x,13,x
 left
+
+m=13,13,13,11
+right
 
 m=18,x,16,18
 left
@@ -772,10 +748,10 @@ up
 m=x,15,x,13
 right
 
-m=x,14,14,12
-down
-
 m=10,12,10,x
+left
+
+m=11,11,9,11
 left
 
 m=5,7,7,5
@@ -814,14 +790,11 @@ down
 m=17,x,x,15
 right
 
-m=16,x,16,14
-up
-
 m=14,16,16,x
 up
 
-m=13,15,13,15
-right
+m=x,14,12,14
+left
 
 m=15,x,15,x
 left
@@ -844,6 +817,9 @@ down
 m=14,14,x,12
 right
 
+m=6,6,8,x
+up
+
 m=9,9,11,11
 down
 
@@ -858,9 +834,6 @@ right
 
 m=14,x,16,14
 right
-
-m=15,17,17,15
-left
 
 m=16,16,x,16
 up
@@ -886,12 +859,6 @@ right
 m=10,10,x,10
 right
 
-m=13,13,11,11
-up
-
-m=x,18,18,16
-left
-
 m=x,17,x,17
 down
 
@@ -904,14 +871,14 @@ right
 m=16,x,16,18
 up
 
-m=16,14,x,16
-up
-
 m=12,12,14,x
 up
 
 m=x,10,12,12
 down
+
+m=11,11,11,9
+right
 
 m=16,16,x,14
 right
@@ -934,6 +901,9 @@ down
 m=16,16,x,18
 up
 
+m=x,16,16,14
+right
+
 m=x,15,15,x
 down
 
@@ -946,14 +916,14 @@ down
 m=14,x,16,16
 up
 
-m=13,13,15,15
-right
+m=13,15,13,15
+up
 
 m=11,13,11,11
 up
 
-m=15,x,x,13
-up
+m=13,13,11,11
+right
 
 m=17,x,17,x
 left
@@ -964,13 +934,13 @@ left
 m=11,11,11,13
 up
 
-m=x,6,6,8
-right
-
 m=x,7,7,x
 down
 
-m=13,13,11,13
+m=13,13,13,15
+up
+
+m=x,14,14,12
 right
 
 m=x,19,x,17
@@ -978,6 +948,9 @@ right
 
 m=x,16,18,18
 down
+
+m=16,x,16,14
+right
 
 m=10,x,10,12
 up
@@ -991,6 +964,9 @@ up
 m=x,16,14,16
 left
 
+m=13,13,15,15
+up
+
 m=20,18,x,18
 right
 
@@ -1003,12 +979,6 @@ up
 m=x,17,17,x
 down
 
-m=18,16,18,x
-left
-
-m=17,17,19,19
-left
-
 m=x,16,18,16
 right
 
@@ -1018,14 +988,14 @@ down
 m=19,x,x,17
 right
 
-m=18,x,18,16
-up
-
 m=17,17,17,17
 up
 
 m=16,16,16,x
 left
+
+m=15,x,x,13
+right
 
 m=x,5,5,x
 left
@@ -1039,8 +1009,14 @@ right
 m=16,x,16,16
 up
 
+m=x,6,6,8
+down
+
 m=12,x,14,14
 up
+
+m=16,14,x,16
+down
 
 m=12,14,12,x
 left
@@ -1052,9 +1028,6 @@ m=5,5,7,5
 up
 
 m=8,x,8,10
-up
-
-m=15,13,13,15
 up
 
 m=18,18,x,20
@@ -1075,14 +1048,17 @@ up
 m=4,x,4,4
 left
 
+m=x,18,18,16
+right
+
 m=x,5,x,5
 right
 
-m=15,13,15,15
-left
-
 m=12,x,14,12
 up
+
+m=16,x,14,16
+left
 
 m=11,13,13,11
 up
@@ -1094,9 +1070,6 @@ m=14,x,14,14
 right
 
 m=6,8,6,x
-left
-
-m=19,19,21,19
 left
 
 m=20,20,x,20
@@ -1114,17 +1087,20 @@ down
 m=x,14,16,16
 down
 
+m=13,13,11,13
+left
+
 m=7,5,5,5
 down
 
 m=4,4,x,4
 down
 
-m=6,x,6,8
+m=15,13,13,15
 left
 
-m=15,15,13,15
-up
+m=6,x,6,8
+left
 
 m=x,20,20,20
 down
@@ -1137,6 +1113,9 @@ right
 
 m=17,x,19,x
 up
+
+m=18,x,18,16
+right
 
 m=17,17,17,19
 left
@@ -1156,20 +1135,14 @@ right
 m=14,x,14,16
 up
 
-m=x,19,17,x
-down
-
-m=18,18,20,x
-left
-
 m=13,15,15,13
 up
 
 m=18,18,18,x
 left
 
-m=19,17,17,19
-up
+m=18,16,18,x
+down
 
 m=6,x,6,6
 up
@@ -1177,26 +1150,23 @@ up
 m=18,20,20,x
 up
 
+m=x,19,17,x
+left
+
 m=x,18,16,18
 left
 
 m=7,7,7,9
 up
 
+m=17,17,19,19
+up
+
 m=15,15,15,13
 right
 
-m=4,6,x,4
-down
-
-m=13,15,15,15
-left
-
 m=x,19,x,21
 down
-
-m=22,x,20,20
-up
 
 m=21,21,21,21
 left
@@ -1207,8 +1177,11 @@ up
 m=5,7,5,5
 left
 
-m=15,17,15,17
+m=15,13,15,15
 down
+
+m=15,17,17,15
+up
 
 m=18,x,18,18
 up
@@ -1222,10 +1195,10 @@ right
 m=18,18,16,x
 left
 
-m=x,4,4,6
-right
+m=13,15,15,15
+up
 
-m=19,x,17,x
+m=18,18,20,x
 up
 
 m=x,21,x,21
@@ -1243,11 +1216,17 @@ up
 m=20,18,x,20
 down
 
+m=19,19,21,19
+right
+
+m=19,x,17,x
+left
+
 m=19,x,19,x
 up
 
-m=17,15,15,17
-up
+m=19,17,17,19
+left
 
 m=x,22,20,20
 right
@@ -1259,6 +1238,9 @@ m=20,18,18,x
 left
 
 m=x,20,18,20
+left
+
+m=17,15,15,17
 left
 
 m=16,18,x,18
@@ -1273,8 +1255,11 @@ up
 m=20,18,20,x
 down
 
+m=19,17,19,17
+down
+
 m=18,20,x,20
 up
 
-m=4,4,x,6
-right
+m=15,15,13,15
+left

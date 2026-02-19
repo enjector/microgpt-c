@@ -84,19 +84,19 @@ MicroGPT-C's **organelle architecture** takes this further. Instead of one large
 ```
 ┌──────────┐     ┌──────────┐     ┌──────────┐
 │ Planner  │────▶│  Mover   │────▶│  Judge   │
-│ (18K)    │     │  (18K)   │     │  (18K)   │
+│ (64K)    │     │  (64K)   │     │  (64K)   │
 └──────────┘     └──────────┘     └──────────┘
      │                │                │
      ▼                ▼                ▼
   "What to do"    "How to do it"  "Did it work?"
 ```
 
-**Total: 54K parameters solving problems that normally require millions.**
+**Total: ~200K parameters solving problems that normally require millions.**
 
-This is proven in five experiments:
-- **8-Puzzle solver** — 96.7% solve rate with 3 organelles
-- **Tic-Tac-Toe** — 82% win+draw rate with 2 organelles
-- **Connect-4** — 85% win rate with 2 organelles
+This is proven in six experiments:
+- **8-Puzzle solver** — 60% solve rate with 5 organelles (100% easy, 50% medium, 30% hard)
+- **Tic-Tac-Toe** — 90% win+draw rate with 2 organelles
+- **Connect-4** — 90% win rate with 2 organelles
 - **C Code Generation** — byte-perfect function recall
 - **C Wiring Generation** — multi-function composition
 

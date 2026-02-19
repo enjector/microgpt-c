@@ -10,9 +10,9 @@ Sub-1M parameter Transformers that can't compose alone — but chain into pipeli
 
 **Picture:** It's like having a team where each person only knows one thing. The librarian finds the book, the architect draws the plan, and the builder follows instructions. Alone they're useless at novel tasks — together they build things none of them could imagine.
 
-**Proof:** The c_codegen model scores 0/10 on novel prompts despite byte-perfect recall of 2,081 known functions. But the 8-puzzle pipeline (3 organelles × 64K params each) solves 96.7% of test puzzles through kanban coordination.
+**Proof:** The c_codegen model scores 0/10 on novel prompts despite byte-perfect recall of 2,081 known functions. But the 8-puzzle pipeline (5 organelles × 64K params each) solves 60% of unseen test puzzles, and Connect-4 wins 90% against random — both through kanban coordination of weak models.
 
-**Push:** Run the experiments below to see the retrieval-vs-composition gap firsthand. Then read the design docs to understand how pipelines bridge it.
+**Push:** Apply MD-delta encoding (pre-computed evaluation per action) to tic-tac-toe and connect-4 to give models structural heuristics instead of raw board strings.
 
 ---
 
@@ -20,11 +20,37 @@ Sub-1M parameter Transformers that can't compose alone — but chain into pipeli
 
 | Experiment | What It Tests | Key Result |
 |-----------|---------------|------------|
-| [Tic-Tac-Toe](tictactoe/) | Planner→Player→Judge pipeline | 82% win+draw vs random |
-| [8-Puzzle](puzzle8/) | Kanban coordination + capacity scaling | 96.7% solve rate (29/30) |
-| [Connect-4](connect4/) | Pipeline rescue of weak models | 85% wins despite 60% invalid moves |
+| [Tic-Tac-Toe](tictactoe/) | Planner→Player→Judge pipeline | **90% win+draw** vs random |
+| [8-Puzzle](puzzle8/) | 5-organelle pipeline + cycle breaking | **60% solve rate** (100% easy, 50% med, 30% hard) |
+| [Connect-4](connect4/) | Pipeline rescue of weak models | **90% wins** despite 50% invalid moves |
 | [C Code Generation](c_codegen/) | Retrieval fidelity + novel composition | 7/7 byte-perfect recall, 0/10 novel |
 | [C Wiring Generation](c_wiringgen/) | Composition grammar hypothesis | Training in progress |
+
+### The Coordination Funnel
+
+![The pipeline acts as a filter — half the model's moves are illegal but the system still wins 90% of games](../organelles/OPA.png)
+
+**Point:** A model that's wrong half the time still wins 90% of games when wrapped in a coordination pipeline.
+
+**Picture:** It's like a chess player who keeps trying to move pieces off the board. Instead of training a better player you hire a referee who says "nope — try again." The player is still bad but the *system* is smart.
+
+**Proof:** Connect-4's player organelle produces ~50% invalid moves (609 out of ~1,200). The kanban pipeline catches every one and replans — resulting in a 90% win rate against a random opponent.
+
+**Push:** Don't build a bigger model. Build a pipeline that filters a small model's mistakes. The shared organelle library (`microgpt_organelle.c|h`) gives you the kanban + judge + replanning loop in ~340 lines of C.
+
+---
+
+## Shared Library
+
+All game/puzzle experiments share generic OPA infrastructure via [`microgpt_organelle.c|h`](../../src/microgpt_organelle.h):
+
+| Component | Purpose |
+|-----------|--------|
+| `Organelle` struct | Bundles model + vocab + docs into one trainable/inferrable unit |
+| `OpaKanban` | Blocked actions, move history, stall tracking |
+| `OpaCycleDetector` | A↔B oscillation breaking |
+| `organelle_train()` | Full training lifecycle with multi-threaded gradient accumulation |
+| `organelle_generate()` | Temperature-controlled inference from prompt |
 
 ## Design Documents
 
@@ -168,7 +194,7 @@ functional organelles:
 | **The Forecaster** | Time-series | Predicted value | Time-series forecasting for sensor streams |
 | **The Gatekeeper** | Decision logits | Confidence score | Autonomous safety and triage layer |
 
-Each organelle shares the same ~875K-parameter architecture and C99 engine. Only
+Each organelle shares the same ~64K-parameter architecture and C99 engine. Only
 the training corpus and inference protocol differ — demonstrating that intelligence
 is a function of **data**, not architecture, at this scale.
 

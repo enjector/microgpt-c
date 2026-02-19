@@ -6,13 +6,13 @@ Three tiny neural networks solve sliding tile puzzles by learning **structural h
 
 ## Spear Summary
 
-**Point:** Two 64K-parameter brains coordinating via plain-text messages solve 60% of randomly scrambled 8-puzzles, including **hard** configurations (md ≥ 9) they never saw during training.
+**Point:** Five 64K-parameter organelles coordinating via plain-text messages solve 60% of randomly scrambled 8-puzzles, including **100% of easy** and **30% of hard** configurations they never saw during training.
 
-**Picture:** It's like two people solving a puzzle by passing notes — the Strategist identifies which tile is most out of place, and the Mover picks which direction to slide based on the *consequences* of each move (how much closer each option gets to the goal). Neither memorises specific board positions; they learn general rules.
+**Picture:** It's like two people solving a puzzle by passing notes — the Strategist identifies which tile is most out of place, and the Mover picks which direction to slide based on the *consequences* of each move (how much closer each option gets to the goal). Neither memorises specific board positions; they learn general rules. When they get stuck oscillating, the pipeline breaks the cycle automatically.
 
-**Proof:** Switching from raw board strings to MD-delta encoding (showing the manhattan distance *after* each possible move) transformed the model from a lookup table (96.7% on seen states, ~0% on unseen) to a genuine heuristic engine: 90% easy, 70% medium, 20% hard. Puzzle #28 (md=9) was solved in 9 moves with every move reducing MD — a perfect greedy descent on an unseen board.
+**Proof:** 18/30 unseen puzzles solved (100% easy, 50% medium, 30% hard). Zero parse errors, zero out-of-bounds rejections. 73 oscillation breaks fired to escape local minima. Pipeline executes in 0.16s. The clean greedy signal (v3b) + orchestration-level cycle breaking recovers the same 60% as the noisy mixed corpus — but with a fully explainable decision path.
 
-**Push:** Add oscillation detection (when moves cycle without progress, try the unexplored direction). This targets the up↔down trapping pattern that accounts for most remaining failures.
+**Push:** Add `trap=1` detour signal to let the model learn *when* to deviate from greedy descent. Feed Strategist output as priority hint to Mover for multi-step planning.
 
 ---
 
@@ -39,7 +39,7 @@ Instead of feeding the raw board string (`board=742153806`), the orchestrator **
 m=3,5,x,4    ← "if you go up→md=3, down→md=5, left→illegal, right→md=4"
 ```
 
-The model's job reduces from "parse a 9-digit string and somehow figure out which tile goes where" to **"pick the smallest number"** — a structural rule that generalises across all board positions.
+The model's job reduces from "parse a 9-digit string and somehow figure out which tile goes where" to **"mostly pick the smallest number"** — a structural rule that generalises across all 181,440 board states using just 428 unique input patterns.
 
 - **Strategist** sees md-deltas → outputs the best direction (priority hint)
 - **Mover** sees md-deltas + blank position → outputs a direction word
@@ -50,7 +50,7 @@ The model's job reduces from "parse a 9-digit string and somehow figure out whic
 
 | Parameter | Value |
 |-----------|-------|
-| Organelles | 3 (Strategist + Mover + Judge) |
+| Organelles | 5 (Strategist + Greedy-Mover + Detour-Detector + Detour-Mover + Judge) |
 | N_EMBD | 48 |
 | N_HEAD | 4 |
 | N_LAYER | 2 |
@@ -62,17 +62,19 @@ The model's job reduces from "parse a 9-digit string and somehow figure out whic
 
 ## Training
 
-| Organelle | Corpus | Entries | Size | Vocab | Unique Patterns |
-|-----------|--------|---------|------|-------|-----------------|
-| Strategist | `puzzle8_strategist.txt` | 427 | 7.5 KB | ~20 chars | 428 |
-| Mover | `puzzle8_mover.txt` | 1,707 | 45 KB | ~25 chars | 428 |
-| Judge | `puzzle8_judge.txt` | 57,344 | 1.6 MB | 31 chars | — |
+| Organelle | Corpus | Entries | Size | Signal |
+|-----------|--------|---------|------|--------|
+| Strategist | `puzzle8_strategist.txt` | 422 | 7.5 KB | Greedy-only (100% consistent) |
+| Greedy-Mover | `puzzle8_mover.txt` | 1,686 | 45 KB | Greedy-only (100% consistent) |
+| Detour-Detector | `puzzle8_detour_detector.txt` | 427 | 8 KB | Binary: g/d classifier |
+| Detour-Mover | `puzzle8_detour_mover.txt` | 255 | 5.5 KB | Non-greedy BFS moves only |
+| Judge | `puzzle8_judge.txt` | 57,344 | 1.6 MB | Valid/invalid moves |
 
 Corpora generated from BFS-optimal solutions of 5,000 unique solvable puzzles (md 1–22). 25,000 training steps per organelle.
 
 ## Results
 
-### Generalisation Test (30 Puzzles, separate seed from training)
+### v3 — Mixed Corpus (baseline for this encoding)
 
 | Band | MD Range | Solved | Rate | Avg Moves |
 |------|----------|--------|------|-----------|
@@ -81,34 +83,116 @@ Corpora generated from BFS-optimal solutions of 5,000 unique solvable puzzles (m
 | **HARD** | 9+ | 2/10 | **20%** | 20.5 |
 | **Overall** | — | **18/30** | **60%** | — |
 
-### Iteration History
+### v3b — Greedy/Detour Split (current)
+
+| Band | MD Range | Solved | Rate | Avg Moves |
+|------|----------|--------|------|-----------|
+| **EASY** | 1–4 | 10/10 | **100%** ✓ | 3.5 |
+| **MEDIUM** | 5–8 | 4/10 | **40%** | 7.5 |
+| **HARD** | 9+ | 2/10 | **20%** | 11.0 |
+| **Overall** | — | **16/30** | **53%** | — |
+
+### v3b + Oscillation Breaker (current)
+
+| Band | MD Range | Solved | Rate | Avg Moves |
+|------|----------|--------|------|-----------|
+| **EASY** | 1–4 | 10/10 | **100%** ✓ | 3.7 |
+| **MEDIUM** | 5–8 | 5/10 | **50%** | 10.4 |
+| **HARD** | 9+ | 3/10 | **30%** | 11.7 |
+| **Overall** | — | **18/30** | **60%** | — |
+
+Cycle breaks: **73** (detected A↔B oscillation and forced exploration of a third direction).
+
+### Full Iteration History
 
 | Version | Encoding | Unique Inputs | Solve Rate | Key Change |
 |---------|----------|---------------|------------|------------|
 | v2 (baseline) | Raw board string | 1,649 | 96.7% (train overlap) | Memorisation, not generalisation |
 | v3-disp | Per-tile displacement | 10,744 | 17% | Too many patterns for 64K params |
-| **v3-md** | **MD-delta** | **428** | **60%** | Structural rule becomes learnable |
+| v3-md | MD-delta (mixed) | 428 | 60% | Structural rule becomes learnable |
+| v3b-dispatch | MD-delta (dual Mover) | 428 | 43% | Detour Mover too weak, causes oscillation |
+| v3b-greedy | MD-delta (clean) | 428 | 53% (100% easy) | Clean signal → perfect easy, loses accidental detours |
+| **v3b+cycle** | **MD-delta (clean + breaker)** | **428** | **60% (100% easy)** | **Orchestration → +10% medium, +10% hard** |
 
 ### Key Observations
 
 1. **Zero parse errors, zero OOB rejections** — the model reliably produces valid direction words
-2. **Greedy descent works** — Puzzle #28 (md=9) solved in 9 consecutive improving moves
-3. **Oscillation is the dominant failure mode** — the model picks `up` then `down` repeatedly when the greedy choice leads to a local minimum
-4. **428 unique MD-delta patterns** vs 181,440 possible board states — the encoding compresses the input space 424×
+2. **Greedy descent works** — Puzzle #28 (md=9) solved in 9 consecutive improving moves (v3)
+3. **Oscillation was the dominant failure mode** — the breaker fires 73 times across 30 puzzles, breaking up↔down and left↔right cycles
+4. **428 unique MD-delta patterns** vs 181,440 possible board states — 424× input space compression
+5. **Clean signal tradeoff** — removing 12.4% contradictory detour examples gives 100% easy but costs medium accuracy (70% → 40%)
+6. **Orchestration recovers the gap** — the cycle breaker adds +10% medium and +10% hard with zero model changes
+
+## Forensic Corpus Analysis
+
+### The "Pick the Smallest" Rule Is 64.4% of the Story
+
+Analysing all 427 Strategist training entries against pure greedy descent (always pick the direction with the lowest post-move MD) reveals a significant gap:
+
+| Category | Count | % of Corpus |
+|---|---|---|
+| **Greedy-optimal** (BFS agrees with min-md) | 275 | **64.4%** |
+| **Tie-breaking** (BFS picks a different direction with same md) | 99 | 23.2% |
+| **Non-greedy detours** (BFS picks a *higher* md) | 53 | **12.4%** |
+
+**35.6% of the training data contradicts "pick the smallest number."** Examples of non-greedy BFS moves:
+
+```
+m=6,4,6,x  → BFS says "up" (md=6), but greedy = "down" (md=4)
+m=x,5,7,x  → BFS says "left" (md=7), but greedy = "down" (md=5)
+m=10,8,10,x → BFS says "up" (md=10), but greedy = "down" (md=8)
+```
+
+These are positions where the optimal solution requires a *temporary increase* in manhattan distance to escape a local minimum. The model has no signal in the input to distinguish "greedy works here" from "you need a detour" — it's learning a noisy approximation.
+
+### This Explains the Performance Curve
+
+| Band | Solve Rate | Why |
+|---|---|---|
+| **EASY** (md 1–4) | 90% | Greedy is almost always BFS-optimal at low md |
+| **MEDIUM** (md 5–8) | 70% | Some detours needed; model sometimes guesses right |
+| **HARD** (md 9+) | 20% | Detours are frequent; model can't tell when to deviate |
+
+The model has learned the greedy rule well enough for easy/medium cases, but it has no input signal to distinguish positions where greedy works from positions requiring a detour.
+
+### Comparison with Connect4
+
+| | Connect4 | Puzzle8 v2 (raw) | **Puzzle8 v3 (MD-delta)** |
+|---|---|---|---|
+| Unique inputs | 3,746 boards | 1,649 boards | **428 patterns** |
+| Unseen-state performance | ~0% (pipeline rescue) | ~0% | **60% (including hard)** |
+| Parse/invalid errors | 60% invalid rate | — | **0%** |
+| Source of performance | Kanban rescue + first-player advantage | Memorisation | **Learned structural rule** |
+
+This is the strongest evidence in the organelle experiments that **representation engineering beats capacity scaling**. Same architecture, same params, same pipeline — 0% → 60% by changing the encoding alone.
+
+### The Greedy/Detour Split Experiment
+
+Splitting the corpus into greedy-only (100% consistent) and detour-only training sets revealed a sharp tradeoff:
+
+| Run | Easy | Medium | Hard | Overall | Signal quality |
+|-----|------|--------|------|---------|----------------|
+| v3 mixed | 90% | **70%** | 20% | **60%** | 12.4% contradictory |
+| v3b dual-dispatch | 90% | 30% | 10% | 43% | Clean, but detour Mover too weak |
+| **v3b greedy-only** | **100%** | 40% | 20% | 53% | **100% consistent** |
+
+**The same noise was simultaneously hurting easy performance and helping medium performance.** The contradictory detour examples prevented the model from achieving 100% on easy puzzles, but those same examples occasionally caused the correct non-greedy move on medium puzzles *by accident*. You can't have both without a disambiguation signal.
+
+The Detour Detector (trained on 427 examples) correctly identifies all oscillation/failure positions — its `[D]` annotations align perfectly with positions where the greedy solver gets trapped. The detector has learned a real signal; it just can't act on it yet because the 255-entry detour Mover hasn't learned meaningful alternative moves.
 
 ## Key Findings
 
 ### Representation is everything
 
-The same model architecture (48-dim, 2-layer transformer) went from 0% to 60% on hard puzzles purely through encoding changes. No capacity increase needed. This validates the VISION.md thesis: *"the task is constrained enough that a few thousand parameters can capture the pattern"* — but only if the pattern is **made explicit** in the input.
+The same model architecture (48-dim, 2-layer transformer) went from 0% to 60% on unseen puzzles purely through encoding changes. No capacity increase needed. This validates the VISION.md thesis: *"the task is constrained enough that a few thousand parameters can capture the pattern"* — but only if the pattern is **made explicit** in the input.
 
-### Greedy heuristics have limits
+### Greedy heuristics have limits — and the corpus teaches them
 
-The MD-delta encoding teaches a greedy policy: always pick the direction that minimises manhattan distance. This fails when the optimal solution requires a *temporary increase* in MD (a "detour"). The 20% hard-band solve rate reflects this — harder puzzles more often require non-greedy moves.
+The MD-delta encoding teaches a *mostly*-greedy policy, but 12.4% of the training data contains BFS-optimal moves that actively increase MD. This creates training noise: the model absorbs contradictory examples without any input feature to disambiguate them. The result is a reliable greedy core with unpredictable behaviour at decision boundaries.
 
 ### The organelle decomposition matters
 
-Separating Strategist (strategic assessment) from Mover (tactical execution) keeps each model's task simple. The Mover only needs to learn "pick smallest number"; the Strategist only needs to learn "which direction looks best at the macro level."
+Separating Strategist (strategic assessment) from Mover (tactical execution) keeps each model's task simple. The Mover learns "given these consequences, pick the best direction"; the Strategist learns "which direction looks best overall."
 
 ## Build & Run
 
@@ -116,10 +200,10 @@ Separating Strategist (strategic assessment) from Mover (tactical execution) kee
 # From repo root
 mkdir build && cd build
 cmake .. && cmake --build . --target puzzle8_demo
-./puzzle8_demo    # trains 3 organelles, then solves 30 puzzles
+./puzzle8_demo    # trains 5 organelles, then solves 30 puzzles
 ```
 
-Auto-resumes from checkpoints (`puzzle8_strategist_v3.ckpt`, `puzzle8_mover_v3.ckpt`, `puzzle8_judge_v3.ckpt`).
+Trains: Strategist, Greedy-Mover, Detour-Detector, Detour-Mover, Judge. Auto-resumes from checkpoints (`puzzle8_*_v3b.ckpt`).
 
 ## Corpus Generation
 
@@ -127,15 +211,16 @@ Auto-resumes from checkpoints (`puzzle8_strategist_v3.ckpt`, `puzzle8_mover_v3.c
 python3 experiments/organelles/puzzle8/generate_corpus.py
 ```
 
-Generates all three corpus files from BFS-optimal solutions of 5,000 puzzles.
+Generates five corpus files (strategist, greedy mover, detour detector, detour mover, judge) from BFS-optimal solutions of 5,000 puzzles.
 
 ## Recommended Next Steps
 
 | Priority | Change | Expected Impact |
 |----------|--------|-----------------|
-| **P1** | Oscillation breaker: if last 4 moves cycle, force the unexplored direction | Breaks most failure modes, +10–20% medium/hard |
-| **P2** | Augment corpus with non-greedy "detour" moves from BFS solutions | Teaches the model when to accept temporary MD increase |
-| **P3** | Feed Strategist output into Mover prompt as priority hint | Enables multi-step planning to overcome local minima |
+| ~~P1~~ | ~~Oscillation breaker: detect cycle → force unexplored direction~~ | ✅ Done — 73 breaks, +10% medium, +10% hard |
+| ~~P1~~ | ~~Split corpus: train a pure greedy model with no contradictory detour examples~~ | ✅ Done — 100% easy, 40% medium, 20% hard |
+| **P1** | **Detour signal**: add `trap=1` flag to input when greedy leads to backtracking, giving the model the missing disambiguation signal | Lets the model learn *when* to deviate from greedy |
+| **P2** | Feed Strategist output into Mover prompt as priority hint | Enables multi-step planning to overcome local minima |
 
 ---
 

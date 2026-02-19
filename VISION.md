@@ -14,7 +14,7 @@
 
 **Picture:** A stem cell doesn't know what it will become until it encounters its environment. Hand it muscle tissue signals and it becomes muscle. Hand MicroGPT-C a shipping address corpus and it becomes an address validator. Same engine, infinite specialisations.
 
-**Proof:** Five working experiments — name generation (trains in < 1s), Shakespeare text (840K params, zero `<unk>`), C code retrieval (byte-perfect on 2,081 functions), 8-puzzle solving (96.7% via 3-model pipeline), and Connect-4 (85% win rate) — prove the stem cell differentiates into real, testable intelligence.
+**Proof:** Six working experiments — name generation (trains in < 1s), Shakespeare text (840K params, zero `<unk>`), C code retrieval (byte-perfect on 2,081 functions), 8-puzzle solving (60% via 5-organelle pipeline), Tic-Tac-Toe (90% win+draw), and Connect-4 (90% win rate) — prove the stem cell differentiates into real, testable intelligence. All game experiments share a [generic organelle library](src/microgpt_organelle.h).
 
 **Push:** Read [VALUE_PROPOSITION.md](VALUE_PROPOSITION.md) for the business case, or jump straight to `experiments/organelles/` to see the experimental evidence.
 

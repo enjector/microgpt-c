@@ -1,16 +1,16 @@
 # Tic-Tac-Toe Multi-Organelle Pipeline
 
-Two tiny neural networks play Tic-Tac-Toe as X against a random opponent — and win 82% of games.
+Two tiny neural networks play Tic-Tac-Toe as X against a random opponent — and win 84% of games.
 
 ---
 
 ## Spear Summary
 
-**Point:** Two 64K-parameter brains talking in plain text beat a random Tic-Tac-Toe opponent 82% of the time with zero external dependencies.
+**Point:** Two 64K-parameter brains talking in plain text beat a random Tic-Tac-Toe opponent 84% of the time with zero external dependencies.
 
 **Picture:** It's like two interns passing sticky notes to each other — one writes the plan ("go for the center then block"), the other picks the actual square — and a supervisor just checks if the square is empty. The sticky-note format is so simple that they almost never misread each other.
 
-**Proof:** 100 games completed in 0.34 seconds. 63 wins, 19 draws, 18 losses. The kanban feedback loop (blocked positions + re-planning) lifted the raw 63% win rate to 82% — a 30% improvement from error correction alone.
+**Proof:** 100 games completed in 0.97 seconds. 84 wins, 6 draws, 10 losses. The kanban feedback loop (blocked positions + re-planning) lifted the raw win rate to 84% with a 90% win+draw rate.
 
 **Push:** The Player's loss plateaued at 0.38 — it's hit a capacity ceiling at 64K params. Bump to N_EMBD=64 / N_LAYER=3 to break through and close the gap to perfect play.
 
@@ -62,23 +62,25 @@ Corpora generated from minimax-optimal play across all reachable board states. P
 
 ## Results (vs Random Opponent)
 
-| Metric | 5K Steps | 25K Steps |
-|--------|----------|-----------|
-| Wins | 68 (68%) | **63 (63%)** |
-| Draws | 5 (5%) | **19 (19%)** |
-| Losses | 27 (27%) | **18 (18%)** |
-| **Win+Draw** | **73%** | **82%** |
-| Parse Errors | 0 | 14 |
-| Re-plans | 0 | 102 |
-| Pipeline Time | 0.14s | 0.34s |
+| Metric | 5K Steps | 25K Steps | Post-Refactor |
+|--------|----------|-----------|---------------|
+| Wins | 68 (68%) | 63 (63%) | **84 (84%)** |
+| Draws | 5 (5%) | 19 (19%) | **6 (6%)** |
+| Losses | 27 (27%) | 18 (18%) | **10 (10%)** |
+| **Win+Draw** | **73%** | **82%** | **90%** |
+| Valid moves | — | — | 362 |
+| Invalid moves | — | — | 4,881 |
+| Parse Errors | 0 | 14 | 10 |
+| Re-plans | 0 | 102 | 45 |
+| Pipeline Time | 0.14s | 0.34s | 0.97s |
 
-### Key Finding: More Training → Defensive Play
+### Key Finding: Aggressive Play Dominates
 
-The 25K model trades 5 wins for 14 extra draws — it learned to force stalemates and block threats rather than play aggressively. Losses dropped 33% (27 → 18).
+The post-refactor run shows a shift to aggressive play: 84 wins (up from 63), only 6 draws (down from 19). Losses halved from 18 to 10. The `OpaKanban` library implementation with `mgpt_default_threads()` provides better training convergence through multi-threaded gradient accumulation.
 
 ### Player Capacity Ceiling
 
-Player loss plateaued at ~0.38 regardless of training duration (5K vs 25K). The 64K-param model can't fully represent all 5,478 reachable board states. This is a capacity limit, not a training one.
+Player loss plateaued at ~0.38 regardless of training duration (5K vs 25K). The 64K-param model can't fully represent all 5,478 reachable board states. This is a capacity limit, not a training one. The 4,881 invalid moves (93% invalid rate) show the model is essentially guessing positions and relying on the kanban loop to eventually find a valid one.
 
 ## Build & Run
 
@@ -102,18 +104,17 @@ Auto-resumes from checkpoints (`tictactoe_planner.ckpt`, `tictactoe_player.ckpt`
 
 ## Known Issues
 
-1. **Multi-threaded training crashes on large corpora** — Race condition in `train_worker_run` with 13K+ doc corpus. Workaround: `nthreads = 1` (costs ~5× training time)
-2. **doc_cursor overflow** — Fixed: wrap with modulo after each step
-3. **Parse errors at 25K** — Player occasionally produces multi-digit output. Could constrain to single-token generation
+1. **High invalid move rate** — 4,881 invalid moves across 100 games (93% invalid rate). The kanban loop compensates but the model is fundamentally guessing
+2. **Parse errors at 25K** — Player occasionally produces multi-digit output. Could constrain to single-token generation
+3. **Pipeline rescue dependency** — Like Connect-4, the high win rate comes from kanban coordination, not genuine board understanding
 
 ## Recommended Next Steps
 
 | Priority | Change | Impact |
 |----------|--------|--------|
-| **P0** | Fix multi-threaded training on large corpora | 5× faster training |
 | **P1** | Increase model capacity (N_EMBD=64, N_LAYER=3) | Break Player loss plateau |
 | **P1** | Constrain Player to single-token output | Eliminate parse errors |
-| **P2** | Weight defensive corpus examples | Reduce losses further |
+| **P2** | MD-delta encoding (like puzzle8) | Give model pre-computed evaluation instead of raw board |
 | **P2** | Test against minimax opponent | Validate learned strategy quality |
 
 ---

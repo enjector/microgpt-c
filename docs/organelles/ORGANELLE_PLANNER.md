@@ -10,7 +10,7 @@
 
 ## Spear Summary
 
-**Point:** Stateless prompting is why multi-organelle pipelines fail — adding a kanban state string (blocked + history + plan) to every prompt turned a 60% solver into a 96.7% solver.
+**Point:** Stateless prompting is why multi-organelle pipelines fail — adding a kanban state string (blocked + history + plan) to every prompt turned oscillating models into effective solvers across three different games.
 
 **Picture:** It's like asking someone for directions but never telling them which streets you already tried. They keep sending you in circles. The kanban is a sticky note that says "already tried right — try up instead."
 
@@ -36,8 +36,15 @@ single-shot execution into a stateful, adaptive coordination system, while remai
 entirely within the pipe-separated flat string format.
 
 > **Experimental Result:** The kanban protocol combined with a model capacity increase
-> (18K → 64K params/organelle) achieved **96.7% solve rate** (29/30 across 3 seeds),
-> up from 60–80% in the baseline. See Section 5 for full results.
+> (18K → 64K params/organelle) achieved **60% solve rate** on unseen 30-puzzle test set
+> (100% easy, 50% medium, 30% hard) with 73 oscillation breaks.
+> See Section 5 for full results.
+
+> [!NOTE]
+> **Implementation Status (Feb 2026):** The kanban struct described in §7.2 is now
+> implemented as `OpaKanban` in [`microgpt_organelle.c|h`](../../src/microgpt_organelle.h).
+> The cycle detection described in §2.2 is implemented as `OpaCycleDetector`.
+> All three game pipelines (puzzle8, tictactoe, connect4) use the shared library.
 
 ---
 
@@ -456,6 +463,10 @@ provides sufficient capacity for board-state reasoning up to md=5.
      int  stalls;         // consecutive failures
    } Kanban;
    ```
+
+   > [!NOTE]
+   > This struct is now implemented as `OpaKanban` in `src/microgpt_organelle.h`
+   > with string-based blocked/last fields for pipe-string compatibility.
 
 2. Update Mover prompting to include `blocked` and `last` from kanban
 3. Update Judge feedback to append rejected direction to `kanban.blocked`

@@ -10,7 +10,7 @@ A living roadmap for MicroGPT-C — a zero-dependency C99 GPT engine designed fo
 
 **Picture:** We've built the LEGO bricks and proved they snap together. The next step is the instruction manual and the box.
 
-**Proof:** Names (trains in < 1s), Shakespeare (840K params), 8-puzzle (96.7% solve, 3-organelle pipeline), Connect-4 (85% wins), C code generation (byte-perfect retrieval of 2,081 functions) — all validated.
+**Proof:** Names (trains in < 1s), Shakespeare (840K params), 8-puzzle (60% solve, 5-organelle pipeline), Tic-Tac-Toe (90% win+draw), Connect-4 (90% wins), C code generation (byte-perfect retrieval of 2,081 functions) — all validated. Shared organelle library (`microgpt_organelle.c|h`) eliminates 300–500 lines of boilerplate per demo.
 
 **Push:** The Q2 2026 organelle toolkit is the critical next step — it turns five separate `main.c` files into a single `microgpt create/train/infer` CLI.
 
@@ -50,9 +50,9 @@ A living roadmap for MicroGPT-C — a zero-dependency C99 GPT engine designed fo
 - [x] **shakespeare** — character-level Shakespeare (840K params, multi-threaded, zero `<unk>`)
 - [x] **c_codegen** — C code generation from prompts (875K params, byte-perfect recall of 2,081 functions)
 - [x] **c_wiringgen** — C function composition grammar (875K params, training in progress)
-- [x] **tic-tac-toe** — 2-organelle pipeline: Planner → Player (82% win+draw vs random)
-- [x] **8-puzzle** — 3-organelle pipeline: Planner → Mover → Judge with kanban coordination (96.7% solve rate)
-- [x] **Connect-4** — 2-organelle pipeline: Planner → Player (85% wins despite 60% invalid moves)
+- [x] **tic-tac-toe** — 2-organelle pipeline: Planner → Player (**90% win+draw** vs random)
+- [x] **8-puzzle** — 5-organelle pipeline: Strategist → Mover → Judge → Detector → DetourMover with kanban + cycle breaking (**60% solve rate**: 100% easy, 50% med, 30% hard)
+- [x] **Connect-4** — 2-organelle pipeline: Planner → Player (**90% wins** despite 50% invalid moves)
 - [x] Multi-organelle [experiment READMEs](experiments/organelles/) with Spear summaries
 - [x] [Design documents](docs/organelles/) — pipeline wire format, kanban planner, CLI vision
 
@@ -63,7 +63,9 @@ A living roadmap for MicroGPT-C — a zero-dependency C99 GPT engine designed fo
 Focus: make MicroGPT-C production-ready as a **differentiable LEGO block** for edge deployment.
 
 ### 1. Organelle Toolkit
-- [ ] **`microgpt_organelle.h`** — high-level API for the stem cell lifecycle: `organelle_create()` → `organelle_train()` → `organelle_infer()` → `organelle_confidence()`
+- [x] **`microgpt_organelle.h`** — high-level API: `Organelle` struct, `organelle_train()`, `organelle_generate()`, `organelle_free()`
+- [x] **`OpaKanban`** — generic kanban state management (blocked actions, move history, stall tracking)
+- [x] **`OpaCycleDetector`** — A↔B oscillation breaking for pipeline coordination
 - [ ] Built-in confidence scoring via softmax entropy (wraps existing `forward_inference` + softmax)
 - [ ] Organelle serialisation: save/load specialised blocks as compact `.bin` files with embedded vocab
 

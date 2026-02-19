@@ -444,7 +444,8 @@ The pipeline orchestrator in `cli_main.c` generalises this loop:
 ### Phase 2: Multi-Organelle Pipelines — Target: Q2 2026
 
 - [ ] `cmd_pipeline`: load multiple models, orchestrate Kanban loop
-- [ ] Generalised `organelle_generate()` (extracted from demo code)
+- [x] Generalised `organelle_generate()` — **implemented in `src/microgpt_organelle.c|h`**
+- [x] `OpaKanban` state management — **implemented in shared library**
 - [ ] Support for `judge = deterministic` (rules-based) and `judge = neural` (model-based)
 - [ ] Pipeline metrics: win rate, avg moves, replan count
 - [ ] **Validation gate:** convert `tictactoe_demo` and `connect4_demo` to `.ini` configs; **verify comparable win rates** vs standalone demos

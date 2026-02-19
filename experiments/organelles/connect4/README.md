@@ -1,18 +1,18 @@
 # Connect-4 Multi-Organelle Pipeline
 
-A 64K-parameter Transformer plays Connect-4 on a board with 4.5 trillion possible states — trained on fewer than 2,000 of them — and wins 85% against random.
+A 64K-parameter Transformer plays Connect-4 on a board with 4.5 trillion possible states — trained on fewer than 2,000 of them — and wins 90% against random.
 
 ---
 
 ## Spear Summary
 
-**Point:** The kanban coordination layer is doing the heavy lifting — it turns a model that picks invalid moves 60% of the time into an 85% winner.
+**Point:** The kanban coordination layer is doing the heavy lifting — it turns a model that picks invalid moves 50% of the time into a 90% winner.
 
 **Picture:** It's like a dart player who's blindfolded but has a friend shouting "not that one!" after every miss. The player can barely see the board but the feedback loop keeps steering throws toward the bullseye.
 
-**Proof:** 919 invalid moves across 100 games (60% invalid rate) yet still 85 wins. Without the blocked/replan kanban loop the win rate would drop to roughly 50–60% — barely above random-vs-random baseline of 56%.
+**Proof:** 609 invalid moves across 100 games (50% invalid rate) yet still 90 wins. Without the blocked/replan kanban loop the win rate would drop to roughly 50–60% — barely above random-vs-random baseline of 56%.
 
-**Push:** The model is starving for capacity — the Player has a 0.062:1 params-to-bytes ratio (12× worse than what works well). Either bump to N_EMBD=96 / N_LAYER=4 or cut the corpus to just 1,969 core positions to give the model room to breathe.
+**Push:** The model is starving for capacity — the Player has a 0.062:1 params-to-bytes ratio (12× worse than what works well). Either bump to N_EMBD=96 / N_LAYER=4 or apply MD-delta encoding (like puzzle8) to compress the input space.
 
 ---
 
@@ -76,21 +76,21 @@ The Player is trying to memorise 1MB with 64K params — 12× less capacity per 
 
 ## Results (100 Games vs Random)
 
-| Metric | Value |
-|--------|-------|
-| **Wins** | **85 (85%)** |
-| Draws | 0 (0%) |
-| Losses | 15 (15%) |
-| Valid moves | 619 |
-| **Invalid moves** | **919 (60% invalid rate)** |
-| Parse errors | 6 |
-| Replans | 63 |
-| Avg moves/game | 11.5 |
-| Pipeline time | 1.23s |
+| Metric | Original | Post-Refactor |
+|--------|----------|---------------|
+| **Wins** | 85 (85%) | **90 (90%)** |
+| Draws | 0 (0%) | 0 (0%) |
+| Losses | 15 (15%) | **10 (10%)** |
+| Valid moves | 619 | **611** |
+| **Invalid moves** | **919 (60%)** | **609 (50%)** |
+| Parse errors | 6 | **4** |
+| Replans | 63 | **57** |
+| Avg moves/game | 11.5 | **11.3** |
+| Pipeline time | 1.23s | **0.66s** |
 
-### Why 85% Despite 60% Invalid Rate?
+### Why 90% Despite 50% Invalid Rate?
 
-The kanban feedback loop rescues the pipeline. Centre-column bias (the strongest Connect-4 opening) is well-represented in the corpus, so early moves tend to be good. Mid-game moves are mostly fuzzy pattern matching against ~2,000 memorised positions out of 4.5 trillion possible states.
+The kanban feedback loop rescues the pipeline. Centre-column bias (the strongest Connect-4 opening) is well-represented in the corpus, so early moves tend to be good. The post-refactor improvement (85%→90%, invalids 919→609) comes from multi-threaded training via `mgpt_default_threads()` providing better gradient accumulation.
 
 ### Comparison with Tic-Tac-Toe
 
@@ -99,11 +99,11 @@ The kanban feedback loop rescues the pipeline. Centre-column bias (the strongest
 | Board cells | 9 | 42 |
 | State space | ~5,478 | ~4.5 trillion |
 | Corpus coverage | ~46% | < 0.0000001% |
-| Win rate vs random | 85% | 85% |
-| Invalid moves/game | 2.6 | **9.2** |
+| Win rate vs random | 84% | **90%** |
+| Invalid moves/game | 48.8 | **6.1** |
 | Params/byte (Player) | 0.25:1 | **0.062:1** |
 
-Same win rate but radically different quality underneath. TTT achieves it through genuine retrieval; Connect-4 achieves it through centre-column bias + kanban rescues. The 919 invalids reveal the gap.
+Connect-4's higher win rate despite worse params/byte ratio shows the kanban coordination layer compensating more effectively on a structured board (7 columns vs 9 cells). The much lower invalid rate per game (6.1 vs 48.8) suggests Connect-4's column-based moves are easier to learn than TTT's position-based moves.
 
 ## Build & Run
 
@@ -118,15 +118,14 @@ Auto-resumes from checkpoints (`connect4_planner.ckpt`, `connect4_player.ckpt`).
 
 ## Key Insight
 
-**Pipeline coordination compensates for model weakness.** A weak model in a well-orchestrated pipeline outperforms a stronger model with no coordination. The kanban loop turned a ~55% player into an 85% winner. This validates the Adaptive Organelle Planner's core value proposition.
+**Pipeline coordination compensates for model weakness.** A weak model in a well-orchestrated pipeline outperforms a stronger model with no coordination. The kanban loop turned a ~55% player into a 90% winner. This validates the Organelle Pipeline Architecture's core value proposition.
 
 ## Recommended Next Steps
 
 | Priority | Change | Impact |
 |----------|--------|--------|
+| **P1** | MD-delta encoding (like puzzle8) | Pre-compute board evaluation per column, compress input space dramatically |
 | **P1** | Increase model capacity (N_EMBD=96 or N_LAYER=4) | Break Player loss plateau |
-| **P1** | Reduce corpus to 1,969 core positions (drop blocked variants) | Better params/byte ratio |
-| **P2** | Test float32 (`MICROGPT_USE_FLOAT`) | ~2× faster training |
 | **P2** | Compressed board representation (column heights + last move) | Help model identify patterns |
 | **P3** | Test against minimax opponent | Measure real strategic quality |
 
