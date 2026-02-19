@@ -1,0 +1,109 @@
+
+========================================
+Run: 2026-02-19 16:38:43
+========================================
+Corpus: 114634 lines | 5312290 chars (5187.8 KB)
+Vocab: 84 characters
+Architecture: N_EMBD=128 N_LAYER=4 N_HEAD=8 BLOCK_SIZE=256
+Params: 840704
+Training: batch=16 steps=30000 lr=0.0010 threads=12
+Seeds: train=42 infer=1771519123
+Inference: temp=0.70 gen_len=300 samples=5
+
+--- Training ---
+step     1 / 30000 | loss 6.8712
+step   500 / 30000 | loss 2.3415
+step  1000 / 30000 | loss 2.1731
+step  1500 / 30000 | loss 1.9252
+step  2000 / 30000 | loss 1.7888
+step  2500 / 30000 | loss 1.7268
+step  3000 / 30000 | loss 1.8802
+step  3500 / 30000 | loss 1.7155
+step  4000 / 30000 | loss 1.6796
+step  4500 / 30000 | loss 1.7660
+step  5000 / 30000 | loss 1.6831
+step  5500 / 30000 | loss 1.6078
+step  6000 / 30000 | loss 1.8434
+step  6500 / 30000 | loss 1.7242
+step  7000 / 30000 | loss 1.7441
+step  7500 / 30000 | loss 1.5215
+step  8000 / 30000 | loss 1.6223
+step  8500 / 30000 | loss 1.7566
+step  9000 / 30000 | loss 1.3632
+step  9500 / 30000 | loss 1.6411
+step 10000 / 30000 | loss 1.6810
+step 10500 / 30000 | loss 1.6436
+step 11000 / 30000 | loss 1.4438
+step 11500 / 30000 | loss 1.4230
+step 12000 / 30000 | loss 1.3104
+step 12500 / 30000 | loss 1.6177
+step 13000 / 30000 | loss 1.5408
+step 13500 / 30000 | loss 1.4128
+step 14000 / 30000 | loss 1.6516
+step 14500 / 30000 | loss 1.4818
+step 15000 / 30000 | loss 1.4225
+step 15500 / 30000 | loss 1.3336
+step 16000 / 30000 | loss 1.3156
+step 16500 / 30000 | loss 1.3558
+step 17000 / 30000 | loss 1.4461
+step 17500 / 30000 | loss 1.4750
+step 18000 / 30000 | loss 1.5653
+step 18500 / 30000 | loss 1.5521
+step 19000 / 30000 | loss 1.3995
+step 19500 / 30000 | loss 1.5444
+step 20000 / 30000 | loss 1.5100
+step 20500 / 30000 | loss 1.3403
+step 21000 / 30000 | loss 1.4369
+step 21500 / 30000 | loss 1.4238
+step 22000 / 30000 | loss 1.4491
+step 22500 / 30000 | loss 1.3356
+step 23000 / 30000 | loss 1.3585
+step 23500 / 30000 | loss 1.4368
+step 24000 / 30000 | loss 1.2630
+step 24500 / 30000 | loss 1.3144
+step 25000 / 30000 | loss 1.4777
+step 25500 / 30000 | loss 1.3465
+step 26000 / 30000 | loss 1.4427
+step 26500 / 30000 | loss 1.3282
+step 27000 / 30000 | loss 1.3030
+step 27500 / 30000 | loss 1.4499
+step 28000 / 30000 | loss 1.3458
+step 28500 / 30000 | loss 1.3924
+step 29000 / 30000 | loss 1.4504
+step 29500 / 30000 | loss 1.4904
+step 30000 / 30000 | loss 1.4929
+
+Training complete: 816.0s | 37 steps/s | 27.8k tok/s
+Final checkpoint: shakespeare.ckpt
+  sample 1: seed='T' | 52 tok | 14039 tok/s
+  sample 2: seed='O' | 45 tok | 15658 tok/s
+  sample 3: seed='W' | 32 tok | 18328 tok/s
+  sample 4: seed='M' | 43 tok | 17050 tok/s
+  sample 5: seed='H' | 17 tok | 19037 tok/s
+
+--- Inference Summary ---
+samples: 5 | total_tokens: 189 | time: 0.012s | avg: 16100 tok/s
+========================================
+
+
+========================================
+Run: 2026-02-19 16:54:55
+========================================
+Corpus: 114634 lines | 5312290 chars (5187.8 KB)
+Vocab: 84 characters
+Architecture: N_EMBD=128 N_LAYER=4 N_HEAD=8 BLOCK_SIZE=256
+Params: 840704
+Training: batch=16 steps=30000 lr=0.0010 threads=12
+Seeds: train=42 infer=1771520095
+Inference: temp=0.70 gen_len=300 samples=5
+Loaded checkpoint: shakespeare.ckpt (trained 30000 steps)
+  sample 1: seed='T' | 65 tok | 15633 tok/s
+  sample 2: seed='O' | 51 tok | 17882 tok/s
+  sample 3: seed='W' | 63 tok | 15909 tok/s
+  sample 4: seed='M' | 6 tok | 17804 tok/s
+  sample 5: seed='H' | 39 tok | 18678 tok/s
+
+--- Inference Summary ---
+samples: 5 | total_tokens: 224 | time: 0.013s | avg: 16723 tok/s
+========================================
+

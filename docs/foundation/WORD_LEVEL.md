@@ -1,5 +1,19 @@
 # Word-Level Tokenisation
 
+---
+
+## Spear Summary
+
+**Point:** Word-level tokenisation trades vocabulary size for semantic density — each token carries a whole word's meaning instead of a single letter.
+
+**Picture:** It's like reading a book word-by-word instead of letter-by-letter. You understand faster but you'll skip any word you've never seen before — and at this model scale that happens a lot.
+
+**Proof:** The Shakespeare corpus has ~8,000 unique words. At the model sizes MicroGPT-C uses (~875K params) the `<unk>` rate becomes problematic. The Shakespeare demo was rewritten from word-level to character-level precisely because of this.
+
+**Push:** Only use word-level tokenisation when you have a controlled vocabulary (forms, templates, structured data). For open-ended text at sub-1M param scale, character-level is strictly better.
+
+---
+
 Word-level tokenisation splits text on whitespace, maps each word to a token ID, and preserves newlines as distinct tokens. It works best for **prose, dialogue, and longer text** where whole-word semantics matter more than individual characters.
 
 ## When to Use

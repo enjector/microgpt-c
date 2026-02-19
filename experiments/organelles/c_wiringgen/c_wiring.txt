@@ -1,0 +1,5710 @@
+/* normalize array to zero mean unit variance */
+void normalize_z(double *out, const double *x, int n) {
+  double m = mean(x, n);
+  double s = stddev(x, n);
+  for (int i = 0; i < n; i++) out[i] = (x[i] - m) / s;
+}
+
+/* smooth then differentiate signal */
+void smooth_diff(double *out, const double *x, int n, int period) {
+  double tmp[1024];
+  rolling_mean(tmp, x, n, period);
+  diff_central(out, tmp, n);
+}
+
+/* chain lowpass filter then downsample */
+void filter_downsample(double *out, const double *x, int n, int factor) {
+  double tmp[1024];
+  lowpass(tmp, x, n, 0.5 / factor);
+  downsample(out, tmp, n, factor);
+}
+
+/* upsample then smooth with moving average */
+void upsample_smooth(double *out, const double *x, int n, int factor, int period) {
+  double tmp[1024];
+  upsample(tmp, x, n, factor);
+  moving_avg(out, tmp, n * factor, period);
+}
+
+/* compute coefficient of variation */
+double coeff_of_variation(const double *x, int n) {
+  return stddev(x, n) / mean(x, n);
+}
+
+/* compute signal to noise ratio */
+double compute_snr(const double *signal, const double *noise, int n) {
+  return signal_rms(signal, n) / signal_rms(noise, n);
+}
+
+/* compute range of array values */
+double array_range(const double *x, int n) {
+  return max_val(x, n) - min_val(x, n);
+}
+
+/* subtract mean from array */
+void demean(double *out, const double *x, int n) {
+  double m = mean(x, n);
+  for (int i = 0; i < n; i++) out[i] = x[i] - m;
+}
+
+/* scale array to unit variance */
+void unit_variance(double *out, const double *x, int n) {
+  double s = stddev(x, n);
+  for (int i = 0; i < n; i++) out[i] = x[i] / s;
+}
+
+/* clamp array values to range */
+void clamp_array(double *out, const double *x, int n, double lo, double hi) {
+  for (int i = 0; i < n; i++) out[i] = clamp(x[i], lo, hi);
+}
+
+/* apply sigmoid to each element */
+void sigmoid_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = sigmoid(x[i]);
+}
+
+/* apply relu to each element */
+void relu_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = relu(x[i]);
+}
+
+/* apply softplus to each element */
+void softplus_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = softplus(x[i]);
+}
+
+/* apply leaky relu to each element */
+void leaky_relu_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = leaky_relu(x[i]);
+}
+
+/* apply tanh to each element */
+void tanh_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = tanh_approx(x[i]);
+}
+
+/* apply sign function to each element */
+void sign_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = sign(x[i]);
+}
+
+/* compute element-wise absolute value */
+void abs_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = x[i] < 0 ? -x[i] : x[i];
+}
+
+/* compute element-wise square */
+void square_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = x[i] * x[i];
+}
+
+/* element-wise sum of two arrays */
+void add_arrays(double *out, const double *a, const double *b, int n) {
+  for (int i = 0; i < n; i++) out[i] = a[i] + b[i];
+}
+
+/* element-wise difference of two arrays */
+void sub_arrays(double *out, const double *a, const double *b, int n) {
+  for (int i = 0; i < n; i++) out[i] = a[i] - b[i];
+}
+
+/* element-wise product of two arrays */
+void mul_arrays(double *out, const double *a, const double *b, int n) {
+  for (int i = 0; i < n; i++) out[i] = a[i] * b[i];
+}
+
+/* element-wise ratio of two arrays */
+void div_arrays(double *out, const double *a, const double *b, int n) {
+  for (int i = 0; i < n; i++) out[i] = a[i] / b[i];
+}
+
+/* element-wise maximum of two arrays */
+void max_arrays(double *out, const double *a, const double *b, int n) {
+  for (int i = 0; i < n; i++) out[i] = a[i] > b[i] ? a[i] : b[i];
+}
+
+/* element-wise minimum of two arrays */
+void min_arrays(double *out, const double *a, const double *b, int n) {
+  for (int i = 0; i < n; i++) out[i] = a[i] < b[i] ? a[i] : b[i];
+}
+
+/* linear interpolation between two arrays */
+void lerp_arrays(double *out, const double *a, const double *b, int n, double t) {
+  for (int i = 0; i < n; i++) out[i] = lerp(a[i], b[i], t);
+}
+
+/* weighted sum of two arrays */
+void weighted_add(double *out, const double *a, const double *b, int n, double wa, double wb) {
+  for (int i = 0; i < n; i++) out[i] = wa * a[i] + wb * b[i];
+}
+
+/* absolute difference between two arrays */
+void abs_diff(double *out, const double *a, const double *b, int n) {
+  for (int i = 0; i < n; i++) {
+    double d = a[i] - b[i];
+    out[i] = d < 0 ? -d : d;
+  }
+}
+
+/* sum of squared element-wise differences */
+double sum_sq_diff(const double *a, const double *b, int n) {
+  double s = 0;
+  for (int i = 0; i < n; i++) { double d = a[i] - b[i]; s += d * d; }
+  return s;
+}
+
+/* root mean square difference of two arrays */
+double rms_diff(const double *a, const double *b, int n) {
+  return sqrt(mse(a, b, n));
+}
+
+/* mean of absolute element-wise differences */
+double mean_abs_diff(const double *a, const double *b, int n) {
+  return mae(a, b, n);
+}
+
+/* normalize then apply sigmoid */
+void normalize_sigmoid(double *out, const double *x, int n) {
+  double m = mean(x, n);
+  double s = stddev(x, n);
+  for (int i = 0; i < n; i++) out[i] = sigmoid((x[i] - m) / s);
+}
+
+/* demean then scale by maximum */
+void center_scale(double *out, const double *x, int n) {
+  double m = mean(x, n);
+  double mx = max_val(x, n);
+  double mn = min_val(x, n);
+  double range = mx - mn;
+  for (int i = 0; i < n; i++) out[i] = (x[i] - m) / range;
+}
+
+/* min-max normalize then apply relu */
+void minmax_relu(double *out, const double *x, int n) {
+  double tmp[1024];
+  minmax_normalize(tmp, x, n);
+  for (int i = 0; i < n; i++) out[i] = relu(tmp[i]);
+}
+
+/* z-score normalize then clamp */
+void zscore_clamp(double *out, const double *x, int n, double lo, double hi) {
+  double tmp[1024];
+  zscore_normalize(tmp, x, n);
+  for (int i = 0; i < n; i++) out[i] = clamp(tmp[i], lo, hi);
+}
+
+/* sort then compute percentile */
+double sorted_percentile(const double *x, int n, double p) {
+  double tmp[1024];
+  for (int i = 0; i < n; i++) tmp[i] = x[i];
+  bubble_sort(tmp, n);
+  return percentile(tmp, n, p);
+}
+
+/* sort then compute interquartile range */
+double sorted_iqr(const double *x, int n) {
+  double tmp[1024];
+  for (int i = 0; i < n; i++) tmp[i] = x[i];
+  bubble_sort(tmp, n);
+  return iqr(tmp, n);
+}
+
+/* sort then compute trimmed mean */
+double sorted_trimmed_mean(const double *x, int n, int trim) {
+  double tmp[1024];
+  for (int i = 0; i < n; i++) tmp[i] = x[i];
+  bubble_sort(tmp, n);
+  return trimmed_mean(tmp, n, trim);
+}
+
+/* sort then compute median */
+double sorted_median(const double *x, int n) {
+  double tmp[1024];
+  for (int i = 0; i < n; i++) tmp[i] = x[i];
+  bubble_sort(tmp, n);
+  return median(tmp, n);
+}
+
+/* smooth signal with rolling mean then normalize */
+void smooth_normalize(double *out, const double *x, int n, int period) {
+  double tmp[1024];
+  rolling_mean(tmp, x, n, period);
+  zscore_normalize(out, tmp, n);
+}
+
+/* compute rolling mean then subtract from original */
+void detrend(double *out, const double *x, int n, int period) {
+  double tmp[1024];
+  rolling_mean(tmp, x, n, period);
+  for (int i = 0; i < n; i++) out[i] = x[i] - tmp[i];
+}
+
+/* compute exponential moving average then subtract from original */
+void ema_detrend(double *out, const double *x, int n, int period) {
+  double tmp[1024];
+  ema_series(tmp, x, n, period);
+  for (int i = 0; i < n; i++) out[i] = x[i] - tmp[i];
+}
+
+/* compute difference between fast and slow moving averages */
+void ma_crossover(double *out, const double *x, int n, int fast, int slow) {
+  double fast_ma[1024], slow_ma[1024];
+  rolling_mean(fast_ma, x, n, fast);
+  rolling_mean(slow_ma, x, n, slow);
+  for (int i = 0; i < n; i++) out[i] = fast_ma[i] - slow_ma[i];
+}
+
+/* compute ratio of fast to slow moving averages */
+void ma_ratio(double *out, const double *x, int n, int fast, int slow) {
+  double fast_ma[1024], slow_ma[1024];
+  rolling_mean(fast_ma, x, n, fast);
+  rolling_mean(slow_ma, x, n, slow);
+  for (int i = 0; i < n; i++) out[i] = fast_ma[i] / slow_ma[i];
+}
+
+/* smooth then compute cumulative sum */
+void smooth_cumsum(double *out, const double *x, int n, int period) {
+  double tmp[1024];
+  rolling_mean(tmp, x, n, period);
+  cumsum(out, tmp, n);
+}
+
+/* differencing then cumulative sum to reconstruct */
+void diff_cumsum(double *out, const double *x, int n) {
+  double tmp[1024];
+  diff_central(tmp, x, n);
+  cumsum(out, tmp, n);
+}
+
+/* compute cumulative sum then normalize */
+void cumsum_normalize(double *out, const double *x, int n) {
+  double tmp[1024];
+  cumsum(tmp, x, n);
+  zscore_normalize(out, tmp, n);
+}
+
+/* apply window function then compute FFT */
+void windowed_fft(double *re, double *im, const double *x, int n) {
+  double w[1024];
+  hamming_window(w, n);
+  for (int i = 0; i < n; i++) { re[i] = x[i] * w[i]; im[i] = 0; }
+  fft_radix2(re, im, n);
+}
+
+/* compute FFT magnitude spectrum */
+void spectrum(double *mag, const double *x, int n) {
+  double re[1024], im[1024];
+  for (int i = 0; i < n; i++) { re[i] = x[i]; im[i] = 0; }
+  fft_radix2(re, im, n);
+  fft_magnitude(mag, re, im, n);
+}
+
+/* compute FFT then extract phase */
+void phase_spectrum(double *phase, const double *x, int n) {
+  double re[1024], im[1024];
+  for (int i = 0; i < n; i++) { re[i] = x[i]; im[i] = 0; }
+  fft_radix2(re, im, n);
+  fft_phase(phase, re, im, n);
+}
+
+/* compute power spectral density */
+void power_spectrum(double *psd, const double *x, int n) {
+  double re[1024], im[1024], mag[1024];
+  for (int i = 0; i < n; i++) { re[i] = x[i]; im[i] = 0; }
+  fft_radix2(re, im, n);
+  fft_magnitude(mag, re, im, n);
+  for (int i = 0; i < n; i++) psd[i] = mag[i] * mag[i];
+}
+
+/* bandpass filter then compute envelope */
+void filtered_envelope(double *out, const double *x, int n, double lo, double hi) {
+  double tmp[1024];
+  bandpass_filter(tmp, x, n, lo, hi);
+  hilbert_envelope(out, tmp, n);
+}
+
+/* lowpass filter then differentiate */
+void filter_diff(double *out, const double *x, int n, double cutoff) {
+  double tmp[1024];
+  lowpass(tmp, x, n, cutoff);
+  diff_central(out, tmp, n);
+}
+
+/* differentiate then lowpass filter */
+void diff_filter(double *out, const double *x, int n, double cutoff) {
+  double tmp[1024];
+  diff_central(tmp, x, n);
+  lowpass(out, tmp, n, cutoff);
+}
+
+/* add noise then lowpass filter */
+void noisy_filter(double *out, const double *x, int n, double noise_level, double cutoff) {
+  double tmp[1024];
+  for (int i = 0; i < n; i++) tmp[i] = x[i];
+  add_noise(tmp, n, noise_level);
+  lowpass(out, tmp, n, cutoff);
+}
+
+/* compute correlation between original and smoothed */
+double smooth_correlation(const double *x, int n, int period) {
+  double tmp[1024];
+  rolling_mean(tmp, x, n, period);
+  return correlation(x, tmp, n);
+}
+
+/* compute distance between two vectors */
+double vector_distance(const double *a, const double *b, int n) {
+  double s = 0;
+  for (int i = 0; i < n; i++) { double d = a[i] - b[i]; s += d * d; }
+  return sqrt(s);
+}
+
+/* normalize two vectors then compute dot product */
+double normalized_dot(const double *a, const double *b, int n) {
+  double na[1024], nb[1024];
+  vec_normalize(na, a, n);
+  vec_normalize(nb, b, n);
+  return dot(na, nb, n);
+}
+
+/* compute mean of two arrays then difference */
+double mean_diff(const double *a, const double *b, int n) {
+  return mean(a, n) - mean(b, n);
+}
+
+/* compute variance ratio of two arrays */
+double variance_ratio(const double *a, const double *b, int n) {
+  return variance(a, n) / variance(b, n);
+}
+
+/* compute ratio of standard deviations */
+double stddev_ratio(const double *a, const double *b, int n) {
+  return stddev(a, n) / stddev(b, n);
+}
+
+/* compute covariance then normalize to correlation */
+double cov_to_corr(const double *a, const double *b, int n) {
+  return covariance(a, b, n) / (stddev(a, n) * stddev(b, n));
+}
+
+/* compute cross entropy between two distributions */
+double array_cross_entropy(const double *p, const double *q, int n) {
+  return cross_entropy(p, q, n);
+}
+
+/* compute KL divergence between two distributions */
+double array_kl_div(const double *p, const double *q, int n) {
+  return kl_divergence(p, q, n);
+}
+
+/* softmax normalize then compute entropy */
+double softmax_entropy(const double *x, int n) {
+  double tmp[1024];
+  softmax(tmp, x, n);
+  return entropy(tmp, n);
+}
+
+/* sort then compute rank correlation */
+double sorted_rank_corr(const double *a, const double *b, int n) {
+  double ra[1024], rb[1024];
+  compute_ranks(ra, a, n);
+  compute_ranks(rb, b, n);
+  return correlation(ra, rb, n);
+}
+
+/* filter above threshold */
+int filter_above(double *out, const double *x, int n, double threshold) {
+  int count = 0;
+  for (int i = 0; i < n; i++)
+    if (x[i] > threshold) out[count++] = x[i];
+  return count;
+}
+
+/* filter below threshold */
+int filter_below(double *out, const double *x, int n, double threshold) {
+  int count = 0;
+  for (int i = 0; i < n; i++)
+    if (x[i] < threshold) out[count++] = x[i];
+  return count;
+}
+
+/* count elements above threshold */
+int count_above(const double *x, int n, double threshold) {
+  int count = 0;
+  for (int i = 0; i < n; i++)
+    if (x[i] > threshold) count++;
+  return count;
+}
+
+/* count elements below threshold */
+int count_below(const double *x, int n, double threshold) {
+  int count = 0;
+  for (int i = 0; i < n; i++)
+    if (x[i] < threshold) count++;
+  return count;
+}
+
+/* fraction of elements above mean */
+double fraction_above_mean(const double *x, int n) {
+  double m = mean(x, n);
+  int count = 0;
+  for (int i = 0; i < n; i++)
+    if (x[i] > m) count++;
+  return (double)count / n;
+}
+
+/* compute sum of array */
+double array_sum(const double *x, int n) {
+  double s = 0;
+  for (int i = 0; i < n; i++) s += x[i];
+  return s;
+}
+
+/* compute sum of squares */
+double sum_of_squares(const double *x, int n) {
+  double s = 0;
+  for (int i = 0; i < n; i++) s += x[i] * x[i];
+  return s;
+}
+
+/* compute root mean square of array */
+double rms_value(const double *x, int n) {
+  double s = 0;
+  for (int i = 0; i < n; i++) s += x[i] * x[i];
+  return sqrt(s / n);
+}
+
+/* compute mean of squared values */
+double mean_sq(const double *x, int n) {
+  double s = 0;
+  for (int i = 0; i < n; i++) s += x[i] * x[i];
+  return s / n;
+}
+
+/* compute product of all elements */
+double array_product(const double *x, int n) {
+  double p = 1;
+  for (int i = 0; i < n; i++) p *= x[i];
+  return p;
+}
+
+/* accumulate weighted sum */
+double weighted_sum(const double *x, const double *w, int n) {
+  double s = 0;
+  for (int i = 0; i < n; i++) s += x[i] * w[i];
+  return s;
+}
+
+/* compute weighted average */
+double weighted_avg(const double *x, const double *w, int n) {
+  double s = 0, wt = 0;
+  for (int i = 0; i < n; i++) { s += x[i] * w[i]; wt += w[i]; }
+  return s / wt;
+}
+
+/* compute Euclidean norm of array */
+double array_norm(const double *x, int n) {
+  return vec_norm(x, n);
+}
+
+/* fill array with constant value */
+void fill_constant(double *out, int n, double val) {
+  for (int i = 0; i < n; i++) out[i] = val;
+}
+
+/* fill array with linear ramp */
+void fill_ramp(double *out, int n, double start, double step) {
+  for (int i = 0; i < n; i++) out[i] = start + i * step;
+}
+
+/* fill array with arithmetic sequence */
+void fill_sequence(double *out, int n, double start, double step) {
+  for (int i = 0; i < n; i++) out[i] = start + i * step;
+}
+
+/* scale array by constant factor */
+void scale_array(double *out, const double *x, int n, double k) {
+  vec_scale(out, x, n, k);
+}
+
+/* add constant to every element */
+void offset_array(double *out, const double *x, int n, double offset) {
+  for (int i = 0; i < n; i++) out[i] = x[i] + offset;
+}
+
+/* map values to range zero to one */
+void map_to_unit(double *out, const double *x, int n) {
+  minmax_normalize(out, x, n);
+}
+
+/* map values from one range to another */
+void remap_array(double *out, const double *x, int n, double in_lo, double in_hi, double out_lo, double out_hi) {
+  for (int i = 0; i < n; i++) out[i] = map_range(x[i], in_lo, in_hi, out_lo, out_hi);
+}
+
+/* copy array */
+void copy_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = x[i];
+}
+
+/* reverse array into output */
+void reverse_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = x[n - 1 - i];
+}
+
+/* compute running maximum */
+void running_max(double *out, const double *x, int n) {
+  out[0] = x[0];
+  for (int i = 1; i < n; i++) out[i] = x[i] > out[i - 1] ? x[i] : out[i - 1];
+}
+
+/* compute running minimum */
+void running_min(double *out, const double *x, int n) {
+  out[0] = x[0];
+  for (int i = 1; i < n; i++) out[i] = x[i] < out[i - 1] ? x[i] : out[i - 1];
+}
+
+/* compute first differences */
+void first_diff(double *out, const double *x, int n) {
+  for (int i = 0; i < n - 1; i++) out[i] = x[i + 1] - x[i];
+}
+
+/* compute percentage changes */
+void pct_change(double *out, const double *x, int n) {
+  for (int i = 0; i < n - 1; i++) out[i] = (x[i + 1] - x[i]) / x[i];
+}
+
+/* compute log of ratios */
+void log_ratio(double *out, const double *x, int n) {
+  for (int i = 0; i < n - 1; i++) out[i] = log(x[i + 1] / x[i]);
+}
+
+/* shift array left by k positions */
+void shift_left(double *out, const double *x, int n, int k) {
+  for (int i = 0; i < n - k; i++) out[i] = x[i + k];
+  for (int i = n - k; i < n; i++) out[i] = 0;
+}
+
+/* shift array right by k positions */
+void shift_right(double *out, const double *x, int n, int k) {
+  for (int i = 0; i < k; i++) out[i] = 0;
+  for (int i = k; i < n; i++) out[i] = x[i - k];
+}
+
+/* normalize signal then compute fft magnitude */
+void norm_spectrum(double *mag, const double *x, int n) {
+  double tmp[1024], re[1024], im[1024];
+  zscore_normalize(tmp, x, n);
+  for (int i = 0; i < n; i++) { re[i] = tmp[i]; im[i] = 0; }
+  fft_radix2(re, im, n);
+  fft_magnitude(mag, re, im, n);
+}
+
+/* detrend then compute fft */
+void detrend_fft(double *re, double *im, const double *x, int n, int period) {
+  double tmp[1024], trend[1024];
+  rolling_mean(trend, x, n, period);
+  for (int i = 0; i < n; i++) { re[i] = x[i] - trend[i]; im[i] = 0; }
+  fft_radix2(re, im, n);
+}
+
+/* filter signal then compute energy */
+double filtered_energy(const double *x, int n, double cutoff) {
+  double tmp[1024];
+  lowpass(tmp, x, n, cutoff);
+  return signal_energy(tmp, n);
+}
+
+/* smooth signal with ema then compute rms */
+double ema_rms(const double *x, int n, int period) {
+  double tmp[1024];
+  ema_series(tmp, x, n, period);
+  return signal_rms(tmp, n);
+}
+
+/* compute histogram then normalize to probability */
+void probability_histogram(double *hist, const double *x, int n, int nbins) {
+  histogram(hist, x, n, nbins);
+  double s = 0;
+  for (int i = 0; i < nbins; i++) s += hist[i];
+  for (int i = 0; i < nbins; i++) hist[i] /= s;
+}
+
+/* compute histogram then apply softmax */
+void softmax_histogram(double *hist, const double *x, int n, int nbins) {
+  double tmp[1024];
+  histogram(tmp, x, n, nbins);
+  softmax(hist, tmp, nbins);
+}
+
+/* sort then return n-th smallest */
+double nth_smallest(const double *x, int n, int k) {
+  double tmp[1024];
+  for (int i = 0; i < n; i++) tmp[i] = x[i];
+  bubble_sort(tmp, n);
+  return tmp[k];
+}
+
+/* sort then return n-th largest */
+double nth_largest(const double *x, int n, int k) {
+  double tmp[1024];
+  for (int i = 0; i < n; i++) tmp[i] = x[i];
+  bubble_sort(tmp, n);
+  return tmp[n - 1 - k];
+}
+
+/* compute mean then ratio to maximum */
+double mean_to_max_ratio(const double *x, int n) {
+  return mean(x, n) / max_val(x, n);
+}
+
+/* compute median then ratio to mean */
+double median_to_mean_ratio(const double *x, int n) {
+  double tmp[1024];
+  for (int i = 0; i < n; i++) tmp[i] = x[i];
+  bubble_sort(tmp, n);
+  return median(tmp, n) / mean(x, n);
+}
+
+/* compute squared deviation from mean */
+void sq_dev(double *out, const double *x, int n) {
+  double m = mean(x, n);
+  for (int i = 0; i < n; i++) { double d = x[i] - m; out[i] = d * d; }
+}
+
+/* compute absolute deviation from mean */
+void abs_dev(double *out, const double *x, int n) {
+  double m = mean(x, n);
+  for (int i = 0; i < n; i++) {
+    double d = x[i] - m;
+    out[i] = d < 0 ? -d : d;
+  }
+}
+
+/* compute absolute deviation from median */
+void abs_dev_median(double *out, const double *x, int n) {
+  double tmp[1024];
+  for (int i = 0; i < n; i++) tmp[i] = x[i];
+  bubble_sort(tmp, n);
+  double med = median(tmp, n);
+  for (int i = 0; i < n; i++) {
+    double d = x[i] - med;
+    out[i] = d < 0 ? -d : d;
+  }
+}
+
+/* subtract rolling mean then compute variance */
+double detrended_variance(const double *x, int n, int period) {
+  double tmp[1024], trend[1024];
+  rolling_mean(trend, x, n, period);
+  for (int i = 0; i < n; i++) tmp[i] = x[i] - trend[i];
+  return variance(tmp, n);
+}
+
+/* subtract ema then compute standard deviation */
+double ema_detrended_stddev(const double *x, int n, int period) {
+  double tmp[1024], trend[1024];
+  ema_series(trend, x, n, period);
+  for (int i = 0; i < n; i++) tmp[i] = x[i] - trend[i];
+  return stddev(tmp, n);
+}
+
+/* compute rolling z-score */
+void rolling_zscore(double *out, const double *x, int n, int period) {
+  double rm[1024], rs[1024];
+  rolling_mean(rm, x, n, period);
+  running_stddev(rs, x, n, period);
+  for (int i = 0; i < n; i++) out[i] = (x[i] - rm[i]) / (rs[i] + 1e-10);
+}
+
+/* normalize then compute autocorrelation */
+double norm_autocorrelation(const double *x, int n, int lag) {
+  double tmp[1024];
+  zscore_normalize(tmp, x, n);
+  return autocorrelation(tmp, n, lag);
+}
+
+/* compute gradient then smooth with ema */
+void smooth_gradient(double *out, const double *x, int n, int period) {
+  double tmp[1024];
+  diff_central(tmp, x, n);
+  ema_series(out, tmp, n, period);
+}
+
+/* smooth then compute zero crossings */
+int smooth_zero_crossings(const double *x, int n, int period) {
+  double tmp[1024];
+  rolling_mean(tmp, x, n, period);
+  return zero_crossings(tmp, n);
+}
+
+/* compute two vectors then return their cosine similarity */
+double array_cosine_sim(const double *a, const double *b, int n) {
+  return cosine_similarity(a, b, n);
+}
+
+/* scale vector to unit length */
+void unit_vector(double *out, const double *x, int n) {
+  vec_normalize(out, x, n);
+}
+
+/* project vector a onto vector b */
+void project_onto(double *out, const double *a, const double *b, int n) {
+  double scale = dot(a, b, n) / dot(b, b, n);
+  vec_scale(out, b, n, scale);
+}
+
+/* compute residual after projection */
+void projection_residual(double *out, const double *a, const double *b, int n) {
+  double proj[1024];
+  double scale = dot(a, b, n) / dot(b, b, n);
+  vec_scale(proj, b, n, scale);
+  for (int i = 0; i < n; i++) out[i] = a[i] - proj[i];
+}
+
+/* compute mean and variance in single pass */
+void mean_variance(double *out_mean, double *out_var, const double *x, int n) {
+  *out_mean = mean(x, n);
+  *out_var = variance(x, n);
+}
+
+/* compute mean and standard deviation */
+void mean_stddev(double *out_mean, double *out_std, const double *x, int n) {
+  *out_mean = mean(x, n);
+  *out_std = stddev(x, n);
+}
+
+/* compute min and max */
+void min_max(double *out_min, double *out_max, const double *x, int n) {
+  *out_min = min_val(x, n);
+  *out_max = max_val(x, n);
+}
+
+/* compute mean of absolute values */
+double mean_abs(const double *x, int n) {
+  double s = 0;
+  for (int i = 0; i < n; i++) s += x[i] < 0 ? -x[i] : x[i];
+  return s / n;
+}
+
+/* exponential decay of array values */
+void exp_decay_array(double *out, const double *x, int n, double rate) {
+  for (int i = 0; i < n; i++) out[i] = x[i] * exp(-rate * i);
+}
+
+/* apply linear regression and extract residuals */
+void regression_residuals(double *out, const double *x, int n) {
+  double slope, intercept;
+  linreg(&slope, &intercept, x, n);
+  for (int i = 0; i < n; i++) out[i] = x[i] - (slope * i + intercept);
+}
+
+/* apply linear regression and predict */
+void regression_predict(double *out, const double *x, int n, int n_pred) {
+  double slope, intercept;
+  linreg(&slope, &intercept, x, n);
+  for (int i = 0; i < n_pred; i++) out[i] = slope * (n + i) + intercept;
+}
+
+/* compute moving average of absolute differences */
+void moving_abs_diff(double *out, const double *x, int n, int period) {
+  double tmp[1024];
+  for (int i = 0; i < n - 1; i++) {
+    double d = x[i + 1] - x[i];
+    tmp[i] = d < 0 ? -d : d;
+  }
+  moving_avg(out, tmp, n - 1, period);
+}
+
+/* compute rolling correlation between two arrays */
+void rolling_correlation(double *out, const double *a, const double *b, int n, int period) {
+  for (int i = 0; i < n - period + 1; i++)
+    out[i] = correlation(a + i, b + i, period);
+}
+
+/* compute rolling covariance between two arrays */
+void rolling_covariance(double *out, const double *a, const double *b, int n, int period) {
+  for (int i = 0; i < n - period + 1; i++)
+    out[i] = covariance(a + i, b + i, period);
+}
+
+/* compute rolling variance of array */
+void rolling_var(double *out, const double *x, int n, int period) {
+  for (int i = 0; i < n - period + 1; i++)
+    out[i] = variance(x + i, period);
+}
+
+/* compute rolling standard deviation */
+void rolling_std(double *out, const double *x, int n, int period) {
+  for (int i = 0; i < n - period + 1; i++)
+    out[i] = stddev(x + i, period);
+}
+
+/* compute rolling max of array */
+void rolling_maximum(double *out, const double *x, int n, int period) {
+  moving_max(out, x, n, period);
+}
+
+/* compute rolling min of array */
+void rolling_minimum(double *out, const double *x, int n, int period) {
+  moving_min(out, x, n, period);
+}
+
+/* compute rolling range */
+void rolling_range(double *out, const double *x, int n, int period) {
+  double hi[1024], lo[1024];
+  moving_max(hi, x, n, period);
+  moving_min(lo, x, n, period);
+  for (int i = 0; i < n; i++) out[i] = hi[i] - lo[i];
+}
+
+/* compute rolling coefficient of variation */
+void rolling_cv(double *out, const double *x, int n, int period) {
+  double rm[1024], rs[1024];
+  rolling_mean(rm, x, n, period);
+  running_stddev(rs, x, n, period);
+  for (int i = 0; i < n; i++) out[i] = rs[i] / (rm[i] + 1e-10);
+}
+
+/* apply median filter then smooth */
+void median_smooth(double *out, const double *x, int n, int width, int period) {
+  double tmp[1024];
+  median_filter(tmp, x, n, width);
+  rolling_mean(out, tmp, n, period);
+}
+
+/* smooth then apply median filter */
+void smooth_median(double *out, const double *x, int n, int period, int width) {
+  double tmp[1024];
+  rolling_mean(tmp, x, n, period);
+  median_filter(out, tmp, n, width);
+}
+
+/* two-stage smoothing with different periods */
+void double_smooth(double *out, const double *x, int n, int p1, int p2) {
+  double tmp[1024];
+  rolling_mean(tmp, x, n, p1);
+  rolling_mean(out, tmp, n, p2);
+}
+
+/* ema followed by sma */
+void ema_then_sma(double *out, const double *x, int n, int ema_period, int sma_period) {
+  double tmp[1024];
+  ema_series(tmp, x, n, ema_period);
+  sma(out, tmp, n, sma_period);
+}
+
+/* sma followed by ema */
+void sma_then_ema(double *out, const double *x, int n, int sma_period, int ema_period) {
+  double tmp[1024];
+  sma(tmp, x, n, sma_period);
+  ema_series(out, tmp, n, ema_period);
+}
+
+/* triple smoothing cascade */
+void triple_smooth(double *out, const double *x, int n, int p1, int p2, int p3) {
+  double t1[1024], t2[1024];
+  rolling_mean(t1, x, n, p1);
+  rolling_mean(t2, t1, n, p2);
+  rolling_mean(out, t2, n, p3);
+}
+
+/* normalize then apply fir filter */
+void norm_filter(double *out, const double *x, int n, const double *h, int nh) {
+  double tmp[1024];
+  zscore_normalize(tmp, x, n);
+  fir_filter(out, tmp, n, h, nh);
+}
+
+/* chain two fir filters */
+void cascade_fir(double *out, const double *x, int n, const double *h1, int nh1, const double *h2, int nh2) {
+  double tmp[1024];
+  fir_filter(tmp, x, n, h1, nh1);
+  fir_filter(out, tmp, n, h2, nh2);
+}
+
+/* generate sine wave then add noise */
+void noisy_sine(double *out, int n, double freq, double noise_level) {
+  gen_sine(out, n, freq);
+  add_noise(out, n, noise_level);
+}
+
+/* generate chirp signal by sweeping frequency */
+void chirp_signal(double *out, int n, double f_start, double f_end) {
+  for (int i = 0; i < n; i++) {
+    double t = (double)i / n;
+    double f = lerp(f_start, f_end, t);
+    out[i] = sin(2 * 3.14159265 * f * t);
+  }
+}
+
+/* generate sine then compute spectrum */
+void sine_spectrum(double *mag, int n, double freq) {
+  double re[1024], im[1024];
+  gen_sine(re, n, freq);
+  for (int i = 0; i < n; i++) im[i] = 0;
+  fft_radix2(re, im, n);
+  fft_magnitude(mag, re, im, n);
+}
+
+/* compute index of maximum value */
+int index_of_max(const double *x, int n) {
+  return argmax(x, n);
+}
+
+/* find peak frequency in signal */
+double peak_frequency(const double *x, int n) {
+  double re[1024], im[1024], mag[1024];
+  for (int i = 0; i < n; i++) { re[i] = x[i]; im[i] = 0; }
+  fft_radix2(re, im, n);
+  fft_magnitude(mag, re, im, n);
+  return (double)argmax(mag, n / 2) / n;
+}
+
+/* conditional smoothing based on variance */
+void adaptive_smooth(double *out, const double *x, int n, int period) {
+  double v = variance(x, n);
+  if (v > 1.0) {
+    rolling_mean(out, x, n, period * 2);
+  } else {
+    rolling_mean(out, x, n, period);
+  }
+}
+
+/* select filter based on signal energy */
+void energy_adaptive_filter(double *out, const double *x, int n) {
+  double e = signal_energy(x, n);
+  if (e > 100.0) {
+    lowpass(out, x, n, 0.1);
+  } else {
+    for (int i = 0; i < n; i++) out[i] = x[i];
+  }
+}
+
+/* apply gradient descent then clamp result */
+void gd_clamp(double *x, const double *grad, int n, double lr, double lo, double hi) {
+  gradient_descent(x, grad, n, lr);
+  for (int i = 0; i < n; i++) x[i] = clamp(x[i], lo, hi);
+}
+
+/* exponentially weight recent values */
+void exp_weight(double *out, const double *x, int n, double decay) {
+  for (int i = 0; i < n; i++) out[i] = x[i] * exp(-decay * (n - 1 - i));
+}
+
+/* compute convolution then normalize */
+void conv_normalize(double *out, const double *x, int nx, const double *h, int nh) {
+  conv(out, x, nx, h, nh);
+  zscore_normalize(out, out, nx + nh - 1);
+}
+
+/* convolve then downsample */
+void conv_downsample(double *out, const double *x, int nx, const double *h, int nh, int factor) {
+  double tmp[1024];
+  conv(tmp, x, nx, h, nh);
+  downsample(out, tmp, nx + nh - 1, factor);
+}
+
+/* welford update then extract mean */
+double online_mean(const double *x, int n) {
+  double wm = 0, wv = 0;
+  for (int i = 0; i < n; i++) welford_update(&wm, &wv, x[i], i + 1);
+  return wm;
+}
+
+/* welford update then extract variance */
+double online_variance(const double *x, int n) {
+  double wm = 0, wv = 0;
+  for (int i = 0; i < n; i++) welford_update(&wm, &wv, x[i], i + 1);
+  return wv / n;
+}
+
+/* compute outer product then scale */
+void scaled_outer(double *out, const double *a, const double *b, int na, int nb, double k) {
+  outer_product(out, a, na, b, nb);
+  for (int i = 0; i < na * nb; i++) out[i] *= k;
+}
+
+/* matrix vector multiply then normalize */
+void matvec_normalize(double *out, const double *M, const double *x, int m, int n) {
+  mat_vec(out, M, x, m, n);
+  vec_normalize(out, out, m);
+}
+
+/* matrix multiply then add bias */
+void matvec_bias(double *out, const double *M, const double *x, const double *b, int m, int n) {
+  mat_vec(out, M, x, m, n);
+  for (int i = 0; i < m; i++) out[i] += b[i];
+}
+
+/* matrix vector multiply then apply relu */
+void matvec_relu(double *out, const double *M, const double *x, int m, int n) {
+  mat_vec(out, M, x, m, n);
+  for (int i = 0; i < m; i++) out[i] = relu(out[i]);
+}
+
+/* matrix vector multiply then apply sigmoid */
+void matvec_sigmoid(double *out, const double *M, const double *x, int m, int n) {
+  mat_vec(out, M, x, m, n);
+  for (int i = 0; i < m; i++) out[i] = sigmoid(out[i]);
+}
+
+/* matrix vector multiply then softmax */
+void matvec_softmax(double *out, const double *M, const double *x, int m, int n) {
+  mat_vec(out, M, x, m, n);
+  softmax(out, out, m);
+}
+
+/* two layer linear transform */
+void two_layer(double *out, const double *M1, const double *M2, const double *x, int d1, int d2, int d3) {
+  double tmp[1024];
+  mat_vec(tmp, M1, x, d2, d1);
+  for (int i = 0; i < d2; i++) tmp[i] = relu(tmp[i]);
+  mat_vec(out, M2, tmp, d3, d2);
+}
+
+/* prefix sum then normalize */
+void prefix_sum_norm(double *out, const double *x, int n) {
+  prefix_sum(out, x, n);
+  double mx = max_val(out, n);
+  for (int i = 0; i < n; i++) out[i] /= mx;
+}
+
+/* cumulative product then normalize */
+void cum_prod_norm(double *out, const double *x, int n) {
+  cumulative_product(out, x, n);
+  double mx = max_val(out, n);
+  for (int i = 0; i < n; i++) out[i] /= mx;
+}
+
+/* apply polynomial evaluation to each element */
+void poly_map(double *out, const double *x, int n, const double *coeffs, int deg) {
+  for (int i = 0; i < n; i++) out[i] = poly_eval(x[i], coeffs, deg);
+}
+
+/* horner evaluation applied to array */
+void horner_map(double *out, const double *x, int n, const double *coeffs, int deg) {
+  for (int i = 0; i < n; i++) out[i] = horner(x[i], coeffs, deg);
+}
+
+/* interpolate array to doubled length */
+void interp_double(double *out, const double *x, int n) {
+  for (int i = 0; i < n - 1; i++) {
+    out[2 * i] = x[i];
+    out[2 * i + 1] = lerp(x[i], x[i + 1], 0.5);
+  }
+  out[2 * (n - 1)] = x[n - 1];
+}
+
+/* blend two signals with crossfade */
+void crossfade(double *out, const double *a, const double *b, int n) {
+  for (int i = 0; i < n; i++) {
+    double t = (double)i / (n - 1);
+    out[i] = lerp(a[i], b[i], t);
+  }
+}
+
+/* mix two signals at fixed ratio */
+void mix_signals(double *out, const double *a, const double *b, int n, double mix) {
+  for (int i = 0; i < n; i++) out[i] = lerp(a[i], b[i], mix);
+}
+
+/* concatenate two arrays */
+void concat_arrays(double *out, const double *a, int na, const double *b, int nb) {
+  for (int i = 0; i < na; i++) out[i] = a[i];
+  for (int i = 0; i < nb; i++) out[na + i] = b[i];
+}
+
+/* interleave two arrays */
+void interleave(double *out, const double *a, const double *b, int n) {
+  for (int i = 0; i < n; i++) {
+    out[2 * i] = a[i];
+    out[2 * i + 1] = b[i];
+  }
+}
+
+/* deinterleave into two arrays */
+void deinterleave(double *a, double *b, const double *x, int n) {
+  for (int i = 0; i < n / 2; i++) {
+    a[i] = x[2 * i];
+    b[i] = x[2 * i + 1];
+  }
+}
+
+/* extract every k-th element */
+void stride_extract(double *out, const double *x, int n, int k) {
+  for (int i = 0; i < n / k; i++) out[i] = x[i * k];
+}
+
+/* tile array to fill output */
+void tile_array(double *out, const double *x, int n, int reps) {
+  for (int r = 0; r < reps; r++)
+    for (int i = 0; i < n; i++) out[r * n + i] = x[i];
+}
+
+/* pad array with zeros at both ends */
+void zero_pad(double *out, const double *x, int n, int pad) {
+  for (int i = 0; i < pad; i++) out[i] = 0;
+  for (int i = 0; i < n; i++) out[pad + i] = x[i];
+  for (int i = 0; i < pad; i++) out[pad + n + i] = 0;
+}
+
+/* normalise array to zero mean unit variance */
+void normalize_z(double *out, const double *x, int n) {
+  double m = mean(x, n);
+  double s = stddev(x, n);
+  for (int i = 0; i < n; i++) out[i] = (x[i] - m) / s;
+}
+
+/* rescale array to zero mean unit variance */
+void normalize_z(double *out, const double *x, int n) {
+  double m = mean(x, n);
+  double s = stddev(x, n);
+  for (int i = 0; i < n; i++) out[i] = (x[i] - m) / s;
+}
+
+/* normalize array to zero average unit variance */
+void normalize_z(double *out, const double *x, int n) {
+  double m = mean(x, n);
+  double s = stddev(x, n);
+  for (int i = 0; i < n; i++) out[i] = (x[i] - m) / s;
+}
+
+/* normalize array to zero mean unit squared deviation */
+void normalize_z(double *out, const double *x, int n) {
+  double m = mean(x, n);
+  double s = stddev(x, n);
+  for (int i = 0; i < n; i++) out[i] = (x[i] - m) / s;
+}
+
+/* filter then differentiate signal */
+void smooth_diff(double *out, const double *x, int n, int period) {
+  double tmp[1024];
+  rolling_mean(tmp, x, n, period);
+  diff_central(out, tmp, n);
+}
+
+/* process then differentiate signal */
+void smooth_diff(double *out, const double *x, int n, int period) {
+  double tmp[1024];
+  rolling_mean(tmp, x, n, period);
+  diff_central(out, tmp, n);
+}
+
+/* smooth then differentiate waveform */
+void smooth_diff(double *out, const double *x, int n, int period) {
+  double tmp[1024];
+  rolling_mean(tmp, x, n, period);
+  diff_central(out, tmp, n);
+}
+
+/* smooth then differentiate signal of array */
+void smooth_diff(double *out, const double *x, int n, int period) {
+  double tmp[1024];
+  rolling_mean(tmp, x, n, period);
+  diff_central(out, tmp, n);
+}
+
+/* pipe lowpass filter then downsample */
+void filter_downsample(double *out, const double *x, int n, int factor) {
+  double tmp[1024];
+  lowpass(tmp, x, n, 0.5 / factor);
+  downsample(out, tmp, n, factor);
+}
+
+/* cascade lowpass filter then downsample */
+void filter_downsample(double *out, const double *x, int n, int factor) {
+  double tmp[1024];
+  lowpass(tmp, x, n, 0.5 / factor);
+  downsample(out, tmp, n, factor);
+}
+
+/* chain lowpass filter then downsample of array */
+void filter_downsample(double *out, const double *x, int n, int factor) {
+  double tmp[1024];
+  lowpass(tmp, x, n, 0.5 / factor);
+  downsample(out, tmp, n, factor);
+}
+
+/* chain lowpass filter */
+void filter_downsample(double *out, const double *x, int n, int factor) {
+  double tmp[1024];
+  lowpass(tmp, x, n, 0.5 / factor);
+  downsample(out, tmp, n, factor);
+}
+
+/* compute upsample then smooth with moving average */
+void upsample_smooth(double *out, const double *x, int n, int factor, int period) {
+  double tmp[1024];
+  upsample(tmp, x, n, factor);
+  moving_avg(out, tmp, n * factor, period);
+}
+
+/* calculate upsample then smooth with moving average */
+void upsample_smooth(double *out, const double *x, int n, int factor, int period) {
+  double tmp[1024];
+  upsample(tmp, x, n, factor);
+  moving_avg(out, tmp, n * factor, period);
+}
+
+/* upsample then smooth with moving mean */
+void upsample_smooth(double *out, const double *x, int n, int factor, int period) {
+  double tmp[1024];
+  upsample(tmp, x, n, factor);
+  moving_avg(out, tmp, n * factor, period);
+}
+
+/* upsample then smooth with moving average of array */
+void upsample_smooth(double *out, const double *x, int n, int factor, int period) {
+  double tmp[1024];
+  upsample(tmp, x, n, factor);
+  moving_avg(out, tmp, n * factor, period);
+}
+
+/* calculate coefficient of variation */
+double coeff_of_variation(const double *x, int n) {
+  return stddev(x, n) / mean(x, n);
+}
+
+/* evaluate coefficient of variation */
+double coeff_of_variation(const double *x, int n) {
+  return stddev(x, n) / mean(x, n);
+}
+
+/* compute weight of variation */
+double coeff_of_variation(const double *x, int n) {
+  return stddev(x, n) / mean(x, n);
+}
+
+/* compute coefficient of variation of array */
+double coeff_of_variation(const double *x, int n) {
+  return stddev(x, n) / mean(x, n);
+}
+
+/* calculate signal to noise ratio */
+double compute_snr(const double *signal, const double *noise, int n) {
+  return signal_rms(signal, n) / signal_rms(noise, n);
+}
+
+/* evaluate signal to noise ratio */
+double compute_snr(const double *signal, const double *noise, int n) {
+  return signal_rms(signal, n) / signal_rms(noise, n);
+}
+
+/* compute waveform to noise ratio */
+double compute_snr(const double *signal, const double *noise, int n) {
+  return signal_rms(signal, n) / signal_rms(noise, n);
+}
+
+/* compute signal to noise proportion */
+double compute_snr(const double *signal, const double *noise, int n) {
+  return signal_rms(signal, n) / signal_rms(noise, n);
+}
+
+/* calculate range of array values */
+double array_range(const double *x, int n) {
+  return max_val(x, n) - min_val(x, n);
+}
+
+/* evaluate range of array values */
+double array_range(const double *x, int n) {
+  return max_val(x, n) - min_val(x, n);
+}
+
+/* compute range of vector values */
+double array_range(const double *x, int n) {
+  return max_val(x, n) - min_val(x, n);
+}
+
+/* compute range of array elements */
+double array_range(const double *x, int n) {
+  return max_val(x, n) - min_val(x, n);
+}
+
+/* compute subtract mean from array */
+void demean(double *out, const double *x, int n) {
+  double m = mean(x, n);
+  for (int i = 0; i < n; i++) out[i] = x[i] - m;
+}
+
+/* calculate subtract mean from array */
+void demean(double *out, const double *x, int n) {
+  double m = mean(x, n);
+  for (int i = 0; i < n; i++) out[i] = x[i] - m;
+}
+
+/* subtract average from array */
+void demean(double *out, const double *x, int n) {
+  double m = mean(x, n);
+  for (int i = 0; i < n; i++) out[i] = x[i] - m;
+}
+
+/* subtract mean from vector */
+void demean(double *out, const double *x, int n) {
+  double m = mean(x, n);
+  for (int i = 0; i < n; i++) out[i] = x[i] - m;
+}
+
+/* compute scale array to unit variance */
+void unit_variance(double *out, const double *x, int n) {
+  double s = stddev(x, n);
+  for (int i = 0; i < n; i++) out[i] = x[i] / s;
+}
+
+/* calculate scale array to unit variance */
+void unit_variance(double *out, const double *x, int n) {
+  double s = stddev(x, n);
+  for (int i = 0; i < n; i++) out[i] = x[i] / s;
+}
+
+/* scale array to unit squared deviation */
+void unit_variance(double *out, const double *x, int n) {
+  double s = stddev(x, n);
+  for (int i = 0; i < n; i++) out[i] = x[i] / s;
+}
+
+/* scale vector to unit variance */
+void unit_variance(double *out, const double *x, int n) {
+  double s = stddev(x, n);
+  for (int i = 0; i < n; i++) out[i] = x[i] / s;
+}
+
+/* compute clamp array values to range */
+void clamp_array(double *out, const double *x, int n, double lo, double hi) {
+  for (int i = 0; i < n; i++) out[i] = clamp(x[i], lo, hi);
+}
+
+/* calculate clamp array values to range */
+void clamp_array(double *out, const double *x, int n, double lo, double hi) {
+  for (int i = 0; i < n; i++) out[i] = clamp(x[i], lo, hi);
+}
+
+/* clamp vector values to range */
+void clamp_array(double *out, const double *x, int n, double lo, double hi) {
+  for (int i = 0; i < n; i++) out[i] = clamp(x[i], lo, hi);
+}
+
+/* clamp array elements to range */
+void clamp_array(double *out, const double *x, int n, double lo, double hi) {
+  for (int i = 0; i < n; i++) out[i] = clamp(x[i], lo, hi);
+}
+
+/* perform sigmoid to each element */
+void sigmoid_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = sigmoid(x[i]);
+}
+
+/* execute sigmoid to each element */
+void sigmoid_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = sigmoid(x[i]);
+}
+
+/* apply sigmoid to each value */
+void sigmoid_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = sigmoid(x[i]);
+}
+
+/* apply sigmoid to each element of array */
+void sigmoid_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = sigmoid(x[i]);
+}
+
+/* perform relu to each element */
+void relu_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = relu(x[i]);
+}
+
+/* execute relu to each element */
+void relu_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = relu(x[i]);
+}
+
+/* apply relu to each value */
+void relu_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = relu(x[i]);
+}
+
+/* apply relu to each element of array */
+void relu_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = relu(x[i]);
+}
+
+/* perform softplus to each element */
+void softplus_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = softplus(x[i]);
+}
+
+/* execute softplus to each element */
+void softplus_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = softplus(x[i]);
+}
+
+/* apply softplus to each value */
+void softplus_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = softplus(x[i]);
+}
+
+/* apply softplus to each element of array */
+void softplus_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = softplus(x[i]);
+}
+
+/* perform leaky relu to each element */
+void leaky_relu_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = leaky_relu(x[i]);
+}
+
+/* execute leaky relu to each element */
+void leaky_relu_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = leaky_relu(x[i]);
+}
+
+/* apply leaky relu to each value */
+void leaky_relu_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = leaky_relu(x[i]);
+}
+
+/* apply leaky relu to each element of array */
+void leaky_relu_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = leaky_relu(x[i]);
+}
+
+/* perform tanh to each element */
+void tanh_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = tanh_approx(x[i]);
+}
+
+/* execute tanh to each element */
+void tanh_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = tanh_approx(x[i]);
+}
+
+/* apply tanh to each value */
+void tanh_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = tanh_approx(x[i]);
+}
+
+/* apply tanh to each element of array */
+void tanh_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = tanh_approx(x[i]);
+}
+
+/* perform sign function to each element */
+void sign_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = sign(x[i]);
+}
+
+/* execute sign function to each element */
+void sign_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = sign(x[i]);
+}
+
+/* apply sign function to each value */
+void sign_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = sign(x[i]);
+}
+
+/* apply sign function to each element of array */
+void sign_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = sign(x[i]);
+}
+
+/* calculate element-wise absolute value */
+void abs_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = x[i] < 0 ? -x[i] : x[i];
+}
+
+/* evaluate element-wise absolute value */
+void abs_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = x[i] < 0 ? -x[i] : x[i];
+}
+
+/* compute entry-wise absolute value */
+void abs_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = x[i] < 0 ? -x[i] : x[i];
+}
+
+/* compute element-wise absolute value of array */
+void abs_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = x[i] < 0 ? -x[i] : x[i];
+}
+
+/* calculate element-wise square */
+void square_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = x[i] * x[i];
+}
+
+/* evaluate element-wise square */
+void square_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = x[i] * x[i];
+}
+
+/* compute value-wise square */
+void square_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = x[i] * x[i];
+}
+
+/* compute element-wise square of array */
+void square_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = x[i] * x[i];
+}
+
+/* compute element-wise sum of two arrays */
+void add_arrays(double *out, const double *a, const double *b, int n) {
+  for (int i = 0; i < n; i++) out[i] = a[i] + b[i];
+}
+
+/* calculate element-wise sum of two arrays */
+void add_arrays(double *out, const double *a, const double *b, int n) {
+  for (int i = 0; i < n; i++) out[i] = a[i] + b[i];
+}
+
+/* element-wise sum of two vectors */
+void add_arrays(double *out, const double *a, const double *b, int n) {
+  for (int i = 0; i < n; i++) out[i] = a[i] + b[i];
+}
+
+/* value-wise sum of two arrays */
+void add_arrays(double *out, const double *a, const double *b, int n) {
+  for (int i = 0; i < n; i++) out[i] = a[i] + b[i];
+}
+
+/* compute element-wise difference of two arrays */
+void sub_arrays(double *out, const double *a, const double *b, int n) {
+  for (int i = 0; i < n; i++) out[i] = a[i] - b[i];
+}
+
+/* calculate element-wise difference of two arrays */
+void sub_arrays(double *out, const double *a, const double *b, int n) {
+  for (int i = 0; i < n; i++) out[i] = a[i] - b[i];
+}
+
+/* element-wise difference of two vectors */
+void sub_arrays(double *out, const double *a, const double *b, int n) {
+  for (int i = 0; i < n; i++) out[i] = a[i] - b[i];
+}
+
+/* value-wise difference of two arrays */
+void sub_arrays(double *out, const double *a, const double *b, int n) {
+  for (int i = 0; i < n; i++) out[i] = a[i] - b[i];
+}
+
+/* compute element-wise product of two arrays */
+void mul_arrays(double *out, const double *a, const double *b, int n) {
+  for (int i = 0; i < n; i++) out[i] = a[i] * b[i];
+}
+
+/* calculate element-wise product of two arrays */
+void mul_arrays(double *out, const double *a, const double *b, int n) {
+  for (int i = 0; i < n; i++) out[i] = a[i] * b[i];
+}
+
+/* element-wise product of two vectors */
+void mul_arrays(double *out, const double *a, const double *b, int n) {
+  for (int i = 0; i < n; i++) out[i] = a[i] * b[i];
+}
+
+/* value-wise product of two arrays */
+void mul_arrays(double *out, const double *a, const double *b, int n) {
+  for (int i = 0; i < n; i++) out[i] = a[i] * b[i];
+}
+
+/* compute element-wise ratio of two arrays */
+void div_arrays(double *out, const double *a, const double *b, int n) {
+  for (int i = 0; i < n; i++) out[i] = a[i] / b[i];
+}
+
+/* calculate element-wise ratio of two arrays */
+void div_arrays(double *out, const double *a, const double *b, int n) {
+  for (int i = 0; i < n; i++) out[i] = a[i] / b[i];
+}
+
+/* element-wise ratio of two vectors */
+void div_arrays(double *out, const double *a, const double *b, int n) {
+  for (int i = 0; i < n; i++) out[i] = a[i] / b[i];
+}
+
+/* value-wise ratio of two arrays */
+void div_arrays(double *out, const double *a, const double *b, int n) {
+  for (int i = 0; i < n; i++) out[i] = a[i] / b[i];
+}
+
+/* compute element-wise maximum of two arrays */
+void max_arrays(double *out, const double *a, const double *b, int n) {
+  for (int i = 0; i < n; i++) out[i] = a[i] > b[i] ? a[i] : b[i];
+}
+
+/* calculate element-wise maximum of two arrays */
+void max_arrays(double *out, const double *a, const double *b, int n) {
+  for (int i = 0; i < n; i++) out[i] = a[i] > b[i] ? a[i] : b[i];
+}
+
+/* element-wise maximum of two vectors */
+void max_arrays(double *out, const double *a, const double *b, int n) {
+  for (int i = 0; i < n; i++) out[i] = a[i] > b[i] ? a[i] : b[i];
+}
+
+/* value-wise maximum of two arrays */
+void max_arrays(double *out, const double *a, const double *b, int n) {
+  for (int i = 0; i < n; i++) out[i] = a[i] > b[i] ? a[i] : b[i];
+}
+
+/* compute element-wise minimum of two arrays */
+void min_arrays(double *out, const double *a, const double *b, int n) {
+  for (int i = 0; i < n; i++) out[i] = a[i] < b[i] ? a[i] : b[i];
+}
+
+/* calculate element-wise minimum of two arrays */
+void min_arrays(double *out, const double *a, const double *b, int n) {
+  for (int i = 0; i < n; i++) out[i] = a[i] < b[i] ? a[i] : b[i];
+}
+
+/* element-wise minimum of two vectors */
+void min_arrays(double *out, const double *a, const double *b, int n) {
+  for (int i = 0; i < n; i++) out[i] = a[i] < b[i] ? a[i] : b[i];
+}
+
+/* value-wise minimum of two arrays */
+void min_arrays(double *out, const double *a, const double *b, int n) {
+  for (int i = 0; i < n; i++) out[i] = a[i] < b[i] ? a[i] : b[i];
+}
+
+/* compute linear interpolation between two arrays */
+void lerp_arrays(double *out, const double *a, const double *b, int n, double t) {
+  for (int i = 0; i < n; i++) out[i] = lerp(a[i], b[i], t);
+}
+
+/* calculate linear interpolation between two arrays */
+void lerp_arrays(double *out, const double *a, const double *b, int n, double t) {
+  for (int i = 0; i < n; i++) out[i] = lerp(a[i], b[i], t);
+}
+
+/* linear interpolation between two vectors */
+void lerp_arrays(double *out, const double *a, const double *b, int n, double t) {
+  for (int i = 0; i < n; i++) out[i] = lerp(a[i], b[i], t);
+}
+
+/* linear interpolation between two arrays of array */
+void lerp_arrays(double *out, const double *a, const double *b, int n, double t) {
+  for (int i = 0; i < n; i++) out[i] = lerp(a[i], b[i], t);
+}
+
+/* compute weighted sum of two arrays */
+void weighted_add(double *out, const double *a, const double *b, int n, double wa, double wb) {
+  for (int i = 0; i < n; i++) out[i] = wa * a[i] + wb * b[i];
+}
+
+/* calculate weighted sum of two arrays */
+void weighted_add(double *out, const double *a, const double *b, int n, double wa, double wb) {
+  for (int i = 0; i < n; i++) out[i] = wa * a[i] + wb * b[i];
+}
+
+/* weighted sum of two vectors */
+void weighted_add(double *out, const double *a, const double *b, int n, double wa, double wb) {
+  for (int i = 0; i < n; i++) out[i] = wa * a[i] + wb * b[i];
+}
+
+/* coefficiented sum of two arrays */
+void weighted_add(double *out, const double *a, const double *b, int n, double wa, double wb) {
+  for (int i = 0; i < n; i++) out[i] = wa * a[i] + wb * b[i];
+}
+
+/* compute absolute difference between two arrays */
+void abs_diff(double *out, const double *a, const double *b, int n) {
+  for (int i = 0; i < n; i++) {
+    double d = a[i] - b[i];
+    out[i] = d < 0 ? -d : d;
+  }
+}
+
+/* calculate absolute difference between two arrays */
+void abs_diff(double *out, const double *a, const double *b, int n) {
+  for (int i = 0; i < n; i++) {
+    double d = a[i] - b[i];
+    out[i] = d < 0 ? -d : d;
+  }
+}
+
+/* absolute difference between two vectors */
+void abs_diff(double *out, const double *a, const double *b, int n) {
+  for (int i = 0; i < n; i++) {
+    double d = a[i] - b[i];
+    out[i] = d < 0 ? -d : d;
+  }
+}
+
+/* absolute difference between two arrays of array */
+void abs_diff(double *out, const double *a, const double *b, int n) {
+  for (int i = 0; i < n; i++) {
+    double d = a[i] - b[i];
+    out[i] = d < 0 ? -d : d;
+  }
+}
+
+/* compute sum of squared element-wise differences */
+double sum_sq_diff(const double *a, const double *b, int n) {
+  double s = 0;
+  for (int i = 0; i < n; i++) { double d = a[i] - b[i]; s += d * d; }
+  return s;
+}
+
+/* calculate sum of squared element-wise differences */
+double sum_sq_diff(const double *a, const double *b, int n) {
+  double s = 0;
+  for (int i = 0; i < n; i++) { double d = a[i] - b[i]; s += d * d; }
+  return s;
+}
+
+/* sum of squared value-wise differences */
+double sum_sq_diff(const double *a, const double *b, int n) {
+  double s = 0;
+  for (int i = 0; i < n; i++) { double d = a[i] - b[i]; s += d * d; }
+  return s;
+}
+
+/* sum of squared element-wise differences of array */
+double sum_sq_diff(const double *a, const double *b, int n) {
+  double s = 0;
+  for (int i = 0; i < n; i++) { double d = a[i] - b[i]; s += d * d; }
+  return s;
+}
+
+/* compute root mean square difference of two arrays */
+double rms_diff(const double *a, const double *b, int n) {
+  return sqrt(mse(a, b, n));
+}
+
+/* calculate root mean square difference of two arrays */
+double rms_diff(const double *a, const double *b, int n) {
+  return sqrt(mse(a, b, n));
+}
+
+/* root average square difference of two arrays */
+double rms_diff(const double *a, const double *b, int n) {
+  return sqrt(mse(a, b, n));
+}
+
+/* root mean square difference of two vectors */
+double rms_diff(const double *a, const double *b, int n) {
+  return sqrt(mse(a, b, n));
+}
+
+/* compute mean of absolute element-wise differences */
+double mean_abs_diff(const double *a, const double *b, int n) {
+  return mae(a, b, n);
+}
+
+/* calculate mean of absolute element-wise differences */
+double mean_abs_diff(const double *a, const double *b, int n) {
+  return mae(a, b, n);
+}
+
+/* average of absolute element-wise differences */
+double mean_abs_diff(const double *a, const double *b, int n) {
+  return mae(a, b, n);
+}
+
+/* mean of absolute value-wise differences */
+double mean_abs_diff(const double *a, const double *b, int n) {
+  return mae(a, b, n);
+}
+
+/* normalise then apply sigmoid */
+void normalize_sigmoid(double *out, const double *x, int n) {
+  double m = mean(x, n);
+  double s = stddev(x, n);
+  for (int i = 0; i < n; i++) out[i] = sigmoid((x[i] - m) / s);
+}
+
+/* rescale then apply sigmoid */
+void normalize_sigmoid(double *out, const double *x, int n) {
+  double m = mean(x, n);
+  double s = stddev(x, n);
+  for (int i = 0; i < n; i++) out[i] = sigmoid((x[i] - m) / s);
+}
+
+/* normalize then apply sigmoid of array */
+void normalize_sigmoid(double *out, const double *x, int n) {
+  double m = mean(x, n);
+  double s = stddev(x, n);
+  for (int i = 0; i < n; i++) out[i] = sigmoid((x[i] - m) / s);
+}
+
+/* normalize then apply */
+void normalize_sigmoid(double *out, const double *x, int n) {
+  double m = mean(x, n);
+  double s = stddev(x, n);
+  for (int i = 0; i < n; i++) out[i] = sigmoid((x[i] - m) / s);
+}
+
+/* compute demean then scale by maximum */
+void center_scale(double *out, const double *x, int n) {
+  double m = mean(x, n);
+  double mx = max_val(x, n);
+  double mn = min_val(x, n);
+  double range = mx - mn;
+  for (int i = 0; i < n; i++) out[i] = (x[i] - m) / range;
+}
+
+/* calculate demean then scale by maximum */
+void center_scale(double *out, const double *x, int n) {
+  double m = mean(x, n);
+  double mx = max_val(x, n);
+  double mn = min_val(x, n);
+  double range = mx - mn;
+  for (int i = 0; i < n; i++) out[i] = (x[i] - m) / range;
+}
+
+/* deaverage then scale by maximum */
+void center_scale(double *out, const double *x, int n) {
+  double m = mean(x, n);
+  double mx = max_val(x, n);
+  double mn = min_val(x, n);
+  double range = mx - mn;
+  for (int i = 0; i < n; i++) out[i] = (x[i] - m) / range;
+}
+
+/* demean then scale by maximum of array */
+void center_scale(double *out, const double *x, int n) {
+  double m = mean(x, n);
+  double mx = max_val(x, n);
+  double mn = min_val(x, n);
+  double range = mx - mn;
+  for (int i = 0; i < n; i++) out[i] = (x[i] - m) / range;
+}
+
+/* compute min-max normalize then apply relu */
+void minmax_relu(double *out, const double *x, int n) {
+  double tmp[1024];
+  minmax_normalize(tmp, x, n);
+  for (int i = 0; i < n; i++) out[i] = relu(tmp[i]);
+}
+
+/* calculate min-max normalize then apply relu */
+void minmax_relu(double *out, const double *x, int n) {
+  double tmp[1024];
+  minmax_normalize(tmp, x, n);
+  for (int i = 0; i < n; i++) out[i] = relu(tmp[i]);
+}
+
+/* min-max normalize then apply relu of array */
+void minmax_relu(double *out, const double *x, int n) {
+  double tmp[1024];
+  minmax_normalize(tmp, x, n);
+  for (int i = 0; i < n; i++) out[i] = relu(tmp[i]);
+}
+
+/* min-max normalize then */
+void minmax_relu(double *out, const double *x, int n) {
+  double tmp[1024];
+  minmax_normalize(tmp, x, n);
+  for (int i = 0; i < n; i++) out[i] = relu(tmp[i]);
+}
+
+/* compute z-score normalize then clamp */
+void zscore_clamp(double *out, const double *x, int n, double lo, double hi) {
+  double tmp[1024];
+  zscore_normalize(tmp, x, n);
+  for (int i = 0; i < n; i++) out[i] = clamp(tmp[i], lo, hi);
+}
+
+/* calculate z-score normalize then clamp */
+void zscore_clamp(double *out, const double *x, int n, double lo, double hi) {
+  double tmp[1024];
+  zscore_normalize(tmp, x, n);
+  for (int i = 0; i < n; i++) out[i] = clamp(tmp[i], lo, hi);
+}
+
+/* z-score normalize then clamp of array */
+void zscore_clamp(double *out, const double *x, int n, double lo, double hi) {
+  double tmp[1024];
+  zscore_normalize(tmp, x, n);
+  for (int i = 0; i < n; i++) out[i] = clamp(tmp[i], lo, hi);
+}
+
+/* z-score normalize then */
+void zscore_clamp(double *out, const double *x, int n, double lo, double hi) {
+  double tmp[1024];
+  zscore_normalize(tmp, x, n);
+  for (int i = 0; i < n; i++) out[i] = clamp(tmp[i], lo, hi);
+}
+
+/* order then compute percentile */
+double sorted_percentile(const double *x, int n, double p) {
+  double tmp[1024];
+  for (int i = 0; i < n; i++) tmp[i] = x[i];
+  bubble_sort(tmp, n);
+  return percentile(tmp, n, p);
+}
+
+/* arrange then compute percentile */
+double sorted_percentile(const double *x, int n, double p) {
+  double tmp[1024];
+  for (int i = 0; i < n; i++) tmp[i] = x[i];
+  bubble_sort(tmp, n);
+  return percentile(tmp, n, p);
+}
+
+/* sort then compute percentile of array */
+double sorted_percentile(const double *x, int n, double p) {
+  double tmp[1024];
+  for (int i = 0; i < n; i++) tmp[i] = x[i];
+  bubble_sort(tmp, n);
+  return percentile(tmp, n, p);
+}
+
+/* sort then compute */
+double sorted_percentile(const double *x, int n, double p) {
+  double tmp[1024];
+  for (int i = 0; i < n; i++) tmp[i] = x[i];
+  bubble_sort(tmp, n);
+  return percentile(tmp, n, p);
+}
+
+/* order then compute interquartile range */
+double sorted_iqr(const double *x, int n) {
+  double tmp[1024];
+  for (int i = 0; i < n; i++) tmp[i] = x[i];
+  bubble_sort(tmp, n);
+  return iqr(tmp, n);
+}
+
+/* arrange then compute interquartile range */
+double sorted_iqr(const double *x, int n) {
+  double tmp[1024];
+  for (int i = 0; i < n; i++) tmp[i] = x[i];
+  bubble_sort(tmp, n);
+  return iqr(tmp, n);
+}
+
+/* sort then compute interquartile span */
+double sorted_iqr(const double *x, int n) {
+  double tmp[1024];
+  for (int i = 0; i < n; i++) tmp[i] = x[i];
+  bubble_sort(tmp, n);
+  return iqr(tmp, n);
+}
+
+/* sort then compute interquartile range of array */
+double sorted_iqr(const double *x, int n) {
+  double tmp[1024];
+  for (int i = 0; i < n; i++) tmp[i] = x[i];
+  bubble_sort(tmp, n);
+  return iqr(tmp, n);
+}
+
+/* order then compute trimmed mean */
+double sorted_trimmed_mean(const double *x, int n, int trim) {
+  double tmp[1024];
+  for (int i = 0; i < n; i++) tmp[i] = x[i];
+  bubble_sort(tmp, n);
+  return trimmed_mean(tmp, n, trim);
+}
+
+/* arrange then compute trimmed mean */
+double sorted_trimmed_mean(const double *x, int n, int trim) {
+  double tmp[1024];
+  for (int i = 0; i < n; i++) tmp[i] = x[i];
+  bubble_sort(tmp, n);
+  return trimmed_mean(tmp, n, trim);
+}
+
+/* sort then compute trimmed average */
+double sorted_trimmed_mean(const double *x, int n, int trim) {
+  double tmp[1024];
+  for (int i = 0; i < n; i++) tmp[i] = x[i];
+  bubble_sort(tmp, n);
+  return trimmed_mean(tmp, n, trim);
+}
+
+/* sort then compute trimmed mean of array */
+double sorted_trimmed_mean(const double *x, int n, int trim) {
+  double tmp[1024];
+  for (int i = 0; i < n; i++) tmp[i] = x[i];
+  bubble_sort(tmp, n);
+  return trimmed_mean(tmp, n, trim);
+}
+
+/* order then compute median */
+double sorted_median(const double *x, int n) {
+  double tmp[1024];
+  for (int i = 0; i < n; i++) tmp[i] = x[i];
+  bubble_sort(tmp, n);
+  return median(tmp, n);
+}
+
+/* arrange then compute median */
+double sorted_median(const double *x, int n) {
+  double tmp[1024];
+  for (int i = 0; i < n; i++) tmp[i] = x[i];
+  bubble_sort(tmp, n);
+  return median(tmp, n);
+}
+
+/* sort then compute middle value */
+double sorted_median(const double *x, int n) {
+  double tmp[1024];
+  for (int i = 0; i < n; i++) tmp[i] = x[i];
+  bubble_sort(tmp, n);
+  return median(tmp, n);
+}
+
+/* sort then compute median of array */
+double sorted_median(const double *x, int n) {
+  double tmp[1024];
+  for (int i = 0; i < n; i++) tmp[i] = x[i];
+  bubble_sort(tmp, n);
+  return median(tmp, n);
+}
+
+/* filter signal with rolling mean then normalize */
+void smooth_normalize(double *out, const double *x, int n, int period) {
+  double tmp[1024];
+  rolling_mean(tmp, x, n, period);
+  zscore_normalize(out, tmp, n);
+}
+
+/* process signal with rolling mean then normalize */
+void smooth_normalize(double *out, const double *x, int n, int period) {
+  double tmp[1024];
+  rolling_mean(tmp, x, n, period);
+  zscore_normalize(out, tmp, n);
+}
+
+/* smooth signal with rolling average then normalize */
+void smooth_normalize(double *out, const double *x, int n, int period) {
+  double tmp[1024];
+  rolling_mean(tmp, x, n, period);
+  zscore_normalize(out, tmp, n);
+}
+
+/* smooth waveform with rolling mean then normalize */
+void smooth_normalize(double *out, const double *x, int n, int period) {
+  double tmp[1024];
+  rolling_mean(tmp, x, n, period);
+  zscore_normalize(out, tmp, n);
+}
+
+/* calculate rolling mean then subtract from original */
+void detrend(double *out, const double *x, int n, int period) {
+  double tmp[1024];
+  rolling_mean(tmp, x, n, period);
+  for (int i = 0; i < n; i++) out[i] = x[i] - tmp[i];
+}
+
+/* evaluate rolling mean then subtract from original */
+void detrend(double *out, const double *x, int n, int period) {
+  double tmp[1024];
+  rolling_mean(tmp, x, n, period);
+  for (int i = 0; i < n; i++) out[i] = x[i] - tmp[i];
+}
+
+/* compute rolling average then subtract from original */
+void detrend(double *out, const double *x, int n, int period) {
+  double tmp[1024];
+  rolling_mean(tmp, x, n, period);
+  for (int i = 0; i < n; i++) out[i] = x[i] - tmp[i];
+}
+
+/* compute rolling mean then subtract from original of array */
+void detrend(double *out, const double *x, int n, int period) {
+  double tmp[1024];
+  rolling_mean(tmp, x, n, period);
+  for (int i = 0; i < n; i++) out[i] = x[i] - tmp[i];
+}
+
+/* calculate exponential moving average then subtract from original */
+void ema_detrend(double *out, const double *x, int n, int period) {
+  double tmp[1024];
+  ema_series(tmp, x, n, period);
+  for (int i = 0; i < n; i++) out[i] = x[i] - tmp[i];
+}
+
+/* evaluate exponential moving average then subtract from original */
+void ema_detrend(double *out, const double *x, int n, int period) {
+  double tmp[1024];
+  ema_series(tmp, x, n, period);
+  for (int i = 0; i < n; i++) out[i] = x[i] - tmp[i];
+}
+
+/* compute exponential moving mean then subtract from original */
+void ema_detrend(double *out, const double *x, int n, int period) {
+  double tmp[1024];
+  ema_series(tmp, x, n, period);
+  for (int i = 0; i < n; i++) out[i] = x[i] - tmp[i];
+}
+
+/* compute exponential moving average then subtract from original of array */
+void ema_detrend(double *out, const double *x, int n, int period) {
+  double tmp[1024];
+  ema_series(tmp, x, n, period);
+  for (int i = 0; i < n; i++) out[i] = x[i] - tmp[i];
+}
+
+/* calculate difference between fast and slow moving averages */
+void ma_crossover(double *out, const double *x, int n, int fast, int slow) {
+  double fast_ma[1024], slow_ma[1024];
+  rolling_mean(fast_ma, x, n, fast);
+  rolling_mean(slow_ma, x, n, slow);
+  for (int i = 0; i < n; i++) out[i] = fast_ma[i] - slow_ma[i];
+}
+
+/* evaluate difference between fast and slow moving averages */
+void ma_crossover(double *out, const double *x, int n, int fast, int slow) {
+  double fast_ma[1024], slow_ma[1024];
+  rolling_mean(fast_ma, x, n, fast);
+  rolling_mean(slow_ma, x, n, slow);
+  for (int i = 0; i < n; i++) out[i] = fast_ma[i] - slow_ma[i];
+}
+
+/* compute difference between fast and slow moving means */
+void ma_crossover(double *out, const double *x, int n, int fast, int slow) {
+  double fast_ma[1024], slow_ma[1024];
+  rolling_mean(fast_ma, x, n, fast);
+  rolling_mean(slow_ma, x, n, slow);
+  for (int i = 0; i < n; i++) out[i] = fast_ma[i] - slow_ma[i];
+}
+
+/* compute difference between fast and slow moving averages of array */
+void ma_crossover(double *out, const double *x, int n, int fast, int slow) {
+  double fast_ma[1024], slow_ma[1024];
+  rolling_mean(fast_ma, x, n, fast);
+  rolling_mean(slow_ma, x, n, slow);
+  for (int i = 0; i < n; i++) out[i] = fast_ma[i] - slow_ma[i];
+}
+
+/* calculate ratio of fast to slow moving averages */
+void ma_ratio(double *out, const double *x, int n, int fast, int slow) {
+  double fast_ma[1024], slow_ma[1024];
+  rolling_mean(fast_ma, x, n, fast);
+  rolling_mean(slow_ma, x, n, slow);
+  for (int i = 0; i < n; i++) out[i] = fast_ma[i] / slow_ma[i];
+}
+
+/* evaluate ratio of fast to slow moving averages */
+void ma_ratio(double *out, const double *x, int n, int fast, int slow) {
+  double fast_ma[1024], slow_ma[1024];
+  rolling_mean(fast_ma, x, n, fast);
+  rolling_mean(slow_ma, x, n, slow);
+  for (int i = 0; i < n; i++) out[i] = fast_ma[i] / slow_ma[i];
+}
+
+/* compute ratio of fast to slow moving means */
+void ma_ratio(double *out, const double *x, int n, int fast, int slow) {
+  double fast_ma[1024], slow_ma[1024];
+  rolling_mean(fast_ma, x, n, fast);
+  rolling_mean(slow_ma, x, n, slow);
+  for (int i = 0; i < n; i++) out[i] = fast_ma[i] / slow_ma[i];
+}
+
+/* compute proportion of fast to slow moving averages */
+void ma_ratio(double *out, const double *x, int n, int fast, int slow) {
+  double fast_ma[1024], slow_ma[1024];
+  rolling_mean(fast_ma, x, n, fast);
+  rolling_mean(slow_ma, x, n, slow);
+  for (int i = 0; i < n; i++) out[i] = fast_ma[i] / slow_ma[i];
+}
+
+/* filter then compute cumulative sum */
+void smooth_cumsum(double *out, const double *x, int n, int period) {
+  double tmp[1024];
+  rolling_mean(tmp, x, n, period);
+  cumsum(out, tmp, n);
+}
+
+/* process then compute cumulative sum */
+void smooth_cumsum(double *out, const double *x, int n, int period) {
+  double tmp[1024];
+  rolling_mean(tmp, x, n, period);
+  cumsum(out, tmp, n);
+}
+
+/* smooth then compute cumulative sum of array */
+void smooth_cumsum(double *out, const double *x, int n, int period) {
+  double tmp[1024];
+  rolling_mean(tmp, x, n, period);
+  cumsum(out, tmp, n);
+}
+
+/* smooth then compute */
+void smooth_cumsum(double *out, const double *x, int n, int period) {
+  double tmp[1024];
+  rolling_mean(tmp, x, n, period);
+  cumsum(out, tmp, n);
+}
+
+/* compute differencing then cumulative sum to reconstruct */
+void diff_cumsum(double *out, const double *x, int n) {
+  double tmp[1024];
+  diff_central(tmp, x, n);
+  cumsum(out, tmp, n);
+}
+
+/* calculate differencing then cumulative sum to reconstruct */
+void diff_cumsum(double *out, const double *x, int n) {
+  double tmp[1024];
+  diff_central(tmp, x, n);
+  cumsum(out, tmp, n);
+}
+
+/* differencing then cumulative sum to reconstruct of array */
+void diff_cumsum(double *out, const double *x, int n) {
+  double tmp[1024];
+  diff_central(tmp, x, n);
+  cumsum(out, tmp, n);
+}
+
+/* differencing then cumulative */
+void diff_cumsum(double *out, const double *x, int n) {
+  double tmp[1024];
+  diff_central(tmp, x, n);
+  cumsum(out, tmp, n);
+}
+
+/* calculate cumulative sum then normalize */
+void cumsum_normalize(double *out, const double *x, int n) {
+  double tmp[1024];
+  cumsum(tmp, x, n);
+  zscore_normalize(out, tmp, n);
+}
+
+/* evaluate cumulative sum then normalize */
+void cumsum_normalize(double *out, const double *x, int n) {
+  double tmp[1024];
+  cumsum(tmp, x, n);
+  zscore_normalize(out, tmp, n);
+}
+
+/* compute cumulative sum then normalize of array */
+void cumsum_normalize(double *out, const double *x, int n) {
+  double tmp[1024];
+  cumsum(tmp, x, n);
+  zscore_normalize(out, tmp, n);
+}
+
+/* compute cumulative sum */
+void cumsum_normalize(double *out, const double *x, int n) {
+  double tmp[1024];
+  cumsum(tmp, x, n);
+  zscore_normalize(out, tmp, n);
+}
+
+/* perform window function then compute FFT */
+void windowed_fft(double *re, double *im, const double *x, int n) {
+  double w[1024];
+  hamming_window(w, n);
+  for (int i = 0; i < n; i++) { re[i] = x[i] * w[i]; im[i] = 0; }
+  fft_radix2(re, im, n);
+}
+
+/* execute window function then compute FFT */
+void windowed_fft(double *re, double *im, const double *x, int n) {
+  double w[1024];
+  hamming_window(w, n);
+  for (int i = 0; i < n; i++) { re[i] = x[i] * w[i]; im[i] = 0; }
+  fft_radix2(re, im, n);
+}
+
+/* apply window function then compute FFT of array */
+void windowed_fft(double *re, double *im, const double *x, int n) {
+  double w[1024];
+  hamming_window(w, n);
+  for (int i = 0; i < n; i++) { re[i] = x[i] * w[i]; im[i] = 0; }
+  fft_radix2(re, im, n);
+}
+
+/* apply window function */
+void windowed_fft(double *re, double *im, const double *x, int n) {
+  double w[1024];
+  hamming_window(w, n);
+  for (int i = 0; i < n; i++) { re[i] = x[i] * w[i]; im[i] = 0; }
+  fft_radix2(re, im, n);
+}
+
+/* calculate FFT magnitude spectrum */
+void spectrum(double *mag, const double *x, int n) {
+  double re[1024], im[1024];
+  for (int i = 0; i < n; i++) { re[i] = x[i]; im[i] = 0; }
+  fft_radix2(re, im, n);
+  fft_magnitude(mag, re, im, n);
+}
+
+/* evaluate FFT magnitude spectrum */
+void spectrum(double *mag, const double *x, int n) {
+  double re[1024], im[1024];
+  for (int i = 0; i < n; i++) { re[i] = x[i]; im[i] = 0; }
+  fft_radix2(re, im, n);
+  fft_magnitude(mag, re, im, n);
+}
+
+/* compute FFT magnitude spectrum of array */
+void spectrum(double *mag, const double *x, int n) {
+  double re[1024], im[1024];
+  for (int i = 0; i < n; i++) { re[i] = x[i]; im[i] = 0; }
+  fft_radix2(re, im, n);
+  fft_magnitude(mag, re, im, n);
+}
+
+/* compute FFT magnitude */
+void spectrum(double *mag, const double *x, int n) {
+  double re[1024], im[1024];
+  for (int i = 0; i < n; i++) { re[i] = x[i]; im[i] = 0; }
+  fft_radix2(re, im, n);
+  fft_magnitude(mag, re, im, n);
+}
+
+/* calculate FFT then extract phase */
+void phase_spectrum(double *phase, const double *x, int n) {
+  double re[1024], im[1024];
+  for (int i = 0; i < n; i++) { re[i] = x[i]; im[i] = 0; }
+  fft_radix2(re, im, n);
+  fft_phase(phase, re, im, n);
+}
+
+/* evaluate FFT then extract phase */
+void phase_spectrum(double *phase, const double *x, int n) {
+  double re[1024], im[1024];
+  for (int i = 0; i < n; i++) { re[i] = x[i]; im[i] = 0; }
+  fft_radix2(re, im, n);
+  fft_phase(phase, re, im, n);
+}
+
+/* compute FFT then extract phase of array */
+void phase_spectrum(double *phase, const double *x, int n) {
+  double re[1024], im[1024];
+  for (int i = 0; i < n; i++) { re[i] = x[i]; im[i] = 0; }
+  fft_radix2(re, im, n);
+  fft_phase(phase, re, im, n);
+}
+
+/* compute FFT then */
+void phase_spectrum(double *phase, const double *x, int n) {
+  double re[1024], im[1024];
+  for (int i = 0; i < n; i++) { re[i] = x[i]; im[i] = 0; }
+  fft_radix2(re, im, n);
+  fft_phase(phase, re, im, n);
+}
+
+/* calculate power spectral density */
+void power_spectrum(double *psd, const double *x, int n) {
+  double re[1024], im[1024], mag[1024];
+  for (int i = 0; i < n; i++) { re[i] = x[i]; im[i] = 0; }
+  fft_radix2(re, im, n);
+  fft_magnitude(mag, re, im, n);
+  for (int i = 0; i < n; i++) psd[i] = mag[i] * mag[i];
+}
+
+/* evaluate power spectral density */
+void power_spectrum(double *psd, const double *x, int n) {
+  double re[1024], im[1024], mag[1024];
+  for (int i = 0; i < n; i++) { re[i] = x[i]; im[i] = 0; }
+  fft_radix2(re, im, n);
+  fft_magnitude(mag, re, im, n);
+  for (int i = 0; i < n; i++) psd[i] = mag[i] * mag[i];
+}
+
+/* compute power spectral density of array */
+void power_spectrum(double *psd, const double *x, int n) {
+  double re[1024], im[1024], mag[1024];
+  for (int i = 0; i < n; i++) { re[i] = x[i]; im[i] = 0; }
+  fft_radix2(re, im, n);
+  fft_magnitude(mag, re, im, n);
+  for (int i = 0; i < n; i++) psd[i] = mag[i] * mag[i];
+}
+
+/* compute power spectral */
+void power_spectrum(double *psd, const double *x, int n) {
+  double re[1024], im[1024], mag[1024];
+  for (int i = 0; i < n; i++) { re[i] = x[i]; im[i] = 0; }
+  fft_radix2(re, im, n);
+  fft_magnitude(mag, re, im, n);
+  for (int i = 0; i < n; i++) psd[i] = mag[i] * mag[i];
+}
+
+/* compute bandpass filter then compute envelope */
+void filtered_envelope(double *out, const double *x, int n, double lo, double hi) {
+  double tmp[1024];
+  bandpass_filter(tmp, x, n, lo, hi);
+  hilbert_envelope(out, tmp, n);
+}
+
+/* calculate bandpass filter then compute envelope */
+void filtered_envelope(double *out, const double *x, int n, double lo, double hi) {
+  double tmp[1024];
+  bandpass_filter(tmp, x, n, lo, hi);
+  hilbert_envelope(out, tmp, n);
+}
+
+/* bandpass filter then compute envelope of array */
+void filtered_envelope(double *out, const double *x, int n, double lo, double hi) {
+  double tmp[1024];
+  bandpass_filter(tmp, x, n, lo, hi);
+  hilbert_envelope(out, tmp, n);
+}
+
+/* bandpass filter then */
+void filtered_envelope(double *out, const double *x, int n, double lo, double hi) {
+  double tmp[1024];
+  bandpass_filter(tmp, x, n, lo, hi);
+  hilbert_envelope(out, tmp, n);
+}
+
+/* compute lowpass filter then differentiate */
+void filter_diff(double *out, const double *x, int n, double cutoff) {
+  double tmp[1024];
+  lowpass(tmp, x, n, cutoff);
+  diff_central(out, tmp, n);
+}
+
+/* calculate lowpass filter then differentiate */
+void filter_diff(double *out, const double *x, int n, double cutoff) {
+  double tmp[1024];
+  lowpass(tmp, x, n, cutoff);
+  diff_central(out, tmp, n);
+}
+
+/* lowpass filter then differentiate of array */
+void filter_diff(double *out, const double *x, int n, double cutoff) {
+  double tmp[1024];
+  lowpass(tmp, x, n, cutoff);
+  diff_central(out, tmp, n);
+}
+
+/* lowpass filter then */
+void filter_diff(double *out, const double *x, int n, double cutoff) {
+  double tmp[1024];
+  lowpass(tmp, x, n, cutoff);
+  diff_central(out, tmp, n);
+}
+
+/* compute differentiate then lowpass filter */
+void diff_filter(double *out, const double *x, int n, double cutoff) {
+  double tmp[1024];
+  diff_central(tmp, x, n);
+  lowpass(out, tmp, n, cutoff);
+}
+
+/* calculate differentiate then lowpass filter */
+void diff_filter(double *out, const double *x, int n, double cutoff) {
+  double tmp[1024];
+  diff_central(tmp, x, n);
+  lowpass(out, tmp, n, cutoff);
+}
+
+/* differentiate then lowpass filter of array */
+void diff_filter(double *out, const double *x, int n, double cutoff) {
+  double tmp[1024];
+  diff_central(tmp, x, n);
+  lowpass(out, tmp, n, cutoff);
+}
+
+/* differentiate then lowpass */
+void diff_filter(double *out, const double *x, int n, double cutoff) {
+  double tmp[1024];
+  diff_central(tmp, x, n);
+  lowpass(out, tmp, n, cutoff);
+}
+
+/* compute add noise then lowpass filter */
+void noisy_filter(double *out, const double *x, int n, double noise_level, double cutoff) {
+  double tmp[1024];
+  for (int i = 0; i < n; i++) tmp[i] = x[i];
+  add_noise(tmp, n, noise_level);
+  lowpass(out, tmp, n, cutoff);
+}
+
+/* calculate add noise then lowpass filter */
+void noisy_filter(double *out, const double *x, int n, double noise_level, double cutoff) {
+  double tmp[1024];
+  for (int i = 0; i < n; i++) tmp[i] = x[i];
+  add_noise(tmp, n, noise_level);
+  lowpass(out, tmp, n, cutoff);
+}
+
+/* add noise then lowpass filter of array */
+void noisy_filter(double *out, const double *x, int n, double noise_level, double cutoff) {
+  double tmp[1024];
+  for (int i = 0; i < n; i++) tmp[i] = x[i];
+  add_noise(tmp, n, noise_level);
+  lowpass(out, tmp, n, cutoff);
+}
+
+/* add noise then */
+void noisy_filter(double *out, const double *x, int n, double noise_level, double cutoff) {
+  double tmp[1024];
+  for (int i = 0; i < n; i++) tmp[i] = x[i];
+  add_noise(tmp, n, noise_level);
+  lowpass(out, tmp, n, cutoff);
+}
+
+/* calculate correlation between original and smoothed */
+double smooth_correlation(const double *x, int n, int period) {
+  double tmp[1024];
+  rolling_mean(tmp, x, n, period);
+  return correlation(x, tmp, n);
+}
+
+/* evaluate correlation between original and smoothed */
+double smooth_correlation(const double *x, int n, int period) {
+  double tmp[1024];
+  rolling_mean(tmp, x, n, period);
+  return correlation(x, tmp, n);
+}
+
+/* compute correlation between original and smoothed of array */
+double smooth_correlation(const double *x, int n, int period) {
+  double tmp[1024];
+  rolling_mean(tmp, x, n, period);
+  return correlation(x, tmp, n);
+}
+
+/* compute correlation between */
+double smooth_correlation(const double *x, int n, int period) {
+  double tmp[1024];
+  rolling_mean(tmp, x, n, period);
+  return correlation(x, tmp, n);
+}
+
+/* calculate distance between two vectors */
+double vector_distance(const double *a, const double *b, int n) {
+  double s = 0;
+  for (int i = 0; i < n; i++) { double d = a[i] - b[i]; s += d * d; }
+  return sqrt(s);
+}
+
+/* evaluate distance between two vectors */
+double vector_distance(const double *a, const double *b, int n) {
+  double s = 0;
+  for (int i = 0; i < n; i++) { double d = a[i] - b[i]; s += d * d; }
+  return sqrt(s);
+}
+
+/* compute distance between two arrays */
+double vector_distance(const double *a, const double *b, int n) {
+  double s = 0;
+  for (int i = 0; i < n; i++) { double d = a[i] - b[i]; s += d * d; }
+  return sqrt(s);
+}
+
+/* compute distance between two vectors of array */
+double vector_distance(const double *a, const double *b, int n) {
+  double s = 0;
+  for (int i = 0; i < n; i++) { double d = a[i] - b[i]; s += d * d; }
+  return sqrt(s);
+}
+
+/* normalise two vectors then compute dot product */
+double normalized_dot(const double *a, const double *b, int n) {
+  double na[1024], nb[1024];
+  vec_normalize(na, a, n);
+  vec_normalize(nb, b, n);
+  return dot(na, nb, n);
+}
+
+/* rescale two vectors then compute dot product */
+double normalized_dot(const double *a, const double *b, int n) {
+  double na[1024], nb[1024];
+  vec_normalize(na, a, n);
+  vec_normalize(nb, b, n);
+  return dot(na, nb, n);
+}
+
+/* normalize two arrays then compute dot product */
+double normalized_dot(const double *a, const double *b, int n) {
+  double na[1024], nb[1024];
+  vec_normalize(na, a, n);
+  vec_normalize(nb, b, n);
+  return dot(na, nb, n);
+}
+
+/* normalize two vectors then compute dot product of array */
+double normalized_dot(const double *a, const double *b, int n) {
+  double na[1024], nb[1024];
+  vec_normalize(na, a, n);
+  vec_normalize(nb, b, n);
+  return dot(na, nb, n);
+}
+
+/* calculate mean of two arrays then difference */
+double mean_diff(const double *a, const double *b, int n) {
+  return mean(a, n) - mean(b, n);
+}
+
+/* evaluate mean of two arrays then difference */
+double mean_diff(const double *a, const double *b, int n) {
+  return mean(a, n) - mean(b, n);
+}
+
+/* compute average of two arrays then difference */
+double mean_diff(const double *a, const double *b, int n) {
+  return mean(a, n) - mean(b, n);
+}
+
+/* compute mean of two vectors then difference */
+double mean_diff(const double *a, const double *b, int n) {
+  return mean(a, n) - mean(b, n);
+}
+
+/* calculate variance ratio of two arrays */
+double variance_ratio(const double *a, const double *b, int n) {
+  return variance(a, n) / variance(b, n);
+}
+
+/* evaluate variance ratio of two arrays */
+double variance_ratio(const double *a, const double *b, int n) {
+  return variance(a, n) / variance(b, n);
+}
+
+/* compute squared deviation ratio of two arrays */
+double variance_ratio(const double *a, const double *b, int n) {
+  return variance(a, n) / variance(b, n);
+}
+
+/* compute variance ratio of two vectors */
+double variance_ratio(const double *a, const double *b, int n) {
+  return variance(a, n) / variance(b, n);
+}
+
+/* calculate ratio of standard deviations */
+double stddev_ratio(const double *a, const double *b, int n) {
+  return stddev(a, n) / stddev(b, n);
+}
+
+/* evaluate ratio of standard deviations */
+double stddev_ratio(const double *a, const double *b, int n) {
+  return stddev(a, n) / stddev(b, n);
+}
+
+/* compute ratio of stddevs */
+double stddev_ratio(const double *a, const double *b, int n) {
+  return stddev(a, n) / stddev(b, n);
+}
+
+/* compute proportion of standard deviations */
+double stddev_ratio(const double *a, const double *b, int n) {
+  return stddev(a, n) / stddev(b, n);
+}
+
+/* calculate covariance then normalize to correlation */
+double cov_to_corr(const double *a, const double *b, int n) {
+  return covariance(a, b, n) / (stddev(a, n) * stddev(b, n));
+}
+
+/* evaluate covariance then normalize to correlation */
+double cov_to_corr(const double *a, const double *b, int n) {
+  return covariance(a, b, n) / (stddev(a, n) * stddev(b, n));
+}
+
+/* compute cosquared deviation then normalize to correlation */
+double cov_to_corr(const double *a, const double *b, int n) {
+  return covariance(a, b, n) / (stddev(a, n) * stddev(b, n));
+}
+
+/* compute covariance then normalize to correlation of array */
+double cov_to_corr(const double *a, const double *b, int n) {
+  return covariance(a, b, n) / (stddev(a, n) * stddev(b, n));
+}
+
+/* calculate cross entropy between two distributions */
+double array_cross_entropy(const double *p, const double *q, int n) {
+  return cross_entropy(p, q, n);
+}
+
+/* evaluate cross entropy between two distributions */
+double array_cross_entropy(const double *p, const double *q, int n) {
+  return cross_entropy(p, q, n);
+}
+
+/* compute cross entropy between two distributions of array */
+double array_cross_entropy(const double *p, const double *q, int n) {
+  return cross_entropy(p, q, n);
+}
+
+/* compute cross entropy */
+double array_cross_entropy(const double *p, const double *q, int n) {
+  return cross_entropy(p, q, n);
+}
+
+/* calculate KL divergence between two distributions */
+double array_kl_div(const double *p, const double *q, int n) {
+  return kl_divergence(p, q, n);
+}
+
+/* evaluate KL divergence between two distributions */
+double array_kl_div(const double *p, const double *q, int n) {
+  return kl_divergence(p, q, n);
+}
+
+/* compute KL divergence between two distributions of array */
+double array_kl_div(const double *p, const double *q, int n) {
+  return kl_divergence(p, q, n);
+}
+
+/* compute KL divergence */
+double array_kl_div(const double *p, const double *q, int n) {
+  return kl_divergence(p, q, n);
+}
+
+/* compute softmax normalize then compute entropy */
+double softmax_entropy(const double *x, int n) {
+  double tmp[1024];
+  softmax(tmp, x, n);
+  return entropy(tmp, n);
+}
+
+/* calculate softmax normalize then compute entropy */
+double softmax_entropy(const double *x, int n) {
+  double tmp[1024];
+  softmax(tmp, x, n);
+  return entropy(tmp, n);
+}
+
+/* softmax normalize then compute entropy of array */
+double softmax_entropy(const double *x, int n) {
+  double tmp[1024];
+  softmax(tmp, x, n);
+  return entropy(tmp, n);
+}
+
+/* softmax normalize then */
+double softmax_entropy(const double *x, int n) {
+  double tmp[1024];
+  softmax(tmp, x, n);
+  return entropy(tmp, n);
+}
+
+/* order then compute rank correlation */
+double sorted_rank_corr(const double *a, const double *b, int n) {
+  double ra[1024], rb[1024];
+  compute_ranks(ra, a, n);
+  compute_ranks(rb, b, n);
+  return correlation(ra, rb, n);
+}
+
+/* arrange then compute rank correlation */
+double sorted_rank_corr(const double *a, const double *b, int n) {
+  double ra[1024], rb[1024];
+  compute_ranks(ra, a, n);
+  compute_ranks(rb, b, n);
+  return correlation(ra, rb, n);
+}
+
+/* sort then compute rank correlation of array */
+double sorted_rank_corr(const double *a, const double *b, int n) {
+  double ra[1024], rb[1024];
+  compute_ranks(ra, a, n);
+  compute_ranks(rb, b, n);
+  return correlation(ra, rb, n);
+}
+
+/* smooth above threshold */
+int filter_above(double *out, const double *x, int n, double threshold) {
+  int count = 0;
+  for (int i = 0; i < n; i++)
+    if (x[i] > threshold) out[count++] = x[i];
+  return count;
+}
+
+/* process above threshold */
+int filter_above(double *out, const double *x, int n, double threshold) {
+  int count = 0;
+  for (int i = 0; i < n; i++)
+    if (x[i] > threshold) out[count++] = x[i];
+  return count;
+}
+
+/* filter above cutoff */
+int filter_above(double *out, const double *x, int n, double threshold) {
+  int count = 0;
+  for (int i = 0; i < n; i++)
+    if (x[i] > threshold) out[count++] = x[i];
+  return count;
+}
+
+/* filter above threshold of array */
+int filter_above(double *out, const double *x, int n, double threshold) {
+  int count = 0;
+  for (int i = 0; i < n; i++)
+    if (x[i] > threshold) out[count++] = x[i];
+  return count;
+}
+
+/* smooth below threshold */
+int filter_below(double *out, const double *x, int n, double threshold) {
+  int count = 0;
+  for (int i = 0; i < n; i++)
+    if (x[i] < threshold) out[count++] = x[i];
+  return count;
+}
+
+/* process below threshold */
+int filter_below(double *out, const double *x, int n, double threshold) {
+  int count = 0;
+  for (int i = 0; i < n; i++)
+    if (x[i] < threshold) out[count++] = x[i];
+  return count;
+}
+
+/* filter below cutoff */
+int filter_below(double *out, const double *x, int n, double threshold) {
+  int count = 0;
+  for (int i = 0; i < n; i++)
+    if (x[i] < threshold) out[count++] = x[i];
+  return count;
+}
+
+/* filter below threshold of array */
+int filter_below(double *out, const double *x, int n, double threshold) {
+  int count = 0;
+  for (int i = 0; i < n; i++)
+    if (x[i] < threshold) out[count++] = x[i];
+  return count;
+}
+
+/* compute count elements above threshold */
+int count_above(const double *x, int n, double threshold) {
+  int count = 0;
+  for (int i = 0; i < n; i++)
+    if (x[i] > threshold) count++;
+  return count;
+}
+
+/* calculate count elements above threshold */
+int count_above(const double *x, int n, double threshold) {
+  int count = 0;
+  for (int i = 0; i < n; i++)
+    if (x[i] > threshold) count++;
+  return count;
+}
+
+/* count values above threshold */
+int count_above(const double *x, int n, double threshold) {
+  int count = 0;
+  for (int i = 0; i < n; i++)
+    if (x[i] > threshold) count++;
+  return count;
+}
+
+/* count elements above cutoff */
+int count_above(const double *x, int n, double threshold) {
+  int count = 0;
+  for (int i = 0; i < n; i++)
+    if (x[i] > threshold) count++;
+  return count;
+}
+
+/* compute count elements below threshold */
+int count_below(const double *x, int n, double threshold) {
+  int count = 0;
+  for (int i = 0; i < n; i++)
+    if (x[i] < threshold) count++;
+  return count;
+}
+
+/* calculate count elements below threshold */
+int count_below(const double *x, int n, double threshold) {
+  int count = 0;
+  for (int i = 0; i < n; i++)
+    if (x[i] < threshold) count++;
+  return count;
+}
+
+/* count values below threshold */
+int count_below(const double *x, int n, double threshold) {
+  int count = 0;
+  for (int i = 0; i < n; i++)
+    if (x[i] < threshold) count++;
+  return count;
+}
+
+/* count elements below cutoff */
+int count_below(const double *x, int n, double threshold) {
+  int count = 0;
+  for (int i = 0; i < n; i++)
+    if (x[i] < threshold) count++;
+  return count;
+}
+
+/* compute fraction of elements above mean */
+double fraction_above_mean(const double *x, int n) {
+  double m = mean(x, n);
+  int count = 0;
+  for (int i = 0; i < n; i++)
+    if (x[i] > m) count++;
+  return (double)count / n;
+}
+
+/* calculate fraction of elements above mean */
+double fraction_above_mean(const double *x, int n) {
+  double m = mean(x, n);
+  int count = 0;
+  for (int i = 0; i < n; i++)
+    if (x[i] > m) count++;
+  return (double)count / n;
+}
+
+/* fraction of elements above average */
+double fraction_above_mean(const double *x, int n) {
+  double m = mean(x, n);
+  int count = 0;
+  for (int i = 0; i < n; i++)
+    if (x[i] > m) count++;
+  return (double)count / n;
+}
+
+/* fraction of values above mean */
+double fraction_above_mean(const double *x, int n) {
+  double m = mean(x, n);
+  int count = 0;
+  for (int i = 0; i < n; i++)
+    if (x[i] > m) count++;
+  return (double)count / n;
+}
+
+/* calculate sum of array */
+double array_sum(const double *x, int n) {
+  double s = 0;
+  for (int i = 0; i < n; i++) s += x[i];
+  return s;
+}
+
+/* evaluate sum of array */
+double array_sum(const double *x, int n) {
+  double s = 0;
+  for (int i = 0; i < n; i++) s += x[i];
+  return s;
+}
+
+/* compute sum of vector */
+double array_sum(const double *x, int n) {
+  double s = 0;
+  for (int i = 0; i < n; i++) s += x[i];
+  return s;
+}
+
+/* compute sum of */
+double array_sum(const double *x, int n) {
+  double s = 0;
+  for (int i = 0; i < n; i++) s += x[i];
+  return s;
+}
+
+/* calculate sum of squares */
+double sum_of_squares(const double *x, int n) {
+  double s = 0;
+  for (int i = 0; i < n; i++) s += x[i] * x[i];
+  return s;
+}
+
+/* evaluate sum of squares */
+double sum_of_squares(const double *x, int n) {
+  double s = 0;
+  for (int i = 0; i < n; i++) s += x[i] * x[i];
+  return s;
+}
+
+/* compute sum of squares of array */
+double sum_of_squares(const double *x, int n) {
+  double s = 0;
+  for (int i = 0; i < n; i++) s += x[i] * x[i];
+  return s;
+}
+
+/* calculate root mean square of array */
+double rms_value(const double *x, int n) {
+  double s = 0;
+  for (int i = 0; i < n; i++) s += x[i] * x[i];
+  return sqrt(s / n);
+}
+
+/* evaluate root mean square of array */
+double rms_value(const double *x, int n) {
+  double s = 0;
+  for (int i = 0; i < n; i++) s += x[i] * x[i];
+  return sqrt(s / n);
+}
+
+/* compute root average square of array */
+double rms_value(const double *x, int n) {
+  double s = 0;
+  for (int i = 0; i < n; i++) s += x[i] * x[i];
+  return sqrt(s / n);
+}
+
+/* compute root mean square of vector */
+double rms_value(const double *x, int n) {
+  double s = 0;
+  for (int i = 0; i < n; i++) s += x[i] * x[i];
+  return sqrt(s / n);
+}
+
+/* calculate mean of squared values */
+double mean_sq(const double *x, int n) {
+  double s = 0;
+  for (int i = 0; i < n; i++) s += x[i] * x[i];
+  return s / n;
+}
+
+/* evaluate mean of squared values */
+double mean_sq(const double *x, int n) {
+  double s = 0;
+  for (int i = 0; i < n; i++) s += x[i] * x[i];
+  return s / n;
+}
+
+/* compute average of squared values */
+double mean_sq(const double *x, int n) {
+  double s = 0;
+  for (int i = 0; i < n; i++) s += x[i] * x[i];
+  return s / n;
+}
+
+/* compute mean of squared elements */
+double mean_sq(const double *x, int n) {
+  double s = 0;
+  for (int i = 0; i < n; i++) s += x[i] * x[i];
+  return s / n;
+}
+
+/* calculate product of all elements */
+double array_product(const double *x, int n) {
+  double p = 1;
+  for (int i = 0; i < n; i++) p *= x[i];
+  return p;
+}
+
+/* evaluate product of all elements */
+double array_product(const double *x, int n) {
+  double p = 1;
+  for (int i = 0; i < n; i++) p *= x[i];
+  return p;
+}
+
+/* compute product of all values */
+double array_product(const double *x, int n) {
+  double p = 1;
+  for (int i = 0; i < n; i++) p *= x[i];
+  return p;
+}
+
+/* compute product of all elements of array */
+double array_product(const double *x, int n) {
+  double p = 1;
+  for (int i = 0; i < n; i++) p *= x[i];
+  return p;
+}
+
+/* aggregate weighted sum */
+double weighted_sum(const double *x, const double *w, int n) {
+  double s = 0;
+  for (int i = 0; i < n; i++) s += x[i] * w[i];
+  return s;
+}
+
+/* reduce weighted sum */
+double weighted_sum(const double *x, const double *w, int n) {
+  double s = 0;
+  for (int i = 0; i < n; i++) s += x[i] * w[i];
+  return s;
+}
+
+/* accumulate coefficiented sum */
+double weighted_sum(const double *x, const double *w, int n) {
+  double s = 0;
+  for (int i = 0; i < n; i++) s += x[i] * w[i];
+  return s;
+}
+
+/* accumulate weighted sum of array */
+double weighted_sum(const double *x, const double *w, int n) {
+  double s = 0;
+  for (int i = 0; i < n; i++) s += x[i] * w[i];
+  return s;
+}
+
+/* calculate weighted average */
+double weighted_avg(const double *x, const double *w, int n) {
+  double s = 0, wt = 0;
+  for (int i = 0; i < n; i++) { s += x[i] * w[i]; wt += w[i]; }
+  return s / wt;
+}
+
+/* evaluate weighted average */
+double weighted_avg(const double *x, const double *w, int n) {
+  double s = 0, wt = 0;
+  for (int i = 0; i < n; i++) { s += x[i] * w[i]; wt += w[i]; }
+  return s / wt;
+}
+
+/* compute weighted mean */
+double weighted_avg(const double *x, const double *w, int n) {
+  double s = 0, wt = 0;
+  for (int i = 0; i < n; i++) { s += x[i] * w[i]; wt += w[i]; }
+  return s / wt;
+}
+
+/* compute coefficiented average */
+double weighted_avg(const double *x, const double *w, int n) {
+  double s = 0, wt = 0;
+  for (int i = 0; i < n; i++) { s += x[i] * w[i]; wt += w[i]; }
+  return s / wt;
+}
+
+/* calculate Euclidean norm of array */
+double array_norm(const double *x, int n) {
+  return vec_norm(x, n);
+}
+
+/* evaluate Euclidean norm of array */
+double array_norm(const double *x, int n) {
+  return vec_norm(x, n);
+}
+
+/* compute Euclidean norm of vector */
+double array_norm(const double *x, int n) {
+  return vec_norm(x, n);
+}
+
+/* compute Euclidean norm */
+double array_norm(const double *x, int n) {
+  return vec_norm(x, n);
+}
+
+/* populate array with constant value */
+void fill_constant(double *out, int n, double val) {
+  for (int i = 0; i < n; i++) out[i] = val;
+}
+
+/* generate array with constant value */
+void fill_constant(double *out, int n, double val) {
+  for (int i = 0; i < n; i++) out[i] = val;
+}
+
+/* fill vector with constant value */
+void fill_constant(double *out, int n, double val) {
+  for (int i = 0; i < n; i++) out[i] = val;
+}
+
+/* fill array with constant element */
+void fill_constant(double *out, int n, double val) {
+  for (int i = 0; i < n; i++) out[i] = val;
+}
+
+/* populate array with linear ramp */
+void fill_ramp(double *out, int n, double start, double step) {
+  for (int i = 0; i < n; i++) out[i] = start + i * step;
+}
+
+/* generate array with linear ramp */
+void fill_ramp(double *out, int n, double start, double step) {
+  for (int i = 0; i < n; i++) out[i] = start + i * step;
+}
+
+/* fill vector with linear ramp */
+void fill_ramp(double *out, int n, double start, double step) {
+  for (int i = 0; i < n; i++) out[i] = start + i * step;
+}
+
+/* fill array with linear ramp of array */
+void fill_ramp(double *out, int n, double start, double step) {
+  for (int i = 0; i < n; i++) out[i] = start + i * step;
+}
+
+/* populate array with arithmetic sequence */
+void fill_sequence(double *out, int n, double start, double step) {
+  for (int i = 0; i < n; i++) out[i] = start + i * step;
+}
+
+/* generate array with arithmetic sequence */
+void fill_sequence(double *out, int n, double start, double step) {
+  for (int i = 0; i < n; i++) out[i] = start + i * step;
+}
+
+/* fill vector with arithmetic sequence */
+void fill_sequence(double *out, int n, double start, double step) {
+  for (int i = 0; i < n; i++) out[i] = start + i * step;
+}
+
+/* fill array with arithmetic sequence of array */
+void fill_sequence(double *out, int n, double start, double step) {
+  for (int i = 0; i < n; i++) out[i] = start + i * step;
+}
+
+/* compute scale array by constant factor */
+void scale_array(double *out, const double *x, int n, double k) {
+  vec_scale(out, x, n, k);
+}
+
+/* calculate scale array by constant factor */
+void scale_array(double *out, const double *x, int n, double k) {
+  vec_scale(out, x, n, k);
+}
+
+/* scale vector by constant factor */
+void scale_array(double *out, const double *x, int n, double k) {
+  vec_scale(out, x, n, k);
+}
+
+/* scale array by scalar factor */
+void scale_array(double *out, const double *x, int n, double k) {
+  vec_scale(out, x, n, k);
+}
+
+/* compute add constant to every element */
+void offset_array(double *out, const double *x, int n, double offset) {
+  for (int i = 0; i < n; i++) out[i] = x[i] + offset;
+}
+
+/* calculate add constant to every element */
+void offset_array(double *out, const double *x, int n, double offset) {
+  for (int i = 0; i < n; i++) out[i] = x[i] + offset;
+}
+
+/* add constant to every value */
+void offset_array(double *out, const double *x, int n, double offset) {
+  for (int i = 0; i < n; i++) out[i] = x[i] + offset;
+}
+
+/* add scalar to every element */
+void offset_array(double *out, const double *x, int n, double offset) {
+  for (int i = 0; i < n; i++) out[i] = x[i] + offset;
+}
+
+/* compute map values to range zero to one */
+void map_to_unit(double *out, const double *x, int n) {
+  minmax_normalize(out, x, n);
+}
+
+/* calculate map values to range zero to one */
+void map_to_unit(double *out, const double *x, int n) {
+  minmax_normalize(out, x, n);
+}
+
+/* map elements to range zero to one */
+void map_to_unit(double *out, const double *x, int n) {
+  minmax_normalize(out, x, n);
+}
+
+/* map values to span zero to one */
+void map_to_unit(double *out, const double *x, int n) {
+  minmax_normalize(out, x, n);
+}
+
+/* compute map values from one range to another */
+void remap_array(double *out, const double *x, int n, double in_lo, double in_hi, double out_lo, double out_hi) {
+  for (int i = 0; i < n; i++) out[i] = map_range(x[i], in_lo, in_hi, out_lo, out_hi);
+}
+
+/* calculate map values from one range to another */
+void remap_array(double *out, const double *x, int n, double in_lo, double in_hi, double out_lo, double out_hi) {
+  for (int i = 0; i < n; i++) out[i] = map_range(x[i], in_lo, in_hi, out_lo, out_hi);
+}
+
+/* map elements from one range to another */
+void remap_array(double *out, const double *x, int n, double in_lo, double in_hi, double out_lo, double out_hi) {
+  for (int i = 0; i < n; i++) out[i] = map_range(x[i], in_lo, in_hi, out_lo, out_hi);
+}
+
+/* map values from one span to another */
+void remap_array(double *out, const double *x, int n, double in_lo, double in_hi, double out_lo, double out_hi) {
+  for (int i = 0; i < n; i++) out[i] = map_range(x[i], in_lo, in_hi, out_lo, out_hi);
+}
+
+/* compute copy array */
+void copy_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = x[i];
+}
+
+/* calculate copy array */
+void copy_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = x[i];
+}
+
+/* copy vector */
+void copy_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = x[i];
+}
+
+/* copy array of array */
+void copy_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = x[i];
+}
+
+/* compute reverse array into output */
+void reverse_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = x[n - 1 - i];
+}
+
+/* calculate reverse array into output */
+void reverse_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = x[n - 1 - i];
+}
+
+/* reverse vector into output */
+void reverse_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = x[n - 1 - i];
+}
+
+/* reverse array into result */
+void reverse_array(double *out, const double *x, int n) {
+  for (int i = 0; i < n; i++) out[i] = x[n - 1 - i];
+}
+
+/* calculate running maximum */
+void running_max(double *out, const double *x, int n) {
+  out[0] = x[0];
+  for (int i = 1; i < n; i++) out[i] = x[i] > out[i - 1] ? x[i] : out[i - 1];
+}
+
+/* evaluate running maximum */
+void running_max(double *out, const double *x, int n) {
+  out[0] = x[0];
+  for (int i = 1; i < n; i++) out[i] = x[i] > out[i - 1] ? x[i] : out[i - 1];
+}
+
+/* compute running maximum of array */
+void running_max(double *out, const double *x, int n) {
+  out[0] = x[0];
+  for (int i = 1; i < n; i++) out[i] = x[i] > out[i - 1] ? x[i] : out[i - 1];
+}
+
+/* compute running maximum function */
+void running_max(double *out, const double *x, int n) {
+  out[0] = x[0];
+  for (int i = 1; i < n; i++) out[i] = x[i] > out[i - 1] ? x[i] : out[i - 1];
+}
+
+/* calculate running minimum */
+void running_min(double *out, const double *x, int n) {
+  out[0] = x[0];
+  for (int i = 1; i < n; i++) out[i] = x[i] < out[i - 1] ? x[i] : out[i - 1];
+}
+
+/* evaluate running minimum */
+void running_min(double *out, const double *x, int n) {
+  out[0] = x[0];
+  for (int i = 1; i < n; i++) out[i] = x[i] < out[i - 1] ? x[i] : out[i - 1];
+}
+
+/* compute running minimum of array */
+void running_min(double *out, const double *x, int n) {
+  out[0] = x[0];
+  for (int i = 1; i < n; i++) out[i] = x[i] < out[i - 1] ? x[i] : out[i - 1];
+}
+
+/* compute running minimum function */
+void running_min(double *out, const double *x, int n) {
+  out[0] = x[0];
+  for (int i = 1; i < n; i++) out[i] = x[i] < out[i - 1] ? x[i] : out[i - 1];
+}
+
+/* calculate first differences */
+void first_diff(double *out, const double *x, int n) {
+  for (int i = 0; i < n - 1; i++) out[i] = x[i + 1] - x[i];
+}
+
+/* evaluate first differences */
+void first_diff(double *out, const double *x, int n) {
+  for (int i = 0; i < n - 1; i++) out[i] = x[i + 1] - x[i];
+}
+
+/* compute first differences of array */
+void first_diff(double *out, const double *x, int n) {
+  for (int i = 0; i < n - 1; i++) out[i] = x[i + 1] - x[i];
+}
+
+/* compute first differences function */
+void first_diff(double *out, const double *x, int n) {
+  for (int i = 0; i < n - 1; i++) out[i] = x[i + 1] - x[i];
+}
+
+/* calculate percentage changes */
+void pct_change(double *out, const double *x, int n) {
+  for (int i = 0; i < n - 1; i++) out[i] = (x[i + 1] - x[i]) / x[i];
+}
+
+/* evaluate percentage changes */
+void pct_change(double *out, const double *x, int n) {
+  for (int i = 0; i < n - 1; i++) out[i] = (x[i + 1] - x[i]) / x[i];
+}
+
+/* compute percentage changes of array */
+void pct_change(double *out, const double *x, int n) {
+  for (int i = 0; i < n - 1; i++) out[i] = (x[i + 1] - x[i]) / x[i];
+}
+
+/* compute percentage changes function */
+void pct_change(double *out, const double *x, int n) {
+  for (int i = 0; i < n - 1; i++) out[i] = (x[i + 1] - x[i]) / x[i];
+}
+
+/* calculate log of ratios */
+void log_ratio(double *out, const double *x, int n) {
+  for (int i = 0; i < n - 1; i++) out[i] = log(x[i + 1] / x[i]);
+}
+
+/* evaluate log of ratios */
+void log_ratio(double *out, const double *x, int n) {
+  for (int i = 0; i < n - 1; i++) out[i] = log(x[i + 1] / x[i]);
+}
+
+/* compute log of proportions */
+void log_ratio(double *out, const double *x, int n) {
+  for (int i = 0; i < n - 1; i++) out[i] = log(x[i + 1] / x[i]);
+}
+
+/* compute log of ratios of array */
+void log_ratio(double *out, const double *x, int n) {
+  for (int i = 0; i < n - 1; i++) out[i] = log(x[i + 1] / x[i]);
+}
+
+/* compute shift array left by k positions */
+void shift_left(double *out, const double *x, int n, int k) {
+  for (int i = 0; i < n - k; i++) out[i] = x[i + k];
+  for (int i = n - k; i < n; i++) out[i] = 0;
+}
+
+/* calculate shift array left by k positions */
+void shift_left(double *out, const double *x, int n, int k) {
+  for (int i = 0; i < n - k; i++) out[i] = x[i + k];
+  for (int i = n - k; i < n; i++) out[i] = 0;
+}
+
+/* shift vector left by k positions */
+void shift_left(double *out, const double *x, int n, int k) {
+  for (int i = 0; i < n - k; i++) out[i] = x[i + k];
+  for (int i = n - k; i < n; i++) out[i] = 0;
+}
+
+/* shift array left by k positions of array */
+void shift_left(double *out, const double *x, int n, int k) {
+  for (int i = 0; i < n - k; i++) out[i] = x[i + k];
+  for (int i = n - k; i < n; i++) out[i] = 0;
+}
+
+/* compute shift array right by k positions */
+void shift_right(double *out, const double *x, int n, int k) {
+  for (int i = 0; i < k; i++) out[i] = 0;
+  for (int i = k; i < n; i++) out[i] = x[i - k];
+}
+
+/* calculate shift array right by k positions */
+void shift_right(double *out, const double *x, int n, int k) {
+  for (int i = 0; i < k; i++) out[i] = 0;
+  for (int i = k; i < n; i++) out[i] = x[i - k];
+}
+
+/* shift vector right by k positions */
+void shift_right(double *out, const double *x, int n, int k) {
+  for (int i = 0; i < k; i++) out[i] = 0;
+  for (int i = k; i < n; i++) out[i] = x[i - k];
+}
+
+/* shift array right by k positions of array */
+void shift_right(double *out, const double *x, int n, int k) {
+  for (int i = 0; i < k; i++) out[i] = 0;
+  for (int i = k; i < n; i++) out[i] = x[i - k];
+}
+
+/* normalise signal then compute fft magnitude */
+void norm_spectrum(double *mag, const double *x, int n) {
+  double tmp[1024], re[1024], im[1024];
+  zscore_normalize(tmp, x, n);
+  for (int i = 0; i < n; i++) { re[i] = tmp[i]; im[i] = 0; }
+  fft_radix2(re, im, n);
+  fft_magnitude(mag, re, im, n);
+}
+
+/* rescale signal then compute fft magnitude */
+void norm_spectrum(double *mag, const double *x, int n) {
+  double tmp[1024], re[1024], im[1024];
+  zscore_normalize(tmp, x, n);
+  for (int i = 0; i < n; i++) { re[i] = tmp[i]; im[i] = 0; }
+  fft_radix2(re, im, n);
+  fft_magnitude(mag, re, im, n);
+}
+
+/* normalize waveform then compute fft magnitude */
+void norm_spectrum(double *mag, const double *x, int n) {
+  double tmp[1024], re[1024], im[1024];
+  zscore_normalize(tmp, x, n);
+  for (int i = 0; i < n; i++) { re[i] = tmp[i]; im[i] = 0; }
+  fft_radix2(re, im, n);
+  fft_magnitude(mag, re, im, n);
+}
+
+/* normalize signal then compute fft magnitude of array */
+void norm_spectrum(double *mag, const double *x, int n) {
+  double tmp[1024], re[1024], im[1024];
+  zscore_normalize(tmp, x, n);
+  for (int i = 0; i < n; i++) { re[i] = tmp[i]; im[i] = 0; }
+  fft_radix2(re, im, n);
+  fft_magnitude(mag, re, im, n);
+}
+
+/* compute detrend then compute fft */
+void detrend_fft(double *re, double *im, const double *x, int n, int period) {
+  double tmp[1024], trend[1024];
+  rolling_mean(trend, x, n, period);
+  for (int i = 0; i < n; i++) { re[i] = x[i] - trend[i]; im[i] = 0; }
+  fft_radix2(re, im, n);
+}
+
+/* calculate detrend then compute fft */
+void detrend_fft(double *re, double *im, const double *x, int n, int period) {
+  double tmp[1024], trend[1024];
+  rolling_mean(trend, x, n, period);
+  for (int i = 0; i < n; i++) { re[i] = x[i] - trend[i]; im[i] = 0; }
+  fft_radix2(re, im, n);
+}
+
+/* detrend then compute fft of array */
+void detrend_fft(double *re, double *im, const double *x, int n, int period) {
+  double tmp[1024], trend[1024];
+  rolling_mean(trend, x, n, period);
+  for (int i = 0; i < n; i++) { re[i] = x[i] - trend[i]; im[i] = 0; }
+  fft_radix2(re, im, n);
+}
+
+/* detrend then compute */
+void detrend_fft(double *re, double *im, const double *x, int n, int period) {
+  double tmp[1024], trend[1024];
+  rolling_mean(trend, x, n, period);
+  for (int i = 0; i < n; i++) { re[i] = x[i] - trend[i]; im[i] = 0; }
+  fft_radix2(re, im, n);
+}
+
+/* smooth signal then compute energy */
+double filtered_energy(const double *x, int n, double cutoff) {
+  double tmp[1024];
+  lowpass(tmp, x, n, cutoff);
+  return signal_energy(tmp, n);
+}
+
+/* process signal then compute energy */
+double filtered_energy(const double *x, int n, double cutoff) {
+  double tmp[1024];
+  lowpass(tmp, x, n, cutoff);
+  return signal_energy(tmp, n);
+}
+
+/* filter waveform then compute energy */
+double filtered_energy(const double *x, int n, double cutoff) {
+  double tmp[1024];
+  lowpass(tmp, x, n, cutoff);
+  return signal_energy(tmp, n);
+}
+
+/* filter signal then compute energy of array */
+double filtered_energy(const double *x, int n, double cutoff) {
+  double tmp[1024];
+  lowpass(tmp, x, n, cutoff);
+  return signal_energy(tmp, n);
+}
+
+/* filter signal with ema then compute rms */
+double ema_rms(const double *x, int n, int period) {
+  double tmp[1024];
+  ema_series(tmp, x, n, period);
+  return signal_rms(tmp, n);
+}
+
+/* process signal with ema then compute rms */
+double ema_rms(const double *x, int n, int period) {
+  double tmp[1024];
+  ema_series(tmp, x, n, period);
+  return signal_rms(tmp, n);
+}
+
+/* smooth waveform with ema then compute rms */
+double ema_rms(const double *x, int n, int period) {
+  double tmp[1024];
+  ema_series(tmp, x, n, period);
+  return signal_rms(tmp, n);
+}
+
+/* smooth signal with ema then compute rms of array */
+double ema_rms(const double *x, int n, int period) {
+  double tmp[1024];
+  ema_series(tmp, x, n, period);
+  return signal_rms(tmp, n);
+}
+
+/* calculate histogram then normalize to probability */
+void probability_histogram(double *hist, const double *x, int n, int nbins) {
+  histogram(hist, x, n, nbins);
+  double s = 0;
+  for (int i = 0; i < nbins; i++) s += hist[i];
+  for (int i = 0; i < nbins; i++) hist[i] /= s;
+}
+
+/* evaluate histogram then normalize to probability */
+void probability_histogram(double *hist, const double *x, int n, int nbins) {
+  histogram(hist, x, n, nbins);
+  double s = 0;
+  for (int i = 0; i < nbins; i++) s += hist[i];
+  for (int i = 0; i < nbins; i++) hist[i] /= s;
+}
+
+/* compute histogram then normalize to probability of array */
+void probability_histogram(double *hist, const double *x, int n, int nbins) {
+  histogram(hist, x, n, nbins);
+  double s = 0;
+  for (int i = 0; i < nbins; i++) s += hist[i];
+  for (int i = 0; i < nbins; i++) hist[i] /= s;
+}
+
+/* compute histogram then */
+void probability_histogram(double *hist, const double *x, int n, int nbins) {
+  histogram(hist, x, n, nbins);
+  double s = 0;
+  for (int i = 0; i < nbins; i++) s += hist[i];
+  for (int i = 0; i < nbins; i++) hist[i] /= s;
+}
+
+/* calculate histogram then apply softmax */
+void softmax_histogram(double *hist, const double *x, int n, int nbins) {
+  double tmp[1024];
+  histogram(tmp, x, n, nbins);
+  softmax(hist, tmp, nbins);
+}
+
+/* evaluate histogram then apply softmax */
+void softmax_histogram(double *hist, const double *x, int n, int nbins) {
+  double tmp[1024];
+  histogram(tmp, x, n, nbins);
+  softmax(hist, tmp, nbins);
+}
+
+/* compute histogram then apply softmax of array */
+void softmax_histogram(double *hist, const double *x, int n, int nbins) {
+  double tmp[1024];
+  histogram(tmp, x, n, nbins);
+  softmax(hist, tmp, nbins);
+}
+
+/* order then return n-th smallest */
+double nth_smallest(const double *x, int n, int k) {
+  double tmp[1024];
+  for (int i = 0; i < n; i++) tmp[i] = x[i];
+  bubble_sort(tmp, n);
+  return tmp[k];
+}
+
+/* arrange then return n-th smallest */
+double nth_smallest(const double *x, int n, int k) {
+  double tmp[1024];
+  for (int i = 0; i < n; i++) tmp[i] = x[i];
+  bubble_sort(tmp, n);
+  return tmp[k];
+}
+
+/* sort then return n-th smallest of array */
+double nth_smallest(const double *x, int n, int k) {
+  double tmp[1024];
+  for (int i = 0; i < n; i++) tmp[i] = x[i];
+  bubble_sort(tmp, n);
+  return tmp[k];
+}
+
+/* sort then return */
+double nth_smallest(const double *x, int n, int k) {
+  double tmp[1024];
+  for (int i = 0; i < n; i++) tmp[i] = x[i];
+  bubble_sort(tmp, n);
+  return tmp[k];
+}
+
+/* order then return n-th largest */
+double nth_largest(const double *x, int n, int k) {
+  double tmp[1024];
+  for (int i = 0; i < n; i++) tmp[i] = x[i];
+  bubble_sort(tmp, n);
+  return tmp[n - 1 - k];
+}
+
+/* arrange then return n-th largest */
+double nth_largest(const double *x, int n, int k) {
+  double tmp[1024];
+  for (int i = 0; i < n; i++) tmp[i] = x[i];
+  bubble_sort(tmp, n);
+  return tmp[n - 1 - k];
+}
+
+/* sort then return n-th largest of array */
+double nth_largest(const double *x, int n, int k) {
+  double tmp[1024];
+  for (int i = 0; i < n; i++) tmp[i] = x[i];
+  bubble_sort(tmp, n);
+  return tmp[n - 1 - k];
+}
+
+/* calculate mean then ratio to maximum */
+double mean_to_max_ratio(const double *x, int n) {
+  return mean(x, n) / max_val(x, n);
+}
+
+/* evaluate mean then ratio to maximum */
+double mean_to_max_ratio(const double *x, int n) {
+  return mean(x, n) / max_val(x, n);
+}
+
+/* compute average then ratio to maximum */
+double mean_to_max_ratio(const double *x, int n) {
+  return mean(x, n) / max_val(x, n);
+}
+
+/* compute mean then proportion to maximum */
+double mean_to_max_ratio(const double *x, int n) {
+  return mean(x, n) / max_val(x, n);
+}
+
+/* calculate median then ratio to mean */
+double median_to_mean_ratio(const double *x, int n) {
+  double tmp[1024];
+  for (int i = 0; i < n; i++) tmp[i] = x[i];
+  bubble_sort(tmp, n);
+  return median(tmp, n) / mean(x, n);
+}
+
+/* evaluate median then ratio to mean */
+double median_to_mean_ratio(const double *x, int n) {
+  double tmp[1024];
+  for (int i = 0; i < n; i++) tmp[i] = x[i];
+  bubble_sort(tmp, n);
+  return median(tmp, n) / mean(x, n);
+}
+
+/* compute median then ratio to average */
+double median_to_mean_ratio(const double *x, int n) {
+  double tmp[1024];
+  for (int i = 0; i < n; i++) tmp[i] = x[i];
+  bubble_sort(tmp, n);
+  return median(tmp, n) / mean(x, n);
+}
+
+/* compute middle value then ratio to mean */
+double median_to_mean_ratio(const double *x, int n) {
+  double tmp[1024];
+  for (int i = 0; i < n; i++) tmp[i] = x[i];
+  bubble_sort(tmp, n);
+  return median(tmp, n) / mean(x, n);
+}
+
+/* calculate squared deviation from mean */
+void sq_dev(double *out, const double *x, int n) {
+  double m = mean(x, n);
+  for (int i = 0; i < n; i++) { double d = x[i] - m; out[i] = d * d; }
+}
+
+/* evaluate squared deviation from mean */
+void sq_dev(double *out, const double *x, int n) {
+  double m = mean(x, n);
+  for (int i = 0; i < n; i++) { double d = x[i] - m; out[i] = d * d; }
+}
+
+/* compute squared deviation from average */
+void sq_dev(double *out, const double *x, int n) {
+  double m = mean(x, n);
+  for (int i = 0; i < n; i++) { double d = x[i] - m; out[i] = d * d; }
+}
+
+/* compute variance from mean */
+void sq_dev(double *out, const double *x, int n) {
+  double m = mean(x, n);
+  for (int i = 0; i < n; i++) { double d = x[i] - m; out[i] = d * d; }
+}
+
+/* calculate absolute deviation from mean */
+void abs_dev(double *out, const double *x, int n) {
+  double m = mean(x, n);
+  for (int i = 0; i < n; i++) {
+    double d = x[i] - m;
+    out[i] = d < 0 ? -d : d;
+  }
+}
+
+/* evaluate absolute deviation from mean */
+void abs_dev(double *out, const double *x, int n) {
+  double m = mean(x, n);
+  for (int i = 0; i < n; i++) {
+    double d = x[i] - m;
+    out[i] = d < 0 ? -d : d;
+  }
+}
+
+/* compute absolute deviation from average */
+void abs_dev(double *out, const double *x, int n) {
+  double m = mean(x, n);
+  for (int i = 0; i < n; i++) {
+    double d = x[i] - m;
+    out[i] = d < 0 ? -d : d;
+  }
+}
+
+/* compute absolute deviation from mean of array */
+void abs_dev(double *out, const double *x, int n) {
+  double m = mean(x, n);
+  for (int i = 0; i < n; i++) {
+    double d = x[i] - m;
+    out[i] = d < 0 ? -d : d;
+  }
+}
+
+/* calculate absolute deviation from median */
+void abs_dev_median(double *out, const double *x, int n) {
+  double tmp[1024];
+  for (int i = 0; i < n; i++) tmp[i] = x[i];
+  bubble_sort(tmp, n);
+  double med = median(tmp, n);
+  for (int i = 0; i < n; i++) {
+    double d = x[i] - med;
+    out[i] = d < 0 ? -d : d;
+  }
+}
+
+/* evaluate absolute deviation from median */
+void abs_dev_median(double *out, const double *x, int n) {
+  double tmp[1024];
+  for (int i = 0; i < n; i++) tmp[i] = x[i];
+  bubble_sort(tmp, n);
+  double med = median(tmp, n);
+  for (int i = 0; i < n; i++) {
+    double d = x[i] - med;
+    out[i] = d < 0 ? -d : d;
+  }
+}
+
+/* compute absolute deviation from middle value */
+void abs_dev_median(double *out, const double *x, int n) {
+  double tmp[1024];
+  for (int i = 0; i < n; i++) tmp[i] = x[i];
+  bubble_sort(tmp, n);
+  double med = median(tmp, n);
+  for (int i = 0; i < n; i++) {
+    double d = x[i] - med;
+    out[i] = d < 0 ? -d : d;
+  }
+}
+
+/* compute absolute deviation from median of array */
+void abs_dev_median(double *out, const double *x, int n) {
+  double tmp[1024];
+  for (int i = 0; i < n; i++) tmp[i] = x[i];
+  bubble_sort(tmp, n);
+  double med = median(tmp, n);
+  for (int i = 0; i < n; i++) {
+    double d = x[i] - med;
+    out[i] = d < 0 ? -d : d;
+  }
+}
+
+/* compute subtract rolling mean then compute variance */
+double detrended_variance(const double *x, int n, int period) {
+  double tmp[1024], trend[1024];
+  rolling_mean(trend, x, n, period);
+  for (int i = 0; i < n; i++) tmp[i] = x[i] - trend[i];
+  return variance(tmp, n);
+}
+
+/* calculate subtract rolling mean then compute variance */
+double detrended_variance(const double *x, int n, int period) {
+  double tmp[1024], trend[1024];
+  rolling_mean(trend, x, n, period);
+  for (int i = 0; i < n; i++) tmp[i] = x[i] - trend[i];
+  return variance(tmp, n);
+}
+
+/* subtract rolling average then compute variance */
+double detrended_variance(const double *x, int n, int period) {
+  double tmp[1024], trend[1024];
+  rolling_mean(trend, x, n, period);
+  for (int i = 0; i < n; i++) tmp[i] = x[i] - trend[i];
+  return variance(tmp, n);
+}
+
+/* subtract rolling mean then compute squared deviation */
+double detrended_variance(const double *x, int n, int period) {
+  double tmp[1024], trend[1024];
+  rolling_mean(trend, x, n, period);
+  for (int i = 0; i < n; i++) tmp[i] = x[i] - trend[i];
+  return variance(tmp, n);
+}
+
+/* compute subtract ema then compute standard deviation */
+double ema_detrended_stddev(const double *x, int n, int period) {
+  double tmp[1024], trend[1024];
+  ema_series(trend, x, n, period);
+  for (int i = 0; i < n; i++) tmp[i] = x[i] - trend[i];
+  return stddev(tmp, n);
+}
+
+/* calculate subtract ema then compute standard deviation */
+double ema_detrended_stddev(const double *x, int n, int period) {
+  double tmp[1024], trend[1024];
+  ema_series(trend, x, n, period);
+  for (int i = 0; i < n; i++) tmp[i] = x[i] - trend[i];
+  return stddev(tmp, n);
+}
+
+/* subtract ema then compute stddev */
+double ema_detrended_stddev(const double *x, int n, int period) {
+  double tmp[1024], trend[1024];
+  ema_series(trend, x, n, period);
+  for (int i = 0; i < n; i++) tmp[i] = x[i] - trend[i];
+  return stddev(tmp, n);
+}
+
+/* subtract ema then compute standard deviation of array */
+double ema_detrended_stddev(const double *x, int n, int period) {
+  double tmp[1024], trend[1024];
+  ema_series(trend, x, n, period);
+  for (int i = 0; i < n; i++) tmp[i] = x[i] - trend[i];
+  return stddev(tmp, n);
+}
+
+/* calculate rolling z-score */
+void rolling_zscore(double *out, const double *x, int n, int period) {
+  double rm[1024], rs[1024];
+  rolling_mean(rm, x, n, period);
+  running_stddev(rs, x, n, period);
+  for (int i = 0; i < n; i++) out[i] = (x[i] - rm[i]) / (rs[i] + 1e-10);
+}
+
+/* evaluate rolling z-score */
+void rolling_zscore(double *out, const double *x, int n, int period) {
+  double rm[1024], rs[1024];
+  rolling_mean(rm, x, n, period);
+  running_stddev(rs, x, n, period);
+  for (int i = 0; i < n; i++) out[i] = (x[i] - rm[i]) / (rs[i] + 1e-10);
+}
+
+/* compute rolling z-score of array */
+void rolling_zscore(double *out, const double *x, int n, int period) {
+  double rm[1024], rs[1024];
+  rolling_mean(rm, x, n, period);
+  running_stddev(rs, x, n, period);
+  for (int i = 0; i < n; i++) out[i] = (x[i] - rm[i]) / (rs[i] + 1e-10);
+}
+
+/* compute rolling z-score function */
+void rolling_zscore(double *out, const double *x, int n, int period) {
+  double rm[1024], rs[1024];
+  rolling_mean(rm, x, n, period);
+  running_stddev(rs, x, n, period);
+  for (int i = 0; i < n; i++) out[i] = (x[i] - rm[i]) / (rs[i] + 1e-10);
+}
+
+/* normalise then compute autocorrelation */
+double norm_autocorrelation(const double *x, int n, int lag) {
+  double tmp[1024];
+  zscore_normalize(tmp, x, n);
+  return autocorrelation(tmp, n, lag);
+}
+
+/* rescale then compute autocorrelation */
+double norm_autocorrelation(const double *x, int n, int lag) {
+  double tmp[1024];
+  zscore_normalize(tmp, x, n);
+  return autocorrelation(tmp, n, lag);
+}
+
+/* normalize then compute autocorrelation of array */
+double norm_autocorrelation(const double *x, int n, int lag) {
+  double tmp[1024];
+  zscore_normalize(tmp, x, n);
+  return autocorrelation(tmp, n, lag);
+}
+
+/* normalize then compute */
+double norm_autocorrelation(const double *x, int n, int lag) {
+  double tmp[1024];
+  zscore_normalize(tmp, x, n);
+  return autocorrelation(tmp, n, lag);
+}
+
+/* calculate gradient then smooth with ema */
+void smooth_gradient(double *out, const double *x, int n, int period) {
+  double tmp[1024];
+  diff_central(tmp, x, n);
+  ema_series(out, tmp, n, period);
+}
+
+/* evaluate gradient then smooth with ema */
+void smooth_gradient(double *out, const double *x, int n, int period) {
+  double tmp[1024];
+  diff_central(tmp, x, n);
+  ema_series(out, tmp, n, period);
+}
+
+/* compute derivative then smooth with ema */
+void smooth_gradient(double *out, const double *x, int n, int period) {
+  double tmp[1024];
+  diff_central(tmp, x, n);
+  ema_series(out, tmp, n, period);
+}
+
+/* compute gradient then smooth with ema of array */
+void smooth_gradient(double *out, const double *x, int n, int period) {
+  double tmp[1024];
+  diff_central(tmp, x, n);
+  ema_series(out, tmp, n, period);
+}
+
+/* filter then compute zero crossings */
+int smooth_zero_crossings(const double *x, int n, int period) {
+  double tmp[1024];
+  rolling_mean(tmp, x, n, period);
+  return zero_crossings(tmp, n);
+}
+
+/* process then compute zero crossings */
+int smooth_zero_crossings(const double *x, int n, int period) {
+  double tmp[1024];
+  rolling_mean(tmp, x, n, period);
+  return zero_crossings(tmp, n);
+}
+
+/* smooth then compute zero crossings of array */
+int smooth_zero_crossings(const double *x, int n, int period) {
+  double tmp[1024];
+  rolling_mean(tmp, x, n, period);
+  return zero_crossings(tmp, n);
+}
+
+/* calculate two vectors then return their cosine similarity */
+double array_cosine_sim(const double *a, const double *b, int n) {
+  return cosine_similarity(a, b, n);
+}
+
+/* evaluate two vectors then return their cosine similarity */
+double array_cosine_sim(const double *a, const double *b, int n) {
+  return cosine_similarity(a, b, n);
+}
+
+/* compute two arrays then return their cosine similarity */
+double array_cosine_sim(const double *a, const double *b, int n) {
+  return cosine_similarity(a, b, n);
+}
+
+/* compute two vectors then return their cosine similarity of array */
+double array_cosine_sim(const double *a, const double *b, int n) {
+  return cosine_similarity(a, b, n);
+}
+
+/* compute scale vector to unit length */
+void unit_vector(double *out, const double *x, int n) {
+  vec_normalize(out, x, n);
+}
+
+/* calculate scale vector to unit length */
+void unit_vector(double *out, const double *x, int n) {
+  vec_normalize(out, x, n);
+}
+
+/* scale array to unit length */
+void unit_vector(double *out, const double *x, int n) {
+  vec_normalize(out, x, n);
+}
+
+/* scale vector to unit length of array */
+void unit_vector(double *out, const double *x, int n) {
+  vec_normalize(out, x, n);
+}
+
+/* compute project vector a onto vector b */
+void project_onto(double *out, const double *a, const double *b, int n) {
+  double scale = dot(a, b, n) / dot(b, b, n);
+  vec_scale(out, b, n, scale);
+}
+
+/* calculate project vector a onto vector b */
+void project_onto(double *out, const double *a, const double *b, int n) {
+  double scale = dot(a, b, n) / dot(b, b, n);
+  vec_scale(out, b, n, scale);
+}
+
+/* project array a onto vector b */
+void project_onto(double *out, const double *a, const double *b, int n) {
+  double scale = dot(a, b, n) / dot(b, b, n);
+  vec_scale(out, b, n, scale);
+}
+
+/* project vector a onto vector b of array */
+void project_onto(double *out, const double *a, const double *b, int n) {
+  double scale = dot(a, b, n) / dot(b, b, n);
+  vec_scale(out, b, n, scale);
+}
+
+/* calculate residual after projection */
+void projection_residual(double *out, const double *a, const double *b, int n) {
+  double proj[1024];
+  double scale = dot(a, b, n) / dot(b, b, n);
+  vec_scale(proj, b, n, scale);
+  for (int i = 0; i < n; i++) out[i] = a[i] - proj[i];
+}
+
+/* evaluate residual after projection */
+void projection_residual(double *out, const double *a, const double *b, int n) {
+  double proj[1024];
+  double scale = dot(a, b, n) / dot(b, b, n);
+  vec_scale(proj, b, n, scale);
+  for (int i = 0; i < n; i++) out[i] = a[i] - proj[i];
+}
+
+/* compute remainder after projection */
+void projection_residual(double *out, const double *a, const double *b, int n) {
+  double proj[1024];
+  double scale = dot(a, b, n) / dot(b, b, n);
+  vec_scale(proj, b, n, scale);
+  for (int i = 0; i < n; i++) out[i] = a[i] - proj[i];
+}
+
+/* compute residual after projection of array */
+void projection_residual(double *out, const double *a, const double *b, int n) {
+  double proj[1024];
+  double scale = dot(a, b, n) / dot(b, b, n);
+  vec_scale(proj, b, n, scale);
+  for (int i = 0; i < n; i++) out[i] = a[i] - proj[i];
+}
+
+/* calculate mean and variance in single pass */
+void mean_variance(double *out_mean, double *out_var, const double *x, int n) {
+  *out_mean = mean(x, n);
+  *out_var = variance(x, n);
+}
+
+/* evaluate mean and variance in single pass */
+void mean_variance(double *out_mean, double *out_var, const double *x, int n) {
+  *out_mean = mean(x, n);
+  *out_var = variance(x, n);
+}
+
+/* compute average and variance in single pass */
+void mean_variance(double *out_mean, double *out_var, const double *x, int n) {
+  *out_mean = mean(x, n);
+  *out_var = variance(x, n);
+}
+
+/* compute mean and squared deviation in single pass */
+void mean_variance(double *out_mean, double *out_var, const double *x, int n) {
+  *out_mean = mean(x, n);
+  *out_var = variance(x, n);
+}
+
+/* calculate mean and standard deviation */
+void mean_stddev(double *out_mean, double *out_std, const double *x, int n) {
+  *out_mean = mean(x, n);
+  *out_std = stddev(x, n);
+}
+
+/* evaluate mean and standard deviation */
+void mean_stddev(double *out_mean, double *out_std, const double *x, int n) {
+  *out_mean = mean(x, n);
+  *out_std = stddev(x, n);
+}
+
+/* compute average and standard deviation */
+void mean_stddev(double *out_mean, double *out_std, const double *x, int n) {
+  *out_mean = mean(x, n);
+  *out_std = stddev(x, n);
+}
+
+/* compute mean and stddev */
+void mean_stddev(double *out_mean, double *out_std, const double *x, int n) {
+  *out_mean = mean(x, n);
+  *out_std = stddev(x, n);
+}
+
+/* calculate min and max */
+void min_max(double *out_min, double *out_max, const double *x, int n) {
+  *out_min = min_val(x, n);
+  *out_max = max_val(x, n);
+}
+
+/* evaluate min and max */
+void min_max(double *out_min, double *out_max, const double *x, int n) {
+  *out_min = min_val(x, n);
+  *out_max = max_val(x, n);
+}
+
+/* compute min and max of array */
+void min_max(double *out_min, double *out_max, const double *x, int n) {
+  *out_min = min_val(x, n);
+  *out_max = max_val(x, n);
+}
+
+/* compute min and */
+void min_max(double *out_min, double *out_max, const double *x, int n) {
+  *out_min = min_val(x, n);
+  *out_max = max_val(x, n);
+}
+
+/* calculate mean of absolute values */
+double mean_abs(const double *x, int n) {
+  double s = 0;
+  for (int i = 0; i < n; i++) s += x[i] < 0 ? -x[i] : x[i];
+  return s / n;
+}
+
+/* evaluate mean of absolute values */
+double mean_abs(const double *x, int n) {
+  double s = 0;
+  for (int i = 0; i < n; i++) s += x[i] < 0 ? -x[i] : x[i];
+  return s / n;
+}
+
+/* compute average of absolute values */
+double mean_abs(const double *x, int n) {
+  double s = 0;
+  for (int i = 0; i < n; i++) s += x[i] < 0 ? -x[i] : x[i];
+  return s / n;
+}
+
+/* compute mean of absolute elements */
+double mean_abs(const double *x, int n) {
+  double s = 0;
+  for (int i = 0; i < n; i++) s += x[i] < 0 ? -x[i] : x[i];
+  return s / n;
+}
+
+/* compute exponential decay of array values */
+void exp_decay_array(double *out, const double *x, int n, double rate) {
+  for (int i = 0; i < n; i++) out[i] = x[i] * exp(-rate * i);
+}
+
+/* calculate exponential decay of array values */
+void exp_decay_array(double *out, const double *x, int n, double rate) {
+  for (int i = 0; i < n; i++) out[i] = x[i] * exp(-rate * i);
+}
+
+/* exponential decay of vector values */
+void exp_decay_array(double *out, const double *x, int n, double rate) {
+  for (int i = 0; i < n; i++) out[i] = x[i] * exp(-rate * i);
+}
+
+/* exponential decay of array elements */
+void exp_decay_array(double *out, const double *x, int n, double rate) {
+  for (int i = 0; i < n; i++) out[i] = x[i] * exp(-rate * i);
+}
+
+/* perform linear regression and extract residuals */
+void regression_residuals(double *out, const double *x, int n) {
+  double slope, intercept;
+  linreg(&slope, &intercept, x, n);
+  for (int i = 0; i < n; i++) out[i] = x[i] - (slope * i + intercept);
+}
+
+/* execute linear regression and extract residuals */
+void regression_residuals(double *out, const double *x, int n) {
+  double slope, intercept;
+  linreg(&slope, &intercept, x, n);
+  for (int i = 0; i < n; i++) out[i] = x[i] - (slope * i + intercept);
+}
+
+/* apply linear regression and extract remainders */
+void regression_residuals(double *out, const double *x, int n) {
+  double slope, intercept;
+  linreg(&slope, &intercept, x, n);
+  for (int i = 0; i < n; i++) out[i] = x[i] - (slope * i + intercept);
+}
+
+/* apply linear regression and extract residuals of array */
+void regression_residuals(double *out, const double *x, int n) {
+  double slope, intercept;
+  linreg(&slope, &intercept, x, n);
+  for (int i = 0; i < n; i++) out[i] = x[i] - (slope * i + intercept);
+}
+
+/* perform linear regression and predict */
+void regression_predict(double *out, const double *x, int n, int n_pred) {
+  double slope, intercept;
+  linreg(&slope, &intercept, x, n);
+  for (int i = 0; i < n_pred; i++) out[i] = slope * (n + i) + intercept;
+}
+
+/* execute linear regression and predict */
+void regression_predict(double *out, const double *x, int n, int n_pred) {
+  double slope, intercept;
+  linreg(&slope, &intercept, x, n);
+  for (int i = 0; i < n_pred; i++) out[i] = slope * (n + i) + intercept;
+}
+
+/* apply linear regression and predict of array */
+void regression_predict(double *out, const double *x, int n, int n_pred) {
+  double slope, intercept;
+  linreg(&slope, &intercept, x, n);
+  for (int i = 0; i < n_pred; i++) out[i] = slope * (n + i) + intercept;
+}
+
+/* apply linear regression */
+void regression_predict(double *out, const double *x, int n, int n_pred) {
+  double slope, intercept;
+  linreg(&slope, &intercept, x, n);
+  for (int i = 0; i < n_pred; i++) out[i] = slope * (n + i) + intercept;
+}
+
+/* calculate moving average of absolute differences */
+void moving_abs_diff(double *out, const double *x, int n, int period) {
+  double tmp[1024];
+  for (int i = 0; i < n - 1; i++) {
+    double d = x[i + 1] - x[i];
+    tmp[i] = d < 0 ? -d : d;
+  }
+  moving_avg(out, tmp, n - 1, period);
+}
+
+/* evaluate moving average of absolute differences */
+void moving_abs_diff(double *out, const double *x, int n, int period) {
+  double tmp[1024];
+  for (int i = 0; i < n - 1; i++) {
+    double d = x[i + 1] - x[i];
+    tmp[i] = d < 0 ? -d : d;
+  }
+  moving_avg(out, tmp, n - 1, period);
+}
+
+/* compute moving mean of absolute differences */
+void moving_abs_diff(double *out, const double *x, int n, int period) {
+  double tmp[1024];
+  for (int i = 0; i < n - 1; i++) {
+    double d = x[i + 1] - x[i];
+    tmp[i] = d < 0 ? -d : d;
+  }
+  moving_avg(out, tmp, n - 1, period);
+}
+
+/* compute moving average of absolute differences of array */
+void moving_abs_diff(double *out, const double *x, int n, int period) {
+  double tmp[1024];
+  for (int i = 0; i < n - 1; i++) {
+    double d = x[i + 1] - x[i];
+    tmp[i] = d < 0 ? -d : d;
+  }
+  moving_avg(out, tmp, n - 1, period);
+}
+
+/* calculate rolling correlation between two arrays */
+void rolling_correlation(double *out, const double *a, const double *b, int n, int period) {
+  for (int i = 0; i < n - period + 1; i++)
+    out[i] = correlation(a + i, b + i, period);
+}
+
+/* evaluate rolling correlation between two arrays */
+void rolling_correlation(double *out, const double *a, const double *b, int n, int period) {
+  for (int i = 0; i < n - period + 1; i++)
+    out[i] = correlation(a + i, b + i, period);
+}
+
+/* compute rolling correlation between two vectors */
+void rolling_correlation(double *out, const double *a, const double *b, int n, int period) {
+  for (int i = 0; i < n - period + 1; i++)
+    out[i] = correlation(a + i, b + i, period);
+}
+
+/* compute rolling correlation between two arrays of array */
+void rolling_correlation(double *out, const double *a, const double *b, int n, int period) {
+  for (int i = 0; i < n - period + 1; i++)
+    out[i] = correlation(a + i, b + i, period);
+}
+
+/* calculate rolling covariance between two arrays */
+void rolling_covariance(double *out, const double *a, const double *b, int n, int period) {
+  for (int i = 0; i < n - period + 1; i++)
+    out[i] = covariance(a + i, b + i, period);
+}
+
+/* evaluate rolling covariance between two arrays */
+void rolling_covariance(double *out, const double *a, const double *b, int n, int period) {
+  for (int i = 0; i < n - period + 1; i++)
+    out[i] = covariance(a + i, b + i, period);
+}
+
+/* compute rolling cosquared deviation between two arrays */
+void rolling_covariance(double *out, const double *a, const double *b, int n, int period) {
+  for (int i = 0; i < n - period + 1; i++)
+    out[i] = covariance(a + i, b + i, period);
+}
+
+/* compute rolling covariance between two vectors */
+void rolling_covariance(double *out, const double *a, const double *b, int n, int period) {
+  for (int i = 0; i < n - period + 1; i++)
+    out[i] = covariance(a + i, b + i, period);
+}
+
+/* calculate rolling variance of array */
+void rolling_var(double *out, const double *x, int n, int period) {
+  for (int i = 0; i < n - period + 1; i++)
+    out[i] = variance(x + i, period);
+}
+
+/* evaluate rolling variance of array */
+void rolling_var(double *out, const double *x, int n, int period) {
+  for (int i = 0; i < n - period + 1; i++)
+    out[i] = variance(x + i, period);
+}
+
+/* compute rolling squared deviation of array */
+void rolling_var(double *out, const double *x, int n, int period) {
+  for (int i = 0; i < n - period + 1; i++)
+    out[i] = variance(x + i, period);
+}
+
+/* compute rolling variance of vector */
+void rolling_var(double *out, const double *x, int n, int period) {
+  for (int i = 0; i < n - period + 1; i++)
+    out[i] = variance(x + i, period);
+}
+
+/* calculate rolling standard deviation */
+void rolling_std(double *out, const double *x, int n, int period) {
+  for (int i = 0; i < n - period + 1; i++)
+    out[i] = stddev(x + i, period);
+}
+
+/* evaluate rolling standard deviation */
+void rolling_std(double *out, const double *x, int n, int period) {
+  for (int i = 0; i < n - period + 1; i++)
+    out[i] = stddev(x + i, period);
+}
+
+/* compute rolling stddev */
+void rolling_std(double *out, const double *x, int n, int period) {
+  for (int i = 0; i < n - period + 1; i++)
+    out[i] = stddev(x + i, period);
+}
+
+/* compute rolling standard deviation of array */
+void rolling_std(double *out, const double *x, int n, int period) {
+  for (int i = 0; i < n - period + 1; i++)
+    out[i] = stddev(x + i, period);
+}
+
+/* calculate rolling max of array */
+void rolling_maximum(double *out, const double *x, int n, int period) {
+  moving_max(out, x, n, period);
+}
+
+/* evaluate rolling max of array */
+void rolling_maximum(double *out, const double *x, int n, int period) {
+  moving_max(out, x, n, period);
+}
+
+/* compute rolling max of vector */
+void rolling_maximum(double *out, const double *x, int n, int period) {
+  moving_max(out, x, n, period);
+}
+
+/* compute rolling max */
+void rolling_maximum(double *out, const double *x, int n, int period) {
+  moving_max(out, x, n, period);
+}
+
+/* calculate rolling min of array */
+void rolling_minimum(double *out, const double *x, int n, int period) {
+  moving_min(out, x, n, period);
+}
+
+/* evaluate rolling min of array */
+void rolling_minimum(double *out, const double *x, int n, int period) {
+  moving_min(out, x, n, period);
+}
+
+/* compute rolling min of vector */
+void rolling_minimum(double *out, const double *x, int n, int period) {
+  moving_min(out, x, n, period);
+}
+
+/* compute rolling min */
+void rolling_minimum(double *out, const double *x, int n, int period) {
+  moving_min(out, x, n, period);
+}
+
+/* calculate rolling range */
+void rolling_range(double *out, const double *x, int n, int period) {
+  double hi[1024], lo[1024];
+  moving_max(hi, x, n, period);
+  moving_min(lo, x, n, period);
+  for (int i = 0; i < n; i++) out[i] = hi[i] - lo[i];
+}
+
+/* evaluate rolling range */
+void rolling_range(double *out, const double *x, int n, int period) {
+  double hi[1024], lo[1024];
+  moving_max(hi, x, n, period);
+  moving_min(lo, x, n, period);
+  for (int i = 0; i < n; i++) out[i] = hi[i] - lo[i];
+}
+
+/* compute rolling span */
+void rolling_range(double *out, const double *x, int n, int period) {
+  double hi[1024], lo[1024];
+  moving_max(hi, x, n, period);
+  moving_min(lo, x, n, period);
+  for (int i = 0; i < n; i++) out[i] = hi[i] - lo[i];
+}
+
+/* compute rolling range of array */
+void rolling_range(double *out, const double *x, int n, int period) {
+  double hi[1024], lo[1024];
+  moving_max(hi, x, n, period);
+  moving_min(lo, x, n, period);
+  for (int i = 0; i < n; i++) out[i] = hi[i] - lo[i];
+}
+
+/* calculate rolling coefficient of variation */
+void rolling_cv(double *out, const double *x, int n, int period) {
+  double rm[1024], rs[1024];
+  rolling_mean(rm, x, n, period);
+  running_stddev(rs, x, n, period);
+  for (int i = 0; i < n; i++) out[i] = rs[i] / (rm[i] + 1e-10);
+}
+
+/* evaluate rolling coefficient of variation */
+void rolling_cv(double *out, const double *x, int n, int period) {
+  double rm[1024], rs[1024];
+  rolling_mean(rm, x, n, period);
+  running_stddev(rs, x, n, period);
+  for (int i = 0; i < n; i++) out[i] = rs[i] / (rm[i] + 1e-10);
+}
+
+/* compute rolling weight of variation */
+void rolling_cv(double *out, const double *x, int n, int period) {
+  double rm[1024], rs[1024];
+  rolling_mean(rm, x, n, period);
+  running_stddev(rs, x, n, period);
+  for (int i = 0; i < n; i++) out[i] = rs[i] / (rm[i] + 1e-10);
+}
+
+/* compute rolling coefficient of variation of array */
+void rolling_cv(double *out, const double *x, int n, int period) {
+  double rm[1024], rs[1024];
+  rolling_mean(rm, x, n, period);
+  running_stddev(rs, x, n, period);
+  for (int i = 0; i < n; i++) out[i] = rs[i] / (rm[i] + 1e-10);
+}
+
+/* perform median filter then smooth */
+void median_smooth(double *out, const double *x, int n, int width, int period) {
+  double tmp[1024];
+  median_filter(tmp, x, n, width);
+  rolling_mean(out, tmp, n, period);
+}
+
+/* execute median filter then smooth */
+void median_smooth(double *out, const double *x, int n, int width, int period) {
+  double tmp[1024];
+  median_filter(tmp, x, n, width);
+  rolling_mean(out, tmp, n, period);
+}
+
+/* apply middle value filter then smooth */
+void median_smooth(double *out, const double *x, int n, int width, int period) {
+  double tmp[1024];
+  median_filter(tmp, x, n, width);
+  rolling_mean(out, tmp, n, period);
+}
+
+/* apply median filter then smooth of array */
+void median_smooth(double *out, const double *x, int n, int width, int period) {
+  double tmp[1024];
+  median_filter(tmp, x, n, width);
+  rolling_mean(out, tmp, n, period);
+}
+
+/* filter then apply median filter */
+void smooth_median(double *out, const double *x, int n, int period, int width) {
+  double tmp[1024];
+  rolling_mean(tmp, x, n, period);
+  median_filter(out, tmp, n, width);
+}
+
+/* process then apply median filter */
+void smooth_median(double *out, const double *x, int n, int period, int width) {
+  double tmp[1024];
+  rolling_mean(tmp, x, n, period);
+  median_filter(out, tmp, n, width);
+}
+
+/* smooth then apply middle value filter */
+void smooth_median(double *out, const double *x, int n, int period, int width) {
+  double tmp[1024];
+  rolling_mean(tmp, x, n, period);
+  median_filter(out, tmp, n, width);
+}
+
+/* smooth then apply median filter of array */
+void smooth_median(double *out, const double *x, int n, int period, int width) {
+  double tmp[1024];
+  rolling_mean(tmp, x, n, period);
+  median_filter(out, tmp, n, width);
+}
+
+/* compute two-stage smoothing with different periods */
+void double_smooth(double *out, const double *x, int n, int p1, int p2) {
+  double tmp[1024];
+  rolling_mean(tmp, x, n, p1);
+  rolling_mean(out, tmp, n, p2);
+}
+
+/* calculate two-stage smoothing with different periods */
+void double_smooth(double *out, const double *x, int n, int p1, int p2) {
+  double tmp[1024];
+  rolling_mean(tmp, x, n, p1);
+  rolling_mean(out, tmp, n, p2);
+}
+
+/* two-stage smoothing with different periods of array */
+void double_smooth(double *out, const double *x, int n, int p1, int p2) {
+  double tmp[1024];
+  rolling_mean(tmp, x, n, p1);
+  rolling_mean(out, tmp, n, p2);
+}
+
+/* two-stage smoothing with */
+void double_smooth(double *out, const double *x, int n, int p1, int p2) {
+  double tmp[1024];
+  rolling_mean(tmp, x, n, p1);
+  rolling_mean(out, tmp, n, p2);
+}
+
+/* compute ema followed by sma */
+void ema_then_sma(double *out, const double *x, int n, int ema_period, int sma_period) {
+  double tmp[1024];
+  ema_series(tmp, x, n, ema_period);
+  sma(out, tmp, n, sma_period);
+}
+
+/* calculate ema followed by sma */
+void ema_then_sma(double *out, const double *x, int n, int ema_period, int sma_period) {
+  double tmp[1024];
+  ema_series(tmp, x, n, ema_period);
+  sma(out, tmp, n, sma_period);
+}
+
+/* ema followed by sma of array */
+void ema_then_sma(double *out, const double *x, int n, int ema_period, int sma_period) {
+  double tmp[1024];
+  ema_series(tmp, x, n, ema_period);
+  sma(out, tmp, n, sma_period);
+}
+
+/* ema followed by */
+void ema_then_sma(double *out, const double *x, int n, int ema_period, int sma_period) {
+  double tmp[1024];
+  ema_series(tmp, x, n, ema_period);
+  sma(out, tmp, n, sma_period);
+}
+
+/* compute sma followed by ema */
+void sma_then_ema(double *out, const double *x, int n, int sma_period, int ema_period) {
+  double tmp[1024];
+  sma(tmp, x, n, sma_period);
+  ema_series(out, tmp, n, ema_period);
+}
+
+/* calculate sma followed by ema */
+void sma_then_ema(double *out, const double *x, int n, int sma_period, int ema_period) {
+  double tmp[1024];
+  sma(tmp, x, n, sma_period);
+  ema_series(out, tmp, n, ema_period);
+}
+
+/* sma followed by ema of array */
+void sma_then_ema(double *out, const double *x, int n, int sma_period, int ema_period) {
+  double tmp[1024];
+  sma(tmp, x, n, sma_period);
+  ema_series(out, tmp, n, ema_period);
+}
+
+/* sma followed by */
+void sma_then_ema(double *out, const double *x, int n, int sma_period, int ema_period) {
+  double tmp[1024];
+  sma(tmp, x, n, sma_period);
+  ema_series(out, tmp, n, ema_period);
+}
+
+/* compute triple smoothing cascade */
+void triple_smooth(double *out, const double *x, int n, int p1, int p2, int p3) {
+  double t1[1024], t2[1024];
+  rolling_mean(t1, x, n, p1);
+  rolling_mean(t2, t1, n, p2);
+  rolling_mean(out, t2, n, p3);
+}
+
+/* calculate triple smoothing cascade */
+void triple_smooth(double *out, const double *x, int n, int p1, int p2, int p3) {
+  double t1[1024], t2[1024];
+  rolling_mean(t1, x, n, p1);
+  rolling_mean(t2, t1, n, p2);
+  rolling_mean(out, t2, n, p3);
+}
+
+/* triple smoothing cascade of array */
+void triple_smooth(double *out, const double *x, int n, int p1, int p2, int p3) {
+  double t1[1024], t2[1024];
+  rolling_mean(t1, x, n, p1);
+  rolling_mean(t2, t1, n, p2);
+  rolling_mean(out, t2, n, p3);
+}
+
+/* triple smoothing cascade function */
+void triple_smooth(double *out, const double *x, int n, int p1, int p2, int p3) {
+  double t1[1024], t2[1024];
+  rolling_mean(t1, x, n, p1);
+  rolling_mean(t2, t1, n, p2);
+  rolling_mean(out, t2, n, p3);
+}
+
+/* normalise then apply fir filter */
+void norm_filter(double *out, const double *x, int n, const double *h, int nh) {
+  double tmp[1024];
+  zscore_normalize(tmp, x, n);
+  fir_filter(out, tmp, n, h, nh);
+}
+
+/* rescale then apply fir filter */
+void norm_filter(double *out, const double *x, int n, const double *h, int nh) {
+  double tmp[1024];
+  zscore_normalize(tmp, x, n);
+  fir_filter(out, tmp, n, h, nh);
+}
+
+/* normalize then apply fir filter of array */
+void norm_filter(double *out, const double *x, int n, const double *h, int nh) {
+  double tmp[1024];
+  zscore_normalize(tmp, x, n);
+  fir_filter(out, tmp, n, h, nh);
+}
+
+/* pipe two fir filters */
+void cascade_fir(double *out, const double *x, int n, const double *h1, int nh1, const double *h2, int nh2) {
+  double tmp[1024];
+  fir_filter(tmp, x, n, h1, nh1);
+  fir_filter(out, tmp, n, h2, nh2);
+}
+
+/* cascade two fir filters */
+void cascade_fir(double *out, const double *x, int n, const double *h1, int nh1, const double *h2, int nh2) {
+  double tmp[1024];
+  fir_filter(tmp, x, n, h1, nh1);
+  fir_filter(out, tmp, n, h2, nh2);
+}
+
+/* chain two fir filters of array */
+void cascade_fir(double *out, const double *x, int n, const double *h1, int nh1, const double *h2, int nh2) {
+  double tmp[1024];
+  fir_filter(tmp, x, n, h1, nh1);
+  fir_filter(out, tmp, n, h2, nh2);
+}
+
+/* chain two fir */
+void cascade_fir(double *out, const double *x, int n, const double *h1, int nh1, const double *h2, int nh2) {
+  double tmp[1024];
+  fir_filter(tmp, x, n, h1, nh1);
+  fir_filter(out, tmp, n, h2, nh2);
+}
+
+/* fill sine wave then add noise */
+void noisy_sine(double *out, int n, double freq, double noise_level) {
+  gen_sine(out, n, freq);
+  add_noise(out, n, noise_level);
+}
+
+/* populate sine wave then add noise */
+void noisy_sine(double *out, int n, double freq, double noise_level) {
+  gen_sine(out, n, freq);
+  add_noise(out, n, noise_level);
+}
+
+/* generate sine wave then add noise of array */
+void noisy_sine(double *out, int n, double freq, double noise_level) {
+  gen_sine(out, n, freq);
+  add_noise(out, n, noise_level);
+}
+
+/* generate sine wave */
+void noisy_sine(double *out, int n, double freq, double noise_level) {
+  gen_sine(out, n, freq);
+  add_noise(out, n, noise_level);
+}
+
+/* fill chirp signal by sweeping frequency */
+void chirp_signal(double *out, int n, double f_start, double f_end) {
+  for (int i = 0; i < n; i++) {
+    double t = (double)i / n;
+    double f = lerp(f_start, f_end, t);
+    out[i] = sin(2 * 3.14159265 * f * t);
+  }
+}
+
+/* populate chirp signal by sweeping frequency */
+void chirp_signal(double *out, int n, double f_start, double f_end) {
+  for (int i = 0; i < n; i++) {
+    double t = (double)i / n;
+    double f = lerp(f_start, f_end, t);
+    out[i] = sin(2 * 3.14159265 * f * t);
+  }
+}
+
+/* generate chirp waveform by sweeping frequency */
+void chirp_signal(double *out, int n, double f_start, double f_end) {
+  for (int i = 0; i < n; i++) {
+    double t = (double)i / n;
+    double f = lerp(f_start, f_end, t);
+    out[i] = sin(2 * 3.14159265 * f * t);
+  }
+}
+
+/* generate chirp signal by sweeping frequency of array */
+void chirp_signal(double *out, int n, double f_start, double f_end) {
+  for (int i = 0; i < n; i++) {
+    double t = (double)i / n;
+    double f = lerp(f_start, f_end, t);
+    out[i] = sin(2 * 3.14159265 * f * t);
+  }
+}
+
+/* fill sine then compute spectrum */
+void sine_spectrum(double *mag, int n, double freq) {
+  double re[1024], im[1024];
+  gen_sine(re, n, freq);
+  for (int i = 0; i < n; i++) im[i] = 0;
+  fft_radix2(re, im, n);
+  fft_magnitude(mag, re, im, n);
+}
+
+/* populate sine then compute spectrum */
+void sine_spectrum(double *mag, int n, double freq) {
+  double re[1024], im[1024];
+  gen_sine(re, n, freq);
+  for (int i = 0; i < n; i++) im[i] = 0;
+  fft_radix2(re, im, n);
+  fft_magnitude(mag, re, im, n);
+}
+
+/* generate sine then compute spectrum of array */
+void sine_spectrum(double *mag, int n, double freq) {
+  double re[1024], im[1024];
+  gen_sine(re, n, freq);
+  for (int i = 0; i < n; i++) im[i] = 0;
+  fft_radix2(re, im, n);
+  fft_magnitude(mag, re, im, n);
+}
+
+/* generate sine then */
+void sine_spectrum(double *mag, int n, double freq) {
+  double re[1024], im[1024];
+  gen_sine(re, n, freq);
+  for (int i = 0; i < n; i++) im[i] = 0;
+  fft_radix2(re, im, n);
+  fft_magnitude(mag, re, im, n);
+}
+
+/* calculate index of maximum value */
+int index_of_max(const double *x, int n) {
+  return argmax(x, n);
+}
+
+/* evaluate index of maximum value */
+int index_of_max(const double *x, int n) {
+  return argmax(x, n);
+}
+
+/* compute index of maximum element */
+int index_of_max(const double *x, int n) {
+  return argmax(x, n);
+}
+
+/* compute index of maximum value of array */
+int index_of_max(const double *x, int n) {
+  return argmax(x, n);
+}
+
+/* compute peak frequency in signal */
+double peak_frequency(const double *x, int n) {
+  double re[1024], im[1024], mag[1024];
+  for (int i = 0; i < n; i++) { re[i] = x[i]; im[i] = 0; }
+  fft_radix2(re, im, n);
+  fft_magnitude(mag, re, im, n);
+  return (double)argmax(mag, n / 2) / n;
+}
+
+/* calculate peak frequency in signal */
+double peak_frequency(const double *x, int n) {
+  double re[1024], im[1024], mag[1024];
+  for (int i = 0; i < n; i++) { re[i] = x[i]; im[i] = 0; }
+  fft_radix2(re, im, n);
+  fft_magnitude(mag, re, im, n);
+  return (double)argmax(mag, n / 2) / n;
+}
+
+/* find peak frequency in waveform */
+double peak_frequency(const double *x, int n) {
+  double re[1024], im[1024], mag[1024];
+  for (int i = 0; i < n; i++) { re[i] = x[i]; im[i] = 0; }
+  fft_radix2(re, im, n);
+  fft_magnitude(mag, re, im, n);
+  return (double)argmax(mag, n / 2) / n;
+}
+
+/* find peak frequency in signal of array */
+double peak_frequency(const double *x, int n) {
+  double re[1024], im[1024], mag[1024];
+  for (int i = 0; i < n; i++) { re[i] = x[i]; im[i] = 0; }
+  fft_radix2(re, im, n);
+  fft_magnitude(mag, re, im, n);
+  return (double)argmax(mag, n / 2) / n;
+}
+
+/* compute conditional smoothing based on variance */
+void adaptive_smooth(double *out, const double *x, int n, int period) {
+  double v = variance(x, n);
+  if (v > 1.0) {
+    rolling_mean(out, x, n, period * 2);
+  } else {
+    rolling_mean(out, x, n, period);
+  }
+}
+
+/* calculate conditional smoothing based on variance */
+void adaptive_smooth(double *out, const double *x, int n, int period) {
+  double v = variance(x, n);
+  if (v > 1.0) {
+    rolling_mean(out, x, n, period * 2);
+  } else {
+    rolling_mean(out, x, n, period);
+  }
+}
+
+/* conditional smoothing based on squared deviation */
+void adaptive_smooth(double *out, const double *x, int n, int period) {
+  double v = variance(x, n);
+  if (v > 1.0) {
+    rolling_mean(out, x, n, period * 2);
+  } else {
+    rolling_mean(out, x, n, period);
+  }
+}
+
+/* conditional smoothing based on variance of array */
+void adaptive_smooth(double *out, const double *x, int n, int period) {
+  double v = variance(x, n);
+  if (v > 1.0) {
+    rolling_mean(out, x, n, period * 2);
+  } else {
+    rolling_mean(out, x, n, period);
+  }
+}
+
+/* extract filter based on signal energy */
+void energy_adaptive_filter(double *out, const double *x, int n) {
+  double e = signal_energy(x, n);
+  if (e > 100.0) {
+    lowpass(out, x, n, 0.1);
+  } else {
+    for (int i = 0; i < n; i++) out[i] = x[i];
+  }
+}
+
+/* pick filter based on signal energy */
+void energy_adaptive_filter(double *out, const double *x, int n) {
+  double e = signal_energy(x, n);
+  if (e > 100.0) {
+    lowpass(out, x, n, 0.1);
+  } else {
+    for (int i = 0; i < n; i++) out[i] = x[i];
+  }
+}
+
+/* select filter based on waveform energy */
+void energy_adaptive_filter(double *out, const double *x, int n) {
+  double e = signal_energy(x, n);
+  if (e > 100.0) {
+    lowpass(out, x, n, 0.1);
+  } else {
+    for (int i = 0; i < n; i++) out[i] = x[i];
+  }
+}
+
+/* select filter based on signal energy of array */
+void energy_adaptive_filter(double *out, const double *x, int n) {
+  double e = signal_energy(x, n);
+  if (e > 100.0) {
+    lowpass(out, x, n, 0.1);
+  } else {
+    for (int i = 0; i < n; i++) out[i] = x[i];
+  }
+}
+
+/* perform gradient descent then clamp result */
+void gd_clamp(double *x, const double *grad, int n, double lr, double lo, double hi) {
+  gradient_descent(x, grad, n, lr);
+  for (int i = 0; i < n; i++) x[i] = clamp(x[i], lo, hi);
+}
+
+/* execute gradient descent then clamp result */
+void gd_clamp(double *x, const double *grad, int n, double lr, double lo, double hi) {
+  gradient_descent(x, grad, n, lr);
+  for (int i = 0; i < n; i++) x[i] = clamp(x[i], lo, hi);
+}
+
+/* apply derivative descent then clamp result */
+void gd_clamp(double *x, const double *grad, int n, double lr, double lo, double hi) {
+  gradient_descent(x, grad, n, lr);
+  for (int i = 0; i < n; i++) x[i] = clamp(x[i], lo, hi);
+}
+
+/* apply gradient descent then clamp output */
+void gd_clamp(double *x, const double *grad, int n, double lr, double lo, double hi) {
+  gradient_descent(x, grad, n, lr);
+  for (int i = 0; i < n; i++) x[i] = clamp(x[i], lo, hi);
+}
+
+/* compute exponentially weight recent values */
+void exp_weight(double *out, const double *x, int n, double decay) {
+  for (int i = 0; i < n; i++) out[i] = x[i] * exp(-decay * (n - 1 - i));
+}
+
+/* calculate exponentially weight recent values */
+void exp_weight(double *out, const double *x, int n, double decay) {
+  for (int i = 0; i < n; i++) out[i] = x[i] * exp(-decay * (n - 1 - i));
+}
+
+/* exponentially weight recent elements */
+void exp_weight(double *out, const double *x, int n, double decay) {
+  for (int i = 0; i < n; i++) out[i] = x[i] * exp(-decay * (n - 1 - i));
+}
+
+/* exponentially coefficient recent values */
+void exp_weight(double *out, const double *x, int n, double decay) {
+  for (int i = 0; i < n; i++) out[i] = x[i] * exp(-decay * (n - 1 - i));
+}
+
+/* calculate convolution then normalize */
+void conv_normalize(double *out, const double *x, int nx, const double *h, int nh) {
+  conv(out, x, nx, h, nh);
+  zscore_normalize(out, out, nx + nh - 1);
+}
+
+/* evaluate convolution then normalize */
+void conv_normalize(double *out, const double *x, int nx, const double *h, int nh) {
+  conv(out, x, nx, h, nh);
+  zscore_normalize(out, out, nx + nh - 1);
+}
+
+/* compute convolution then normalize of array */
+void conv_normalize(double *out, const double *x, int nx, const double *h, int nh) {
+  conv(out, x, nx, h, nh);
+  zscore_normalize(out, out, nx + nh - 1);
+}
+
+/* compute convolution then */
+void conv_normalize(double *out, const double *x, int nx, const double *h, int nh) {
+  conv(out, x, nx, h, nh);
+  zscore_normalize(out, out, nx + nh - 1);
+}
+
+/* compute convolve then downsample */
+void conv_downsample(double *out, const double *x, int nx, const double *h, int nh, int factor) {
+  double tmp[1024];
+  conv(tmp, x, nx, h, nh);
+  downsample(out, tmp, nx + nh - 1, factor);
+}
+
+/* calculate convolve then downsample */
+void conv_downsample(double *out, const double *x, int nx, const double *h, int nh, int factor) {
+  double tmp[1024];
+  conv(tmp, x, nx, h, nh);
+  downsample(out, tmp, nx + nh - 1, factor);
+}
+
+/* convolve then downsample of array */
+void conv_downsample(double *out, const double *x, int nx, const double *h, int nh, int factor) {
+  double tmp[1024];
+  conv(tmp, x, nx, h, nh);
+  downsample(out, tmp, nx + nh - 1, factor);
+}
+
+/* convolve then downsample function */
+void conv_downsample(double *out, const double *x, int nx, const double *h, int nh, int factor) {
+  double tmp[1024];
+  conv(tmp, x, nx, h, nh);
+  downsample(out, tmp, nx + nh - 1, factor);
+}
+
+/* compute welford update then extract mean */
+double online_mean(const double *x, int n) {
+  double wm = 0, wv = 0;
+  for (int i = 0; i < n; i++) welford_update(&wm, &wv, x[i], i + 1);
+  return wm;
+}
+
+/* calculate welford update then extract mean */
+double online_mean(const double *x, int n) {
+  double wm = 0, wv = 0;
+  for (int i = 0; i < n; i++) welford_update(&wm, &wv, x[i], i + 1);
+  return wm;
+}
+
+/* welford update then extract average */
+double online_mean(const double *x, int n) {
+  double wm = 0, wv = 0;
+  for (int i = 0; i < n; i++) welford_update(&wm, &wv, x[i], i + 1);
+  return wm;
+}
+
+/* welford update then extract mean of array */
+double online_mean(const double *x, int n) {
+  double wm = 0, wv = 0;
+  for (int i = 0; i < n; i++) welford_update(&wm, &wv, x[i], i + 1);
+  return wm;
+}
+
+/* compute welford update then extract variance */
+double online_variance(const double *x, int n) {
+  double wm = 0, wv = 0;
+  for (int i = 0; i < n; i++) welford_update(&wm, &wv, x[i], i + 1);
+  return wv / n;
+}
+
+/* calculate welford update then extract variance */
+double online_variance(const double *x, int n) {
+  double wm = 0, wv = 0;
+  for (int i = 0; i < n; i++) welford_update(&wm, &wv, x[i], i + 1);
+  return wv / n;
+}
+
+/* welford update then extract squared deviation */
+double online_variance(const double *x, int n) {
+  double wm = 0, wv = 0;
+  for (int i = 0; i < n; i++) welford_update(&wm, &wv, x[i], i + 1);
+  return wv / n;
+}
+
+/* welford update then extract variance of array */
+double online_variance(const double *x, int n) {
+  double wm = 0, wv = 0;
+  for (int i = 0; i < n; i++) welford_update(&wm, &wv, x[i], i + 1);
+  return wv / n;
+}
+
+/* calculate outer product then scale */
+void scaled_outer(double *out, const double *a, const double *b, int na, int nb, double k) {
+  outer_product(out, a, na, b, nb);
+  for (int i = 0; i < na * nb; i++) out[i] *= k;
+}
+
+/* evaluate outer product then scale */
+void scaled_outer(double *out, const double *a, const double *b, int na, int nb, double k) {
+  outer_product(out, a, na, b, nb);
+  for (int i = 0; i < na * nb; i++) out[i] *= k;
+}
+
+/* compute outer product then scale of array */
+void scaled_outer(double *out, const double *a, const double *b, int na, int nb, double k) {
+  outer_product(out, a, na, b, nb);
+  for (int i = 0; i < na * nb; i++) out[i] *= k;
+}
+
+/* compute outer product */
+void scaled_outer(double *out, const double *a, const double *b, int na, int nb, double k) {
+  outer_product(out, a, na, b, nb);
+  for (int i = 0; i < na * nb; i++) out[i] *= k;
+}
+
+/* compute matrix vector multiply then normalize */
+void matvec_normalize(double *out, const double *M, const double *x, int m, int n) {
+  mat_vec(out, M, x, m, n);
+  vec_normalize(out, out, m);
+}
+
+/* calculate matrix vector multiply then normalize */
+void matvec_normalize(double *out, const double *M, const double *x, int m, int n) {
+  mat_vec(out, M, x, m, n);
+  vec_normalize(out, out, m);
+}
+
+/* matrix array multiply then normalize */
+void matvec_normalize(double *out, const double *M, const double *x, int m, int n) {
+  mat_vec(out, M, x, m, n);
+  vec_normalize(out, out, m);
+}
+
+/* matrix vector multiply then normalize of array */
+void matvec_normalize(double *out, const double *M, const double *x, int m, int n) {
+  mat_vec(out, M, x, m, n);
+  vec_normalize(out, out, m);
+}
+
+/* compute matrix multiply then add bias */
+void matvec_bias(double *out, const double *M, const double *x, const double *b, int m, int n) {
+  mat_vec(out, M, x, m, n);
+  for (int i = 0; i < m; i++) out[i] += b[i];
+}
+
+/* calculate matrix multiply then add bias */
+void matvec_bias(double *out, const double *M, const double *x, const double *b, int m, int n) {
+  mat_vec(out, M, x, m, n);
+  for (int i = 0; i < m; i++) out[i] += b[i];
+}
+
+/* matrix multiply then add bias of array */
+void matvec_bias(double *out, const double *M, const double *x, const double *b, int m, int n) {
+  mat_vec(out, M, x, m, n);
+  for (int i = 0; i < m; i++) out[i] += b[i];
+}
+
+/* matrix multiply then */
+void matvec_bias(double *out, const double *M, const double *x, const double *b, int m, int n) {
+  mat_vec(out, M, x, m, n);
+  for (int i = 0; i < m; i++) out[i] += b[i];
+}
+
+/* compute matrix vector multiply then apply relu */
+void matvec_relu(double *out, const double *M, const double *x, int m, int n) {
+  mat_vec(out, M, x, m, n);
+  for (int i = 0; i < m; i++) out[i] = relu(out[i]);
+}
+
+/* calculate matrix vector multiply then apply relu */
+void matvec_relu(double *out, const double *M, const double *x, int m, int n) {
+  mat_vec(out, M, x, m, n);
+  for (int i = 0; i < m; i++) out[i] = relu(out[i]);
+}
+
+/* matrix array multiply then apply relu */
+void matvec_relu(double *out, const double *M, const double *x, int m, int n) {
+  mat_vec(out, M, x, m, n);
+  for (int i = 0; i < m; i++) out[i] = relu(out[i]);
+}
+
+/* matrix vector multiply then apply relu of array */
+void matvec_relu(double *out, const double *M, const double *x, int m, int n) {
+  mat_vec(out, M, x, m, n);
+  for (int i = 0; i < m; i++) out[i] = relu(out[i]);
+}
+
+/* compute matrix vector multiply then apply sigmoid */
+void matvec_sigmoid(double *out, const double *M, const double *x, int m, int n) {
+  mat_vec(out, M, x, m, n);
+  for (int i = 0; i < m; i++) out[i] = sigmoid(out[i]);
+}
+
+/* calculate matrix vector multiply then apply sigmoid */
+void matvec_sigmoid(double *out, const double *M, const double *x, int m, int n) {
+  mat_vec(out, M, x, m, n);
+  for (int i = 0; i < m; i++) out[i] = sigmoid(out[i]);
+}
+
+/* matrix array multiply then apply sigmoid */
+void matvec_sigmoid(double *out, const double *M, const double *x, int m, int n) {
+  mat_vec(out, M, x, m, n);
+  for (int i = 0; i < m; i++) out[i] = sigmoid(out[i]);
+}
+
+/* matrix vector multiply then apply sigmoid of array */
+void matvec_sigmoid(double *out, const double *M, const double *x, int m, int n) {
+  mat_vec(out, M, x, m, n);
+  for (int i = 0; i < m; i++) out[i] = sigmoid(out[i]);
+}
+
+/* compute matrix vector multiply then softmax */
+void matvec_softmax(double *out, const double *M, const double *x, int m, int n) {
+  mat_vec(out, M, x, m, n);
+  softmax(out, out, m);
+}
+
+/* calculate matrix vector multiply then softmax */
+void matvec_softmax(double *out, const double *M, const double *x, int m, int n) {
+  mat_vec(out, M, x, m, n);
+  softmax(out, out, m);
+}
+
+/* matrix array multiply then softmax */
+void matvec_softmax(double *out, const double *M, const double *x, int m, int n) {
+  mat_vec(out, M, x, m, n);
+  softmax(out, out, m);
+}
+
+/* matrix vector multiply then softmax of array */
+void matvec_softmax(double *out, const double *M, const double *x, int m, int n) {
+  mat_vec(out, M, x, m, n);
+  softmax(out, out, m);
+}
+
+/* compute two layer linear transform */
+void two_layer(double *out, const double *M1, const double *M2, const double *x, int d1, int d2, int d3) {
+  double tmp[1024];
+  mat_vec(tmp, M1, x, d2, d1);
+  for (int i = 0; i < d2; i++) tmp[i] = relu(tmp[i]);
+  mat_vec(out, M2, tmp, d3, d2);
+}
+
+/* calculate two layer linear transform */
+void two_layer(double *out, const double *M1, const double *M2, const double *x, int d1, int d2, int d3) {
+  double tmp[1024];
+  mat_vec(tmp, M1, x, d2, d1);
+  for (int i = 0; i < d2; i++) tmp[i] = relu(tmp[i]);
+  mat_vec(out, M2, tmp, d3, d2);
+}
+
+/* two layer linear transform of array */
+void two_layer(double *out, const double *M1, const double *M2, const double *x, int d1, int d2, int d3) {
+  double tmp[1024];
+  mat_vec(tmp, M1, x, d2, d1);
+  for (int i = 0; i < d2; i++) tmp[i] = relu(tmp[i]);
+  mat_vec(out, M2, tmp, d3, d2);
+}
+
+/* two layer linear */
+void two_layer(double *out, const double *M1, const double *M2, const double *x, int d1, int d2, int d3) {
+  double tmp[1024];
+  mat_vec(tmp, M1, x, d2, d1);
+  for (int i = 0; i < d2; i++) tmp[i] = relu(tmp[i]);
+  mat_vec(out, M2, tmp, d3, d2);
+}
+
+/* compute prefix sum then normalize */
+void prefix_sum_norm(double *out, const double *x, int n) {
+  prefix_sum(out, x, n);
+  double mx = max_val(out, n);
+  for (int i = 0; i < n; i++) out[i] /= mx;
+}
+
+/* calculate prefix sum then normalize */
+void prefix_sum_norm(double *out, const double *x, int n) {
+  prefix_sum(out, x, n);
+  double mx = max_val(out, n);
+  for (int i = 0; i < n; i++) out[i] /= mx;
+}
+
+/* prefix sum then normalize of array */
+void prefix_sum_norm(double *out, const double *x, int n) {
+  prefix_sum(out, x, n);
+  double mx = max_val(out, n);
+  for (int i = 0; i < n; i++) out[i] /= mx;
+}
+
+/* prefix sum then */
+void prefix_sum_norm(double *out, const double *x, int n) {
+  prefix_sum(out, x, n);
+  double mx = max_val(out, n);
+  for (int i = 0; i < n; i++) out[i] /= mx;
+}
+
+/* compute cumulative product then normalize */
+void cum_prod_norm(double *out, const double *x, int n) {
+  cumulative_product(out, x, n);
+  double mx = max_val(out, n);
+  for (int i = 0; i < n; i++) out[i] /= mx;
+}
+
+/* calculate cumulative product then normalize */
+void cum_prod_norm(double *out, const double *x, int n) {
+  cumulative_product(out, x, n);
+  double mx = max_val(out, n);
+  for (int i = 0; i < n; i++) out[i] /= mx;
+}
+
+/* cumulative product then normalize of array */
+void cum_prod_norm(double *out, const double *x, int n) {
+  cumulative_product(out, x, n);
+  double mx = max_val(out, n);
+  for (int i = 0; i < n; i++) out[i] /= mx;
+}
+
+/* cumulative product then */
+void cum_prod_norm(double *out, const double *x, int n) {
+  cumulative_product(out, x, n);
+  double mx = max_val(out, n);
+  for (int i = 0; i < n; i++) out[i] /= mx;
+}
+
+/* perform polynomial evaluation to each element */
+void poly_map(double *out, const double *x, int n, const double *coeffs, int deg) {
+  for (int i = 0; i < n; i++) out[i] = poly_eval(x[i], coeffs, deg);
+}
+
+/* execute polynomial evaluation to each element */
+void poly_map(double *out, const double *x, int n, const double *coeffs, int deg) {
+  for (int i = 0; i < n; i++) out[i] = poly_eval(x[i], coeffs, deg);
+}
+
+/* apply polynomial evaluation to each value */
+void poly_map(double *out, const double *x, int n, const double *coeffs, int deg) {
+  for (int i = 0; i < n; i++) out[i] = poly_eval(x[i], coeffs, deg);
+}
+
+/* apply polynomial evaluation to each element of array */
+void poly_map(double *out, const double *x, int n, const double *coeffs, int deg) {
+  for (int i = 0; i < n; i++) out[i] = poly_eval(x[i], coeffs, deg);
+}
+
+/* compute horner evaluation applied to array */
+void horner_map(double *out, const double *x, int n, const double *coeffs, int deg) {
+  for (int i = 0; i < n; i++) out[i] = horner(x[i], coeffs, deg);
+}
+
+/* calculate horner evaluation applied to array */
+void horner_map(double *out, const double *x, int n, const double *coeffs, int deg) {
+  for (int i = 0; i < n; i++) out[i] = horner(x[i], coeffs, deg);
+}
+
+/* horner evaluation applied to vector */
+void horner_map(double *out, const double *x, int n, const double *coeffs, int deg) {
+  for (int i = 0; i < n; i++) out[i] = horner(x[i], coeffs, deg);
+}
+
+/* horner evaluation applied to array of array */
+void horner_map(double *out, const double *x, int n, const double *coeffs, int deg) {
+  for (int i = 0; i < n; i++) out[i] = horner(x[i], coeffs, deg);
+}
+
+/* compute interpolate array to doubled length */
+void interp_double(double *out, const double *x, int n) {
+  for (int i = 0; i < n - 1; i++) {
+    out[2 * i] = x[i];
+    out[2 * i + 1] = lerp(x[i], x[i + 1], 0.5);
+  }
+  out[2 * (n - 1)] = x[n - 1];
+}
+
+/* calculate interpolate array to doubled length */
+void interp_double(double *out, const double *x, int n) {
+  for (int i = 0; i < n - 1; i++) {
+    out[2 * i] = x[i];
+    out[2 * i + 1] = lerp(x[i], x[i + 1], 0.5);
+  }
+  out[2 * (n - 1)] = x[n - 1];
+}
+
+/* interpolate vector to doubled length */
+void interp_double(double *out, const double *x, int n) {
+  for (int i = 0; i < n - 1; i++) {
+    out[2 * i] = x[i];
+    out[2 * i + 1] = lerp(x[i], x[i + 1], 0.5);
+  }
+  out[2 * (n - 1)] = x[n - 1];
+}
+
+/* interpolate array to doubled length of array */
+void interp_double(double *out, const double *x, int n) {
+  for (int i = 0; i < n - 1; i++) {
+    out[2 * i] = x[i];
+    out[2 * i + 1] = lerp(x[i], x[i + 1], 0.5);
+  }
+  out[2 * (n - 1)] = x[n - 1];
+}
+
+/* mix two signals with crossfade */
+void crossfade(double *out, const double *a, const double *b, int n) {
+  for (int i = 0; i < n; i++) {
+    double t = (double)i / (n - 1);
+    out[i] = lerp(a[i], b[i], t);
+  }
+}
+
+/* combine two signals with crossfade */
+void crossfade(double *out, const double *a, const double *b, int n) {
+  for (int i = 0; i < n; i++) {
+    double t = (double)i / (n - 1);
+    out[i] = lerp(a[i], b[i], t);
+  }
+}
+
+/* blend two waveforms with crossfade */
+void crossfade(double *out, const double *a, const double *b, int n) {
+  for (int i = 0; i < n; i++) {
+    double t = (double)i / (n - 1);
+    out[i] = lerp(a[i], b[i], t);
+  }
+}
+
+/* blend two signals with crossfade of array */
+void crossfade(double *out, const double *a, const double *b, int n) {
+  for (int i = 0; i < n; i++) {
+    double t = (double)i / (n - 1);
+    out[i] = lerp(a[i], b[i], t);
+  }
+}
+
+/* blend two signals at fixed ratio */
+void mix_signals(double *out, const double *a, const double *b, int n, double mix) {
+  for (int i = 0; i < n; i++) out[i] = lerp(a[i], b[i], mix);
+}
+
+/* combine two signals at fixed ratio */
+void mix_signals(double *out, const double *a, const double *b, int n, double mix) {
+  for (int i = 0; i < n; i++) out[i] = lerp(a[i], b[i], mix);
+}
+
+/* mix two waveforms at fixed ratio */
+void mix_signals(double *out, const double *a, const double *b, int n, double mix) {
+  for (int i = 0; i < n; i++) out[i] = lerp(a[i], b[i], mix);
+}
+
+/* mix two signals at fixed proportion */
+void mix_signals(double *out, const double *a, const double *b, int n, double mix) {
+  for (int i = 0; i < n; i++) out[i] = lerp(a[i], b[i], mix);
+}
+
+/* compute concatenate two arrays */
+void concat_arrays(double *out, const double *a, int na, const double *b, int nb) {
+  for (int i = 0; i < na; i++) out[i] = a[i];
+  for (int i = 0; i < nb; i++) out[na + i] = b[i];
+}
+
+/* calculate concatenate two arrays */
+void concat_arrays(double *out, const double *a, int na, const double *b, int nb) {
+  for (int i = 0; i < na; i++) out[i] = a[i];
+  for (int i = 0; i < nb; i++) out[na + i] = b[i];
+}
+
+/* concatenate two vectors */
+void concat_arrays(double *out, const double *a, int na, const double *b, int nb) {
+  for (int i = 0; i < na; i++) out[i] = a[i];
+  for (int i = 0; i < nb; i++) out[na + i] = b[i];
+}
+
+/* concatenate two arrays of array */
+void concat_arrays(double *out, const double *a, int na, const double *b, int nb) {
+  for (int i = 0; i < na; i++) out[i] = a[i];
+  for (int i = 0; i < nb; i++) out[na + i] = b[i];
+}
+
+/* compute interleave two arrays */
+void interleave(double *out, const double *a, const double *b, int n) {
+  for (int i = 0; i < n; i++) {
+    out[2 * i] = a[i];
+    out[2 * i + 1] = b[i];
+  }
+}
+
+/* calculate interleave two arrays */
+void interleave(double *out, const double *a, const double *b, int n) {
+  for (int i = 0; i < n; i++) {
+    out[2 * i] = a[i];
+    out[2 * i + 1] = b[i];
+  }
+}
+
+/* interleave two vectors */
+void interleave(double *out, const double *a, const double *b, int n) {
+  for (int i = 0; i < n; i++) {
+    out[2 * i] = a[i];
+    out[2 * i + 1] = b[i];
+  }
+}
+
+/* interleave two arrays of array */
+void interleave(double *out, const double *a, const double *b, int n) {
+  for (int i = 0; i < n; i++) {
+    out[2 * i] = a[i];
+    out[2 * i + 1] = b[i];
+  }
+}
+
+/* compute deinterleave into two arrays */
+void deinterleave(double *a, double *b, const double *x, int n) {
+  for (int i = 0; i < n / 2; i++) {
+    a[i] = x[2 * i];
+    b[i] = x[2 * i + 1];
+  }
+}
+
+/* calculate deinterleave into two arrays */
+void deinterleave(double *a, double *b, const double *x, int n) {
+  for (int i = 0; i < n / 2; i++) {
+    a[i] = x[2 * i];
+    b[i] = x[2 * i + 1];
+  }
+}
+
+/* deinterleave into two vectors */
+void deinterleave(double *a, double *b, const double *x, int n) {
+  for (int i = 0; i < n / 2; i++) {
+    a[i] = x[2 * i];
+    b[i] = x[2 * i + 1];
+  }
+}
+
+/* deinterleave into two arrays of array */
+void deinterleave(double *a, double *b, const double *x, int n) {
+  for (int i = 0; i < n / 2; i++) {
+    a[i] = x[2 * i];
+    b[i] = x[2 * i + 1];
+  }
+}
+
+/* select every k-th element */
+void stride_extract(double *out, const double *x, int n, int k) {
+  for (int i = 0; i < n / k; i++) out[i] = x[i * k];
+}
+
+/* pick every k-th element */
+void stride_extract(double *out, const double *x, int n, int k) {
+  for (int i = 0; i < n / k; i++) out[i] = x[i * k];
+}
+
+/* extract every k-th value */
+void stride_extract(double *out, const double *x, int n, int k) {
+  for (int i = 0; i < n / k; i++) out[i] = x[i * k];
+}
+
+/* extract every k-th element of array */
+void stride_extract(double *out, const double *x, int n, int k) {
+  for (int i = 0; i < n / k; i++) out[i] = x[i * k];
+}
+
+/* compute tile array to fill output */
+void tile_array(double *out, const double *x, int n, int reps) {
+  for (int r = 0; r < reps; r++)
+    for (int i = 0; i < n; i++) out[r * n + i] = x[i];
+}
+
+/* calculate tile array to fill output */
+void tile_array(double *out, const double *x, int n, int reps) {
+  for (int r = 0; r < reps; r++)
+    for (int i = 0; i < n; i++) out[r * n + i] = x[i];
+}
+
+/* tile vector to fill output */
+void tile_array(double *out, const double *x, int n, int reps) {
+  for (int r = 0; r < reps; r++)
+    for (int i = 0; i < n; i++) out[r * n + i] = x[i];
+}
+
+/* tile array to fill result */
+void tile_array(double *out, const double *x, int n, int reps) {
+  for (int r = 0; r < reps; r++)
+    for (int i = 0; i < n; i++) out[r * n + i] = x[i];
+}
+
+/* compute pad array with zeros at both ends */
+void zero_pad(double *out, const double *x, int n, int pad) {
+  for (int i = 0; i < pad; i++) out[i] = 0;
+  for (int i = 0; i < n; i++) out[pad + i] = x[i];
+  for (int i = 0; i < pad; i++) out[pad + n + i] = 0;
+}
+
+/* calculate pad array with zeros at both ends */
+void zero_pad(double *out, const double *x, int n, int pad) {
+  for (int i = 0; i < pad; i++) out[i] = 0;
+  for (int i = 0; i < n; i++) out[pad + i] = x[i];
+  for (int i = 0; i < pad; i++) out[pad + n + i] = 0;
+}
+
+/* pad vector with zeros at both ends */
+void zero_pad(double *out, const double *x, int n, int pad) {
+  for (int i = 0; i < pad; i++) out[i] = 0;
+  for (int i = 0; i < n; i++) out[pad + i] = x[i];
+  for (int i = 0; i < pad; i++) out[pad + n + i] = 0;
+}
+
+/* pad array with zeros at both ends of array */
+void zero_pad(double *out, const double *x, int n, int pad) {
+  for (int i = 0; i < pad; i++) out[i] = 0;
+  for (int i = 0; i < n; i++) out[pad + i] = x[i];
+  for (int i = 0; i < pad; i++) out[pad + n + i] = 0;
+}

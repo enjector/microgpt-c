@@ -18,10 +18,12 @@
 #include <string.h>
 #include <time.h>
 
+static MicrogptConfig g_cfg;
+
 /* ---- Timing helpers ---- */
 
-static double elapsed_ms(clock_t start) {
-  return (double)(clock() - start) / (double)CLOCKS_PER_SEC * 1000.0;
+static scalar_t elapsed_ms(clock_t start) {
+  return (scalar_t)(clock() - start) / (scalar_t)CLOCKS_PER_SEC * 1000.0;
 }
 
 #define BENCH_HEADER(name)                                                     \
@@ -42,37 +44,39 @@ static void bench_model_create(void) {
   clock_t t0 = clock();
   for (int i = 0; i < iters; i++) {
     seed_rng(42);
-    Model *m = model_create(100);
+    Model *m = model_create(100, &g_cfg);
     model_free(m);
   }
-  double ms = elapsed_ms(t0);
-  BENCH_RESULT(ms / iters, (double)iters / (ms / 1000.0), "creates/s");
+  scalar_t ms = elapsed_ms(t0);
+  BENCH_RESULT(ms / iters, (scalar_t)iters / (ms / 1000.0), "creates/s");
 }
 
 static void bench_forward_inference(void) {
   BENCH_HEADER("forward_inference (1 token)");
 
   seed_rng(42);
-  Model *m = model_create(50);
-  double logits[MAX_VOCAB];
-  double *keys[N_LAYER], *vals[N_LAYER];
-  size_t cl[N_LAYER];
-  for (int L = 0; L < N_LAYER; L++) {
-    keys[L] = (double *)calloc((size_t)BLOCK_SIZE * N_EMBD, sizeof(double));
-    vals[L] = (double *)calloc((size_t)BLOCK_SIZE * N_EMBD, sizeof(double));
+  Model *m = model_create(50, &g_cfg);
+  scalar_t logits[g_cfg.max_vocab];
+  scalar_t *keys[g_cfg.n_layer], *vals[g_cfg.n_layer];
+  size_t cl[g_cfg.n_layer];
+  for (int L = 0; L < g_cfg.n_layer; L++) {
+    keys[L] = (scalar_t *)calloc(
+        (size_t)g_cfg.block_size * (size_t)g_cfg.n_embd, sizeof(scalar_t));
+    vals[L] = (scalar_t *)calloc(
+        (size_t)g_cfg.block_size * (size_t)g_cfg.n_embd, sizeof(scalar_t));
   }
 
   int iters = 10000;
   clock_t t0 = clock();
   for (int i = 0; i < iters; i++) {
-    for (int L = 0; L < N_LAYER; L++)
+    for (int L = 0; L < g_cfg.n_layer; L++)
       cl[L] = 0;
     forward_inference(m, 0, 0, keys, vals, cl, logits);
   }
-  double ms = elapsed_ms(t0);
-  BENCH_RESULT(ms / iters, (double)iters / (ms / 1000.0), "infer/s");
+  scalar_t ms = elapsed_ms(t0);
+  BENCH_RESULT(ms / iters, (scalar_t)iters / (ms / 1000.0), "infer/s");
 
-  for (int L = 0; L < N_LAYER; L++) {
+  for (int L = 0; L < g_cfg.n_layer; L++) {
     free(keys[L]);
     free(vals[L]);
   }
@@ -83,28 +87,30 @@ static void bench_forward_backward(void) {
   BENCH_HEADER("forward_backward_one (1 pos)");
 
   seed_rng(42);
-  Model *m = model_create(50);
+  Model *m = model_create(50, &g_cfg);
   size_t np = model_num_params(m);
-  double *grads = (double *)calloc(np, sizeof(double));
-  double *keys[N_LAYER], *vals[N_LAYER];
-  size_t cl[N_LAYER];
-  for (int L = 0; L < N_LAYER; L++) {
-    keys[L] = (double *)calloc((size_t)BLOCK_SIZE * N_EMBD, sizeof(double));
-    vals[L] = (double *)calloc((size_t)BLOCK_SIZE * N_EMBD, sizeof(double));
+  scalar_t *grads = (scalar_t *)calloc(np, sizeof(scalar_t));
+  scalar_t *keys[g_cfg.n_layer], *vals[g_cfg.n_layer];
+  size_t cl[g_cfg.n_layer];
+  for (int L = 0; L < g_cfg.n_layer; L++) {
+    keys[L] = (scalar_t *)calloc(
+        (size_t)g_cfg.block_size * (size_t)g_cfg.n_embd, sizeof(scalar_t));
+    vals[L] = (scalar_t *)calloc(
+        (size_t)g_cfg.block_size * (size_t)g_cfg.n_embd, sizeof(scalar_t));
   }
 
   int iters = 5000;
   clock_t t0 = clock();
   for (int i = 0; i < iters; i++) {
-    for (int L = 0; L < N_LAYER; L++)
+    for (int L = 0; L < g_cfg.n_layer; L++)
       cl[L] = 0;
-    memset(grads, 0, np * sizeof(double));
+    memset(grads, 0, np * sizeof(scalar_t));
     forward_backward_one(m, 0, 0, 1, keys, vals, cl, grads);
   }
-  double ms = elapsed_ms(t0);
-  BENCH_RESULT(ms / iters, (double)iters / (ms / 1000.0), "fwd+bwd/s");
+  scalar_t ms = elapsed_ms(t0);
+  BENCH_RESULT(ms / iters, (scalar_t)iters / (ms / 1000.0), "fwd+bwd/s");
 
-  for (int L = 0; L < N_LAYER; L++) {
+  for (int L = 0; L < g_cfg.n_layer; L++) {
     free(keys[L]);
     free(vals[L]);
   }
@@ -116,22 +122,22 @@ static void bench_adam_step(void) {
   BENCH_HEADER("adam_step");
 
   seed_rng(42);
-  Model *m = model_create(50);
+  Model *m = model_create(50, &g_cfg);
   size_t np = model_num_params(m);
-  double *grads = (double *)calloc(np, sizeof(double));
-  double *mom = (double *)calloc(np, sizeof(double));
-  double *vel = (double *)calloc(np, sizeof(double));
+  scalar_t *grads = (scalar_t *)calloc(np, sizeof(scalar_t));
+  scalar_t *mom = (scalar_t *)calloc(np, sizeof(scalar_t));
+  scalar_t *vel = (scalar_t *)calloc(np, sizeof(scalar_t));
   /* Fill grads with small values */
   for (size_t i = 0; i < np; i++)
-    grads[i] = 0.001 * (double)(i % 100);
+    grads[i] = 0.001 * (scalar_t)(i % 100);
 
   int iters = 10000;
   clock_t t0 = clock();
   for (int i = 0; i < iters; i++) {
     adam_step(m, grads, mom, vel, i);
   }
-  double ms = elapsed_ms(t0);
-  BENCH_RESULT(ms / iters, (double)iters / (ms / 1000.0), "steps/s");
+  scalar_t ms = elapsed_ms(t0);
+  BENCH_RESULT(ms / iters, (scalar_t)iters / (ms / 1000.0), "steps/s");
 
   free(grads);
   free(mom);
@@ -143,17 +149,17 @@ static void bench_sample_token(void) {
   BENCH_HEADER("sample_token (vocab=50)");
 
   seed_rng(42);
-  double logits[50];
+  scalar_t logits[50];
   for (int i = 0; i < 50; i++)
-    logits[i] = (double)(i % 7) - 3.0;
+    logits[i] = (scalar_t)(i % 7) - 3.0;
 
   int iters = 1000000;
   clock_t t0 = clock();
   for (int i = 0; i < iters; i++) {
     sample_token(logits, 50, 0.8);
   }
-  double ms = elapsed_ms(t0);
-  BENCH_RESULT(ms / 1000.0, (double)iters / (ms / 1000.0), "samples/s");
+  scalar_t ms = elapsed_ms(t0);
+  BENCH_RESULT(ms / 1000.0, (scalar_t)iters / (ms / 1000.0), "samples/s");
 }
 
 static void bench_tokenize_chars(void) {
@@ -183,8 +189,8 @@ static void bench_tokenize_chars(void) {
   for (int i = 0; i < iters; i++) {
     tokenize(doc, doc_len, &vocab, ids, 64);
   }
-  double ms = elapsed_ms(t0);
-  BENCH_RESULT(ms / 1000.0, (double)iters / (ms / 1000.0), "tok/s");
+  scalar_t ms = elapsed_ms(t0);
+  BENCH_RESULT(ms / 1000.0, (scalar_t)iters / (ms / 1000.0), "tok/s");
 }
 
 static void bench_build_word_vocab(void) {
@@ -215,8 +221,8 @@ static void bench_build_word_vocab(void) {
     build_word_vocab(text, pos, 100, &wv);
     free_word_vocab(&wv);
   }
-  double ms = elapsed_ms(t0);
-  BENCH_RESULT(ms / iters, (double)iters / (ms / 1000.0), "builds/s");
+  scalar_t ms = elapsed_ms(t0);
+  BENCH_RESULT(ms / iters, (scalar_t)iters / (ms / 1000.0), "builds/s");
 }
 
 static void bench_tokenize_words(void) {
@@ -249,8 +255,8 @@ static void bench_tokenize_words(void) {
   for (int i = 0; i < iters; i++) {
     tokenize_words(text, pos, &wv, ids, 512);
   }
-  double ms = elapsed_ms(t0);
-  BENCH_RESULT(ms / 1000.0, (double)iters / (ms / 1000.0), "tok/s");
+  scalar_t ms = elapsed_ms(t0);
+  BENCH_RESULT(ms / 1000.0, (scalar_t)iters / (ms / 1000.0), "tok/s");
 
   free_word_vocab(&wv);
 }
@@ -259,30 +265,31 @@ static void bench_checkpoint_roundtrip(void) {
   BENCH_HEADER("checkpoint save+load (vocab=50)");
 
   seed_rng(42);
-  Model *m = model_create(50);
+  Model *m = model_create(50, &g_cfg);
   size_t np = model_num_params(m);
-  double *mom = (double *)calloc(np, sizeof(double));
-  double *vel = (double *)calloc(np, sizeof(double));
+  scalar_t *mom = (scalar_t *)calloc(np, sizeof(scalar_t));
+  scalar_t *vel = (scalar_t *)calloc(np, sizeof(scalar_t));
   for (size_t i = 0; i < np; i++) {
-    mom[i] = 0.001 * (double)(i % 50);
-    vel[i] = 0.0001 * (double)(i % 50);
+    mom[i] = 0.001 * (scalar_t)(i % 50);
+    vel[i] = 0.0001 * (scalar_t)(i % 50);
   }
 
   int iters = 200;
   clock_t t0 = clock();
   for (int i = 0; i < iters; i++) {
     checkpoint_save(m, mom, vel, 42, "_bench_ckpt.bin");
-    double *m2 = (double *)calloc(np, sizeof(double));
-    double *v2 = (double *)calloc(np, sizeof(double));
+    scalar_t *m2 = (scalar_t *)calloc(np, sizeof(scalar_t));
+    scalar_t *v2 = (scalar_t *)calloc(np, sizeof(scalar_t));
     int step_out;
-    Model *loaded = checkpoint_load("_bench_ckpt.bin", 50, m2, v2, &step_out);
+    Model *loaded =
+        checkpoint_load("_bench_ckpt.bin", 50, &g_cfg, m2, v2, &step_out);
     model_free(loaded);
     free(m2);
     free(v2);
   }
-  double ms = elapsed_ms(t0);
+  scalar_t ms = elapsed_ms(t0);
   remove("_bench_ckpt.bin");
-  BENCH_RESULT(ms / iters, (double)iters / (ms / 1000.0), "roundtrips/s");
+  BENCH_RESULT(ms / iters, (scalar_t)iters / (ms / 1000.0), "roundtrips/s");
 
   free(mom);
   free(vel);
@@ -293,16 +300,18 @@ static void bench_training_step(void) {
   BENCH_HEADER("full training step (batch=1, seq=8)");
 
   seed_rng(42);
-  Model *m = model_create(20);
+  Model *m = model_create(20, &g_cfg);
   size_t np = model_num_params(m);
-  double *grads = (double *)calloc(np, sizeof(double));
-  double *mom = (double *)calloc(np, sizeof(double));
-  double *vel = (double *)calloc(np, sizeof(double));
-  double *keys[N_LAYER], *vals[N_LAYER];
-  size_t cl[N_LAYER];
-  for (int L = 0; L < N_LAYER; L++) {
-    keys[L] = (double *)calloc((size_t)BLOCK_SIZE * N_EMBD, sizeof(double));
-    vals[L] = (double *)calloc((size_t)BLOCK_SIZE * N_EMBD, sizeof(double));
+  scalar_t *grads = (scalar_t *)calloc(np, sizeof(scalar_t));
+  scalar_t *mom = (scalar_t *)calloc(np, sizeof(scalar_t));
+  scalar_t *vel = (scalar_t *)calloc(np, sizeof(scalar_t));
+  scalar_t *keys[g_cfg.n_layer], *vals[g_cfg.n_layer];
+  size_t cl[g_cfg.n_layer];
+  for (int L = 0; L < g_cfg.n_layer; L++) {
+    keys[L] = (scalar_t *)calloc(
+        (size_t)g_cfg.block_size * (size_t)g_cfg.n_embd, sizeof(scalar_t));
+    vals[L] = (scalar_t *)calloc(
+        (size_t)g_cfg.block_size * (size_t)g_cfg.n_embd, sizeof(scalar_t));
   }
 
   size_t seq[] = {0, 1, 2, 3, 4, 5, 6, 7};
@@ -311,25 +320,25 @@ static void bench_training_step(void) {
   int iters = 2000;
   clock_t t0 = clock();
   for (int step = 0; step < iters; step++) {
-    memset(grads, 0, np * sizeof(double));
-    for (int L = 0; L < N_LAYER; L++)
+    memset(grads, 0, np * sizeof(scalar_t));
+    for (int L = 0; L < g_cfg.n_layer; L++)
       cl[L] = 0;
 
     for (size_t p = 0; p < seq_len - 1; p++)
       forward_backward_one(m, seq[p], p, seq[p + 1], keys, vals, cl, grads);
 
     for (size_t i = 0; i < np; i++)
-      grads[i] /= (double)(seq_len - 1);
+      grads[i] /= (scalar_t)(seq_len - 1);
 
     adam_step(m, grads, mom, vel, step);
   }
-  double ms = elapsed_ms(t0);
-  double tok_per_step = (double)(seq_len - 1);
+  scalar_t ms = elapsed_ms(t0);
+  scalar_t tok_per_step = (scalar_t)(seq_len - 1);
   BENCH_RESULT(ms / iters,
-               tok_per_step * (double)iters / (ms / 1000.0) / 1000.0,
+               tok_per_step * (scalar_t)iters / (ms / 1000.0) / 1000.0,
                "k tok/s");
 
-  for (int L = 0; L < N_LAYER; L++) {
+  for (int L = 0; L < g_cfg.n_layer; L++) {
     free(keys[L]);
     free(vals[L]);
   }
@@ -346,20 +355,22 @@ static void bench_inference_sequence(void) {
   BENCH_HEADER("auto-regressive inference (seq=16)");
 
   seed_rng(42);
-  Model *m = model_create(30);
-  double logits[MAX_VOCAB];
-  double *keys[N_LAYER], *vals[N_LAYER];
-  size_t cl[N_LAYER];
-  for (int L = 0; L < N_LAYER; L++) {
-    keys[L] = (double *)calloc((size_t)BLOCK_SIZE * N_EMBD, sizeof(double));
-    vals[L] = (double *)calloc((size_t)BLOCK_SIZE * N_EMBD, sizeof(double));
+  Model *m = model_create(30, &g_cfg);
+  scalar_t logits[g_cfg.max_vocab];
+  scalar_t *keys[g_cfg.n_layer], *vals[g_cfg.n_layer];
+  size_t cl[g_cfg.n_layer];
+  for (int L = 0; L < g_cfg.n_layer; L++) {
+    keys[L] = (scalar_t *)calloc(
+        (size_t)g_cfg.block_size * (size_t)g_cfg.n_embd, sizeof(scalar_t));
+    vals[L] = (scalar_t *)calloc(
+        (size_t)g_cfg.block_size * (size_t)g_cfg.n_embd, sizeof(scalar_t));
   }
 
   int iters = 500;
   int seq_len = 16;
   clock_t t0 = clock();
   for (int i = 0; i < iters; i++) {
-    for (int L = 0; L < N_LAYER; L++)
+    for (int L = 0; L < g_cfg.n_layer; L++)
       cl[L] = 0;
     size_t tok = 0;
     for (int p = 0; p < seq_len; p++) {
@@ -367,11 +378,11 @@ static void bench_inference_sequence(void) {
       tok = sample_token(logits, 30, 0.8);
     }
   }
-  double ms = elapsed_ms(t0);
-  double total_tokens = (double)iters * (double)seq_len;
+  scalar_t ms = elapsed_ms(t0);
+  scalar_t total_tokens = (scalar_t)iters * (scalar_t)seq_len;
   BENCH_RESULT(ms / iters, total_tokens / (ms / 1000.0), "tok/s");
 
-  for (int L = 0; L < N_LAYER; L++) {
+  for (int L = 0; L < g_cfg.n_layer; L++) {
     free(keys[L]);
     free(vals[L]);
   }
@@ -382,31 +393,33 @@ static void bench_multi_position_fwd_bwd(void) {
   BENCH_HEADER("fwd+bwd multi-pos (seq=8)");
 
   seed_rng(42);
-  Model *m = model_create(20);
+  Model *m = model_create(20, &g_cfg);
   size_t np = model_num_params(m);
-  double *grads = (double *)calloc(np, sizeof(double));
-  double *keys[N_LAYER], *vals[N_LAYER];
-  size_t cl[N_LAYER];
-  for (int L = 0; L < N_LAYER; L++) {
-    keys[L] = (double *)calloc((size_t)BLOCK_SIZE * N_EMBD, sizeof(double));
-    vals[L] = (double *)calloc((size_t)BLOCK_SIZE * N_EMBD, sizeof(double));
+  scalar_t *grads = (scalar_t *)calloc(np, sizeof(scalar_t));
+  scalar_t *keys[g_cfg.n_layer], *vals[g_cfg.n_layer];
+  size_t cl[g_cfg.n_layer];
+  for (int L = 0; L < g_cfg.n_layer; L++) {
+    keys[L] = (scalar_t *)calloc(
+        (size_t)g_cfg.block_size * (size_t)g_cfg.n_embd, sizeof(scalar_t));
+    vals[L] = (scalar_t *)calloc(
+        (size_t)g_cfg.block_size * (size_t)g_cfg.n_embd, sizeof(scalar_t));
   }
 
   size_t seq[] = {0, 1, 2, 3, 4, 5, 6, 7};
   int iters = 2000;
   clock_t t0 = clock();
   for (int i = 0; i < iters; i++) {
-    memset(grads, 0, np * sizeof(double));
-    for (int L = 0; L < N_LAYER; L++)
+    memset(grads, 0, np * sizeof(scalar_t));
+    for (int L = 0; L < g_cfg.n_layer; L++)
       cl[L] = 0;
     for (int p = 0; p < 7; p++)
       forward_backward_one(m, seq[p], (size_t)p, seq[p + 1], keys, vals, cl,
                            grads);
   }
-  double ms = elapsed_ms(t0);
-  BENCH_RESULT(ms / iters, 7.0 * (double)iters / (ms / 1000.0), "pos/s");
+  scalar_t ms = elapsed_ms(t0);
+  BENCH_RESULT(ms / iters, 7.0 * (scalar_t)iters / (ms / 1000.0), "pos/s");
 
-  for (int L = 0; L < N_LAYER; L++) {
+  for (int L = 0; L < g_cfg.n_layer; L++) {
     free(keys[L]);
     free(vals[L]);
   }
@@ -430,13 +443,13 @@ static void bench_model_create_scaling(void) {
     clock_t t0 = clock();
     for (int i = 0; i < iters; i++) {
       seed_rng(42);
-      Model *m = model_create(vs);
+      Model *m = model_create(vs, &g_cfg);
       model_free(m);
     }
-    double ms = elapsed_ms(t0);
+    scalar_t ms = elapsed_ms(t0);
 
     seed_rng(42);
-    Model *m = model_create(vs);
+    Model *m = model_create(vs, &g_cfg);
     size_t np = model_num_params(m);
     model_free(m);
 
@@ -448,27 +461,29 @@ static void bench_convergence_speed(void) {
   BENCH_HEADER("convergence 100 steps");
 
   seed_rng(42);
-  Model *m = model_create(20);
+  Model *m = model_create(20, &g_cfg);
   size_t np = model_num_params(m);
-  double *grads = (double *)calloc(np, sizeof(double));
-  double *mom = (double *)calloc(np, sizeof(double));
-  double *vel = (double *)calloc(np, sizeof(double));
-  double *keys[N_LAYER], *vals[N_LAYER];
-  size_t cl[N_LAYER];
-  for (int L = 0; L < N_LAYER; L++) {
-    keys[L] = (double *)calloc((size_t)BLOCK_SIZE * N_EMBD, sizeof(double));
-    vals[L] = (double *)calloc((size_t)BLOCK_SIZE * N_EMBD, sizeof(double));
+  scalar_t *grads = (scalar_t *)calloc(np, sizeof(scalar_t));
+  scalar_t *mom = (scalar_t *)calloc(np, sizeof(scalar_t));
+  scalar_t *vel = (scalar_t *)calloc(np, sizeof(scalar_t));
+  scalar_t *keys[g_cfg.n_layer], *vals[g_cfg.n_layer];
+  size_t cl[g_cfg.n_layer];
+  for (int L = 0; L < g_cfg.n_layer; L++) {
+    keys[L] = (scalar_t *)calloc(
+        (size_t)g_cfg.block_size * (size_t)g_cfg.n_embd, sizeof(scalar_t));
+    vals[L] = (scalar_t *)calloc(
+        (size_t)g_cfg.block_size * (size_t)g_cfg.n_embd, sizeof(scalar_t));
   }
 
   size_t seq[] = {0, 1, 2, 3, 4, 5, 6, 7};
-  double first_loss = 0, last_loss = 0;
+  scalar_t first_loss = 0, last_loss = 0;
 
   clock_t t0 = clock();
   for (int step = 0; step < 100; step++) {
-    memset(grads, 0, np * sizeof(double));
-    for (int L = 0; L < N_LAYER; L++)
+    memset(grads, 0, np * sizeof(scalar_t));
+    for (int L = 0; L < g_cfg.n_layer; L++)
       cl[L] = 0;
-    double step_loss = 0;
+    scalar_t step_loss = 0;
     for (int p = 0; p < 7; p++)
       step_loss += forward_backward_one(m, seq[p], (size_t)p, seq[p + 1], keys,
                                         vals, cl, grads);
@@ -481,8 +496,8 @@ static void bench_convergence_speed(void) {
     if (step == 99)
       last_loss = step_loss;
   }
-  double ms = elapsed_ms(t0);
-  double reduction = (1.0 - last_loss / first_loss) * 100.0;
+  scalar_t ms = elapsed_ms(t0);
+  scalar_t reduction = (1.0 - last_loss / first_loss) * 100.0;
   printf("\n");
   printf("    %-40s %8.2f ms\n", "total training time", ms);
   printf("    %-40s %8.2f ms\n", "per step", ms / 100.0);
@@ -490,7 +505,7 @@ static void bench_convergence_speed(void) {
   printf("    %-40s %8.4f\n", "final loss", last_loss);
   printf("    %-40s %7.1f%%\n", "loss reduction", reduction);
 
-  for (int L = 0; L < N_LAYER; L++) {
+  for (int L = 0; L < g_cfg.n_layer; L++) {
     free(keys[L]);
     free(vals[L]);
   }
@@ -509,19 +524,115 @@ static void bench_memory_footprint(void) {
   for (int s = 0; s < num_sizes; s++) {
     size_t vs = vocab_sizes[s];
     seed_rng(42);
-    Model *m = model_create(vs);
+    Model *m = model_create(vs, &g_cfg);
     size_t np = model_num_params(m);
-    size_t weight_bytes = np * sizeof(double);
-    size_t optimizer_bytes = np * 3 * sizeof(double); /* grads+m+v */
-    size_t kv_bytes =
-        (size_t)N_LAYER * 2 * BLOCK_SIZE * N_EMBD * sizeof(double);
+    size_t weight_bytes = np * sizeof(scalar_t);
+    size_t optimizer_bytes = np * 3 * sizeof(scalar_t); /* grads+m+v */
+    size_t kv_bytes = (size_t)g_cfg.n_layer * 2 * (size_t)g_cfg.block_size *
+                      (size_t)g_cfg.n_embd * sizeof(scalar_t);
     size_t total = weight_bytes + optimizer_bytes + kv_bytes;
 
     printf("    vocab=%-5zu  weights=%.1fKB  optim=%.1fKB  kv=%.1fKB  "
            "total=%.1fKB\n",
-           vs, (double)weight_bytes / 1024.0, (double)optimizer_bytes / 1024.0,
-           (double)kv_bytes / 1024.0, (double)total / 1024.0);
+           vs, (scalar_t)weight_bytes / 1024.0,
+           (scalar_t)optimizer_bytes / 1024.0, (scalar_t)kv_bytes / 1024.0,
+           (scalar_t)total / 1024.0);
     model_free(m);
+  }
+}
+
+/* ==================================================================== */
+/*                   TILED LINEAR ALGEBRA                                */
+/* ==================================================================== */
+
+#define BENCH_TILE_R 32
+#define BENCH_TILE_C 64
+
+static scalar_t bench_randf(void) {
+  return 2.0 * ((scalar_t)rand() / (scalar_t)RAND_MAX) - 1.0;
+}
+
+/* Naive: y = W @ x */
+static void bench_naive_lin_fwd(const scalar_t *x, const scalar_t *W,
+                                size_t nin, size_t nout, scalar_t *y) {
+  for (size_t j = 0; j < nout; j++) {
+    scalar_t s = 0;
+    for (size_t i = 0; i < nin; i++)
+      s += W[j * nin + i] * x[i];
+    y[j] = s;
+  }
+}
+
+/* Tiled: y = W @ x */
+static void bench_tiled_lin_fwd(const scalar_t *x, const scalar_t *W,
+                                size_t nin, size_t nout, scalar_t *y) {
+  memset(y, 0, nout * sizeof(scalar_t));
+  for (size_t j0 = 0; j0 < nout; j0 += BENCH_TILE_R) {
+    size_t j1 = (j0 + BENCH_TILE_R < nout) ? j0 + BENCH_TILE_R : nout;
+    for (size_t i0 = 0; i0 < nin; i0 += BENCH_TILE_C) {
+      size_t i1 = (i0 + BENCH_TILE_C < nin) ? i0 + BENCH_TILE_C : nin;
+      for (size_t j = j0; j < j1; j++) {
+        scalar_t s = 0;
+        const scalar_t *Wrow = W + j * nin + i0;
+        for (size_t i = 0; i < i1 - i0; i++)
+          s += x[i0 + i] * Wrow[i];
+        y[j] += s;
+      }
+    }
+  }
+}
+
+static void bench_tiled_matmul(void) {
+  BENCH_HEADER("tiled lin_fwd (naive vs tiled)");
+  printf("\n");
+
+  struct {
+    size_t nout, nin;
+    const char *label;
+  } sizes[] = {
+      {32, 32, "32x32 (sub-tile)"},
+      {128, 128, "128x128 (N_EMBD)"},
+      {512, 512, "512x512 (future)"},
+      {73, 97, "73x97 (non-aligned)"},
+  };
+  int nsizes = 4;
+
+  for (int s = 0; s < nsizes; s++) {
+    size_t nout = sizes[s].nout, nin = sizes[s].nin;
+    scalar_t *W = (scalar_t *)malloc(nout * nin * sizeof(scalar_t));
+    scalar_t *x = (scalar_t *)malloc(nin * sizeof(scalar_t));
+    scalar_t *y = (scalar_t *)calloc(nout, sizeof(scalar_t));
+
+    srand(42);
+    for (size_t i = 0; i < nout * nin; i++)
+      W[i] = bench_randf();
+    for (size_t i = 0; i < nin; i++)
+      x[i] = bench_randf();
+
+    /* Warm-up */
+    bench_naive_lin_fwd(x, W, nin, nout, y);
+    bench_tiled_lin_fwd(x, W, nin, nout, y);
+
+    int iters = (nout <= 128) ? 100000 : 10000;
+
+    clock_t t0 = clock();
+    for (int i = 0; i < iters; i++)
+      bench_naive_lin_fwd(x, W, nin, nout, y);
+    scalar_t ms_naive = elapsed_ms(t0);
+
+    t0 = clock();
+    for (int i = 0; i < iters; i++)
+      bench_tiled_lin_fwd(x, W, nin, nout, y);
+    scalar_t ms_tiled = elapsed_ms(t0);
+
+    scalar_t speedup = ms_naive / ms_tiled;
+    printf("    %-30s naive=%6.2f ms  tiled=%6.2f ms  speedup=%.2fx\n",
+           sizes[s].label, ms_naive / iters * 1000.0, ms_tiled / iters * 1000.0,
+           speedup);
+
+    free(W);
+    free(x);
+    free(y);
   }
 }
 
@@ -530,9 +641,11 @@ static void bench_memory_footprint(void) {
 /* ==================================================================== */
 
 int main(void) {
+  g_cfg = microgpt_default_config();
+
   printf("\n=== MicroGPT-C Benchmarks ===\n");
-  printf("N_EMBD=%d  N_LAYER=%d  BLOCK_SIZE=%d  N_HEAD=%d\n\n", N_EMBD, N_LAYER,
-         BLOCK_SIZE, N_HEAD);
+  printf("n_embd=%d  n_layer=%d  block_size=%d  n_head=%d\n\n", g_cfg.n_embd,
+         g_cfg.n_layer, g_cfg.block_size, g_cfg.n_head);
 
   printf("[Core Operations]\n");
   bench_model_create();
@@ -562,6 +675,9 @@ int main(void) {
 
   printf("\n[Convergence]\n");
   bench_convergence_speed();
+
+  printf("\n[Tiled Linear Algebra]\n");
+  bench_tiled_matmul();
 
   printf("\n=== Done ===\n\n");
   return 0;

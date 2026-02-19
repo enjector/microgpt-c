@@ -1,0 +1,94 @@
+
+========================================
+Run: 2026-02-18 17:33:52
+========================================
+Corpus: 2081 functions | 492493 chars (481.0 KB)
+Vocab: 90 characters
+Architecture: N_EMBD=128 N_LAYER=4 N_HEAD=4 BLOCK_SIZE=512
+Params: 875008
+Training: batch=16 steps=50000 lr=0.0003 threads=12
+Seeds: train=42 infer=1771436032
+Inference: temp=0.30 gen_len=400
+Loaded checkpoint: c_codegen.ckpt (trained 50000 steps)
+  prompt: /* create array of square numbers */
+  confidence: 47% | gen_conf: 95% | 182 tok | 5446 tok/s
+  prompt: /* reverse array in place */
+  confidence: 52% | gen_conf: 95% | 135 tok | 6439 tok/s
+  prompt: /* create array of cube numbers */
+  confidence: 37% | gen_conf: 95% | 227 tok | 5423 tok/s
+  prompt: /* fill array with powers of two */
+  confidence: 41% | gen_conf: 91% | 362 tok | 4394 tok/s
+  prompt: /* element-wise multiply two arrays */
+  confidence: 52% | gen_conf: 90% | 295 tok | 4812 tok/s
+  prompt: /* absolute difference of two arrays */
+  confidence: 57% | gen_conf: 95% | 124 tok | 6537 tok/s
+  prompt: /* sum of squared differences */
+  confidence: 45% | gen_conf: 91% | 294 tok | 4910 tok/s
+  prompt: /* root mean square value */
+  confidence: 72% | gen_conf: 94% | 231 tok | 5546 tok/s
+  prompt: /* weighted median of array */
+  confidence: 82% | gen_conf: 92% | 170 tok | 6184 tok/s
+  prompt: /* compute array range (max minus min) */
+  confidence: 48% | gen_conf: 91% | 253 tok | 5342 tok/s
+  prompt: /* compute average of array */
+  confidence: 88% | gen_conf: 100% | 144 tok | 6607 tok/s
+  prompt: /* FFT with Hamming window */
+  confidence: 89% | gen_conf: 100% | 242 tok | 5393 tok/s
+  prompt: /* Black-Scholes call option price */
+  confidence: 92% | gen_conf: 99% | 287 tok | 4938 tok/s
+  prompt: /* compute MACD histogram */
+  confidence: 86% | gen_conf: 100% | 253 tok | 5282 tok/s
+  prompt: /* bubble sort ascending */
+  confidence: 90% | gen_conf: 100% | 220 tok | 5475 tok/s
+
+--- Inference Summary ---
+prompts: 15 | total_tokens: 3419 | time: 0.648s | avg: 5275 tok/s
+========================================
+
+
+========================================
+Run: 2026-02-18 17:33:59
+========================================
+Corpus: 2081 functions | 492493 chars (481.0 KB)
+Vocab: 90 characters
+Architecture: N_EMBD=128 N_LAYER=4 N_HEAD=4 BLOCK_SIZE=512
+Params: 875008
+Training: batch=16 steps=50000 lr=0.0003 threads=12
+Seeds: train=42 infer=1771436039
+Inference: temp=0.30 gen_len=400
+Loaded checkpoint: c_codegen.ckpt (trained 50000 steps)
+  prompt: /* create array of square numbers */
+  confidence: 47% | gen_conf: 95% | 168 tok | 5390 tok/s
+  prompt: /* reverse array in place */
+  confidence: 52% | gen_conf: 92% | 358 tok | 4407 tok/s
+  prompt: /* create array of cube numbers */
+  confidence: 37% | gen_conf: 94% | 253 tok | 5249 tok/s
+  prompt: /* fill array with powers of two */
+  confidence: 41% | gen_conf: 92% | 437 tok | 3990 tok/s
+  prompt: /* element-wise multiply two arrays */
+  confidence: 52% | gen_conf: 89% | 145 tok | 6399 tok/s
+  prompt: /* absolute difference of two arrays */
+  confidence: 57% | gen_conf: 95% | 113 tok | 6792 tok/s
+  prompt: /* sum of squared differences */
+  confidence: 45% | gen_conf: 93% | 164 tok | 6203 tok/s
+  prompt: /* root mean square value */
+  confidence: 72% | gen_conf: 93% | 262 tok | 5047 tok/s
+  prompt: /* weighted median of array */
+  confidence: 82% | gen_conf: 92% | 170 tok | 6007 tok/s
+  prompt: /* compute array range (max minus min) */
+  confidence: 48% | gen_conf: 93% | 134 tok | 6419 tok/s
+  prompt: /* compute average of array */
+  confidence: 88% | gen_conf: 100% | 144 tok | 6472 tok/s
+  prompt: /* FFT with Hamming window */
+  confidence: 89% | gen_conf: 100% | 242 tok | 5192 tok/s
+  prompt: /* Black-Scholes call option price */
+  confidence: 92% | gen_conf: 99% | 396 tok | 4246 tok/s
+  prompt: /* compute MACD histogram */
+  confidence: 86% | gen_conf: 100% | 253 tok | 5125 tok/s
+  prompt: /* bubble sort ascending */
+  confidence: 90% | gen_conf: 100% | 220 tok | 5521 tok/s
+
+--- Inference Summary ---
+prompts: 15 | total_tokens: 3459 | time: 0.688s | avg: 5025 tok/s
+========================================
+

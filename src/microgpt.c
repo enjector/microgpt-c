@@ -50,7 +50,7 @@
  *   ────────────────────────────────────────────────
  *   lin_fwd()       — Dense layer: y = W @ x (matrix-vector multiply)
  *   lin_bwd()       — Backward: compute dx, dW from upstream dy
- *   rmsnorm_fwd()   — RMS normalisation: x / sqrt(mean(x²) + eps)
+ *   rmsnorm_fwd()   — RMS normalisation: x / M_SQRT(mean(x²) + eps)
  *   rmsnorm_bwd()   — Backward pass for RMSNorm
  *
  *   SECTION 5: Forward + Backward Pass (line ~922)
@@ -98,7 +98,7 @@
  *
  * BUILD MODES
  * ───────────
- *   FP64 (default)  - all weights stored as double precision.
+ *   FP64 (default)  - all weights stored as scalar_t precision.
  *   INT8 (optional)  - weights stored as int8_t with per-matrix fp64 scales.
  *                       A fp64 master copy is maintained for Adam updates;
  *                       after each step the master is requantised to int8.
@@ -111,6 +111,33 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifdef MICROGPT_METAL
+#include "microgpt_metal.h"
+#endif
+
+#ifdef MICROGPT_HEAD_PARALLEL
+#include "microgpt_thread.h"
+#endif
+
+#ifdef MICROGPT_BLAS
+#ifdef __APPLE__
+#define ACCELERATE_NEW_LAPACK
+#include <Accelerate/Accelerate.h>
+#else
+#include <cblas.h>
+#endif
+#endif
+
+/* ---- Cache tiling parameters for lin_fwd / lin_bwd ----
+ * TILE_R rows × TILE_C columns = panel that fits comfortably in L1.
+ * 32 × 64 × 8B = 16 KB  (M2 Max L1 = 128 KB, leaves room for x/y/dx). */
+#ifndef LIN_TILE_R
+#define LIN_TILE_R 32
+#endif
+#ifndef LIN_TILE_C
+#define LIN_TILE_C 64
+#endif
 
 #if defined(QUANTIZATION_INT8) || defined(QUANTISATION_INT8)
 /*
@@ -148,26 +175,27 @@
  * N_SCALES counts the total number of per-matrix scale factors:
  *   3 global (wte, wpe, lm_head) + 6 per layer (wq, wk, wv, wo, fc1, fc2)
  */
-#define N_SCALES (3 + 6 * N_LAYER)
+#define N_SCALES(nl) (3 + 6 * (nl))
 struct Model {
-  size_t vocab_size;        /* number of character tokens + BOS            */
-  int8_t *wte;              /* token embedding      [vocab_size × N_EMBD] */
-  int8_t *wpe;              /* position embedding   [BLOCK_SIZE × N_EMBD] */
-  int8_t *lm_head;          /* output projection    [vocab_size × N_EMBD] */
-  int8_t *attn_wq[N_LAYER]; /* query   weight       [N_EMBD × N_EMBD]     */
-  int8_t *attn_wk[N_LAYER]; /* key     weight       [N_EMBD × N_EMBD]     */
-  int8_t *attn_wv[N_LAYER]; /* value   weight       [N_EMBD × N_EMBD]     */
-  int8_t *attn_wo[N_LAYER]; /* output  weight       [N_EMBD × N_EMBD]     */
-  int8_t *mlp_fc1[N_LAYER]; /* MLP up-projection    [MLP_DIM × N_EMBD]    */
-  int8_t *mlp_fc2[N_LAYER]; /* MLP down-projection  [N_EMBD × MLP_DIM]    */
-  double scale[N_SCALES];   /* per-matrix quantisation scales              */
-  double *master;           /* fp64 master weights for Adam updates        */
+  MicrogptConfig cfg; /* runtime configuration                       */
+  size_t vocab_size;  /* number of character tokens + BOS            */
+  int8_t *wte;        /* token embedding      [vocab_size × n_embd]  */
+  int8_t *wpe;        /* position embedding   [block_size × n_embd]  */
+  int8_t *lm_head;    /* output projection    [vocab_size × n_embd]  */
+  int8_t **attn_wq;   /* query   weight       [n_embd × n_embd]      */
+  int8_t **attn_wk;   /* key     weight       [n_embd × n_embd]      */
+  int8_t **attn_wv;   /* value   weight       [n_embd × n_embd]      */
+  int8_t **attn_wo;   /* output  weight       [n_embd × n_embd]      */
+  int8_t **mlp_fc1;   /* MLP up-projection    [mlp_dim × n_embd]     */
+  int8_t **mlp_fc2;   /* MLP down-projection  [n_embd × mlp_dim]     */
+  scalar_t *scale;    /* per-matrix quantisation scales               */
+  scalar_t *master;   /* fp64 master weights for Adam updates         */
 };
 #else
 /*
  * FP64 Model Layout (default)
  * ---------------------------
- * Every weight matrix is a heap-allocated double array.
+ * Every weight matrix is a heap-allocated scalar_t array.
  * Weight layouts follow row-major [output_dim x input_dim] convention so
  * that y = W @ x is computed as: y[j] = sum_i W[j*nin + i] * x[i].
  *
@@ -188,18 +216,22 @@ struct Model {
  *   which is cache-friendly.  Each row gives us one output element.
  */
 struct Model {
-  size_t vocab_size;        /* number of character tokens + BOS            */
-  double *wte;              /* token embedding      [vocab_size × N_EMBD] */
-  double *wpe;              /* position embedding   [BLOCK_SIZE × N_EMBD] */
-  double *lm_head;          /* output projection    [vocab_size × N_EMBD] */
-  double *attn_wq[N_LAYER]; /* query   weight       [N_EMBD × N_EMBD]     */
-  double *attn_wk[N_LAYER]; /* key     weight       [N_EMBD × N_EMBD]     */
-  double *attn_wv[N_LAYER]; /* value   weight       [N_EMBD × N_EMBD]     */
-  double *attn_wo[N_LAYER]; /* output  weight       [N_EMBD × N_EMBD]     */
-  double *mlp_fc1[N_LAYER]; /* MLP up-projection    [MLP_DIM × N_EMBD]    */
-  double *mlp_fc2[N_LAYER]; /* MLP down-projection  [N_EMBD × MLP_DIM]    */
+  MicrogptConfig cfg; /* runtime configuration                       */
+  size_t vocab_size;  /* number of character tokens + BOS             */
+  scalar_t *wte;      /* token embedding      [vocab_size × n_embd]  */
+  scalar_t *wpe;      /* position embedding   [block_size × n_embd]  */
+  scalar_t *lm_head;  /* output projection    [vocab_size × n_embd]  */
+  scalar_t **attn_wq; /* query   weight       [n_embd × n_embd]      */
+  scalar_t **attn_wk; /* key     weight       [n_embd × n_embd]      */
+  scalar_t **attn_wv; /* value   weight       [n_embd × n_embd]      */
+  scalar_t **attn_wo; /* output  weight       [n_embd × n_embd]      */
+  scalar_t **mlp_fc1; /* MLP up-projection    [mlp_dim × n_embd]     */
+  scalar_t **mlp_fc2; /* MLP down-projection  [n_embd × mlp_dim]     */
 };
 #endif
+
+/* model_config - Return a pointer to the config stored inside a model. */
+const MicrogptConfig *model_config(const Model *model) { return &model->cfg; }
 
 /* qsort comparator for unsigned chars — used to sort the vocabulary. */
 static int char_cmp(const void *a, const void *b) {
@@ -216,21 +248,21 @@ static int char_cmp(const void *a, const void *b) {
 static unsigned long rng_state = 42;
 void seed_rng(unsigned int seed) { rng_state = (unsigned long)seed; }
 
-/* Return a uniform random double in [0, 1). */
-static double rand_u(void) {
+/* Return a uniform random scalar_t in [0, 1). */
+scalar_t rand_u(void) {
   rng_state = rng_state * 1103515245UL + 12345UL;
-  return (double)((rng_state / 65536UL) % 32768UL) / 32768.0;
+  return (scalar_t)((rng_state / 65536UL) % 32768UL) / 32768.0;
 }
 
 /*
  * Box-Muller transform: convert two uniform samples into one sample
  * from N(0, 1).  Used for Gaussian weight initialisation.
  */
-static double rand_gauss(void) {
-  double u1 = rand_u(), u2 = rand_u();
+static scalar_t rand_gauss(void) {
+  scalar_t u1 = rand_u(), u2 = rand_u();
   if (u1 < 1e-10)
-    u1 = 1e-10; /* clamp to avoid log(0) */
-  return sqrt(-2.0 * log(u1)) * cos(2.0 * 3.14159265358979323846 * u2);
+    u1 = 1e-10; /* clamp to avoid M_LOG(0) */
+  return M_SQRT(-2.0 * M_LOG(u1)) * cos(2.0 * 3.14159265358979323846 * u2);
 }
 
 /* ========================== Data Loading ================================= */
@@ -246,7 +278,7 @@ static double rand_gauss(void) {
  * Returns 0 on success, -1 on any error (file not found, too large, OOM).
  * Maximum file size is capped at 50 MiB for safety.
  */
-int load_docs(const char *path, Docs *docs) {
+int load_docs(const char *path, Docs *docs, int max_docs) {
   FILE *f = fopen(path, "rb");
   if (!f)
     return -1;
@@ -270,9 +302,9 @@ int load_docs(const char *path, Docs *docs) {
   docs->data[nread] = '\0'; /* nul-terminate for safe scanning */
   fclose(f);
 
-  /* Allocate line index arrays (up to MAX_DOCS entries) */
-  docs->lines = (char **)malloc(MAX_DOCS * sizeof(char *));
-  docs->doc_lens = (size_t *)malloc(MAX_DOCS * sizeof(size_t));
+  /* Allocate line index arrays (up to max_docs entries) */
+  docs->lines = (char **)malloc((size_t)max_docs * sizeof(char *));
+  docs->doc_lens = (size_t *)malloc((size_t)max_docs * sizeof(size_t));
   if (!docs->lines || !docs->doc_lens) {
     free(docs->data);
     return -1;
@@ -281,7 +313,7 @@ int load_docs(const char *path, Docs *docs) {
   /* Scan buffer and record each non-empty line */
   size_t nd = 0;
   char *p = docs->data;
-  while (nd < MAX_DOCS && *p) {
+  while (nd < (size_t)max_docs && *p) {
     char *start = p;
     while (*p && *p != '\r' && *p != '\n')
       p++; /* advance to EOL */
@@ -382,12 +414,14 @@ size_t tokenize(const char *doc, size_t doc_len, const Vocab *vocab,
  *
  *   Layout order: wte | wpe | lm_head | per-layer {wq, wk, wv, wo, fc1, fc2}
  */
-static size_t count_params(size_t vs) {
-  /* wte: vs*N_EMBD, wpe: BLOCK_SIZE*N_EMBD, lm_head: vs*N_EMBD */
-  size_t n = vs * N_EMBD * 2 + BLOCK_SIZE * N_EMBD;
-  /* Per-layer: 4 attention matrices (N_EMBD²) + 2 MLP matrices */
+static size_t count_params(size_t vs, const MicrogptConfig *cfg) {
+  const size_t ne = (size_t)N_EMBD;
+  const size_t md = (size_t)MLP_DIM;
+  /* wte: vs*ne, wpe: block_size*ne, lm_head: vs*ne */
+  size_t n = vs * ne * 2 + (size_t)BLOCK_SIZE * ne;
+  /* Per-layer: 4 attention matrices (ne²) + 2 MLP matrices */
   for (int L = 0; L < N_LAYER; L++)
-    n += N_EMBD * N_EMBD * 4 + MLP_DIM * N_EMBD + N_EMBD * MLP_DIM;
+    n += ne * ne * 4 + md * ne + ne * md;
   return n;
 }
 
@@ -409,15 +443,15 @@ static size_t count_params(size_t vs) {
  *   balance: per-tensor loses too much precision when different layers have
  *   very different weight ranges; per-channel adds complexity.
  */
-static void quantize_fp64_to_int8(const double *src, size_t n, int8_t *dst,
-                                  double *scale_out) {
-  double mx = 0;
+static void quantize_fp64_to_int8(const scalar_t *src, size_t n, int8_t *dst,
+                                  scalar_t *scale_out) {
+  scalar_t mx = 0;
   for (size_t i = 0; i < n; i++) {
-    double a = fabs(src[i]);
+    scalar_t a = M_FABS(src[i]);
     if (a > mx)
       mx = a;
   }
-  double s = (mx > 1e-10) ? (mx / 127.0) : 1.0;
+  scalar_t s = (mx > 1e-10) ? (mx / 127.0) : 1.0;
   *scale_out = s;
   for (size_t i = 0; i < n; i++) {
     int v = (int)round(src[i] / s);
@@ -434,10 +468,10 @@ static void quantize_fp64_to_int8(const double *src, size_t n, int8_t *dst,
  *   fp64_val ≈ scale × int8_val
  *   Used during backward pass (gradients must be computed in fp64).
  */
-static void dequantize_int8_to_fp64(const int8_t *src, double scale, size_t n,
-                                    double *dst) {
+static void dequantize_int8_to_fp64(const int8_t *src, scalar_t scale, size_t n,
+                                    scalar_t *dst) {
   for (size_t i = 0; i < n; i++)
-    dst[i] = scale * (double)src[i];
+    dst[i] = scale * (scalar_t)src[i];
 }
 
 /*
@@ -445,14 +479,15 @@ static void dequantize_int8_to_fp64(const int8_t *src, double scale, size_t n,
  *   Same algorithm as weight quantisation, but returns the scale factor
  *   (needed for the caller to rescale the int8 matmul result).
  */
-static double quantize_vec_to_int8(const double *x, size_t n, int8_t *x_i8) {
-  double mx = 0;
+static scalar_t quantize_vec_to_int8(const scalar_t *x, size_t n,
+                                     int8_t *x_i8) {
+  scalar_t mx = 0;
   for (size_t i = 0; i < n; i++) {
-    double a = fabs(x[i]);
+    scalar_t a = M_FABS(x[i]);
     if (a > mx)
       mx = a;
   }
-  double scale_x = (mx > 1e-10) ? (mx / 127.0) : 1.0;
+  scalar_t scale_x = (mx > 1e-10) ? (mx / 127.0) : 1.0;
   for (size_t i = 0; i < n; i++) {
     int v = (int)round(x[i] / scale_x);
     if (v > 127)
@@ -491,115 +526,266 @@ static void lin_fwd_int8(const int8_t *x_i8, const int8_t *W_i8, size_t nin,
  *   In INT8 mode: dequantises from int8 into a temporary fp64 buffer.
  *   In FP64 mode: simply casts the pointer (no copy needed).
  */
-static const double *get_W(const Model *m, const void *ptr, int scale_idx,
-                           size_t n, double *tmp) {
+static const scalar_t *get_W(const Model *m, const void *ptr, int scale_idx,
+                             size_t n, scalar_t *tmp) {
   dequantize_int8_to_fp64((const int8_t *)ptr, m->scale[scale_idx], n, tmp);
   return tmp;
 }
 #else
 /* FP64 mode: get_W is a no-op that returns the pointer unchanged. */
-static const double *get_W(const Model *m, const void *ptr, int scale_idx,
-                           size_t n, double *tmp) {
+static const scalar_t *get_W(const Model *m, const void *ptr, int scale_idx,
+                             size_t n, scalar_t *tmp) {
   (void)m;
   (void)scale_idx;
   (void)n;
   (void)tmp;
-  return (const double *)ptr;
+  return (const scalar_t *)ptr;
 }
 #endif
 
-Model *model_create(size_t vocab_size) {
+/* ==================================================================== */
+/*                       PAGED KV CACHE                                  */
+/* ==================================================================== */
+
+#ifdef MICROGPT_PAGED_KV
+
+PagedKVCache *paged_kv_create(size_t max_positions, int n_embd) {
+  PagedKVCache *c = (PagedKVCache *)calloc(1, sizeof(PagedKVCache));
+  if (!c)
+    return NULL;
+  c->capacity = (max_positions + KV_PAGE_SIZE - 1) / KV_PAGE_SIZE;
+  c->pages = (KVPage **)calloc(c->capacity, sizeof(KVPage *));
+  if (!c->pages) {
+    free(c);
+    return NULL;
+  }
+  c->n_pages = 0;
+  c->len = 0;
+  c->n_embd = n_embd;
+  return c;
+}
+
+void paged_kv_free(PagedKVCache *c) {
+  if (!c)
+    return;
+  for (size_t i = 0; i < c->n_pages; i++) {
+    if (c->pages[i]) {
+      free(c->pages[i]->data);
+      free(c->pages[i]);
+    }
+  }
+  free(c->pages);
+  free(c);
+}
+
+void paged_kv_reset(PagedKVCache *c) {
+  if (c)
+    c->len = 0; /* pages retained for reuse */
+}
+
+scalar_t *paged_kv_append(PagedKVCache *c) {
+  size_t page_idx = c->len / KV_PAGE_SIZE;
+  size_t slot = c->len % KV_PAGE_SIZE;
+  int ne = c->n_embd;
+
+  /* Allocate new page on demand */
+  if (page_idx >= c->n_pages) {
+    KVPage *p = (KVPage *)calloc(1, sizeof(KVPage));
+    p->data =
+        (scalar_t *)calloc((size_t)KV_PAGE_SIZE * (size_t)ne, sizeof(scalar_t));
+    c->pages[page_idx] = p;
+    c->n_pages = page_idx + 1;
+  }
+
+  c->len++;
+  return c->pages[page_idx]->data + slot * (size_t)ne;
+}
+
+const scalar_t *paged_kv_get(const PagedKVCache *c, size_t pos) {
+  size_t page_idx = pos / KV_PAGE_SIZE;
+  size_t slot = pos % KV_PAGE_SIZE;
+  int ne = c->n_embd;
+  return c->pages[page_idx]->data + slot * (size_t)ne;
+}
+
+/* Accessor macros — transparently switch between flat and paged KV access.
+ * KV_WRITE(keys, L, cl, ne)  → pointer to write slot at cache_len[L]
+ * KV_READ(keys, L, t, ne)    → pointer to read slot at position t
+ */
+
+/* Helper: sync paged len with caller's cache_len, then append. */
+static inline scalar_t *paged_kv_sync_append(PagedKVCache *c,
+                                             size_t caller_len) {
+  if (c->len != caller_len)
+    c->len = caller_len; /* caller reset cache_len to 0 */
+  return paged_kv_append(c);
+}
+
+#define KV_WRITE(arr, L, cl, ne)                                               \
+  paged_kv_sync_append((PagedKVCache *)(arr)[L], (cl)[L])
+#define KV_READ(arr, L, t, ne) paged_kv_get((const PagedKVCache *)(arr)[L], t)
+
+#else /* !MICROGPT_PAGED_KV — flat arrays (original path) */
+
+#define KV_WRITE(arr, L, cl, ne) ((arr)[L] + (cl)[L] * (ne))
+#define KV_READ(arr, L, t, ne) ((arr)[L] + (t) * (ne))
+
+#endif /* MICROGPT_PAGED_KV */
+
+/* ---- Portable KV cache helpers (work with both flat and paged modes) ---- */
+
+scalar_t *kv_cache_alloc(const MicrogptConfig *cfg) {
+#ifdef MICROGPT_PAGED_KV
+  return (scalar_t *)paged_kv_create((size_t)BLOCK_SIZE, N_EMBD);
+#else
+  return (scalar_t *)calloc((size_t)BLOCK_SIZE * (size_t)N_EMBD,
+                            sizeof(scalar_t));
+#endif
+}
+
+void kv_cache_free(scalar_t *kv) {
+#ifdef MICROGPT_PAGED_KV
+  paged_kv_free((PagedKVCache *)kv);
+#else
+  free(kv);
+#endif
+}
+
+void kv_cache_reset(scalar_t *kv, const MicrogptConfig *cfg) {
+#ifdef MICROGPT_PAGED_KV
+  paged_kv_reset((PagedKVCache *)kv);
+#else
+  memset(kv, 0, (size_t)BLOCK_SIZE * (size_t)N_EMBD * sizeof(scalar_t));
+#endif
+}
+
+/* Helper: allocate the per-layer pointer arrays for the Model struct. */
+static int alloc_layer_ptrs(Model *m, int n_layer) {
+#if defined(QUANTIZATION_INT8) || defined(QUANTISATION_INT8)
+  m->attn_wq = (int8_t **)calloc((size_t)n_layer, sizeof(int8_t *));
+  m->attn_wk = (int8_t **)calloc((size_t)n_layer, sizeof(int8_t *));
+  m->attn_wv = (int8_t **)calloc((size_t)n_layer, sizeof(int8_t *));
+  m->attn_wo = (int8_t **)calloc((size_t)n_layer, sizeof(int8_t *));
+  m->mlp_fc1 = (int8_t **)calloc((size_t)n_layer, sizeof(int8_t *));
+  m->mlp_fc2 = (int8_t **)calloc((size_t)n_layer, sizeof(int8_t *));
+  m->scale = (scalar_t *)calloc((size_t)N_SCALES(n_layer), sizeof(scalar_t));
+#else
+  m->attn_wq = (scalar_t **)calloc((size_t)n_layer, sizeof(scalar_t *));
+  m->attn_wk = (scalar_t **)calloc((size_t)n_layer, sizeof(scalar_t *));
+  m->attn_wv = (scalar_t **)calloc((size_t)n_layer, sizeof(scalar_t *));
+  m->attn_wo = (scalar_t **)calloc((size_t)n_layer, sizeof(scalar_t *));
+  m->mlp_fc1 = (scalar_t **)calloc((size_t)n_layer, sizeof(scalar_t *));
+  m->mlp_fc2 = (scalar_t **)calloc((size_t)n_layer, sizeof(scalar_t *));
+#endif
+  if (!m->attn_wq || !m->attn_wk || !m->attn_wv || !m->attn_wo || !m->mlp_fc1 ||
+      !m->mlp_fc2)
+    return -1;
+  return 0;
+}
+
+Model *model_create(size_t vocab_size, const MicrogptConfig *cfg) {
   Model *m = (Model *)calloc(1, sizeof(Model));
   if (!m)
     return NULL;
+  m->cfg = *cfg;
   m->vocab_size = vocab_size;
-  double std = INIT_STD;
+  const size_t ne = (size_t)N_EMBD;
+  const size_t bs = (size_t)BLOCK_SIZE;
+  const size_t md = (size_t)MLP_DIM;
+  const int nl = N_LAYER;
+  scalar_t std = INIT_STD;
+
+  if (alloc_layer_ptrs(m, nl) != 0) {
+    free(m);
+    return NULL;
+  }
+
 #if defined(QUANTIZATION_INT8) || defined(QUANTISATION_INT8)
   /* Allocate master (fp64) and int8 weight buffers */
-  size_t np = count_params(vocab_size);
-  m->master = (double *)malloc(np * sizeof(double));
+  size_t np = count_params(vocab_size, cfg);
+  m->master = (scalar_t *)malloc(np * sizeof(scalar_t));
   if (!m->master) {
     free(m);
     return NULL;
   }
-  double *pm = m->master;
-  for (size_t i = 0; i < vocab_size * N_EMBD; i++)
+  scalar_t *pm = m->master;
+  for (size_t i = 0; i < vocab_size * ne; i++)
     pm[i] = rand_gauss() * std;
-  pm += vocab_size * N_EMBD;
-  for (size_t i = 0; i < BLOCK_SIZE * N_EMBD; i++)
+  pm += vocab_size * ne;
+  for (size_t i = 0; i < bs * ne; i++)
     pm[i] = rand_gauss() * std;
-  pm += BLOCK_SIZE * N_EMBD;
-  for (size_t i = 0; i < vocab_size * N_EMBD; i++)
+  pm += bs * ne;
+  for (size_t i = 0; i < vocab_size * ne; i++)
     pm[i] = rand_gauss() * std;
-  pm += vocab_size * N_EMBD;
-  for (int L = 0; L < N_LAYER; L++) {
-    for (size_t i = 0; i < N_EMBD * N_EMBD; i++)
+  pm += vocab_size * ne;
+  for (int L = 0; L < nl; L++) {
+    for (size_t i = 0; i < ne * ne; i++)
       pm[i] = rand_gauss() * std;
-    pm += N_EMBD * N_EMBD;
-    for (size_t i = 0; i < N_EMBD * N_EMBD; i++)
+    pm += ne * ne;
+    for (size_t i = 0; i < ne * ne; i++)
       pm[i] = rand_gauss() * std;
-    pm += N_EMBD * N_EMBD;
-    for (size_t i = 0; i < N_EMBD * N_EMBD; i++)
+    pm += ne * ne;
+    for (size_t i = 0; i < ne * ne; i++)
       pm[i] = rand_gauss() * std;
-    pm += N_EMBD * N_EMBD;
-    for (size_t i = 0; i < N_EMBD * N_EMBD; i++)
+    pm += ne * ne;
+    for (size_t i = 0; i < ne * ne; i++)
       pm[i] = rand_gauss() * std;
-    pm += N_EMBD * N_EMBD;
-    for (size_t i = 0; i < MLP_DIM * N_EMBD; i++)
+    pm += ne * ne;
+    for (size_t i = 0; i < md * ne; i++)
       pm[i] = rand_gauss() * std;
-    pm += MLP_DIM * N_EMBD;
-    for (size_t i = 0; i < N_EMBD * MLP_DIM; i++)
+    pm += md * ne;
+    for (size_t i = 0; i < ne * md; i++)
       pm[i] = rand_gauss() * std;
-    pm += N_EMBD * MLP_DIM;
+    pm += ne * md;
   }
   /* Quantize master -> int8 and set scales */
-  m->wte = (int8_t *)malloc(vocab_size * N_EMBD * sizeof(int8_t));
-  m->wpe = (int8_t *)malloc(BLOCK_SIZE * N_EMBD * sizeof(int8_t));
-  m->lm_head = (int8_t *)malloc(vocab_size * N_EMBD * sizeof(int8_t));
+  m->wte = (int8_t *)malloc(vocab_size * ne * sizeof(int8_t));
+  m->wpe = (int8_t *)malloc(bs * ne * sizeof(int8_t));
+  m->lm_head = (int8_t *)malloc(vocab_size * ne * sizeof(int8_t));
   if (!m->wte || !m->wpe || !m->lm_head)
     goto err_i8;
-  quantize_fp64_to_int8(m->master, vocab_size * N_EMBD, m->wte, &m->scale[0]);
-  quantize_fp64_to_int8(m->master + vocab_size * N_EMBD, BLOCK_SIZE * N_EMBD,
-                        m->wpe, &m->scale[1]);
-  quantize_fp64_to_int8(m->master + vocab_size * N_EMBD + BLOCK_SIZE * N_EMBD,
-                        vocab_size * N_EMBD, m->lm_head, &m->scale[2]);
-  size_t off = vocab_size * N_EMBD * 2 + BLOCK_SIZE * N_EMBD;
-  for (int L = 0; L < N_LAYER; L++) {
-    m->attn_wq[L] = (int8_t *)malloc(N_EMBD * N_EMBD * sizeof(int8_t));
-    m->attn_wk[L] = (int8_t *)malloc(N_EMBD * N_EMBD * sizeof(int8_t));
-    m->attn_wv[L] = (int8_t *)malloc(N_EMBD * N_EMBD * sizeof(int8_t));
-    m->attn_wo[L] = (int8_t *)malloc(N_EMBD * N_EMBD * sizeof(int8_t));
-    m->mlp_fc1[L] = (int8_t *)malloc(MLP_DIM * N_EMBD * sizeof(int8_t));
-    m->mlp_fc2[L] = (int8_t *)malloc(N_EMBD * MLP_DIM * sizeof(int8_t));
+  quantize_fp64_to_int8(m->master, vocab_size * ne, m->wte, &m->scale[0]);
+  quantize_fp64_to_int8(m->master + vocab_size * ne, bs * ne, m->wpe,
+                        &m->scale[1]);
+  quantize_fp64_to_int8(m->master + vocab_size * ne + bs * ne, vocab_size * ne,
+                        m->lm_head, &m->scale[2]);
+  size_t off = vocab_size * ne * 2 + bs * ne;
+  for (int L = 0; L < nl; L++) {
+    m->attn_wq[L] = (int8_t *)malloc(ne * ne * sizeof(int8_t));
+    m->attn_wk[L] = (int8_t *)malloc(ne * ne * sizeof(int8_t));
+    m->attn_wv[L] = (int8_t *)malloc(ne * ne * sizeof(int8_t));
+    m->attn_wo[L] = (int8_t *)malloc(ne * ne * sizeof(int8_t));
+    m->mlp_fc1[L] = (int8_t *)malloc(md * ne * sizeof(int8_t));
+    m->mlp_fc2[L] = (int8_t *)malloc(ne * md * sizeof(int8_t));
     if (!m->attn_wq[L] || !m->attn_wk[L] || !m->attn_wv[L] || !m->attn_wo[L] ||
         !m->mlp_fc1[L] || !m->mlp_fc2[L])
       goto err_i8;
     int sidx = 3 + L * 6;
-    quantize_fp64_to_int8(m->master + off, N_EMBD * N_EMBD, m->attn_wq[L],
+    quantize_fp64_to_int8(m->master + off, ne * ne, m->attn_wq[L],
                           &m->scale[sidx]);
-    off += N_EMBD * N_EMBD;
-    quantize_fp64_to_int8(m->master + off, N_EMBD * N_EMBD, m->attn_wk[L],
+    off += ne * ne;
+    quantize_fp64_to_int8(m->master + off, ne * ne, m->attn_wk[L],
                           &m->scale[sidx + 1]);
-    off += N_EMBD * N_EMBD;
-    quantize_fp64_to_int8(m->master + off, N_EMBD * N_EMBD, m->attn_wv[L],
+    off += ne * ne;
+    quantize_fp64_to_int8(m->master + off, ne * ne, m->attn_wv[L],
                           &m->scale[sidx + 2]);
-    off += N_EMBD * N_EMBD;
-    quantize_fp64_to_int8(m->master + off, N_EMBD * N_EMBD, m->attn_wo[L],
+    off += ne * ne;
+    quantize_fp64_to_int8(m->master + off, ne * ne, m->attn_wo[L],
                           &m->scale[sidx + 3]);
-    off += N_EMBD * N_EMBD;
-    quantize_fp64_to_int8(m->master + off, MLP_DIM * N_EMBD, m->mlp_fc1[L],
+    off += ne * ne;
+    quantize_fp64_to_int8(m->master + off, md * ne, m->mlp_fc1[L],
                           &m->scale[sidx + 4]);
-    off += MLP_DIM * N_EMBD;
-    quantize_fp64_to_int8(m->master + off, N_EMBD * MLP_DIM, m->mlp_fc2[L],
+    off += md * ne;
+    quantize_fp64_to_int8(m->master + off, ne * md, m->mlp_fc2[L],
                           &m->scale[sidx + 5]);
-    off += N_EMBD * MLP_DIM;
+    off += ne * md;
   }
   return m;
 err_i8:
   free(m->wte);
   free(m->wpe);
   free(m->lm_head);
-  for (int L = 0; L < N_LAYER; L++) {
+  for (int L = 0; L < nl; L++) {
     free(m->attn_wq[L]);
     free(m->attn_wk[L]);
     free(m->attn_wv[L]);
@@ -607,40 +793,47 @@ err_i8:
     free(m->mlp_fc1[L]);
     free(m->mlp_fc2[L]);
   }
+  free(m->attn_wq);
+  free(m->attn_wk);
+  free(m->attn_wv);
+  free(m->attn_wo);
+  free(m->mlp_fc1);
+  free(m->mlp_fc2);
+  free(m->scale);
   free(m->master);
   free(m);
   return NULL;
 #else
-  m->wte = (double *)malloc(vocab_size * N_EMBD * sizeof(double));
-  m->wpe = (double *)malloc(BLOCK_SIZE * N_EMBD * sizeof(double));
-  m->lm_head = (double *)malloc(vocab_size * N_EMBD * sizeof(double));
+  m->wte = (scalar_t *)malloc(vocab_size * ne * sizeof(scalar_t));
+  m->wpe = (scalar_t *)malloc(bs * ne * sizeof(scalar_t));
+  m->lm_head = (scalar_t *)malloc(vocab_size * ne * sizeof(scalar_t));
   if (!m->wte || !m->wpe || !m->lm_head)
     goto err;
-  for (size_t i = 0; i < vocab_size * N_EMBD; i++)
+  for (size_t i = 0; i < vocab_size * ne; i++)
     m->wte[i] = rand_gauss() * std;
-  for (size_t i = 0; i < BLOCK_SIZE * N_EMBD; i++)
+  for (size_t i = 0; i < bs * ne; i++)
     m->wpe[i] = rand_gauss() * std;
-  for (size_t i = 0; i < vocab_size * N_EMBD; i++)
+  for (size_t i = 0; i < vocab_size * ne; i++)
     m->lm_head[i] = rand_gauss() * std;
-  for (int L = 0; L < N_LAYER; L++) {
-    m->attn_wq[L] = (double *)malloc(N_EMBD * N_EMBD * sizeof(double));
-    m->attn_wk[L] = (double *)malloc(N_EMBD * N_EMBD * sizeof(double));
-    m->attn_wv[L] = (double *)malloc(N_EMBD * N_EMBD * sizeof(double));
-    m->attn_wo[L] = (double *)malloc(N_EMBD * N_EMBD * sizeof(double));
-    m->mlp_fc1[L] = (double *)malloc(MLP_DIM * N_EMBD * sizeof(double));
-    m->mlp_fc2[L] = (double *)malloc(N_EMBD * MLP_DIM * sizeof(double));
+  for (int L = 0; L < nl; L++) {
+    m->attn_wq[L] = (scalar_t *)malloc(ne * ne * sizeof(scalar_t));
+    m->attn_wk[L] = (scalar_t *)malloc(ne * ne * sizeof(scalar_t));
+    m->attn_wv[L] = (scalar_t *)malloc(ne * ne * sizeof(scalar_t));
+    m->attn_wo[L] = (scalar_t *)malloc(ne * ne * sizeof(scalar_t));
+    m->mlp_fc1[L] = (scalar_t *)malloc(md * ne * sizeof(scalar_t));
+    m->mlp_fc2[L] = (scalar_t *)malloc(ne * md * sizeof(scalar_t));
     if (!m->attn_wq[L] || !m->attn_wk[L] || !m->attn_wv[L] || !m->attn_wo[L] ||
         !m->mlp_fc1[L] || !m->mlp_fc2[L])
       goto err;
-    for (size_t i = 0; i < N_EMBD * N_EMBD; i++) {
+    for (size_t i = 0; i < ne * ne; i++) {
       m->attn_wq[L][i] = rand_gauss() * std;
       m->attn_wk[L][i] = rand_gauss() * std;
       m->attn_wv[L][i] = rand_gauss() * std;
       m->attn_wo[L][i] = rand_gauss() * std;
     }
-    for (size_t i = 0; i < MLP_DIM * N_EMBD; i++)
+    for (size_t i = 0; i < md * ne; i++)
       m->mlp_fc1[L][i] = rand_gauss() * std;
-    for (size_t i = 0; i < N_EMBD * MLP_DIM; i++)
+    for (size_t i = 0; i < ne * md; i++)
       m->mlp_fc2[L][i] = rand_gauss() * std;
   }
   return m;
@@ -651,7 +844,7 @@ err:
 }
 
 /*
- * model_free - Release all weight buffers and the Model struct.
+ *   model_free - Release all weight buffers and the Model struct.
  *   Safe to call with NULL (no-op).
  */
 void model_free(Model *m) {
@@ -660,33 +853,48 @@ void model_free(Model *m) {
   free(m->wte);
   free(m->wpe);
   free(m->lm_head);
-  for (int L = 0; L < N_LAYER; L++) {
-    free(m->attn_wq[L]);
-    free(m->attn_wk[L]);
-    free(m->attn_wv[L]);
-    free(m->attn_wo[L]);
-    free(m->mlp_fc1[L]);
-    free(m->mlp_fc2[L]);
+  for (int L = 0; L < m->cfg.n_layer; L++) {
+    if (m->attn_wq)
+      free(m->attn_wq[L]);
+    if (m->attn_wk)
+      free(m->attn_wk[L]);
+    if (m->attn_wv)
+      free(m->attn_wv[L]);
+    if (m->attn_wo)
+      free(m->attn_wo[L]);
+    if (m->mlp_fc1)
+      free(m->mlp_fc1[L]);
+    if (m->mlp_fc2)
+      free(m->mlp_fc2[L]);
   }
+  free(m->attn_wq);
+  free(m->attn_wk);
+  free(m->attn_wv);
+  free(m->attn_wo);
+  free(m->mlp_fc1);
+  free(m->mlp_fc2);
 #if defined(QUANTIZATION_INT8) || defined(QUANTISATION_INT8)
+  free(m->scale);
   free(m->master);
 #endif
   free(m);
 }
 
 /* Return the total scalar parameter count (for buffer allocation). */
-size_t model_num_params(const Model *m) { return count_params(m->vocab_size); }
+size_t model_num_params(const Model *m) {
+  return count_params(m->vocab_size, &m->cfg);
+}
 
 /* ======================== Serialisation (fp64 only) ======================= */
 
 #if !defined(QUANTIZATION_INT8) && !defined(QUANTISATION_INT8)
 /* Helper: write 'n' doubles to a binary file.  Returns 0 on success. */
-static int write_doubles(FILE *f, const double *p, size_t n) {
-  return fwrite(p, sizeof(double), n, f) == n ? 0 : -1;
+static int write_doubles(FILE *f, const scalar_t *p, size_t n) {
+  return fwrite(p, sizeof(scalar_t), n, f) == n ? 0 : -1;
 }
 /* Helper: read 'n' doubles from a binary file.  Returns 0 on success. */
-static int read_doubles(FILE *f, double *p, size_t n) {
-  return fread(p, sizeof(double), n, f) == n ? 0 : -1;
+static int read_doubles(FILE *f, scalar_t *p, size_t n) {
+  return fread(p, sizeof(scalar_t), n, f) == n ? 0 : -1;
 }
 /*
  * model_save - Serialise all weights to a binary file.
@@ -697,44 +905,33 @@ int model_save(const Model *m, const char *path) {
   if (!f)
     return -1;
   size_t vs = m->vocab_size;
+  const size_t ne = (size_t)N_EMBD;
+  const size_t bs = (size_t)BLOCK_SIZE;
+  const size_t md = (size_t)MLP_DIM;
+  const int nl = N_LAYER;
   if (fwrite(&vs, sizeof(size_t), 1, f) != 1) {
     fclose(f);
     return -1;
   }
-  if (write_doubles(f, m->wte, vs * N_EMBD) != 0) {
+  if (write_doubles(f, m->wte, vs * ne) != 0) {
     fclose(f);
     return -1;
   }
-  if (write_doubles(f, m->wpe, (size_t)BLOCK_SIZE * N_EMBD) != 0) {
+  if (write_doubles(f, m->wpe, bs * ne) != 0) {
     fclose(f);
     return -1;
   }
-  if (write_doubles(f, m->lm_head, vs * N_EMBD) != 0) {
+  if (write_doubles(f, m->lm_head, vs * ne) != 0) {
     fclose(f);
     return -1;
   }
-  for (int L = 0; L < N_LAYER; L++) {
-    if (write_doubles(f, m->attn_wq[L], N_EMBD * N_EMBD) != 0) {
-      fclose(f);
-      return -1;
-    }
-    if (write_doubles(f, m->attn_wk[L], N_EMBD * N_EMBD) != 0) {
-      fclose(f);
-      return -1;
-    }
-    if (write_doubles(f, m->attn_wv[L], N_EMBD * N_EMBD) != 0) {
-      fclose(f);
-      return -1;
-    }
-    if (write_doubles(f, m->attn_wo[L], N_EMBD * N_EMBD) != 0) {
-      fclose(f);
-      return -1;
-    }
-    if (write_doubles(f, m->mlp_fc1[L], MLP_DIM * N_EMBD) != 0) {
-      fclose(f);
-      return -1;
-    }
-    if (write_doubles(f, m->mlp_fc2[L], N_EMBD * MLP_DIM) != 0) {
+  for (int L = 0; L < nl; L++) {
+    if (write_doubles(f, m->attn_wq[L], ne * ne) != 0 ||
+        write_doubles(f, m->attn_wk[L], ne * ne) != 0 ||
+        write_doubles(f, m->attn_wv[L], ne * ne) != 0 ||
+        write_doubles(f, m->attn_wo[L], ne * ne) != 0 ||
+        write_doubles(f, m->mlp_fc1[L], md * ne) != 0 ||
+        write_doubles(f, m->mlp_fc2[L], ne * md) != 0) {
       fclose(f);
       return -1;
     }
@@ -747,7 +944,8 @@ int model_save(const Model *m, const char *path) {
  *   Validates that the stored vocab_size matches the expected value.
  *   Returns a newly heap-allocated Model, or NULL on error.
  */
-Model *model_load(const char *path, size_t vocab_size) {
+Model *model_load(const char *path, size_t vocab_size,
+                  const MicrogptConfig *cfg) {
   FILE *f = fopen(path, "rb");
   if (!f)
     return NULL;
@@ -756,53 +954,29 @@ Model *model_load(const char *path, size_t vocab_size) {
     fclose(f);
     return NULL;
   }
-  Model *m = model_create(vocab_size);
+  Model *m = model_create(vocab_size, cfg);
   if (!m) {
     fclose(f);
     return NULL;
   }
-  if (read_doubles(f, m->wte, vs * N_EMBD) != 0) {
+  const size_t ne = (size_t)N_EMBD;
+  const size_t bs = (size_t)BLOCK_SIZE;
+  const size_t md = (size_t)MLP_DIM;
+  const int nl = N_LAYER;
+  if (read_doubles(f, m->wte, vs * ne) != 0 ||
+      read_doubles(f, m->wpe, bs * ne) != 0 ||
+      read_doubles(f, m->lm_head, vs * ne) != 0) {
     model_free(m);
     fclose(f);
     return NULL;
   }
-  if (read_doubles(f, m->wpe, (size_t)BLOCK_SIZE * N_EMBD) != 0) {
-    model_free(m);
-    fclose(f);
-    return NULL;
-  }
-  if (read_doubles(f, m->lm_head, vs * N_EMBD) != 0) {
-    model_free(m);
-    fclose(f);
-    return NULL;
-  }
-  for (int L = 0; L < N_LAYER; L++) {
-    if (read_doubles(f, m->attn_wq[L], N_EMBD * N_EMBD) != 0) {
-      model_free(m);
-      fclose(f);
-      return NULL;
-    }
-    if (read_doubles(f, m->attn_wk[L], N_EMBD * N_EMBD) != 0) {
-      model_free(m);
-      fclose(f);
-      return NULL;
-    }
-    if (read_doubles(f, m->attn_wv[L], N_EMBD * N_EMBD) != 0) {
-      model_free(m);
-      fclose(f);
-      return NULL;
-    }
-    if (read_doubles(f, m->attn_wo[L], N_EMBD * N_EMBD) != 0) {
-      model_free(m);
-      fclose(f);
-      return NULL;
-    }
-    if (read_doubles(f, m->mlp_fc1[L], MLP_DIM * N_EMBD) != 0) {
-      model_free(m);
-      fclose(f);
-      return NULL;
-    }
-    if (read_doubles(f, m->mlp_fc2[L], N_EMBD * MLP_DIM) != 0) {
+  for (int L = 0; L < nl; L++) {
+    if (read_doubles(f, m->attn_wq[L], ne * ne) != 0 ||
+        read_doubles(f, m->attn_wk[L], ne * ne) != 0 ||
+        read_doubles(f, m->attn_wv[L], ne * ne) != 0 ||
+        read_doubles(f, m->attn_wo[L], ne * ne) != 0 ||
+        read_doubles(f, m->mlp_fc1[L], md * ne) != 0 ||
+        read_doubles(f, m->mlp_fc2[L], ne * md) != 0) {
       model_free(m);
       fclose(f);
       return NULL;
@@ -818,9 +992,13 @@ Model *model_load(const char *path, size_t vocab_size) {
  *           [wte] [wpe] [lm_head] [per-layer weights]
  *           [Adam m buffer] [Adam v buffer]
  */
-int checkpoint_save(const Model *model, const double *m_buf,
-                    const double *v_buf, int step, const char *path) {
+int checkpoint_save(const Model *model, const scalar_t *m_buf,
+                    const scalar_t *v_buf, int step, const char *path) {
   size_t vs = model->vocab_size;
+  const size_t ne = (size_t)N_EMBD;
+  const size_t bs = (size_t)BLOCK_SIZE;
+  const size_t md = (size_t)MLP_DIM;
+  const int nl = N_LAYER;
   FILE *f = fopen(path, "wb");
   if (!f)
     return -1;
@@ -836,19 +1014,19 @@ int checkpoint_save(const Model *model, const double *m_buf,
   }
 
   /* Write model weights (same order as model_save) */
-  if (write_doubles(f, model->wte, vs * N_EMBD) != 0 ||
-      write_doubles(f, model->wpe, (size_t)BLOCK_SIZE * N_EMBD) != 0 ||
-      write_doubles(f, model->lm_head, vs * N_EMBD) != 0) {
+  if (write_doubles(f, model->wte, vs * ne) != 0 ||
+      write_doubles(f, model->wpe, bs * ne) != 0 ||
+      write_doubles(f, model->lm_head, vs * ne) != 0) {
     fclose(f);
     return -1;
   }
-  for (int L = 0; L < N_LAYER; L++) {
-    if (write_doubles(f, model->attn_wq[L], N_EMBD * N_EMBD) != 0 ||
-        write_doubles(f, model->attn_wk[L], N_EMBD * N_EMBD) != 0 ||
-        write_doubles(f, model->attn_wv[L], N_EMBD * N_EMBD) != 0 ||
-        write_doubles(f, model->attn_wo[L], N_EMBD * N_EMBD) != 0 ||
-        write_doubles(f, model->mlp_fc1[L], MLP_DIM * N_EMBD) != 0 ||
-        write_doubles(f, model->mlp_fc2[L], N_EMBD * MLP_DIM) != 0) {
+  for (int L = 0; L < nl; L++) {
+    if (write_doubles(f, model->attn_wq[L], ne * ne) != 0 ||
+        write_doubles(f, model->attn_wk[L], ne * ne) != 0 ||
+        write_doubles(f, model->attn_wv[L], ne * ne) != 0 ||
+        write_doubles(f, model->attn_wo[L], ne * ne) != 0 ||
+        write_doubles(f, model->mlp_fc1[L], md * ne) != 0 ||
+        write_doubles(f, model->mlp_fc2[L], ne * md) != 0) {
       fclose(f);
       return -1;
     }
@@ -868,8 +1046,9 @@ int checkpoint_save(const Model *model, const double *m_buf,
 /*
  * checkpoint_load - Load a full training checkpoint in a single pass.
  */
-Model *checkpoint_load(const char *path, size_t vocab_size, double *m_buf,
-                       double *v_buf, int *step_out) {
+Model *checkpoint_load(const char *path, size_t vocab_size,
+                       const MicrogptConfig *cfg, scalar_t *m_buf,
+                       scalar_t *v_buf, int *step_out) {
   FILE *f = fopen(path, "rb");
   if (!f)
     return NULL;
@@ -884,26 +1063,30 @@ Model *checkpoint_load(const char *path, size_t vocab_size, double *m_buf,
   }
 
   /* Create model and read weights */
-  Model *model = model_create(vocab_size);
+  Model *model = model_create(vocab_size, cfg);
   if (!model) {
     fclose(f);
     return NULL;
   }
+  const size_t ne = (size_t)N_EMBD;
+  const size_t bs = (size_t)BLOCK_SIZE;
+  const size_t md = (size_t)MLP_DIM;
+  const int nl = N_LAYER;
 
-  if (read_doubles(f, model->wte, vs * N_EMBD) != 0 ||
-      read_doubles(f, model->wpe, (size_t)BLOCK_SIZE * N_EMBD) != 0 ||
-      read_doubles(f, model->lm_head, vs * N_EMBD) != 0) {
+  if (read_doubles(f, model->wte, vs * ne) != 0 ||
+      read_doubles(f, model->wpe, bs * ne) != 0 ||
+      read_doubles(f, model->lm_head, vs * ne) != 0) {
     model_free(model);
     fclose(f);
     return NULL;
   }
-  for (int L = 0; L < N_LAYER; L++) {
-    if (read_doubles(f, model->attn_wq[L], N_EMBD * N_EMBD) != 0 ||
-        read_doubles(f, model->attn_wk[L], N_EMBD * N_EMBD) != 0 ||
-        read_doubles(f, model->attn_wv[L], N_EMBD * N_EMBD) != 0 ||
-        read_doubles(f, model->attn_wo[L], N_EMBD * N_EMBD) != 0 ||
-        read_doubles(f, model->mlp_fc1[L], MLP_DIM * N_EMBD) != 0 ||
-        read_doubles(f, model->mlp_fc2[L], N_EMBD * MLP_DIM) != 0) {
+  for (int L = 0; L < nl; L++) {
+    if (read_doubles(f, model->attn_wq[L], ne * ne) != 0 ||
+        read_doubles(f, model->attn_wk[L], ne * ne) != 0 ||
+        read_doubles(f, model->attn_wv[L], ne * ne) != 0 ||
+        read_doubles(f, model->attn_wo[L], ne * ne) != 0 ||
+        read_doubles(f, model->mlp_fc1[L], md * ne) != 0 ||
+        read_doubles(f, model->mlp_fc2[L], ne * md) != 0) {
       model_free(model);
       fclose(f);
       return NULL;
@@ -929,12 +1112,14 @@ int model_save(const Model *m, const char *path) {
   (void)path;
   return -1;
 }
-Model *model_load(const char *path, size_t vocab_size) {
+Model *model_load(const char *path, size_t vocab_size,
+                  const MicrogptConfig *cfg) {
   (void)path;
   (void)vocab_size;
+  (void)cfg;
   return NULL;
 }
-int checkpoint_save(const Model *model, const double *m, const double *v,
+int checkpoint_save(const Model *model, const scalar_t *m, const scalar_t *v,
                     int step, const char *path) {
   (void)model;
   (void)m;
@@ -943,10 +1128,12 @@ int checkpoint_save(const Model *model, const double *m, const double *v,
   (void)path;
   return -1;
 }
-Model *checkpoint_load(const char *path, size_t vocab_size, double *m,
-                       double *v, int *step_out) {
+Model *checkpoint_load(const char *path, size_t vocab_size,
+                       const MicrogptConfig *cfg, scalar_t *m, scalar_t *v,
+                       int *step_out) {
   (void)path;
   (void)vocab_size;
+  (void)cfg;
   (void)m;
   (void)v;
   (void)step_out;
@@ -972,97 +1159,118 @@ Model *checkpoint_load(const char *path, size_t vocab_size, double *m,
  *   Computes y = W @ x   (matrix-vector product)
  *   More precisely: y[j] = Σ_i  W[j·nin + i] · x[i]
  *
- *   W is stored in row-major layout [nout × nin]:
+ *   W is stored in row-major layout [nout × nin].
  *
- *     x  (input, nin elements)            W  (nout rows × nin cols)
- *     ┌──┐                               ┌──────────────────────┐
- *     │x₀│                          row 0 │ w₀₀  w₀₁  w₀₂  ... │ → dot with x →
- * y₀ │x₁│                          row 1 │ w₁₀  w₁₁  w₁₂  ... │ → dot with x →
- * y₁ │x₂│                          row 2 │ w₂₀  w₂₁  w₂₂  ... │ → dot with x →
- * y₂ │..│                            ... │ ...                 │ └──┘
- * └──────────────────────┘
- *
- *   The inner loop (over i) computes one dot product = one output element.
- *   The outer loop (over j) iterates across rows = all output elements.
- *
- *   Performance notes:
- *   - `restrict` tells the compiler x, W, y don't alias → better vectorisation
- *   - Clang pragma enables SIMD auto-vectorisation of the dot product
- *   - Wrow pointer avoids recomputing j*nin every inner iteration
+ *   When MICROGPT_BLAS is defined, uses CBLAS_GEMV for hardware-accelerated
+ *   matrix-vector multiply (Apple Accelerate, OpenBLAS, MKL, etc.).
  */
-static void lin_fwd(const double *restrict x, const double *restrict W,
-                    size_t nin, size_t nout, double *restrict y) {
-  for (size_t j = 0; j < nout; j++) {
-    double s = 0;
-    const double *restrict Wrow = W + j * nin;
-#if defined(__clang__)
-    _Pragma("clang loop vectorize(enable) interleave(enable)")
-#endif
-        for (size_t i = 0; i < nin; i++) s += x[i] * Wrow[i];
-    y[j] = s;
+static void lin_fwd(const scalar_t *restrict x, const scalar_t *restrict W,
+                    size_t nin, size_t nout, scalar_t *restrict y) {
+#ifdef MICROGPT_METAL
+  if (metal_available()) {
+    metal_lin_fwd(x, W, nin, nout, y);
+    return;
   }
+#endif
+#ifdef MICROGPT_BLAS
+  /* y = W @ x  via BLAS:  y = 1.0 * W * x + 0.0 * y
+   * W is row-major [nout × nin], x is [nin × 1], y is [nout × 1] */
+  CBLAS_GEMV(CblasRowMajor, CblasNoTrans, (int)nout,
+             (int)nin,         /* M=nout rows, N=nin cols */
+             1.0, W, (int)nin, /* alpha=1.0, A=W, lda=nin */
+             x, 1,             /* x vector, stride=1 */
+             0.0, y, 1);       /* beta=0.0, y vector, stride=1 */
+#else
+  /* Tiled y = W @ x : process W in TILE_R×TILE_C panels.
+   * Each panel (16 KB) stays in L1.  Partial sums accumulate in y[]. */
+  memset(y, 0, nout * sizeof(scalar_t));
+  for (size_t j0 = 0; j0 < nout; j0 += LIN_TILE_R) {
+    size_t j1 = (j0 + LIN_TILE_R < nout) ? j0 + LIN_TILE_R : nout;
+    for (size_t i0 = 0; i0 < nin; i0 += LIN_TILE_C) {
+      size_t i1 = (i0 + LIN_TILE_C < nin) ? i0 + LIN_TILE_C : nin;
+      for (size_t j = j0; j < j1; j++) {
+        scalar_t s = 0;
+        const scalar_t *restrict Wrow = W + j * nin + i0;
+#if defined(__clang__)
+        _Pragma("clang loop vectorize(enable) interleave(enable)")
+#endif
+            for (size_t i = 0; i < i1 - i0; i++) s += x[i0 + i] * Wrow[i];
+        y[j] += s;
+      }
+    }
+  }
+#endif
 }
 
 /*
  * lin_bwd - BACKWARD pass for the linear layer.
  *
- *   Backpropagation computes how much each input and each weight
- *   contributed to the loss.  Given the upstream gradient dy (how much
- *   each output element affected the loss), we derive two gradients:
+ *   dx = W^T @ dy   (gradient w.r.t. input, accumulated)
+ *   dW += dy ⊗ x    (gradient w.r.t. weights, outer product, accumulated)
  *
- *   GRADIENT W.R.T. INPUT (dx):
- *   ──────────────────────────
- *   Since y = W @ x, by the chain rule:
- *     dx = W^T @ dy   →   dx[i] += Σ_j  dy[j] · W[j·nin + i]
- *
- *   This is like "running the layer backwards" — projecting the error
- *   signal back through the transpose of W.
- *
- *   GRADIENT W.R.T. WEIGHTS (dW):
- *   ──────────────────────────────
- *   Each weight w_ji contributes to y[j] proportionally to x[i]:
- *     dW[j·nin + i] += dy[j] · x[i]   (outer product of dy and x)
- *
- *   ┌─ CACHE OPTIMISATION ────────────────────────────────────────────┐
- *   │ The dx computation uses ROW-MAJOR traversal of W:               │
- *   │                                                                 │
- *   │   for each row j:                                               │
- *   │     dyj = dy[j]          (scalar, stays in register)            │
- *   │     for each col i:                                             │
- *   │       dx[i] += dyj * W[j*nin + i]   (sequential W read!)        │
- *   │                                                                 │
- *   │ The naive alternative (loop i then j) would stride through W    │
- *   │ in column-major order, causing cache misses when nout >> nin     │
- *   │ (e.g. lm_head backward with vocab_size=6000, N_EMBD=32).        │
- *   └─────────────────────────────────────────────────────────────────┘
- *
- *   Gradients are *accumulated* (+=), not overwritten, because multiple
- *   positions in a sequence contribute gradients to the same weights.
+ *   When MICROGPT_BLAS is defined, uses CBLAS_GEMV for dx and CBLAS_GER
+ *   for dW (hardware-accelerated rank-1 update).
  */
-static void lin_bwd(const double *restrict x, const double *restrict W,
-                    const double *restrict dy, size_t nin, size_t nout,
-                    double *restrict dx, double *restrict dW) {
+static void lin_bwd(const scalar_t *restrict x, const scalar_t *restrict W,
+                    const scalar_t *restrict dy, size_t nin, size_t nout,
+                    scalar_t *restrict dx, scalar_t *restrict dW) {
+#ifdef MICROGPT_METAL
+  if (metal_available()) {
+    metal_lin_bwd(x, W, dy, nin, nout, dx, dW);
+    return;
+  }
+#endif
+#ifdef MICROGPT_BLAS
   if (dx)
-    /* Row-major traversal: read W sequentially, scatter into small dx[].
-     * Much more cache-friendly than column-major when nout >> nin
-     * (e.g. lm_head backward with vocab=6000, nin=32). */
-    for (size_t j = 0; j < nout; j++) {
-      double dyj = dy[j];
-      const double *restrict Wrow = W + j * nin;
-#if defined(__clang__)
-      _Pragma("clang loop vectorize(enable) interleave(enable)")
-#endif
-          for (size_t i = 0; i < nin; i++) dx[i] += dyj * Wrow[i];
-    }
+    /* dx += W^T @ dy  via BLAS:  dx = 1.0 * W^T * dy + 1.0 * dx */
+    CBLAS_GEMV(CblasRowMajor, CblasTrans, (int)nout,
+               (int)nin,         /* M=nout, N=nin (W dimensions) */
+               1.0, W, (int)nin, /* alpha=1.0, A=W, lda=nin */
+               dy, 1,            /* dy vector, stride=1 */
+               1.0, dx, 1);      /* beta=1.0 (accumulate), dx, stride=1 */
   if (dW)
-    for (size_t j = 0; j < nout; j++) {
-      double dyj = dy[j];
-      double *restrict dWrow = dW + j * nin;
+    /* dW += dy ⊗ x  (rank-1 outer product update) */
+    CBLAS_GER(CblasRowMajor, (int)nout, (int)nin, /* M=nout, N=nin */
+              1.0,                                /* alpha=1.0 */
+              dy, 1,                              /* dy vector, stride=1 */
+              x, 1,                               /* x vector, stride=1 */
+              dW, (int)nin);                      /* dW matrix, lda=nin */
+#else
+  /* Tiled dx += W^T @ dy : process W by TILE_R×TILE_C panels.
+   * Reading W tile-by-tile keeps each 16 KB panel in L1 while
+   * accumulating into the dx[] region covered by that tile. */
+  if (dx)
+    for (size_t j0 = 0; j0 < nout; j0 += LIN_TILE_R) {
+      size_t j1 = (j0 + LIN_TILE_R < nout) ? j0 + LIN_TILE_R : nout;
+      for (size_t i0 = 0; i0 < nin; i0 += LIN_TILE_C) {
+        size_t i1 = (i0 + LIN_TILE_C < nin) ? i0 + LIN_TILE_C : nin;
+        for (size_t j = j0; j < j1; j++) {
+          scalar_t dyj = dy[j];
+          const scalar_t *restrict Wrow = W + j * nin + i0;
 #if defined(__clang__)
-      _Pragma("clang loop vectorize(enable) interleave(enable)")
+          _Pragma("clang loop vectorize(enable) interleave(enable)")
 #endif
-          for (size_t i = 0; i < nin; i++) dWrow[i] += dyj * x[i];
+              for (size_t i = 0; i < i1 - i0; i++) dx[i0 + i] += dyj * Wrow[i];
+        }
+      }
     }
+  /* Tiled dW += dy ⊗ x : same tiling for cache-friendly write to dW. */
+  if (dW)
+    for (size_t j0 = 0; j0 < nout; j0 += LIN_TILE_R) {
+      size_t j1 = (j0 + LIN_TILE_R < nout) ? j0 + LIN_TILE_R : nout;
+      for (size_t i0 = 0; i0 < nin; i0 += LIN_TILE_C) {
+        size_t i1 = (i0 + LIN_TILE_C < nin) ? i0 + LIN_TILE_C : nin;
+        for (size_t j = j0; j < j1; j++) {
+          scalar_t dyj = dy[j];
+          scalar_t *restrict dWrow = dW + j * nin + i0;
+#if defined(__clang__)
+          _Pragma("clang loop vectorize(enable) interleave(enable)")
+#endif
+              for (size_t i = 0; i < i1 - i0; i++) dWrow[i] += dyj * x[i0 + i];
+        }
+      }
+    }
+#endif
 }
 
 /*
@@ -1073,12 +1281,12 @@ static void lin_bwd(const double *restrict x, const double *restrict W,
  *   through many layers.
  *
  *   Formula:
- *     rms = sqrt( (1/d) · Σ x[i]² + ε )
+ *     rms = M_SQRT( (1/d) · Σ x[i]² + ε )
  *     out[i] = x[i] / rms
  *
  *   Example with d=4:
  *     x = [3.0, 4.0, 0.0, 0.0]
- *     rms = sqrt((9+16+0+0)/4 + 1e-5) = sqrt(6.25) = 2.5
+ *     rms = M_SQRT((9+16+0+0)/4 + 1e-5) = M_SQRT(6.25) = 2.5
  *     out = [1.2, 1.6, 0.0, 0.0]    ← unit "energy" scale
  *
  *   vs. LayerNorm:
@@ -1089,14 +1297,14 @@ static void lin_bwd(const double *restrict x, const double *restrict W,
  *
  *   eps (1e-5) prevents division by zero when all x values are near 0.
  */
-static void rmsnorm_fwd(const double *restrict x, size_t d,
-                        double *restrict out) {
-  double sum = 0;
+static void rmsnorm_fwd(const scalar_t *restrict x, size_t d,
+                        scalar_t *restrict out) {
+  scalar_t sum = 0;
 #if defined(__clang__)
   _Pragma("clang loop vectorize(enable)")
 #endif
       for (size_t i = 0; i < d; i++) sum += x[i] * x[i];
-  double scale = 1.0 / sqrt(sum / (double)d + 1e-5);
+  scalar_t scale = 1.0 / M_SQRT(sum / (scalar_t)d + 1e-5);
 #if defined(__clang__)
   _Pragma("clang loop vectorize(enable)")
 #endif
@@ -1106,32 +1314,180 @@ static void rmsnorm_fwd(const double *restrict x, size_t d,
 /*
  * rmsnorm_bwd - Backward pass for RMSNorm.
  *   Given dy (upstream gradient) and x (original input, pre-norm):
- *     rms = sqrt(mean(x^2) + eps)
+ *     rms = M_SQRT(mean(x^2) + eps)
  *     dx[i] = (1/rms) * (dy[i] - out[i] * dot(dy, out) / d)
  *   where out[i] = x[i] / rms.
  *   Gradients are accumulated (+=) into dx.
  */
-static void rmsnorm_bwd(const double *restrict x, const double *restrict dy,
-                        size_t d, double *restrict dx) {
-  double sum_sq = 0;
+static void rmsnorm_bwd(const scalar_t *restrict x, const scalar_t *restrict dy,
+                        size_t d, scalar_t *restrict dx) {
+  scalar_t sum_sq = 0;
 #if defined(__clang__)
   _Pragma("clang loop vectorize(enable)")
 #endif
       for (size_t i = 0; i < d; i++) sum_sq += x[i] * x[i];
-  double rms = sqrt(sum_sq / (double)d + 1e-5);
-  double inv_rms = 1.0 / rms;
+  scalar_t rms = M_SQRT(sum_sq / (scalar_t)d + 1e-5);
+  scalar_t inv_rms = 1.0 / rms;
   /* Compute dot(dy, x) / (d * rms^2) */
-  double dot = 0;
+  scalar_t dot = 0;
 #if defined(__clang__)
   _Pragma("clang loop vectorize(enable)")
 #endif
       for (size_t i = 0; i < d; i++) dot += dy[i] * x[i];
-  double coeff = dot / ((double)d * rms * rms);
+  scalar_t coeff = dot / ((scalar_t)d * rms * rms);
 #if defined(__clang__)
   _Pragma("clang loop vectorize(enable)")
 #endif
       for (size_t i = 0; i < d; i++) dx[i] += inv_rms * dy[i] - coeff * x[i];
 }
+
+/* ================== Per-Head Attention Parallelism ====================== */
+
+#ifdef MICROGPT_HEAD_PARALLEL
+/*
+ * When MICROGPT_HEAD_PARALLEL is defined, attention heads are processed in
+ * parallel using one thread per head.  Each head reads/writes non-overlapping
+ * memory slices (keyed by h*hd and h*bs), so no locks are needed.
+ *
+ * This is most beneficial when batch-level parallelism is not active
+ * (nthreads==1), e.g. during inference.  When combined with batch-level
+ * threading, over-subscription may occur.
+ */
+
+/* ---- Forward attention head worker ---- */
+typedef struct {
+  int h;                  /* head index */
+  scalar_t scale;         /* 1/M_SQRT(hd) */
+  size_t T;               /* number of positions to attend over */
+  size_t cache_len_L;     /* cached positions for this layer */
+  const scalar_t *q;      /* full Q vector [ne] */
+  const scalar_t *k;      /* current K vector [ne] */
+  const scalar_t *v;      /* current V vector [ne] */
+  scalar_t **keys;        /* full KV cache keys array */
+  scalar_t **values;      /* full KV cache values array */
+  int L;                  /* layer index */
+  scalar_t *attn_weights; /* output: attn_weights[h*bs..] */
+  scalar_t *x_attn;       /* output: x_attn[h*hd..] */
+  size_t ne;              /* n_embd */
+  size_t hd;              /* head_dim */
+  size_t bs;              /* block_size */
+} AttnHeadFwdArg;
+
+static void *attn_head_fwd_worker(void *arg) {
+  AttnHeadFwdArg *a = (AttnHeadFwdArg *)arg;
+  const size_t ne = a->ne;
+  const size_t hd = a->hd;
+  const size_t bs = a->bs;
+  size_t hoff = (size_t)a->h * hd;
+  size_t hw = (size_t)a->h * bs;
+  /* Step 1: Q·K scores */
+  for (size_t t = 0; t < a->T; t++) {
+    const scalar_t *kt = (t < a->cache_len_L)
+                             ? (KV_READ(a->keys, a->L, t, ne) + hoff)
+                             : (a->k + hoff);
+    scalar_t s = 0;
+    for (size_t d = 0; d < hd; d++)
+      s += a->q[hoff + d] * kt[d];
+    a->attn_weights[hw + t] = s * a->scale;
+  }
+  /* Step 2: Softmax */
+  scalar_t max_s = a->attn_weights[hw];
+  for (size_t t = 1; t < a->T; t++)
+    if (a->attn_weights[hw + t] > max_s)
+      max_s = a->attn_weights[hw + t];
+  scalar_t sum = 0;
+  for (size_t t = 0; t < a->T; t++) {
+    a->attn_weights[hw + t] = M_EXP(a->attn_weights[hw + t] - max_s);
+    sum += a->attn_weights[hw + t];
+  }
+  for (size_t t = 0; t < a->T; t++)
+    a->attn_weights[hw + t] /= sum;
+  /* Step 3: Weighted sum of values */
+  for (size_t d = 0; d < hd; d++) {
+    scalar_t s = 0;
+    for (size_t t = 0; t < a->T; t++) {
+      const scalar_t *vt = (t < a->cache_len_L)
+                               ? (KV_READ(a->values, a->L, t, ne) + hoff)
+                               : (a->v + hoff);
+      s += a->attn_weights[hw + t] * vt[d];
+    }
+    a->x_attn[hoff + d] = s;
+  }
+  return NULL;
+}
+
+/* ---- Backward attention head worker ---- */
+typedef struct {
+  int h;                       /* head index */
+  scalar_t attn_scale;         /* 1/M_SQRT(hd) */
+  size_t TL;                   /* T for this layer (from saved forward) */
+  const scalar_t *d_x_attn;    /* upstream gradient through x_attn [ne] */
+  const scalar_t *sv_attn_w_L; /* saved attn weights [nh*bs] */
+  const scalar_t *sv_q_L;      /* saved Q [ne] */
+  scalar_t **keys;             /* full KV cache keys array */
+  scalar_t **values;           /* full KV cache values array */
+  int L;                       /* layer index */
+  scalar_t *d_q;               /* output: d_q[h*hd..] */
+  scalar_t *d_k_cur;           /* output: d_k_cur[h*hd..] */
+  scalar_t *d_v_cur;           /* output: d_v_cur[h*hd..] */
+  size_t ne;                   /* n_embd */
+  size_t hd;                   /* head_dim */
+  size_t bs;                   /* block_size */
+} AttnHeadBwdArg;
+
+static void *attn_head_bwd_worker(void *arg) {
+  AttnHeadBwdArg *a = (AttnHeadBwdArg *)arg;
+  const size_t ne = a->ne;
+  const size_t hd = a->hd;
+  const size_t bs = a->bs;
+  size_t hoff = (size_t)a->h * hd;
+  size_t hw = (size_t)a->h * bs;
+  /* d_attn_h[t] = dot(d_x_attn[hoff..], V[t][hoff..]) */
+  scalar_t d_attn_h[bs];
+  for (size_t t = 0; t < a->TL; t++) {
+    const scalar_t *vt = KV_READ(a->values, a->L, t, ne);
+    scalar_t s = 0;
+    for (size_t d = 0; d < hd; d++)
+      s += a->d_x_attn[hoff + d] * vt[hoff + d];
+    d_attn_h[t] = s;
+  }
+  /* Softmax backward */
+  scalar_t dot_ad = 0;
+  for (size_t t = 0; t < a->TL; t++)
+    dot_ad += a->sv_attn_w_L[hw + t] * d_attn_h[t];
+  scalar_t d_score_h[bs];
+  for (size_t t = 0; t < a->TL; t++)
+    d_score_h[t] =
+        a->sv_attn_w_L[hw + t] * (d_attn_h[t] - dot_ad) * a->attn_scale;
+  /* Q·K backward */
+  for (size_t t = 0; t < a->TL; t++) {
+    const scalar_t *kt = KV_READ(a->keys, a->L, t, ne);
+    for (size_t d = 0; d < hd; d++)
+      a->d_q[hoff + d] += d_score_h[t] * kt[hoff + d];
+  }
+  /* K backward for current position */
+  for (size_t d = 0; d < hd; d++)
+    a->d_k_cur[hoff + d] += d_score_h[a->TL - 1] * a->sv_q_L[hoff + d];
+  /* V backward for current position */
+  for (size_t d = 0; d < hd; d++)
+    a->d_v_cur[hoff + d] +=
+        a->sv_attn_w_L[hw + a->TL - 1] * a->d_x_attn[hoff + d];
+  return NULL;
+}
+
+/* ---- Dispatch helper: spawn nh threads, join all ---- */
+static void attn_heads_dispatch(void *(*fn)(void *), void *args,
+                                size_t arg_size, int nh) {
+  mgpt_thread_t threads[nh];
+  mgpt_thread_trampoline_t tramps[nh];
+  for (int h = 0; h < nh; h++)
+    mgpt_thread_create(&threads[h], &tramps[h], fn,
+                       (char *)args + (size_t)h * arg_size);
+  for (int h = 0; h < nh; h++)
+    mgpt_thread_join(threads[h]);
+}
+
+#endif /* MICROGPT_HEAD_PARALLEL */
 
 /* ================== Forward + Backward (Training) ======================== */
 
@@ -1153,7 +1509,7 @@ static void rmsnorm_bwd(const double *restrict x, const double *restrict dy,
  * │    x = RMSNorm(x)                                                 │
  * │    (Normalise the embedding to unit scale)                        │
  * │                                                                   │
- * │  Step 3: TRANSFORMER BLOCKS (× N_LAYER)                           │
+ * │  Step 3: TRANSFORMER BLOCKS (× nl)                           │
  * │    For each layer L:                                              │
  * │      3a. ATTENTION SUB-BLOCK:                                     │
  * │          x_norm = RMSNorm(x)                                      │
@@ -1170,7 +1526,7 @@ static void rmsnorm_bwd(const double *restrict x, const double *restrict dy,
  * │  Step 4: LM HEAD                                                  │
  * │    logits = lm_head @ x   (project to vocab-size scores)         │
  * │    probs = softmax(logits)                                        │
- * │    loss = -log(probs[target_id])  (cross-entropy: how surprised?) │
+ * │    loss = -M_LOG(probs[target_id])  (cross-entropy: how surprised?) │
  * │                                                                   │
  * └───────────────────────────────────────────────────────────────────┘
  *
@@ -1201,35 +1557,40 @@ static void rmsnorm_bwd(const double *restrict x, const double *restrict dy,
  *   - The KV cache (keys/values arrays) enables efficient autoregressive
  *     training where each new position attends to all previous positions.
  */
-double forward_backward_one(const Model *model, size_t token_id, size_t pos_id,
-                            size_t target_id, double **keys, double **values,
-                            size_t *cache_len, double *grad_buffer) {
+scalar_t forward_backward_one(const Model *model, size_t token_id,
+                              size_t pos_id, size_t target_id, scalar_t **keys,
+                              scalar_t **values, size_t *cache_len,
+                              scalar_t *grad_buffer) {
   const size_t vs = model->vocab_size;
-  const size_t ne = N_EMBD;
+  const size_t ne = (size_t)N_EMBD;
+  const int nl = N_LAYER;
+  const int nh = N_HEAD;
+  const size_t bs = (size_t)BLOCK_SIZE;
+  const size_t md = (size_t)MLP_DIM;
+  const size_t hd = ne / (size_t)nh;
+  const size_t max_vocab = (size_t)MAX_VOCAB;
   const size_t T = cache_len[0] + 1;
-#define MAX_W_SIZE (MLP_DIM * N_EMBD)
-  double W_tmp[MAX_W_SIZE];
+  const size_t max_w = md > ne ? md * ne : ne * ne;
+  scalar_t W_tmp[max_w];
 
   /* Per-layer saved activations for backward */
-  double sv_x_pre[N_LAYER][N_EMBD];   /* input to each layer */
-  double sv_x_norm1[N_LAYER][N_EMBD]; /* pre-attention norm output */
-  double sv_attn_w[N_LAYER]
-                  [N_HEAD * BLOCK_SIZE]; /* per-head attention weights */
-  double sv_q[N_LAYER][N_EMBD];      /* saved projected queries for backward */
-  size_t sv_T[N_LAYER];              /* T at each layer */
-  double sv_x_attn[N_LAYER][N_EMBD]; /* attention output (pre-Wo) */
-  double sv_x_post_attn[N_LAYER][N_EMBD]; /* after attention residual */
-  double sv_x_norm2[N_LAYER][N_EMBD];     /* pre-MLP norm output */
-  double sv_mlp_pre[N_LAYER][MLP_DIM];    /* fc1 output pre-ReLU */
-  double sv_mlp_post[N_LAYER][MLP_DIM];   /* fc1 output post-ReLU */
-  double sv_x_embed[N_EMBD];              /* embedding before initial norm */
+  scalar_t sv_x_pre[nl][ne];       /* input to each layer */
+  scalar_t sv_x_norm1[nl][ne];     /* pre-attention norm output */
+  scalar_t sv_attn_w[nl][nh * bs]; /* per-head attention weights */
+  scalar_t sv_q[nl][ne];           /* saved projected queries for backward */
+  size_t sv_T[nl];                 /* T at each layer */
+  scalar_t sv_x_attn[nl][ne];      /* attention output (pre-Wo) */
+  scalar_t sv_x_post_attn[nl][ne]; /* after attention residual */
+  scalar_t sv_x_norm2[nl][ne];     /* pre-MLP norm output */
+  scalar_t sv_mlp_pre[nl][md];     /* fc1 output pre-ReLU */
+  scalar_t sv_mlp_post[nl][md];    /* fc1 output post-ReLU */
+  scalar_t sv_x_embed[ne];         /* embedding before initial norm */
 
   /* Single-position activation buffers */
-  double x0[N_EMBD], x_norm1[N_EMBD], q[N_EMBD], k[N_EMBD], v[N_EMBD];
-  double attn_weights[N_HEAD * BLOCK_SIZE], x_attn[N_EMBD], x1[N_EMBD],
-      x_norm2[N_EMBD];
-  double mlp1[MLP_DIM], x2[N_EMBD], logits[MAX_VOCAB];
-  double d_x[N_EMBD], d_logits[MAX_VOCAB];
+  scalar_t x0[ne], x_norm1[ne], q[ne], k[ne], v[ne];
+  scalar_t attn_weights[nh * bs], x_attn[ne], x1[ne], x_norm2[ne];
+  scalar_t mlp1[md], x2[ne], logits[max_vocab];
+  scalar_t d_x[ne], d_logits[max_vocab];
   memset(d_x, 0, sizeof(d_x));
   memset(d_logits, 0, sizeof(d_logits));
 
@@ -1237,71 +1598,71 @@ double forward_backward_one(const Model *model, size_t token_id, size_t pos_id,
    * integer matmul results before rescaling back to fp64.
    * These are only allocated when INT8 quantisation is enabled. */
 #if defined(QUANTIZATION_INT8) || defined(QUANTISATION_INT8)
-  int8_t x_i8[MLP_DIM];
-  int64_t acc_buf[MAX_VOCAB];
+  int8_t x_i8[md];
+  int64_t acc_buf[max_vocab];
 #endif
 
   /* ── Step 1: EMBEDDING ──────────────────────────────────────────────── */
   /* Look up the token's embedding vector and add its position encoding.
    * INT8: embeddings are stored as int8 → must dequantise (scale × int8)
-   * FP64: direct double lookup, no conversion needed. */
+   * FP64: direct scalar_t lookup, no conversion needed. */
 #if defined(QUANTIZATION_INT8) || defined(QUANTISATION_INT8)
   /* INT8 embedding: dequantise by multiplying scale × int8 value */
   for (size_t i = 0; i < ne; i++)
-    x0[i] = model->scale[0] * (double)model->wte[token_id * ne + i] +
-            model->scale[1] * (double)model->wpe[pos_id * ne + i];
+    x0[i] = model->scale[0] * (scalar_t)model->wte[token_id * ne + i] +
+            model->scale[1] * (scalar_t)model->wpe[pos_id * ne + i];
 #else
   for (size_t i = 0; i < ne; i++)
     x0[i] = model->wte[token_id * ne + i] + model->wpe[pos_id * ne + i];
 #endif
-  memcpy(sv_x_embed, x0, ne * sizeof(double));
+  memcpy(sv_x_embed, x0, ne * sizeof(scalar_t));
   rmsnorm_fwd(x0, ne, x_norm1);
-  memcpy(x0, x_norm1, ne * sizeof(double));
+  memcpy(x0, x_norm1, ne * sizeof(scalar_t));
 
-  for (int L = 0; L < N_LAYER; L++) {
-    memcpy(sv_x_pre[L], x0, ne * sizeof(double));
+  for (int L = 0; L < nl; L++) {
+    memcpy(sv_x_pre[L], x0, ne * sizeof(scalar_t));
     sv_T[L] = T;
     /* ── Step 3a: ATTENTION SUB-BLOCK ───────────────────────────────────── */
     rmsnorm_fwd(x0, ne, x_norm1);
-    memcpy(sv_x_norm1[L], x_norm1, ne * sizeof(double));
+    memcpy(sv_x_norm1[L], x_norm1, ne * sizeof(scalar_t));
     /* Project normalised input into Q, K, V vectors.
      * INT8: quantise x_norm1 → int8, do integer matmul with int8 weights,
      *   then rescale: q[j] = scale_x × scale_w × int_accumulator[j]
      *   Scale indices: wq=3+L*6, wk=4+L*6, wv=5+L*6, wo=6+L*6,
      *                  fc1=7+L*6, fc2=8+L*6  (3 global + 6 per layer)
-     * FP64: standard double-precision matrix multiply. */
+     * FP64: standard scalar_t-precision matrix multiply. */
 #if defined(QUANTIZATION_INT8) || defined(QUANTISATION_INT8)
     {
-      double sx = quantize_vec_to_int8(x_norm1, ne, x_i8);
+      scalar_t sx = quantize_vec_to_int8(x_norm1, ne, x_i8);
       lin_fwd_int8(x_i8, model->attn_wq[L], ne, ne, acc_buf);
-      double sw = model->scale[3 + L * 6];
+      scalar_t sw = model->scale[3 + L * 6];
       for (size_t j = 0; j < ne; j++)
-        q[j] = sx * sw * (double)acc_buf[j];
+        q[j] = sx * sw * (scalar_t)acc_buf[j];
     }
     {
-      double sx = quantize_vec_to_int8(x_norm1, ne, x_i8);
+      scalar_t sx = quantize_vec_to_int8(x_norm1, ne, x_i8);
       lin_fwd_int8(x_i8, model->attn_wk[L], ne, ne, acc_buf);
-      double sw = model->scale[4 + L * 6];
+      scalar_t sw = model->scale[4 + L * 6];
       for (size_t j = 0; j < ne; j++)
-        k[j] = sx * sw * (double)acc_buf[j];
+        k[j] = sx * sw * (scalar_t)acc_buf[j];
     }
     {
-      double sx = quantize_vec_to_int8(x_norm1, ne, x_i8);
+      scalar_t sx = quantize_vec_to_int8(x_norm1, ne, x_i8);
       lin_fwd_int8(x_i8, model->attn_wv[L], ne, ne, acc_buf);
-      double sw = model->scale[5 + L * 6];
+      scalar_t sw = model->scale[5 + L * 6];
       for (size_t j = 0; j < ne; j++)
-        v[j] = sx * sw * (double)acc_buf[j];
+        v[j] = sx * sw * (scalar_t)acc_buf[j];
     }
 #else
     lin_fwd(x_norm1, model->attn_wq[L], ne, ne, q);
     lin_fwd(x_norm1, model->attn_wk[L], ne, ne, k);
     lin_fwd(x_norm1, model->attn_wv[L], ne, ne, v);
 #endif
-    memcpy(sv_q[L], q, ne * sizeof(double));
+    memcpy(sv_q[L], q, ne * sizeof(scalar_t));
     /* Append to cache (caller owns keys[L], values[L]; we write current at
      * cache_len[L]) */
-    memcpy(keys[L] + cache_len[L] * ne, k, ne * sizeof(double));
-    memcpy(values[L] + cache_len[L] * ne, v, ne * sizeof(double));
+    memcpy(KV_WRITE(keys, L, cache_len, ne), k, ne * sizeof(scalar_t));
+    memcpy(KV_WRITE(values, L, cache_len, ne), v, ne * sizeof(scalar_t));
 
     /*
      * MULTI-HEAD CAUSAL SELF-ATTENTION
@@ -1309,10 +1670,10 @@ double forward_backward_one(const Model *model, size_t token_id, size_t pos_id,
      *
      * The attention mechanism lets the model decide how much each
      * previous token (and the current one) should influence the current
-     * output.  Multi-head means we do this N_HEAD times in parallel,
-     * each head operating on a different HEAD_DIM-sized slice.
+     * output.  Multi-head means we do this nh times in parallel,
+     * each head operating on a different hd-sized slice.
      *
-     *   Full Q vector (N_EMBD = 32):
+     *   Full Q vector (ne = 32):
      *   ┌────────┬────────┬────────┬────────┐
      *   │ Head 0 │ Head 1 │ Head 2 │ Head 3 │
      *   │ 8 dims │ 8 dims │ 8 dims │ 8 dims │
@@ -1320,9 +1681,9 @@ double forward_backward_one(const Model *model, size_t token_id, size_t pos_id,
      *
      * For each head h:
      *
-     *   1. SCORE: dot(Q_h, K_h[t]) / sqrt(HEAD_DIM)  for each past position t
+     *   1. SCORE: dot(Q_h, K_h[t]) / M_SQRT(hd)  for each past position t
      *      ─ How relevant is position t to the current position?
-     *      ─ Divide by sqrt(d_k) to prevent dot products from growing too
+     *      ─ Divide by M_SQRT(d_k) to prevent dot products from growing too
      *        large (which would make softmax saturate to one-hot).
      *
      *   2. SOFTMAX: normalise scores to probabilities that sum to 1
@@ -1335,128 +1696,152 @@ double forward_backward_one(const Model *model, size_t token_id, size_t pos_id,
      *   This is achieved implicitly because the KV cache only contains
      *   positions 0..T-1 (no future positions).
      */
-    double scale = 1.0 / sqrt((double)HEAD_DIM);
-    for (int h = 0; h < N_HEAD; h++) {
-      size_t hoff =
-          (size_t)h * HEAD_DIM; /* offset into the full N_EMBD vector */
-      size_t hw = (size_t)h * BLOCK_SIZE; /* offset into attn_weights storage */
+    scalar_t scale = 1.0 / M_SQRT((scalar_t)hd);
+#ifdef MICROGPT_HEAD_PARALLEL
+    { /* Parallel forward attention: one thread per head */
+      AttnHeadFwdArg fwd_args[nh];
+      for (int h = 0; h < nh; h++) {
+        fwd_args[h].h = h;
+        fwd_args[h].scale = scale;
+        fwd_args[h].T = T;
+        fwd_args[h].cache_len_L = cache_len[L];
+        fwd_args[h].q = q;
+        fwd_args[h].k = k;
+        fwd_args[h].v = v;
+        fwd_args[h].keys = keys;
+        fwd_args[h].values = values;
+        fwd_args[h].L = L;
+        fwd_args[h].attn_weights = attn_weights;
+        fwd_args[h].x_attn = x_attn;
+        fwd_args[h].ne = ne;
+        fwd_args[h].hd = hd;
+        fwd_args[h].bs = bs;
+      }
+      attn_heads_dispatch(attn_head_fwd_worker, fwd_args,
+                          sizeof(AttnHeadFwdArg), nh);
+    }
+#else
+    for (int h = 0; h < nh; h++) {
+      size_t hoff = (size_t)h * hd; /* offset into the full ne vector */
+      size_t hw = (size_t)h * bs;   /* offset into attn_weights storage */
       /* Step 1: Compute attention scores (Q · K for each cached position) */
       for (size_t t = 0; t < T; t++) {
-        const double *kt =
-            (t < cache_len[L]) ? (keys[L] + t * ne + hoff) : (k + hoff);
-        double s = 0;
-        for (size_t d = 0; d < HEAD_DIM; d++)
+        const scalar_t *kt =
+            (t < cache_len[L]) ? (KV_READ(keys, L, t, ne) + hoff) : (k + hoff);
+        scalar_t s = 0;
+        for (size_t d = 0; d < hd; d++)
           s += q[hoff + d] * kt[d];
         attn_weights[hw + t] = s * scale;
       }
       /* Step 2: Softmax with numerical stability trick (subtract max) */
-      double max_s = attn_weights[hw];
+      scalar_t max_s = attn_weights[hw];
       for (size_t t = 1; t < T; t++)
         if (attn_weights[hw + t] > max_s)
           max_s = attn_weights[hw + t];
-      double sum = 0;
+      scalar_t sum = 0;
       for (size_t t = 0; t < T; t++) {
-        attn_weights[hw + t] = exp(attn_weights[hw + t] - max_s);
+        attn_weights[hw + t] = M_EXP(attn_weights[hw + t] - max_s);
         sum += attn_weights[hw + t];
       }
       for (size_t t = 0; t < T; t++)
         attn_weights[hw + t] /= sum;
       /* Step 3: Weighted sum of value vectors → attention output */
-      for (size_t d = 0; d < HEAD_DIM; d++) {
-        double s = 0;
+      for (size_t d = 0; d < hd; d++) {
+        scalar_t s = 0;
         for (size_t t = 0; t < T; t++) {
-          const double *vt =
-              (t < cache_len[L]) ? (values[L] + t * ne + hoff) : (v + hoff);
+          const scalar_t *vt = (t < cache_len[L])
+                                   ? (KV_READ(values, L, t, ne) + hoff)
+                                   : (v + hoff);
           s += attn_weights[hw + t] * vt[d];
         }
         x_attn[hoff + d] = s;
       }
     }
-    memcpy(sv_attn_w[L], attn_weights,
-           (size_t)N_HEAD * BLOCK_SIZE * sizeof(double));
-    memcpy(sv_x_attn[L], x_attn, ne * sizeof(double));
+#endif
+    memcpy(sv_attn_w[L], attn_weights, (size_t)nh * bs * sizeof(scalar_t));
+    memcpy(sv_x_attn[L], x_attn, ne * sizeof(scalar_t));
     /* Project attention output through Wo.
      * INT8: quantise x_attn → int8, do integer matmul, rescale result.
      *   y_fp64 = scale_x × scale_w × int_accumulator
-     * FP64: standard double-precision matrix multiply. */
+     * FP64: standard scalar_t-precision matrix multiply. */
 #if defined(QUANTIZATION_INT8) || defined(QUANTISATION_INT8)
     {
-      double sx = quantize_vec_to_int8(x_attn, ne, x_i8);
+      scalar_t sx = quantize_vec_to_int8(x_attn, ne, x_i8);
       lin_fwd_int8(x_i8, model->attn_wo[L], ne, ne, acc_buf);
-      double sw = model->scale[6 + L * 6];
+      scalar_t sw = model->scale[6 + L * 6];
       for (size_t j = 0; j < ne; j++)
-        x1[j] = sx * sw * (double)acc_buf[j];
+        x1[j] = sx * sw * (scalar_t)acc_buf[j];
     }
 #else
     lin_fwd(x_attn, model->attn_wo[L], ne, ne, x1);
 #endif
     for (size_t i = 0; i < ne; i++)
       x1[i] += x0[i]; /* residual */
-    memcpy(x0, x1, ne * sizeof(double));
-    memcpy(sv_x_post_attn[L], x0, ne * sizeof(double));
+    memcpy(x0, x1, ne * sizeof(scalar_t));
+    memcpy(sv_x_post_attn[L], x0, ne * sizeof(scalar_t));
 
     /* ── Step 3b: MLP SUB-BLOCK ──────────────────────────────────────── */
     rmsnorm_fwd(x0, ne, x_norm2);
-    memcpy(sv_x_norm2[L], x_norm2, ne * sizeof(double));
-    /* MLP: expand to MLP_DIM via fc1, apply ReLU, then project back via fc2.
+    memcpy(sv_x_norm2[L], x_norm2, ne * sizeof(scalar_t));
+    /* MLP: expand to md via fc1, apply ReLU, then project back via fc2.
      * INT8: each matmul is quantise → int8 multiply → rescale.
      *   fc1 uses scale index 7+L*6, fc2 uses 8+L*6.
-     * FP64: standard double-precision matrix multiply. */
+     * FP64: standard scalar_t-precision matrix multiply. */
 #if defined(QUANTIZATION_INT8) || defined(QUANTISATION_INT8)
     {
-      double sx = quantize_vec_to_int8(x_norm2, ne, x_i8);
-      lin_fwd_int8(x_i8, model->mlp_fc1[L], ne, MLP_DIM, acc_buf);
-      double sw = model->scale[7 + L * 6];
-      for (size_t j = 0; j < MLP_DIM; j++)
-        mlp1[j] = sx * sw * (double)acc_buf[j];
+      scalar_t sx = quantize_vec_to_int8(x_norm2, ne, x_i8);
+      lin_fwd_int8(x_i8, model->mlp_fc1[L], ne, md, acc_buf);
+      scalar_t sw = model->scale[7 + L * 6];
+      for (size_t j = 0; j < md; j++)
+        mlp1[j] = sx * sw * (scalar_t)acc_buf[j];
     }
-    memcpy(sv_mlp_pre[L], mlp1, MLP_DIM * sizeof(double));
-    for (size_t i = 0; i < MLP_DIM; i++)
+    memcpy(sv_mlp_pre[L], mlp1, md * sizeof(scalar_t));
+    for (size_t i = 0; i < md; i++)
       mlp1[i] = mlp1[i] > 0 ? mlp1[i] : 0; /* ReLU activation */
-    memcpy(sv_mlp_post[L], mlp1, MLP_DIM * sizeof(double));
+    memcpy(sv_mlp_post[L], mlp1, md * sizeof(scalar_t));
     {
-      double sx = quantize_vec_to_int8(mlp1, MLP_DIM, x_i8);
-      lin_fwd_int8(x_i8, model->mlp_fc2[L], MLP_DIM, ne, acc_buf);
-      double sw = model->scale[8 + L * 6];
+      scalar_t sx = quantize_vec_to_int8(mlp1, md, x_i8);
+      lin_fwd_int8(x_i8, model->mlp_fc2[L], md, ne, acc_buf);
+      scalar_t sw = model->scale[8 + L * 6];
       for (size_t j = 0; j < ne; j++)
-        x2[j] = sx * sw * (double)acc_buf[j];
+        x2[j] = sx * sw * (scalar_t)acc_buf[j];
     }
 #else
-    lin_fwd(x_norm2, model->mlp_fc1[L], ne, MLP_DIM, mlp1);
-    memcpy(sv_mlp_pre[L], mlp1, MLP_DIM * sizeof(double));
-    for (size_t i = 0; i < MLP_DIM; i++)
+    lin_fwd(x_norm2, model->mlp_fc1[L], ne, md, mlp1);
+    memcpy(sv_mlp_pre[L], mlp1, md * sizeof(scalar_t));
+    for (size_t i = 0; i < md; i++)
       mlp1[i] = mlp1[i] > 0 ? mlp1[i] : 0;
-    memcpy(sv_mlp_post[L], mlp1, MLP_DIM * sizeof(double));
-    lin_fwd(mlp1, model->mlp_fc2[L], MLP_DIM, ne, x2);
+    memcpy(sv_mlp_post[L], mlp1, md * sizeof(scalar_t));
+    lin_fwd(mlp1, model->mlp_fc2[L], md, ne, x2);
 #endif
     for (size_t i = 0; i < ne; i++)
       x2[i] += x0[i];
-    memcpy(x0, x2, ne * sizeof(double));
+    memcpy(x0, x2, ne * sizeof(scalar_t));
   }
 
 #if defined(QUANTIZATION_INT8) || defined(QUANTISATION_INT8)
   {
-    double sx = quantize_vec_to_int8(x0, ne, x_i8);
+    scalar_t sx = quantize_vec_to_int8(x0, ne, x_i8);
     lin_fwd_int8(x_i8, model->lm_head, ne, vs, acc_buf);
-    double sw = model->scale[2];
+    scalar_t sw = model->scale[2];
     for (size_t j = 0; j < vs; j++)
-      logits[j] = sx * sw * (double)acc_buf[j];
+      logits[j] = sx * sw * (scalar_t)acc_buf[j];
   }
 #else
   lin_fwd(x0, model->lm_head, ne, vs, logits);
 #endif
-  double max_l = logits[0];
+  scalar_t max_l = logits[0];
   for (size_t i = 1; i < vs; i++)
     if (logits[i] > max_l)
       max_l = logits[i];
-  double sum = 0;
+  scalar_t sum = 0;
   for (size_t i = 0; i < vs; i++) {
-    logits[i] = exp(logits[i] - max_l);
+    logits[i] = M_EXP(logits[i] - max_l);
     sum += logits[i];
   }
   for (size_t i = 0; i < vs; i++)
     logits[i] /= sum;
-  double loss = -log(logits[target_id] > 1e-10 ? logits[target_id] : 1e-10);
+  scalar_t loss = -M_LOG(logits[target_id] > 1e-10 ? logits[target_id] : 1e-10);
 
   /* =================== BACKWARD PASS =================== */
 
@@ -1467,9 +1852,8 @@ double forward_backward_one(const Model *model, size_t token_id, size_t pos_id,
   /* Grad buffer layout offsets */
   size_t off_wte = 0;
   size_t off_wpe = vs * ne;
-  size_t off_lm = vs * ne + (size_t)BLOCK_SIZE * ne;
-  size_t layer_stride = (size_t)N_EMBD * N_EMBD * 4 + (size_t)MLP_DIM * N_EMBD +
-                        (size_t)N_EMBD * MLP_DIM;
+  size_t off_lm = vs * ne + (size_t)bs * ne;
+  size_t layer_stride = (size_t)ne * ne * 4 + (size_t)md * ne + (size_t)ne * md;
   size_t off_layers = off_lm + vs * ne;
 
   /* Backward through lm_head: d_x = lm_head^T @ d_logits */
@@ -1477,102 +1861,125 @@ double forward_backward_one(const Model *model, size_t token_id, size_t pos_id,
           d_x, grad_buffer + off_lm);
 
   /* Backward through layers (reverse order) */
-  for (int L = N_LAYER - 1; L >= 0; L--) {
+  for (int L = nl - 1; L >= 0; L--) {
     size_t off_L = off_layers + (size_t)L * layer_stride;
     size_t off_wq = off_L;
     size_t off_wk = off_L + ne * ne;
     size_t off_wv = off_L + ne * ne * 2;
     size_t off_wo = off_L + ne * ne * 3;
     size_t off_fc1 = off_L + ne * ne * 4;
-    size_t off_fc2 = off_L + ne * ne * 4 + (size_t)MLP_DIM * ne;
+    size_t off_fc2 = off_L + ne * ne * 4 + (size_t)md * ne;
     size_t TL = sv_T[L];
 
     /* --- MLP residual: d_x flows through addition --- */
     /* d_x is the gradient of output of this layer (post-MLP-residual) */
 
     /* Backward through fc2 */
-    double d_mlp_post[MLP_DIM];
+    scalar_t d_mlp_post[md];
     memset(d_mlp_post, 0, sizeof(d_mlp_post));
-    lin_bwd(
-        sv_mlp_post[L],
-        get_W(model, model->mlp_fc2[L], 8 + L * 6, (size_t)ne * MLP_DIM, W_tmp),
-        d_x, MLP_DIM, ne, d_mlp_post, grad_buffer + off_fc2);
+    lin_bwd(sv_mlp_post[L],
+            get_W(model, model->mlp_fc2[L], 8 + L * 6, (size_t)ne * md, W_tmp),
+            d_x, md, ne, d_mlp_post, grad_buffer + off_fc2);
 
     /* Backward through ReLU */
-    double d_mlp_pre[MLP_DIM];
-    for (size_t i = 0; i < MLP_DIM; i++)
+    scalar_t d_mlp_pre[md];
+    for (size_t i = 0; i < md; i++)
       d_mlp_pre[i] = sv_mlp_pre[L][i] > 0 ? d_mlp_post[i] : 0;
 
     /* Backward through fc1 */
-    double d_x_norm2[N_EMBD];
+    scalar_t d_x_norm2[ne];
     memset(d_x_norm2, 0, sizeof(d_x_norm2));
-    lin_bwd(
-        sv_x_norm2[L],
-        get_W(model, model->mlp_fc1[L], 7 + L * 6, (size_t)MLP_DIM * ne, W_tmp),
-        d_mlp_pre, ne, MLP_DIM, d_x_norm2, grad_buffer + off_fc1);
+    lin_bwd(sv_x_norm2[L],
+            get_W(model, model->mlp_fc1[L], 7 + L * 6, (size_t)md * ne, W_tmp),
+            d_mlp_pre, ne, md, d_x_norm2, grad_buffer + off_fc1);
 
     /* Backward through pre-MLP RMSNorm */
-    double d_x_post_attn[N_EMBD];
+    scalar_t d_x_post_attn[ne];
     memset(d_x_post_attn, 0, sizeof(d_x_post_attn));
     rmsnorm_bwd(sv_x_post_attn[L], d_x_norm2, ne, d_x_post_attn);
 
     /* MLP residual: d_x1 = d_x (from residual skip) + d_x_post_attn */
-    double d_x1[N_EMBD];
+    scalar_t d_x1[ne];
     for (size_t i = 0; i < ne; i++)
       d_x1[i] = d_x[i] + d_x_post_attn[i];
 
     /* Backward through Wo */
-    double d_x_attn[N_EMBD];
+    scalar_t d_x_attn[ne];
     memset(d_x_attn, 0, sizeof(d_x_attn));
     lin_bwd(sv_x_attn[L],
             get_W(model, model->attn_wo[L], 6 + L * 6, ne * ne, W_tmp), d_x1,
             ne, ne, d_x_attn, grad_buffer + off_wo);
 
     /* Backward through multi-head attention */
-    double d_q[N_EMBD];
+    scalar_t d_q[ne];
     memset(d_q, 0, sizeof(d_q));
-    double d_k_cur[N_EMBD];
+    scalar_t d_k_cur[ne];
     memset(d_k_cur, 0, sizeof(d_k_cur));
-    double d_v_cur[N_EMBD];
+    scalar_t d_v_cur[ne];
     memset(d_v_cur, 0, sizeof(d_v_cur));
-    double attn_scale = 1.0 / sqrt((double)HEAD_DIM);
+    scalar_t attn_scale = 1.0 / M_SQRT((scalar_t)hd);
 
-    for (int h = 0; h < N_HEAD; h++) {
-      size_t hoff = (size_t)h * HEAD_DIM;
-      size_t hw = (size_t)h * BLOCK_SIZE;
+#ifdef MICROGPT_HEAD_PARALLEL
+    { /* Parallel backward attention: one thread per head */
+      AttnHeadBwdArg bwd_args[nh];
+      for (int h = 0; h < nh; h++) {
+        bwd_args[h].h = h;
+        bwd_args[h].attn_scale = attn_scale;
+        bwd_args[h].TL = TL;
+        bwd_args[h].d_x_attn = d_x_attn;
+        bwd_args[h].sv_attn_w_L = sv_attn_w[L];
+        bwd_args[h].sv_q_L = sv_q[L];
+        bwd_args[h].keys = keys;
+        bwd_args[h].values = values;
+        bwd_args[h].L = L;
+        bwd_args[h].d_q = d_q;
+        bwd_args[h].d_k_cur = d_k_cur;
+        bwd_args[h].d_v_cur = d_v_cur;
+        bwd_args[h].ne = ne;
+        bwd_args[h].hd = hd;
+        bwd_args[h].bs = bs;
+      }
+      attn_heads_dispatch(attn_head_bwd_worker, bwd_args,
+                          sizeof(AttnHeadBwdArg), nh);
+    }
+#else
+    for (int h = 0; h < nh; h++) {
+      size_t hoff = (size_t)h * hd;
+      size_t hw = (size_t)h * bs;
       /* d_a_h[t] = sum_d d_x_attn[hoff+d] * V[t][hoff+d] */
-      double d_attn_h[BLOCK_SIZE];
+      scalar_t d_attn_h[bs];
       for (size_t t = 0; t < TL; t++) {
-        const double *vt = values[L] + t * ne;
-        double s = 0;
-        for (size_t d = 0; d < HEAD_DIM; d++)
+        const scalar_t *vt = KV_READ(values, L, t, ne);
+        scalar_t s = 0;
+        for (size_t d = 0; d < hd; d++)
           s += d_x_attn[hoff + d] * vt[hoff + d];
         d_attn_h[t] = s;
       }
       /* Softmax backward per head */
-      double dot_ad = 0;
+      scalar_t dot_ad = 0;
       for (size_t t = 0; t < TL; t++)
         dot_ad += sv_attn_w[L][hw + t] * d_attn_h[t];
-      double d_score_h[BLOCK_SIZE];
+      scalar_t d_score_h[bs];
       for (size_t t = 0; t < TL; t++)
         d_score_h[t] =
             sv_attn_w[L][hw + t] * (d_attn_h[t] - dot_ad) * attn_scale;
       /* Q·K backward per head */
       for (size_t t = 0; t < TL; t++) {
-        const double *kt = keys[L] + t * ne;
-        for (size_t d = 0; d < HEAD_DIM; d++)
+        const scalar_t *kt = KV_READ(keys, L, t, ne);
+        for (size_t d = 0; d < hd; d++)
           d_q[hoff + d] += d_score_h[t] * kt[hoff + d];
       }
       /* K backward for current position: d_k += d_score[TL-1] * q */
-      for (size_t d = 0; d < HEAD_DIM; d++)
+      for (size_t d = 0; d < hd; d++)
         d_k_cur[hoff + d] += d_score_h[TL - 1] * sv_q[L][hoff + d];
       /* V backward for current position: d_v += a_h[TL-1] * d_x_attn */
-      for (size_t d = 0; d < HEAD_DIM; d++)
+      for (size_t d = 0; d < hd; d++)
         d_v_cur[hoff + d] += sv_attn_w[L][hw + TL - 1] * d_x_attn[hoff + d];
     }
+#endif
 
     /* Backward through Q = Wq @ x_norm1 */
-    double d_x_norm1[N_EMBD];
+    scalar_t d_x_norm1[ne];
     memset(d_x_norm1, 0, sizeof(d_x_norm1));
     lin_bwd(sv_x_norm1[L],
             get_W(model, model->attn_wq[L], 3 + L * 6, ne * ne, W_tmp), d_q, ne,
@@ -1586,7 +1993,7 @@ double forward_backward_one(const Model *model, size_t token_id, size_t pos_id,
             ne, ne, d_x_norm1, grad_buffer + off_wv);
 
     /* Backward through pre-attention RMSNorm */
-    double d_x_pre[N_EMBD];
+    scalar_t d_x_pre[ne];
     memset(d_x_pre, 0, sizeof(d_x_pre));
     rmsnorm_bwd(sv_x_pre[L], d_x_norm1, ne, d_x_pre);
 
@@ -1595,11 +2002,11 @@ double forward_backward_one(const Model *model, size_t token_id, size_t pos_id,
       d_x_pre[i] += d_x1[i];
 
     /* d_x for next layer down = d_x_pre */
-    memcpy(d_x, d_x_pre, ne * sizeof(double));
+    memcpy(d_x, d_x_pre, ne * sizeof(scalar_t));
   }
 
   /* Backward through initial RMSNorm */
-  double d_embed[N_EMBD];
+  scalar_t d_embed[ne];
   memset(d_embed, 0, sizeof(d_embed));
   rmsnorm_bwd(sv_x_embed, d_x, ne, d_embed);
 
@@ -1610,7 +2017,7 @@ double forward_backward_one(const Model *model, size_t token_id, size_t pos_id,
   }
 
   cache_len[0]++;
-  for (int L = 1; L < N_LAYER; L++)
+  for (int L = 1; L < nl; L++)
     cache_len[L]++;
   return loss;
 }
@@ -1627,158 +2034,190 @@ double forward_backward_one(const Model *model, size_t token_id, size_t pos_id,
  *   cache (keys[L], values[L]), and increments cache_len[L].
  */
 void forward_inference(const Model *model, size_t token_id, size_t pos_id,
-                       double **keys, double **values, size_t *cache_len,
-                       double *logits_out) {
+                       scalar_t **keys, scalar_t **values, size_t *cache_len,
+                       scalar_t *logits_out) {
   const size_t vs = model->vocab_size;
-  const size_t ne = N_EMBD;
+  const size_t ne = (size_t)N_EMBD;
+  const int nl = N_LAYER;
+  const int nh = N_HEAD;
+  const size_t bs = (size_t)BLOCK_SIZE;
+  const size_t md = (size_t)MLP_DIM;
+  const size_t hd = ne / (size_t)nh;
   size_t T = cache_len[0] + 1; /* total positions including current */
 #if !defined(QUANTIZATION_INT8) && !defined(QUANTISATION_INT8)
-  double W_tmp[MLP_DIM * N_EMBD];
+  scalar_t W_tmp[md * ne];
+  (void)W_tmp;
 #endif
-  double x0[N_EMBD], x_norm1[N_EMBD], q[N_EMBD], k[N_EMBD], v[N_EMBD];
-  double attn_weights[N_HEAD * BLOCK_SIZE], x_attn[N_EMBD], x1[N_EMBD],
-      x_norm2[N_EMBD];
-  double mlp1[MLP_DIM], x2[N_EMBD];
+  scalar_t x0[ne], x_norm1[ne], q[ne], k[ne], v[ne];
+  scalar_t attn_weights[nh * bs], x_attn[ne], x1[ne], x_norm2[ne];
+  scalar_t mlp1[md], x2[ne];
 
 #if defined(QUANTIZATION_INT8) || defined(QUANTISATION_INT8)
-  int8_t x_i8[MLP_DIM];
-  int64_t acc_buf[MAX_VOCAB];
+  int8_t x_i8[md];
+  int64_t acc_buf[max_vocab];
   for (size_t i = 0; i < ne; i++)
-    x0[i] = model->scale[0] * (double)model->wte[token_id * ne + i] +
-            model->scale[1] * (double)model->wpe[pos_id * ne + i];
+    x0[i] = model->scale[0] * (scalar_t)model->wte[token_id * ne + i] +
+            model->scale[1] * (scalar_t)model->wpe[pos_id * ne + i];
 #else
   for (size_t i = 0; i < ne; i++)
     x0[i] = model->wte[token_id * ne + i] + model->wpe[pos_id * ne + i];
 #endif
   rmsnorm_fwd(x0, ne, x_norm1);
-  memcpy(x0, x_norm1, ne * sizeof(double));
+  memcpy(x0, x_norm1, ne * sizeof(scalar_t));
 
-  for (int L = 0; L < N_LAYER; L++) {
+  for (int L = 0; L < nl; L++) {
     rmsnorm_fwd(x0, ne, x_norm1);
-    /* Project normalised input \u2192 Q, K, V (same as training, no saved activations).
-     * INT8: quantise \u2192 int8 matmul \u2192 rescale.  FP64: direct double matmul. */
+    /* Project normalised input \u2192 Q, K, V (same as training, no saved
+     * activations). INT8: quantise \u2192 int8 matmul \u2192 rescale.  FP64:
+     * direct scalar_t matmul. */
 #if defined(QUANTIZATION_INT8) || defined(QUANTISATION_INT8)
     {
-      double sx = quantize_vec_to_int8(x_norm1, ne, x_i8);
+      scalar_t sx = quantize_vec_to_int8(x_norm1, ne, x_i8);
       lin_fwd_int8(x_i8, model->attn_wq[L], ne, ne, acc_buf);
-      double sw = model->scale[3 + L * 6];
+      scalar_t sw = model->scale[3 + L * 6];
       for (size_t j = 0; j < ne; j++)
-        q[j] = sx * sw * (double)acc_buf[j];
+        q[j] = sx * sw * (scalar_t)acc_buf[j];
     }
     {
-      double sx = quantize_vec_to_int8(x_norm1, ne, x_i8);
+      scalar_t sx = quantize_vec_to_int8(x_norm1, ne, x_i8);
       lin_fwd_int8(x_i8, model->attn_wk[L], ne, ne, acc_buf);
-      double sw = model->scale[4 + L * 6];
+      scalar_t sw = model->scale[4 + L * 6];
       for (size_t j = 0; j < ne; j++)
-        k[j] = sx * sw * (double)acc_buf[j];
+        k[j] = sx * sw * (scalar_t)acc_buf[j];
     }
     {
-      double sx = quantize_vec_to_int8(x_norm1, ne, x_i8);
+      scalar_t sx = quantize_vec_to_int8(x_norm1, ne, x_i8);
       lin_fwd_int8(x_i8, model->attn_wv[L], ne, ne, acc_buf);
-      double sw = model->scale[5 + L * 6];
+      scalar_t sw = model->scale[5 + L * 6];
       for (size_t j = 0; j < ne; j++)
-        v[j] = sx * sw * (double)acc_buf[j];
+        v[j] = sx * sw * (scalar_t)acc_buf[j];
     }
 #else
     lin_fwd(x_norm1, model->attn_wq[L], ne, ne, q);
     lin_fwd(x_norm1, model->attn_wk[L], ne, ne, k);
     lin_fwd(x_norm1, model->attn_wv[L], ne, ne, v);
 #endif
-    memcpy(keys[L] + cache_len[L] * ne, k, ne * sizeof(double));
-    memcpy(values[L] + cache_len[L] * ne, v, ne * sizeof(double));
+    memcpy(KV_WRITE(keys, L, cache_len, ne), k, ne * sizeof(scalar_t));
+    memcpy(KV_WRITE(values, L, cache_len, ne), v, ne * sizeof(scalar_t));
     /* Multi-head attention */
-    double scale = 1.0 / sqrt((double)HEAD_DIM);
-    for (int h = 0; h < N_HEAD; h++) {
-      size_t hoff = (size_t)h * HEAD_DIM;
-      size_t hw = (size_t)h * BLOCK_SIZE;
+    scalar_t scale = 1.0 / M_SQRT((scalar_t)hd);
+#ifdef MICROGPT_HEAD_PARALLEL
+    { /* Parallel inference attention: one thread per head */
+      AttnHeadFwdArg fwd_args[nh];
+      for (int h = 0; h < nh; h++) {
+        fwd_args[h].h = h;
+        fwd_args[h].scale = scale;
+        fwd_args[h].T = T;
+        fwd_args[h].cache_len_L = cache_len[L];
+        fwd_args[h].q = q;
+        fwd_args[h].k = k;
+        fwd_args[h].v = v;
+        fwd_args[h].keys = keys;
+        fwd_args[h].values = values;
+        fwd_args[h].L = L;
+        fwd_args[h].attn_weights = attn_weights;
+        fwd_args[h].x_attn = x_attn;
+        fwd_args[h].ne = ne;
+        fwd_args[h].hd = hd;
+        fwd_args[h].bs = bs;
+      }
+      attn_heads_dispatch(attn_head_fwd_worker, fwd_args,
+                          sizeof(AttnHeadFwdArg), nh);
+    }
+#else
+    for (int h = 0; h < nh; h++) {
+      size_t hoff = (size_t)h * hd;
+      size_t hw = (size_t)h * bs;
       for (size_t t = 0; t < T; t++) {
-        const double *kt =
-            (t < cache_len[L]) ? (keys[L] + t * ne + hoff) : (k + hoff);
-        double s = 0;
-        for (size_t d = 0; d < HEAD_DIM; d++)
+        const scalar_t *kt =
+            (t < cache_len[L]) ? (KV_READ(keys, L, t, ne) + hoff) : (k + hoff);
+        scalar_t s = 0;
+        for (size_t d = 0; d < hd; d++)
           s += q[hoff + d] * kt[d];
         attn_weights[hw + t] = s * scale;
       }
-      double max_s = attn_weights[hw];
+      scalar_t max_s = attn_weights[hw];
       for (size_t t = 1; t < T; t++)
         if (attn_weights[hw + t] > max_s)
           max_s = attn_weights[hw + t];
-      double sum = 0;
+      scalar_t sum = 0;
       for (size_t t = 0; t < T; t++) {
-        attn_weights[hw + t] = exp(attn_weights[hw + t] - max_s);
+        attn_weights[hw + t] = M_EXP(attn_weights[hw + t] - max_s);
         sum += attn_weights[hw + t];
       }
       for (size_t t = 0; t < T; t++)
         attn_weights[hw + t] /= sum;
-      for (size_t d = 0; d < HEAD_DIM; d++) {
-        double s = 0;
+      for (size_t d = 0; d < hd; d++) {
+        scalar_t s = 0;
         for (size_t t = 0; t < T; t++) {
-          const double *vt =
-              (t < cache_len[L]) ? (values[L] + t * ne + hoff) : (v + hoff);
+          const scalar_t *vt = (t < cache_len[L])
+                                   ? (KV_READ(values, L, t, ne) + hoff)
+                                   : (v + hoff);
           s += attn_weights[hw + t] * vt[d];
         }
         x_attn[hoff + d] = s;
       }
     }
+#endif
 #if defined(QUANTIZATION_INT8) || defined(QUANTISATION_INT8)
     {
-      double sx = quantize_vec_to_int8(x_attn, ne, x_i8);
+      scalar_t sx = quantize_vec_to_int8(x_attn, ne, x_i8);
       lin_fwd_int8(x_i8, model->attn_wo[L], ne, ne, acc_buf);
-      double sw = model->scale[6 + L * 6];
+      scalar_t sw = model->scale[6 + L * 6];
       for (size_t j = 0; j < ne; j++)
-        x1[j] = sx * sw * (double)acc_buf[j];
+        x1[j] = sx * sw * (scalar_t)acc_buf[j];
     }
 #else
     lin_fwd(x_attn, model->attn_wo[L], ne, ne, x1);
 #endif
     for (size_t i = 0; i < ne; i++)
       x1[i] += x0[i];
-    memcpy(x0, x1, ne * sizeof(double));
+    memcpy(x0, x1, ne * sizeof(scalar_t));
     /* ── MLP forward (inference) ── */
     rmsnorm_fwd(x0, ne, x_norm2);
     /* INT8: quantise → int8 matmul → rescale for both fc1 and fc2. */
 #if defined(QUANTIZATION_INT8) || defined(QUANTISATION_INT8)
     {
-      double sx = quantize_vec_to_int8(x_norm2, ne, x_i8);
-      lin_fwd_int8(x_i8, model->mlp_fc1[L], ne, MLP_DIM, acc_buf);
-      double sw = model->scale[7 + L * 6];
-      for (size_t j = 0; j < MLP_DIM; j++)
-        mlp1[j] = sx * sw * (double)acc_buf[j];
+      scalar_t sx = quantize_vec_to_int8(x_norm2, ne, x_i8);
+      lin_fwd_int8(x_i8, model->mlp_fc1[L], ne, md, acc_buf);
+      scalar_t sw = model->scale[7 + L * 6];
+      for (size_t j = 0; j < md; j++)
+        mlp1[j] = sx * sw * (scalar_t)acc_buf[j];
     }
-    for (size_t i = 0; i < MLP_DIM; i++)
+    for (size_t i = 0; i < md; i++)
       mlp1[i] = mlp1[i] > 0 ? mlp1[i] : 0;
     {
-      double sx = quantize_vec_to_int8(mlp1, MLP_DIM, x_i8);
-      lin_fwd_int8(x_i8, model->mlp_fc2[L], MLP_DIM, ne, acc_buf);
-      double sw = model->scale[8 + L * 6];
+      scalar_t sx = quantize_vec_to_int8(mlp1, md, x_i8);
+      lin_fwd_int8(x_i8, model->mlp_fc2[L], md, ne, acc_buf);
+      scalar_t sw = model->scale[8 + L * 6];
       for (size_t j = 0; j < ne; j++)
-        x2[j] = sx * sw * (double)acc_buf[j];
+        x2[j] = sx * sw * (scalar_t)acc_buf[j];
     }
 #else
-    lin_fwd(x_norm2, model->mlp_fc1[L], ne, MLP_DIM, mlp1);
-    for (size_t i = 0; i < MLP_DIM; i++)
+    lin_fwd(x_norm2, model->mlp_fc1[L], ne, md, mlp1);
+    for (size_t i = 0; i < md; i++)
       mlp1[i] = mlp1[i] > 0 ? mlp1[i] : 0;
-    lin_fwd(mlp1, model->mlp_fc2[L], MLP_DIM, ne, x2);
+    lin_fwd(mlp1, model->mlp_fc2[L], md, ne, x2);
 #endif
     for (size_t i = 0; i < ne; i++)
       x2[i] += x0[i];
-    memcpy(x0, x2, ne * sizeof(double));
+    memcpy(x0, x2, ne * sizeof(scalar_t));
     T = cache_len[L] + 1;
   }
   /* ── LM head: project final hidden state to vocabulary logits ── */
   /* INT8: final quantise → int8 matmul → rescale.  scale[2] = lm_head scale. */
 #if defined(QUANTIZATION_INT8) || defined(QUANTISATION_INT8)
   {
-    double sx = quantize_vec_to_int8(x0, ne, x_i8);
+    scalar_t sx = quantize_vec_to_int8(x0, ne, x_i8);
     lin_fwd_int8(x_i8, model->lm_head, ne, vs, acc_buf);
-    double sw = model->scale[2];
+    scalar_t sw = model->scale[2];
     for (size_t j = 0; j < vs; j++)
-      logits_out[j] = sx * sw * (double)acc_buf[j];
+      logits_out[j] = sx * sw * (scalar_t)acc_buf[j];
   }
 #else
   lin_fwd(x0, model->lm_head, ne, vs, logits_out);
 #endif
-  for (int L = 0; L < N_LAYER; L++)
+  for (int L = 0; L < nl; L++)
     cache_len[L]++;
 }
 
@@ -1828,208 +2267,212 @@ void forward_inference(const Model *model, size_t token_id, size_t pos_id,
  *   directly — that would lose precision).  After all parameters are
  *   updated, the master copy is requantised to int8 with fresh scales.
  */
-void adam_step(Model *model, const double *grads, double *m, double *v,
+void adam_step(Model *model, const scalar_t *grads, scalar_t *m, scalar_t *v,
                int step) {
   /* ── Cosine LR schedule with linear warmup ─────────────────────────── */
-  double lr;
-  if (step < WARMUP_STEPS)
-    /* Warmup: linearly ramp from 0 → LEARNING_RATE */
-    lr = LEARNING_RATE * ((double)(step + 1) / (double)WARMUP_STEPS);
+  const int warmup = WARMUP_STEPS;
+  const int total = NUM_STEPS;
+  const scalar_t peak_lr = (scalar_t)LEARNING_RATE;
+  scalar_t lr;
+  if (step < warmup)
+    /* Warmup: linearly ramp from 0 → peak_lr */
+    lr = peak_lr * ((scalar_t)(step + 1) / (scalar_t)warmup);
   else {
-    /* Cosine decay: LEARNING_RATE → ~0 following a half-cosine curve */
-    double progress =
-        (double)(step - WARMUP_STEPS) / (double)(NUM_STEPS - WARMUP_STEPS);
-    lr = LEARNING_RATE * 0.5 * (1.0 + cos(progress * 3.14159265358979323846));
+    /* Cosine decay: peak_lr → ~0 following a half-cosine curve */
+    scalar_t progress = (scalar_t)(step - warmup) / (scalar_t)(total - warmup);
+    lr = peak_lr * 0.5 * (1.0 + cos(progress * 3.14159265358979323846));
   }
-  double b1 = BETA1, b2 = BETA2, eps = EPS_ADAM;
+  scalar_t b1 = BETA1, b2 = BETA2, eps = EPS_ADAM;
   /* Pre-compute bias-correction denominators once per step (not per weight!
    * — these only depend on step number, not on individual gradients). */
-  double bc1 = 1.0 - pow(b1, (double)(step + 1));
-  double bc2 = 1.0 - pow(b2, (double)(step + 1));
+  scalar_t bc1 = 1.0 - M_POW(b1, (scalar_t)(step + 1));
+  scalar_t bc2 = 1.0 - M_POW(b2, (scalar_t)(step + 1));
   size_t vs = model->vocab_size;
+  const size_t ne = (size_t)N_EMBD;
+  const int nl = N_LAYER;
+  const size_t bs = (size_t)BLOCK_SIZE;
+  const size_t md = (size_t)MLP_DIM;
   size_t idx = 0; /* flat index into the gradient / moment arrays */
   /* ── INT8 path: update the fp64 master copy, then requantise later ── */
 #if defined(QUANTIZATION_INT8) || defined(QUANTISATION_INT8)
-  double *master = model->master;
+  scalar_t *master = model->master;
   /* Update wte (token embeddings) in the master copy */
-  for (size_t i = 0; i < vs * N_EMBD; i++, idx++) {
-    double g = grads[idx];
+  for (size_t i = 0; i < vs * ne; i++, idx++) {
+    scalar_t g = grads[idx];
     m[idx] = b1 * m[idx] + (1 - b1) * g;
     v[idx] = b2 * v[idx] + (1 - b2) * g * g;
-    double mh = m[idx] / bc1;
-    double vh = v[idx] / bc2;
-    master[idx] -= lr * mh / (sqrt(vh) + eps);
+    scalar_t mh = m[idx] / bc1;
+    scalar_t vh = v[idx] / bc2;
+    master[idx] -= lr * mh / (M_SQRT(vh) + eps);
   }
-  for (size_t i = 0; i < BLOCK_SIZE * N_EMBD; i++, idx++) {
-    double g = grads[idx];
+  for (size_t i = 0; i < bs * ne; i++, idx++) {
+    scalar_t g = grads[idx];
     m[idx] = b1 * m[idx] + (1 - b1) * g;
     v[idx] = b2 * v[idx] + (1 - b2) * g * g;
-    double mh = m[idx] / bc1;
-    double vh = v[idx] / bc2;
-    master[idx] -= lr * mh / (sqrt(vh) + eps);
+    scalar_t mh = m[idx] / bc1;
+    scalar_t vh = v[idx] / bc2;
+    master[idx] -= lr * mh / (M_SQRT(vh) + eps);
   }
-  for (size_t i = 0; i < vs * N_EMBD; i++, idx++) {
-    double g = grads[idx];
+  for (size_t i = 0; i < vs * ne; i++, idx++) {
+    scalar_t g = grads[idx];
     m[idx] = b1 * m[idx] + (1 - b1) * g;
     v[idx] = b2 * v[idx] + (1 - b2) * g * g;
-    double mh = m[idx] / bc1;
-    double vh = v[idx] / bc2;
-    master[idx] -= lr * mh / (sqrt(vh) + eps);
+    scalar_t mh = m[idx] / bc1;
+    scalar_t vh = v[idx] / bc2;
+    master[idx] -= lr * mh / (M_SQRT(vh) + eps);
   }
-  for (int L = 0; L < N_LAYER; L++) {
-    for (size_t i = 0; i < N_EMBD * N_EMBD; i++, idx++) {
-      double g = grads[idx];
+  for (int L = 0; L < nl; L++) {
+    for (size_t i = 0; i < ne * ne; i++, idx++) {
+      scalar_t g = grads[idx];
       m[idx] = b1 * m[idx] + (1 - b1) * g;
       v[idx] = b2 * v[idx] + (1 - b2) * g * g;
-      double mh = m[idx] / bc1;
-      double vh = v[idx] / bc2;
-      master[idx] -= lr * mh / (sqrt(vh) + eps);
+      scalar_t mh = m[idx] / bc1;
+      scalar_t vh = v[idx] / bc2;
+      master[idx] -= lr * mh / (M_SQRT(vh) + eps);
     }
-    for (size_t i = 0; i < N_EMBD * N_EMBD; i++, idx++) {
-      double g = grads[idx];
+    for (size_t i = 0; i < ne * ne; i++, idx++) {
+      scalar_t g = grads[idx];
       m[idx] = b1 * m[idx] + (1 - b1) * g;
       v[idx] = b2 * v[idx] + (1 - b2) * g * g;
-      double mh = m[idx] / bc1;
-      double vh = v[idx] / bc2;
-      master[idx] -= lr * mh / (sqrt(vh) + eps);
+      scalar_t mh = m[idx] / bc1;
+      scalar_t vh = v[idx] / bc2;
+      master[idx] -= lr * mh / (M_SQRT(vh) + eps);
     }
-    for (size_t i = 0; i < N_EMBD * N_EMBD; i++, idx++) {
-      double g = grads[idx];
+    for (size_t i = 0; i < ne * ne; i++, idx++) {
+      scalar_t g = grads[idx];
       m[idx] = b1 * m[idx] + (1 - b1) * g;
       v[idx] = b2 * v[idx] + (1 - b2) * g * g;
-      double mh = m[idx] / bc1;
-      double vh = v[idx] / bc2;
-      master[idx] -= lr * mh / (sqrt(vh) + eps);
+      scalar_t mh = m[idx] / bc1;
+      scalar_t vh = v[idx] / bc2;
+      master[idx] -= lr * mh / (M_SQRT(vh) + eps);
     }
-    for (size_t i = 0; i < N_EMBD * N_EMBD; i++, idx++) {
-      double g = grads[idx];
+    for (size_t i = 0; i < ne * ne; i++, idx++) {
+      scalar_t g = grads[idx];
       m[idx] = b1 * m[idx] + (1 - b1) * g;
       v[idx] = b2 * v[idx] + (1 - b2) * g * g;
-      double mh = m[idx] / bc1;
-      double vh = v[idx] / bc2;
-      master[idx] -= lr * mh / (sqrt(vh) + eps);
+      scalar_t mh = m[idx] / bc1;
+      scalar_t vh = v[idx] / bc2;
+      master[idx] -= lr * mh / (M_SQRT(vh) + eps);
     }
-    for (size_t i = 0; i < MLP_DIM * N_EMBD; i++, idx++) {
-      double g = grads[idx];
+    for (size_t i = 0; i < md * ne; i++, idx++) {
+      scalar_t g = grads[idx];
       m[idx] = b1 * m[idx] + (1 - b1) * g;
       v[idx] = b2 * v[idx] + (1 - b2) * g * g;
-      double mh = m[idx] / bc1;
-      double vh = v[idx] / bc2;
-      master[idx] -= lr * mh / (sqrt(vh) + eps);
+      scalar_t mh = m[idx] / bc1;
+      scalar_t vh = v[idx] / bc2;
+      master[idx] -= lr * mh / (M_SQRT(vh) + eps);
     }
-    for (size_t i = 0; i < N_EMBD * MLP_DIM; i++, idx++) {
-      double g = grads[idx];
+    for (size_t i = 0; i < ne * md; i++, idx++) {
+      scalar_t g = grads[idx];
       m[idx] = b1 * m[idx] + (1 - b1) * g;
       v[idx] = b2 * v[idx] + (1 - b2) * g * g;
-      double mh = m[idx] / bc1;
-      double vh = v[idx] / bc2;
-      master[idx] -= lr * mh / (sqrt(vh) + eps);
+      scalar_t mh = m[idx] / bc1;
+      scalar_t vh = v[idx] / bc2;
+      master[idx] -= lr * mh / (M_SQRT(vh) + eps);
     }
   }
   /* Requantize master -> int8 */
   size_t off = 0;
-  quantize_fp64_to_int8(master + off, vs * N_EMBD, model->wte,
-                        &model->scale[0]);
-  off += vs * N_EMBD;
-  quantize_fp64_to_int8(master + off, BLOCK_SIZE * N_EMBD, model->wpe,
-                        &model->scale[1]);
-  off += BLOCK_SIZE * N_EMBD;
-  quantize_fp64_to_int8(master + off, vs * N_EMBD, model->lm_head,
+  quantize_fp64_to_int8(master + off, vs * ne, model->wte, &model->scale[0]);
+  off += vs * ne;
+  quantize_fp64_to_int8(master + off, bs * ne, model->wpe, &model->scale[1]);
+  off += bs * ne;
+  quantize_fp64_to_int8(master + off, vs * ne, model->lm_head,
                         &model->scale[2]);
-  off += vs * N_EMBD;
-  for (int L = 0; L < N_LAYER; L++) {
-    quantize_fp64_to_int8(master + off, N_EMBD * N_EMBD, model->attn_wq[L],
+  off += vs * ne;
+  for (int L = 0; L < nl; L++) {
+    quantize_fp64_to_int8(master + off, ne * ne, model->attn_wq[L],
                           &model->scale[3 + L * 6]);
-    off += N_EMBD * N_EMBD;
-    quantize_fp64_to_int8(master + off, N_EMBD * N_EMBD, model->attn_wk[L],
+    off += ne * ne;
+    quantize_fp64_to_int8(master + off, ne * ne, model->attn_wk[L],
                           &model->scale[4 + L * 6]);
-    off += N_EMBD * N_EMBD;
-    quantize_fp64_to_int8(master + off, N_EMBD * N_EMBD, model->attn_wv[L],
+    off += ne * ne;
+    quantize_fp64_to_int8(master + off, ne * ne, model->attn_wv[L],
                           &model->scale[5 + L * 6]);
-    off += N_EMBD * N_EMBD;
-    quantize_fp64_to_int8(master + off, N_EMBD * N_EMBD, model->attn_wo[L],
+    off += ne * ne;
+    quantize_fp64_to_int8(master + off, ne * ne, model->attn_wo[L],
                           &model->scale[6 + L * 6]);
-    off += N_EMBD * N_EMBD;
-    quantize_fp64_to_int8(master + off, MLP_DIM * N_EMBD, model->mlp_fc1[L],
+    off += ne * ne;
+    quantize_fp64_to_int8(master + off, md * ne, model->mlp_fc1[L],
                           &model->scale[7 + L * 6]);
-    off += MLP_DIM * N_EMBD;
-    quantize_fp64_to_int8(master + off, N_EMBD * MLP_DIM, model->mlp_fc2[L],
+    off += md * ne;
+    quantize_fp64_to_int8(master + off, ne * md, model->mlp_fc2[L],
                           &model->scale[8 + L * 6]);
-    off += N_EMBD * MLP_DIM;
+    off += ne * md;
   }
 #else
-  for (size_t i = 0; i < vs * N_EMBD; i++, idx++) {
-    double g = grads[idx];
+  for (size_t i = 0; i < vs * ne; i++, idx++) {
+    scalar_t g = grads[idx];
     m[idx] = b1 * m[idx] + (1 - b1) * g;
     v[idx] = b2 * v[idx] + (1 - b2) * g * g;
-    double mh = m[idx] / bc1;
-    double vh = v[idx] / bc2;
-    model->wte[i] -= lr * mh / (sqrt(vh) + eps);
+    scalar_t mh = m[idx] / bc1;
+    scalar_t vh = v[idx] / bc2;
+    model->wte[i] -= lr * mh / (M_SQRT(vh) + eps);
   }
-  for (size_t i = 0; i < BLOCK_SIZE * N_EMBD; i++, idx++) {
-    double g = grads[idx];
+  for (size_t i = 0; i < bs * ne; i++, idx++) {
+    scalar_t g = grads[idx];
     m[idx] = b1 * m[idx] + (1 - b1) * g;
     v[idx] = b2 * v[idx] + (1 - b2) * g * g;
-    double mh = m[idx] / bc1;
-    double vh = v[idx] / bc2;
-    model->wpe[i] -= lr * mh / (sqrt(vh) + eps);
+    scalar_t mh = m[idx] / bc1;
+    scalar_t vh = v[idx] / bc2;
+    model->wpe[i] -= lr * mh / (M_SQRT(vh) + eps);
   }
-  for (size_t i = 0; i < vs * N_EMBD; i++, idx++) {
-    double g = grads[idx];
+  for (size_t i = 0; i < vs * ne; i++, idx++) {
+    scalar_t g = grads[idx];
     m[idx] = b1 * m[idx] + (1 - b1) * g;
     v[idx] = b2 * v[idx] + (1 - b2) * g * g;
-    double mh = m[idx] / bc1;
-    double vh = v[idx] / bc2;
-    model->lm_head[i] -= lr * mh / (sqrt(vh) + eps);
+    scalar_t mh = m[idx] / bc1;
+    scalar_t vh = v[idx] / bc2;
+    model->lm_head[i] -= lr * mh / (M_SQRT(vh) + eps);
   }
-  for (int L = 0; L < N_LAYER; L++) {
-    for (size_t i = 0; i < N_EMBD * N_EMBD; i++, idx++) {
-      double g = grads[idx];
+  for (int L = 0; L < nl; L++) {
+    for (size_t i = 0; i < ne * ne; i++, idx++) {
+      scalar_t g = grads[idx];
       m[idx] = b1 * m[idx] + (1 - b1) * g;
       v[idx] = b2 * v[idx] + (1 - b2) * g * g;
-      double mh = m[idx] / bc1;
-      double vh = v[idx] / bc2;
-      model->attn_wq[L][i] -= lr * mh / (sqrt(vh) + eps);
+      scalar_t mh = m[idx] / bc1;
+      scalar_t vh = v[idx] / bc2;
+      model->attn_wq[L][i] -= lr * mh / (M_SQRT(vh) + eps);
     }
-    for (size_t i = 0; i < N_EMBD * N_EMBD; i++, idx++) {
-      double g = grads[idx];
+    for (size_t i = 0; i < ne * ne; i++, idx++) {
+      scalar_t g = grads[idx];
       m[idx] = b1 * m[idx] + (1 - b1) * g;
       v[idx] = b2 * v[idx] + (1 - b2) * g * g;
-      double mh = m[idx] / bc1;
-      double vh = v[idx] / bc2;
-      model->attn_wk[L][i] -= lr * mh / (sqrt(vh) + eps);
+      scalar_t mh = m[idx] / bc1;
+      scalar_t vh = v[idx] / bc2;
+      model->attn_wk[L][i] -= lr * mh / (M_SQRT(vh) + eps);
     }
-    for (size_t i = 0; i < N_EMBD * N_EMBD; i++, idx++) {
-      double g = grads[idx];
+    for (size_t i = 0; i < ne * ne; i++, idx++) {
+      scalar_t g = grads[idx];
       m[idx] = b1 * m[idx] + (1 - b1) * g;
       v[idx] = b2 * v[idx] + (1 - b2) * g * g;
-      double mh = m[idx] / bc1;
-      double vh = v[idx] / bc2;
-      model->attn_wv[L][i] -= lr * mh / (sqrt(vh) + eps);
+      scalar_t mh = m[idx] / bc1;
+      scalar_t vh = v[idx] / bc2;
+      model->attn_wv[L][i] -= lr * mh / (M_SQRT(vh) + eps);
     }
-    for (size_t i = 0; i < N_EMBD * N_EMBD; i++, idx++) {
-      double g = grads[idx];
+    for (size_t i = 0; i < ne * ne; i++, idx++) {
+      scalar_t g = grads[idx];
       m[idx] = b1 * m[idx] + (1 - b1) * g;
       v[idx] = b2 * v[idx] + (1 - b2) * g * g;
-      double mh = m[idx] / bc1;
-      double vh = v[idx] / bc2;
-      model->attn_wo[L][i] -= lr * mh / (sqrt(vh) + eps);
+      scalar_t mh = m[idx] / bc1;
+      scalar_t vh = v[idx] / bc2;
+      model->attn_wo[L][i] -= lr * mh / (M_SQRT(vh) + eps);
     }
-    for (size_t i = 0; i < MLP_DIM * N_EMBD; i++, idx++) {
-      double g = grads[idx];
+    for (size_t i = 0; i < md * ne; i++, idx++) {
+      scalar_t g = grads[idx];
       m[idx] = b1 * m[idx] + (1 - b1) * g;
       v[idx] = b2 * v[idx] + (1 - b2) * g * g;
-      double mh = m[idx] / bc1;
-      double vh = v[idx] / bc2;
-      model->mlp_fc1[L][i] -= lr * mh / (sqrt(vh) + eps);
+      scalar_t mh = m[idx] / bc1;
+      scalar_t vh = v[idx] / bc2;
+      model->mlp_fc1[L][i] -= lr * mh / (M_SQRT(vh) + eps);
     }
-    for (size_t i = 0; i < N_EMBD * MLP_DIM; i++, idx++) {
-      double g = grads[idx];
+    for (size_t i = 0; i < ne * md; i++, idx++) {
+      scalar_t g = grads[idx];
       m[idx] = b1 * m[idx] + (1 - b1) * g;
       v[idx] = b2 * v[idx] + (1 - b2) * g * g;
-      double mh = m[idx] / bc1;
-      double vh = v[idx] / bc2;
-      model->mlp_fc2[L][i] -= lr * mh / (sqrt(vh) + eps);
+      scalar_t mh = m[idx] / bc1;
+      scalar_t vh = v[idx] / bc2;
+      model->mlp_fc2[L][i] -= lr * mh / (M_SQRT(vh) + eps);
     }
   }
 #endif
@@ -2041,7 +2484,7 @@ void adam_step(Model *model, const double *grads, double *m, double *v,
  * sample_token - Draw a token from a temperature-scaled softmax distribution.
  *
  *   1. Subtract max(logits) for numerical stability.
- *   2. Compute softmax: p_i = exp((logit_i - max) / temperature) / Z
+ *   2. Compute softmax: p_i = M_EXP((logit_i - max) / temperature) / Z
  *   3. Sample from the resulting categorical distribution using the
  *      internal PRNG (rand_u).
  *
@@ -2051,27 +2494,27 @@ void adam_step(Model *model, const double *grads, double *m, double *v,
  *   Falls through to the last token if floating-point rounding prevents
  *   the cumulative sum from reaching zero.
  */
-size_t sample_token(const double *logits, size_t vocab_size,
-                    double temperature) {
-  double buf[MAX_VOCAB];
-  /* Clamp temperature to prevent underflow in exp() */
+size_t sample_token(const scalar_t *logits, size_t vocab_size,
+                    scalar_t temperature) {
+  scalar_t buf[vocab_size];
+  /* Clamp temperature to prevent underflow in M_EXP() */
   if (temperature < 1e-4)
     temperature = 1e-4;
-  /* Find max logit for numerical stability in exp() */
-  double max_val = logits[0];
+  /* Find max logit for numerical stability in M_EXP() */
+  scalar_t max_val = logits[0];
   for (size_t i = 1; i < vocab_size; i++)
     if (logits[i] > max_val)
       max_val = logits[i];
   /* Temperature-scaled softmax */
-  double sum = 0;
+  scalar_t sum = 0;
   for (size_t i = 0; i < vocab_size; i++) {
-    buf[i] = exp((logits[i] - max_val) / temperature);
+    buf[i] = M_EXP((logits[i] - max_val) / temperature);
     sum += buf[i];
   }
   for (size_t i = 0; i < vocab_size; i++)
     buf[i] /= sum; /* normalise to probabilities */
   /* Inverse-CDF sampling: draw r ~ U[0,1), subtract probs until r <= 0 */
-  double r = rand_u();
+  scalar_t r = rand_u();
   for (size_t i = 0; i < vocab_size; i++) {
     r -= buf[i];
     if (r <= 0)
@@ -2116,11 +2559,11 @@ char *load_file(const char *path, size_t *out_len) {
  * The vocabulary is built by:
  *   1. Scan all documents, counting word frequencies (hash table)
  *   2. Sort by frequency (descending)
- *   3. Keep the top MAX_VOCAB words; out-of-vocabulary words map to <UNK>
+ *   3. Keep the top max_vocab words; out-of-vocabulary words map to <UNK>
  *
  * For word lookup we use a HASH TABLE with OPEN ADDRESSING:
  *
- *   Hash table (capacity = MAX_VOCAB * 2):
+ *   Hash table (capacity = max_vocab * 2):
  *   ┌───────┬───────┬───────┬───────┬───────┬───────┬─── ─ ─
  *   │ empty │ "the" │ empty │ "and" │ empty │  "of" │ ...
  *   │       │ id=3  │       │ id=7  │       │ id=5  │
@@ -2352,4 +2795,63 @@ size_t tokenize_words(const char *text, size_t text_len, const WordVocab *wv,
     ids[k++] = word_to_id(wv, word_buf);
   }
   return k;
+}
+
+/* ======================== Training Helpers ================================ */
+
+/*
+ * shuffle_docs - Fisher-Yates in-place shuffle of the document list.
+ */
+void shuffle_docs(Docs *docs) {
+  for (size_t i = docs->num_docs; i > 1; i--) {
+    size_t j = (size_t)rand() % i;
+    char *tmp_line = docs->lines[j];
+    size_t tmp_len = docs->doc_lens[j];
+    docs->lines[j] = docs->lines[i - 1];
+    docs->doc_lens[j] = docs->doc_lens[i - 1];
+    docs->lines[i - 1] = tmp_line;
+    docs->doc_lens[i - 1] = tmp_len;
+  }
+}
+
+/*
+ * train_worker_run - Thread entry point for batched training.
+ *   Processes documents [batch_start, batch_end), tokenises each document,
+ *   runs forward+backward, and accumulates gradients and loss.
+ */
+void *train_worker_run(void *arg) {
+  TrainWorker *w = (TrainWorker *)arg;
+  const int nl = N_LAYER;
+  const size_t bs = (size_t)BLOCK_SIZE;
+  size_t nparams = model_num_params(w->model);
+  memset(w->grads, 0, nparams * sizeof(scalar_t));
+  w->loss = 0;
+  w->positions = 0;
+
+  for (int b = w->batch_start; b < w->batch_end; b++) {
+    for (int L = 0; L < nl; L++)
+      w->cache_len[L] = 0;
+
+    /* Pick a random document */
+    size_t di = (size_t)rand_r(&w->rng_seed) % w->docs->num_docs;
+    const char *doc = w->docs->lines[di];
+    size_t doc_len = w->docs->doc_lens[di];
+
+    /* Tokenize: [BOS] chars... [BOS/EOS] */
+    size_t n_tok = tokenize(doc, doc_len, w->vocab, w->token_buf, bs + 2);
+    size_t n = n_tok - 1;
+    if (n > bs)
+      n = bs;
+    if (n == 0)
+      continue;
+    w->positions += n;
+
+    for (size_t pos = 0; pos < n; pos++) {
+      scalar_t loss = forward_backward_one(w->model, w->token_buf[pos], pos,
+                                           w->token_buf[pos + 1], w->keys,
+                                           w->values, w->cache_len, w->grads);
+      w->loss += loss;
+    }
+  }
+  return NULL;
 }

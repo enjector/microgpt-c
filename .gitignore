@@ -4,7 +4,13 @@
 
 # Build
 build/
-build_quantised/
+build_*/
+tmp/
+journals/
+
+# Saved models
+models/*.ckpt
+models/*.bin
 
 # Prerequisites
 *.d

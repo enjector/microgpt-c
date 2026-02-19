@@ -1,6 +1,9 @@
 /*
  * vocab_analysis.c — Measure <unk> ratio at different max_words settings
  *
+ * Copyright (c) 2026 Ajay Soni (ajay.soni@enjector.com), Enjector Software Ltd.
+ * MIT License — see LICENSE file for details.
+ *
  * Build manually:
  *   cc -O2 -DN_EMBD=64 -DN_HEAD=4 -DMLP_DIM=256 -DN_LAYER=2 -DBLOCK_SIZE=32 \
  *      -DBATCH_SIZE=1 -DNUM_STEPS=1 -DLEARNING_RATE=0.001 -DMAX_VOCAB=50000 \

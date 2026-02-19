@@ -169,55 +169,102 @@
 #define MICROGPT_H
 
 #include <stddef.h>
+#include <stdio.h> /* for printf in microgpt_print_config */
 #if defined(QUANTIZATION_INT8) || defined(QUANTISATION_INT8)
 #include <stdint.h> /* int8_t, int32_t for quantised weight storage */
 #endif
 
-/* ========================== Model Architecture ========================== */
+/* ======================== Scalar Precision ================================ */
+/*
+ * scalar_t — compile-time toggle between float (32-bit) and double (64-bit).
+ *
+ * Define MICROGPT_USE_FLOAT (via CMake or -D flag) to use single precision.
+ * Float roughly doubles SIMD throughput on ARM NEON (4 vs 2 elements per
+ * 128-bit register) and halves memory bandwidth, at the cost of ~7 decimal
+ * digits of precision vs ~15 for double.
+ *
+ * All weight matrices, activations, gradients, and KV cache entries use
+ * scalar_t.  Hyperparameters (learning rate, betas, epsilon) remain double
+ * for optimizer stability.
+ */
+#ifdef MICROGPT_USE_FLOAT
+typedef float scalar_t;
+#define SC_FMT "f"
+#define SC_SCAN "f"
+#define M_EXP expf
+#define M_LOG logf
+#define M_SQRT sqrtf
+#define M_POW powf
+#define M_FABS fabsf
+#define M_SIN sinf
+#define M_COS cosf
+#ifdef MICROGPT_BLAS
+#define CBLAS_GEMV cblas_sgemv
+#define CBLAS_GER cblas_sger
+#endif
+#else
+typedef double scalar_t;
+#define SC_FMT "lf"
+#define SC_SCAN "lf"
+#define M_EXP exp
+#define M_LOG log
+#define M_SQRT sqrt
+#define M_POW pow
+#define M_FABS fabs
+#define M_SIN sin
+#define M_COS cos
+#ifdef MICROGPT_BLAS
+#define CBLAS_GEMV cblas_dgemv
+#define CBLAS_GER cblas_dger
+#endif
+#endif
+
+/* ======================== Runtime Configuration =========================== */
+/*
+ * MicrogptConfig — Holds all hyperparameters for display (config banner) and
+ * API convenience.  The HOT inner loops read compile-time #define macros
+ * (N_EMBD, N_LAYER, etc.) directly so the compiler can constant-fold and
+ * unroll.  The struct's defaults are populated from those same macros by
+ * microgpt_default_config().
+ *
+ * Use microgpt_default_config() to get the defaults, then override per-demo.
+ */
+typedef struct {
+  /* Model Architecture */
+  int n_embd;     /* embedding dimension                          */
+  int n_head;     /* number of attention heads                    */
+  int n_layer;    /* number of transformer layers                 */
+  int block_size; /* maximum context window (KV cache length)     */
+  int mlp_dim;    /* MLP hidden dimension (typically 4 × n_embd) */
+
+  /* Training */
+  int num_steps;        /* total training steps                    */
+  double learning_rate; /* peak learning rate for Adam             */
+  int batch_size;       /* documents per gradient accumulation     */
+  int warmup_steps;     /* linear warmup before cosine decay       */
+  double temperature;   /* sampling temperature for inference      */
+
+  /* Data Limits */
+  int max_vocab;   /* max vocabulary size                          */
+  int max_docs;    /* max number of documents (lines) to load     */
+  int max_doc_len; /* max characters per document                 */
+} MicrogptConfig;
 
 /*
- * MODEL DIMENSIONS — How everything fits together:
- *
- *   ┌──────────────────────────────────────────────────────────────────────┐
- *   │                         N_EMBD = 32                                 │
- *   │  Every token is represented as a vector of N_EMBD floating-point    │
- *   │  numbers.  This vector flows through every layer of the network.    │
- *   └──────────────────────────────────────────────────────────────────────┘
- *
- *   Multi-Head Attention splits the embedding into N_HEAD independent heads:
- *
- *     N_EMBD = 32
- *     ├───────┼───────┼───────┼───────┤
- *     │ Head0 │ Head1 │ Head2 │ Head3 │    N_HEAD = 4
- *     │ (8d)  │ (8d)  │ (8d)  │ (8d)  │    HEAD_DIM = N_EMBD / N_HEAD = 8
- *     └───────┴───────┴───────┴───────┘
- *
- *     Each head can learn to attend to different types of relationships
- *     (e.g. one head might track the previous word, another tracks the
- *     subject of the sentence).
- *
- *   MLP expands the embedding to a wider hidden layer, then projects back:
- *
- *     N_EMBD = 32 ──fc1──► MLP_DIM = 128 ──fc2──► N_EMBD = 32
- *                    (expand 4×)            (shrink back)
- *
- *     MLP_RATIO controls this expansion factor (default 4×).
- *     The expansion lets the network learn richer non-linear transformations.
- *
- *   Context window:
- *
- *     Token positions:  [0] [1] [2] ... [BLOCK_SIZE-1]
- *                        ◄───── BLOCK_SIZE = 32 ─────►
- *
- *     The model can "see" this many tokens into the past.  Larger values
- *     let the model capture longer-range dependencies but use more memory
- *     and compute (the KV cache grows linearly with BLOCK_SIZE).
- *
- *
- * All defines are wrapped in #ifndef so they can be overridden via compiler
- * flags (-DN_EMBD=64) or before #include, allowing different demo binaries
- * to use different model configurations from the same engine code.
+ * Computed field: head_dim = n_embd / n_head.  Not stored in the struct;
+ * use the macro below for convenience.
  */
+#define MICROGPT_HEAD_DIM(cfg) ((cfg)->n_embd / (cfg)->n_head)
+
+/* ======================== Compile-Time Constants ========================= */
+/*
+ * Architecture and training constants.  Demos and CMake can override any of
+ * these with -DN_EMBD=128 etc.  The hot inner loops in microgpt.c read
+ * these macros directly so the compiler can constant-fold and unroll.
+ * microgpt_default_config() also reads from them for the config banner.
+ */
+
+/* ---- Architecture ---- */
 #ifndef N_EMBD
 #define N_EMBD 16
 #endif
@@ -230,41 +277,39 @@
 #ifndef BLOCK_SIZE
 #define BLOCK_SIZE 16
 #endif
-#define HEAD_DIM (N_EMBD / N_HEAD)
-#ifndef MLP_RATIO
-#define MLP_RATIO 4
-#endif
 #ifndef MLP_DIM
-#define MLP_DIM (N_EMBD * MLP_RATIO)
+#define MLP_DIM 64
 #endif
 
-/* ======================== Training Hyperparameters ======================== */
-
-/*
- * NUM_STEPS     - Total number of optimiser steps (one doc per step).
- * LEARNING_RATE - Peak learning rate for Adam; cosine-annealed with warmup.
- * WARMUP_STEPS  - Number of linear-warmup steps before cosine decay begins.
- * BATCH_SIZE    - Number of documents to accumulate gradients over per step.
- * BETA1, BETA2  - Exponential decay rates for Adam's first and second moment
- *                 estimates.
- * EPS_ADAM      - Small constant added to the denominator in Adam for
- *                 numerical stability.
- * NUM_SAMPLES   - Number of names to generate during the inference demo.
- * TEMPERATURE   - Softmax temperature used during sampling; lower values
- *                 produce more deterministic output.
- */
+/* ---- Training ---- */
 #ifndef NUM_STEPS
 #define NUM_STEPS 1000
 #endif
 #ifndef LEARNING_RATE
 #define LEARNING_RATE 0.01
 #endif
-#ifndef WARMUP_STEPS
-#define WARMUP_STEPS (NUM_STEPS / 10)
-#endif
 #ifndef BATCH_SIZE
 #define BATCH_SIZE 8
 #endif
+#ifndef WARMUP_STEPS
+#define WARMUP_STEPS 100
+#endif
+#ifndef TEMPERATURE
+#define TEMPERATURE 0.5
+#endif
+
+/* ---- Data limits ---- */
+#ifndef MAX_VOCAB
+#define MAX_VOCAB 257
+#endif
+#ifndef MAX_DOCS
+#define MAX_DOCS 50000
+#endif
+#ifndef MAX_DOC_LEN
+#define MAX_DOC_LEN 64
+#endif
+
+/* ---- Optimizer ---- */
 #ifndef BETA1
 #define BETA1 0.85
 #endif
@@ -277,30 +322,114 @@
 #ifndef NUM_SAMPLES
 #define NUM_SAMPLES 20
 #endif
-#ifndef TEMPERATURE
-#define TEMPERATURE 0.5
-#endif
 #ifndef INIT_STD
 #define INIT_STD 0.08
 #endif
 
-/* ============================ Data Limits ================================ */
+/*
+ * microgpt_default_config - Return a config populated with sensible defaults.
+ *   These match the compile-time constants above.
+ */
+static inline MicrogptConfig microgpt_default_config(void) {
+  MicrogptConfig cfg;
+  cfg.n_embd = N_EMBD;
+  cfg.n_head = N_HEAD;
+  cfg.n_layer = N_LAYER;
+  cfg.block_size = BLOCK_SIZE;
+  cfg.mlp_dim = MLP_DIM;
+
+  cfg.num_steps = NUM_STEPS;
+  cfg.learning_rate = LEARNING_RATE;
+  cfg.batch_size = BATCH_SIZE;
+  cfg.warmup_steps = WARMUP_STEPS;
+  cfg.temperature = TEMPERATURE;
+
+  cfg.max_vocab = MAX_VOCAB;
+  cfg.max_docs = MAX_DOCS;
+  cfg.max_doc_len = MAX_DOC_LEN;
+  return cfg;
+}
+
+/* ========================= Configuration Banner ========================== */
 
 /*
- * MAX_VOCAB   - Maximum supported vocabulary size (256 byte values + 1 BOS).
- * MAX_DOCS    - Upper bound on the number of lines (documents) loaded from
- *               the input file.
- * MAX_DOC_LEN - Maximum character length of a single document (line).
+ * microgpt_print_config - Prints all configuration values from a config struct.
+ *
+ * Call at the top of main() in any demo to display the full runtime
+ * configuration — model hyperparameters, training settings, data limits,
+ * and feature switches.
  */
-#ifndef MAX_VOCAB
-#define MAX_VOCAB 257
+static inline void microgpt_print_config(const char *demo_name,
+                                         const MicrogptConfig *cfg) {
+  printf("================================================================\n");
+  if (demo_name)
+    printf("  %s\n", demo_name);
+  printf("================================================================\n");
+  printf("\n");
+
+  printf("  [Model Architecture]\n");
+  printf("    n_embd      = %d\n", cfg->n_embd);
+  printf("    n_head       = %d\n", cfg->n_head);
+  printf("    head_dim     = %d\n", MICROGPT_HEAD_DIM(cfg));
+  printf("    mlp_dim      = %d\n", cfg->mlp_dim);
+  printf("    n_layer      = %d\n", cfg->n_layer);
+  printf("    block_size   = %d\n", cfg->block_size);
+  printf("\n");
+
+  printf("  [Training]\n");
+  printf("    num_steps    = %d\n", cfg->num_steps);
+  printf("    learning_rate= %.6f\n", cfg->learning_rate);
+  printf("    batch_size   = %d\n", cfg->batch_size);
+  printf("    warmup_steps = %d\n", cfg->warmup_steps);
+  printf("    temperature  = %.4f\n", cfg->temperature);
+  printf("\n");
+
+  printf("  [Data Limits]\n");
+  printf("    max_vocab    = %d\n", cfg->max_vocab);
+  printf("    max_docs     = %d\n", cfg->max_docs);
+  printf("    max_doc_len  = %d\n", cfg->max_doc_len);
+  printf("\n");
+
+  printf("  [Feature Switches]\n");
+#ifdef MICROGPT_USE_FLOAT
+  printf("    scalar_t     = float  (32-bit)\n");
+#else
+  printf("    scalar_t     = double (64-bit)\n");
 #endif
-#ifndef MAX_DOCS
-#define MAX_DOCS 50000
+#ifdef MICROGPT_SIMD
+  printf("    SIMD         = ON\n");
+#else
+  printf("    SIMD         = OFF\n");
 #endif
-#ifndef MAX_DOC_LEN
-#define MAX_DOC_LEN 64
+#ifdef QUANTIZATION_INT8
+  printf("    INT8 quant   = ON\n");
+#else
+  printf("    INT8 quant   = OFF\n");
 #endif
+#ifdef MICROGPT_METAL
+  printf("    Metal GPU    = ON\n");
+#else
+  printf("    Metal GPU    = OFF\n");
+#endif
+#ifdef MICROGPT_BLAS
+  printf("    BLAS         = ON\n");
+#else
+  printf("    BLAS         = OFF\n");
+#endif
+#ifdef MICROGPT_PAGED_KV
+  printf("    Paged KV     = ON\n");
+#else
+  printf("    Paged KV     = OFF\n");
+#endif
+#ifdef MICROGPT_HEAD_PARALLEL
+  printf("    Head Parallel= ON\n");
+#else
+  printf("    Head Parallel= OFF\n");
+#endif
+  printf("\n");
+  printf(
+      "================================================================\n\n");
+}
 
 /* ============================== Data Types =============================== */
 
@@ -334,10 +463,18 @@ typedef struct {
 
 /*
  * Model - Opaque handle to the Transformer model.
+ *         Contains a copy of the MicrogptConfig used to create it.
  *         Internal layout depends on whether INT8 quantisation is enabled.
  *         See microgpt.c for the full struct definition.
  */
 typedef struct Model Model;
+
+/*
+ * model_config - Return a pointer to the config stored inside a model.
+ *   Allows callers to read the model's architecture without knowing
+ *   the internal struct layout.
+ */
+const MicrogptConfig *model_config(const Model *model);
 
 /* ======================== Data Loading & Tokenisation ==================== */
 
@@ -345,8 +482,9 @@ typedef struct Model Model;
  * load_docs  - Read a text file into 'docs'.  Each line becomes one document.
  *              Returns 0 on success, -1 on failure.
  *              The file must be <= 50 MiB.
+ *              max_docs limits the number of lines loaded.
  */
-int load_docs(const char *path, Docs *docs);
+int load_docs(const char *path, Docs *docs, int max_docs);
 
 /*
  * free_docs  - Release all heap memory owned by 'docs' and zero the struct.
@@ -378,10 +516,11 @@ size_t tokenize(const char *doc, size_t doc_len, const Vocab *vocab,
 
 /*
  * model_create    - Allocate and randomly initialise a Transformer model
- *                   with the given vocabulary size.  Weights are drawn from
- *                   N(0, 0.08²).  Returns NULL on allocation failure.
+ *                   with the given vocabulary size and configuration.
+ *                   Weights are drawn from N(0, 0.08²).
+ *                   Returns NULL on allocation failure.
  */
-Model *model_create(size_t vocab_size);
+Model *model_create(size_t vocab_size, const MicrogptConfig *cfg);
 
 /*
  * model_free      - Free all weight buffers and the Model struct itself.
@@ -399,13 +538,15 @@ size_t model_num_params(const Model *model);
 
 /*
  * model_save / model_load - Binary serialisation of all weights as fp64.
- *   model_save writes: [vocab_size (size_t)] [wte] [wpe] [lm_head] [per-layer
- * weights]. model_load reads the same format and returns a newly allocated
- * Model, or NULL on error.  Disabled (returns -1 / NULL) when INT8 quantisation
- *   is active.
+ *   model_save writes: [config] [vocab_size (size_t)] [wte] [wpe] [lm_head]
+ *     [per-layer weights].
+ *   model_load reads the same format and returns a newly allocated
+ *     Model, or NULL on error.
+ *   Disabled (returns -1 / NULL) when INT8 quantisation is active.
  */
 int model_save(const Model *model, const char *path);
-Model *model_load(const char *path, size_t vocab_size);
+Model *model_load(const char *path, size_t vocab_size,
+                  const MicrogptConfig *cfg);
 
 /* ======================== Training Checkpoints =========================== */
 
@@ -423,7 +564,7 @@ Model *model_load(const char *path, size_t vocab_size);
  *   Returns 0 on success, -1 on failure.
  *   Disabled (returns -1) when INT8 quantisation is active.
  */
-int checkpoint_save(const Model *model, const double *m, const double *v,
+int checkpoint_save(const Model *model, const scalar_t *m, const scalar_t *v,
                     int step, const char *path);
 
 /*
@@ -440,8 +581,82 @@ int checkpoint_save(const Model *model, const double *m, const double *v,
  *   Returns a newly allocated Model on success, NULL on failure.
  *   Disabled (returns NULL) when INT8 quantisation is active.
  */
-Model *checkpoint_load(const char *path, size_t vocab_size, double *m,
-                       double *v, int *step_out);
+Model *checkpoint_load(const char *path, size_t vocab_size,
+                       const MicrogptConfig *cfg, scalar_t *m, scalar_t *v,
+                       int *step_out);
+
+/* ======================== Paged KV Cache ================================== */
+#ifdef MICROGPT_PAGED_KV
+
+/*
+ * Demand-paged KV cache — allocates memory in fixed-size pages as the
+ * sequence grows, rather than pre-allocating block_size × n_embd upfront.
+ *
+ * Each page holds KV_PAGE_SIZE positions × n_embd doubles.
+ * Pages are allocated on first access and reused on reset.
+ */
+#ifndef KV_PAGE_SIZE
+#define KV_PAGE_SIZE 64
+#endif
+
+typedef struct {
+  scalar_t *data; /* KV_PAGE_SIZE × n_embd doubles */
+} KVPage;
+
+typedef struct {
+  KVPage **pages;  /* page table: pages[page_idx] */
+  size_t n_pages;  /* number of allocated pages */
+  size_t capacity; /* max page table slots */
+  size_t len;      /* number of positions stored */
+  int n_embd;      /* embedding dimension for this cache */
+} PagedKVCache;
+
+/*
+ * paged_kv_create - Allocate a page table for up to max_positions entries.
+ *   No data pages are allocated until paged_kv_append is called.
+ */
+PagedKVCache *paged_kv_create(size_t max_positions, int n_embd);
+
+/*
+ * paged_kv_free - Free all pages and the page table.
+ */
+void paged_kv_free(PagedKVCache *c);
+
+/*
+ * paged_kv_reset - Reset the position counter to zero.
+ *   Pages are retained (not freed) for reuse.
+ */
+void paged_kv_reset(PagedKVCache *c);
+
+/*
+ * paged_kv_append - Append one position.  Returns a pointer to an n_embd-
+ *   sized slot where the caller should write the K or V vector.
+ *   Allocates a new page if needed.
+ */
+scalar_t *paged_kv_append(PagedKVCache *c);
+
+/*
+ * paged_kv_get - Read access to position 'pos'.
+ *   Returns pointer to the n_embd-sized slot.
+ */
+const scalar_t *paged_kv_get(const PagedKVCache *c, size_t pos);
+
+#endif /* MICROGPT_PAGED_KV */
+
+/* ======================== KV Cache Helpers =================================
+ */
+
+/*
+ * Portable KV cache allocation — works with both flat and paged modes.
+ * Callers should use these instead of raw malloc/calloc for KV arrays.
+ *
+ * When MICROGPT_PAGED_KV is active the returned pointer is actually a
+ * PagedKVCache* cast to scalar_t*.  The engine's KV_WRITE/KV_READ macros
+ * know how to interpret either representation.
+ */
+scalar_t *kv_cache_alloc(const MicrogptConfig *cfg);
+void kv_cache_free(scalar_t *kv);
+void kv_cache_reset(scalar_t *kv, const MicrogptConfig *cfg);
 
 /* ======================== Training (Forward + Backward) =================== */
 
@@ -454,10 +669,10 @@ Model *checkpoint_load(const char *path, size_t vocab_size, double *m,
  *   pos_id      - Positional index (0-based).
  *   target_id   - Ground-truth next-token ID for computing the loss.
  *   keys/values - Per-layer KV cache arrays; each keys[L] and values[L]
- *                 must have capacity for BLOCK_SIZE * N_EMBD doubles.
+ *                 must have capacity for block_size * n_embd doubles.
  *                 The function appends the current K and V vectors at
  *                 cache_len[L], then increments cache_len[L].
- *   cache_len   - Array of N_LAYER counters tracking how many positions
+ *   cache_len   - Array of n_layer counters tracking how many positions
  *                 have been cached so far per layer.
  *   grad_buffer - Flat buffer of length model_num_params(); gradients are
  *                 *accumulated* (not overwritten) — caller must zero it
@@ -465,9 +680,10 @@ Model *checkpoint_load(const char *path, size_t vocab_size, double *m,
  *
  *   Returns the cross-entropy loss for this single position.
  */
-double forward_backward_one(const Model *model, size_t token_id, size_t pos_id,
-                            size_t target_id, double **keys, double **values,
-                            size_t *cache_len, double *grad_buffer);
+scalar_t forward_backward_one(const Model *model, size_t token_id,
+                              size_t pos_id, size_t target_id, scalar_t **keys,
+                              scalar_t **values, size_t *cache_len,
+                              scalar_t *grad_buffer);
 
 /* ======================== Optimiser (Adam) ================================ */
 
@@ -483,7 +699,7 @@ double forward_backward_one(const Model *model, size_t token_id, size_t pos_id,
  *   For INT8 models, Adam updates the fp64 master copy and then requantises
  *   all weight matrices back to int8 with fresh per-matrix scales.
  */
-void adam_step(Model *model, const double *grads, double *m, double *v,
+void adam_step(Model *model, const scalar_t *grads, scalar_t *m, scalar_t *v,
                int step);
 
 /* ======================== Inference / Sampling ============================ */
@@ -498,8 +714,8 @@ void adam_step(Model *model, const double *grads, double *m, double *v,
  *
  *   Returns the sampled token ID.
  */
-size_t sample_token(const double *logits, size_t vocab_size,
-                    double temperature);
+size_t sample_token(const scalar_t *logits, size_t vocab_size,
+                    scalar_t temperature);
 
 /*
  * forward_inference - Inference-only forward pass (no loss computation, no
@@ -510,8 +726,8 @@ size_t sample_token(const double *logits, size_t vocab_size,
  *   grad_buffer.  'logits_out' must have space for vocab_size doubles.
  */
 void forward_inference(const Model *model, size_t token_id, size_t pos_id,
-                       double **keys, double **values, size_t *cache_len,
-                       double *logits_out);
+                       scalar_t **keys, scalar_t **values, size_t *cache_len,
+                       scalar_t *logits_out);
 
 /* =========================== Utility ===================================== */
 
@@ -605,5 +821,52 @@ size_t word_to_id(const WordVocab *wv, const char *word);
  */
 size_t tokenize_words(const char *text, size_t text_len, const WordVocab *wv,
                       size_t *ids, size_t max_tokens);
+
+/* ======================== Training Helpers ================================ */
+
+/*
+ * shuffle_docs - Fisher-Yates in-place shuffle of the document list.
+ *   Randomises document order to prevent the model from memorising
+ *   sequential patterns in the dataset.
+ */
+void shuffle_docs(Docs *docs);
+
+/*
+ * rand_u - Return a uniform random scalar_t in [0, 1).
+ *   Uses the internal LCG seeded by seed_rng().
+ */
+scalar_t rand_u(void);
+
+/*
+ * TrainWorker - Per-thread work descriptor for batched training.
+ *   Each thread processes a slice of the batch [batch_start, batch_end)
+ *   and accumulates gradients + loss into its own buffers.
+ *
+ *   All arrays are dynamically allocated based on the model's config.
+ */
+typedef struct {
+  const Model *model;
+  const Docs *docs;
+  const Vocab *vocab;
+  scalar_t *grads;
+  scalar_t **keys;   /* keys[n_layer], each a KV cache buffer */
+  scalar_t **values; /* values[n_layer], each a KV cache buffer */
+  size_t *cache_len; /* cache_len[n_layer] */
+  size_t *token_buf; /* token_buf[block_size + 2] */
+  int batch_start;
+  int batch_end;
+  scalar_t loss;
+  size_t positions;
+  unsigned int rng_seed;
+} TrainWorker;
+
+/*
+ * train_worker_run - Thread entry point for batched training.
+ *   Processes the documents assigned by [batch_start, batch_end),
+ *   tokenises each, runs forward+backward, and accumulates gradients
+ *   and loss into the TrainWorker's own buffers.
+ *   Cast arg to TrainWorker*.
+ */
+void *train_worker_run(void *arg);
 
 #endif

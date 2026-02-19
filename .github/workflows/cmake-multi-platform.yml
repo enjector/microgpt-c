@@ -66,9 +66,9 @@ jobs:
       shell: bash
       run: |
         if [ "${{ matrix.os }}" = "windows-latest" ]; then
-          cd build/Release && ./microgpt.exe
+          cd build/Release && ./test_microgpt.exe
         else
-          cd build && ./microgpt
+          cd build && ./test_microgpt
         fi
 
     - name: Test
