@@ -61,8 +61,7 @@ jobs:
     - name: Build
       run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }}
 
-    # Added: A manual step to run the executable and verify it doesn't crash
-    - name: Run MicroGPT Smoke Test
+    - name: Run MicroGPT Unit Test
       shell: bash
       run: |
         if [ "${{ matrix.os }}" = "windows-latest" ]; then
@@ -71,6 +70,11 @@ jobs:
           cd build && ./test_microgpt
         fi
 
-    - name: Test
-      working-directory: ${{ steps.strings.outputs.build-output-dir }}
-      run: ctest --build-config ${{ matrix.build_type }}
+    - name: Run MicroGPT Benchmarks
+      shell: bash
+      run: |
+        if [ "${{ matrix.os }}" = "windows-latest" ]; then
+          cd build/Release && ./bench_microgpt.exe
+        else
+          cd build && ./bench_microgpt
+        fi
