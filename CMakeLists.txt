@@ -12,7 +12,7 @@ endif()
 if(MSVC)
   set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /O2 /Ot" CACHE STRING "" FORCE)
 else()
-  set(CMAKE_C_FLAGS_RELEASE "-O3 -ffast-math -march=native -flto -funroll-loops -DNDEBUG" CACHE STRING "" FORCE)
+  set(CMAKE_C_FLAGS_RELEASE "-O3 -ffast-math -funroll-loops -DNDEBUG" CACHE STRING "" FORCE)
 endif()
 
 # ==================================================================

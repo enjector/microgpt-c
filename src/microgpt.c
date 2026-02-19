@@ -1443,7 +1443,7 @@ static void *attn_head_bwd_worker(void *arg) {
   size_t hoff = (size_t)a->h * hd;
   size_t hw = (size_t)a->h * bs;
   /* d_attn_h[t] = dot(d_x_attn[hoff..], V[t][hoff..]) */
-  scalar_t d_attn_h[bs];
+  scalar_t d_attn_h[BLOCK_SIZE];
   for (size_t t = 0; t < a->TL; t++) {
     const scalar_t *vt = KV_READ(a->values, a->L, t, ne);
     scalar_t s = 0;
@@ -1455,7 +1455,7 @@ static void *attn_head_bwd_worker(void *arg) {
   scalar_t dot_ad = 0;
   for (size_t t = 0; t < a->TL; t++)
     dot_ad += a->sv_attn_w_L[hw + t] * d_attn_h[t];
-  scalar_t d_score_h[bs];
+  scalar_t d_score_h[BLOCK_SIZE];
   for (size_t t = 0; t < a->TL; t++)
     d_score_h[t] =
         a->sv_attn_w_L[hw + t] * (d_attn_h[t] - dot_ad) * a->attn_scale;
@@ -1570,27 +1570,28 @@ scalar_t forward_backward_one(const Model *model, size_t token_id,
   const size_t hd = ne / (size_t)nh;
   const size_t max_vocab = (size_t)MAX_VOCAB;
   const size_t T = cache_len[0] + 1;
-  const size_t max_w = md > ne ? md * ne : ne * ne;
-  scalar_t W_tmp[max_w];
+  scalar_t W_tmp[_MGPT_MAX_W];
 
   /* Per-layer saved activations for backward */
-  scalar_t sv_x_pre[nl][ne];       /* input to each layer */
-  scalar_t sv_x_norm1[nl][ne];     /* pre-attention norm output */
-  scalar_t sv_attn_w[nl][nh * bs]; /* per-head attention weights */
-  scalar_t sv_q[nl][ne];           /* saved projected queries for backward */
-  size_t sv_T[nl];                 /* T at each layer */
-  scalar_t sv_x_attn[nl][ne];      /* attention output (pre-Wo) */
-  scalar_t sv_x_post_attn[nl][ne]; /* after attention residual */
-  scalar_t sv_x_norm2[nl][ne];     /* pre-MLP norm output */
-  scalar_t sv_mlp_pre[nl][md];     /* fc1 output pre-ReLU */
-  scalar_t sv_mlp_post[nl][md];    /* fc1 output post-ReLU */
-  scalar_t sv_x_embed[ne];         /* embedding before initial norm */
+  scalar_t sv_x_pre[N_LAYER][N_EMBD];   /* input to each layer */
+  scalar_t sv_x_norm1[N_LAYER][N_EMBD]; /* pre-attention norm output */
+  scalar_t sv_attn_w[N_LAYER]
+                    [N_HEAD * BLOCK_SIZE]; /* per-head attention weights */
+  scalar_t sv_q[N_LAYER][N_EMBD]; /* saved projected queries for backward */
+  size_t sv_T[N_LAYER];           /* T at each layer */
+  scalar_t sv_x_attn[N_LAYER][N_EMBD];      /* attention output (pre-Wo) */
+  scalar_t sv_x_post_attn[N_LAYER][N_EMBD]; /* after attention residual */
+  scalar_t sv_x_norm2[N_LAYER][N_EMBD];     /* pre-MLP norm output */
+  scalar_t sv_mlp_pre[N_LAYER][MLP_DIM];    /* fc1 output pre-ReLU */
+  scalar_t sv_mlp_post[N_LAYER][MLP_DIM];   /* fc1 output post-ReLU */
+  scalar_t sv_x_embed[N_EMBD];              /* embedding before initial norm */
 
   /* Single-position activation buffers */
-  scalar_t x0[ne], x_norm1[ne], q[ne], k[ne], v[ne];
-  scalar_t attn_weights[nh * bs], x_attn[ne], x1[ne], x_norm2[ne];
-  scalar_t mlp1[md], x2[ne], logits[max_vocab];
-  scalar_t d_x[ne], d_logits[max_vocab];
+  scalar_t x0[N_EMBD], x_norm1[N_EMBD], q[N_EMBD], k[N_EMBD], v[N_EMBD];
+  scalar_t attn_weights[N_HEAD * BLOCK_SIZE], x_attn[N_EMBD], x1[N_EMBD],
+      x_norm2[N_EMBD];
+  scalar_t mlp1[MLP_DIM], x2[N_EMBD], logits[MAX_VOCAB];
+  scalar_t d_x[N_EMBD], d_logits[MAX_VOCAB];
   memset(d_x, 0, sizeof(d_x));
   memset(d_logits, 0, sizeof(d_logits));
 
@@ -1875,53 +1876,53 @@ scalar_t forward_backward_one(const Model *model, size_t token_id,
     /* d_x is the gradient of output of this layer (post-MLP-residual) */
 
     /* Backward through fc2 */
-    scalar_t d_mlp_post[md];
+    scalar_t d_mlp_post[MLP_DIM];
     memset(d_mlp_post, 0, sizeof(d_mlp_post));
     lin_bwd(sv_mlp_post[L],
             get_W(model, model->mlp_fc2[L], 8 + L * 6, (size_t)ne * md, W_tmp),
             d_x, md, ne, d_mlp_post, grad_buffer + off_fc2);
 
     /* Backward through ReLU */
-    scalar_t d_mlp_pre[md];
+    scalar_t d_mlp_pre[MLP_DIM];
     for (size_t i = 0; i < md; i++)
       d_mlp_pre[i] = sv_mlp_pre[L][i] > 0 ? d_mlp_post[i] : 0;
 
     /* Backward through fc1 */
-    scalar_t d_x_norm2[ne];
+    scalar_t d_x_norm2[N_EMBD];
     memset(d_x_norm2, 0, sizeof(d_x_norm2));
     lin_bwd(sv_x_norm2[L],
             get_W(model, model->mlp_fc1[L], 7 + L * 6, (size_t)md * ne, W_tmp),
             d_mlp_pre, ne, md, d_x_norm2, grad_buffer + off_fc1);
 
     /* Backward through pre-MLP RMSNorm */
-    scalar_t d_x_post_attn[ne];
+    scalar_t d_x_post_attn[N_EMBD];
     memset(d_x_post_attn, 0, sizeof(d_x_post_attn));
     rmsnorm_bwd(sv_x_post_attn[L], d_x_norm2, ne, d_x_post_attn);
 
     /* MLP residual: d_x1 = d_x (from residual skip) + d_x_post_attn */
-    scalar_t d_x1[ne];
+    scalar_t d_x1[N_EMBD];
     for (size_t i = 0; i < ne; i++)
       d_x1[i] = d_x[i] + d_x_post_attn[i];
 
     /* Backward through Wo */
-    scalar_t d_x_attn[ne];
+    scalar_t d_x_attn[N_EMBD];
     memset(d_x_attn, 0, sizeof(d_x_attn));
     lin_bwd(sv_x_attn[L],
             get_W(model, model->attn_wo[L], 6 + L * 6, ne * ne, W_tmp), d_x1,
             ne, ne, d_x_attn, grad_buffer + off_wo);
 
     /* Backward through multi-head attention */
-    scalar_t d_q[ne];
+    scalar_t d_q[N_EMBD];
     memset(d_q, 0, sizeof(d_q));
-    scalar_t d_k_cur[ne];
+    scalar_t d_k_cur[N_EMBD];
     memset(d_k_cur, 0, sizeof(d_k_cur));
-    scalar_t d_v_cur[ne];
+    scalar_t d_v_cur[N_EMBD];
     memset(d_v_cur, 0, sizeof(d_v_cur));
     scalar_t attn_scale = 1.0 / M_SQRT((scalar_t)hd);
 
 #ifdef MICROGPT_HEAD_PARALLEL
     { /* Parallel backward attention: one thread per head */
-      AttnHeadBwdArg bwd_args[nh];
+      AttnHeadBwdArg bwd_args[N_HEAD];
       for (int h = 0; h < nh; h++) {
         bwd_args[h].h = h;
         bwd_args[h].attn_scale = attn_scale;
@@ -1947,7 +1948,7 @@ scalar_t forward_backward_one(const Model *model, size_t token_id,
       size_t hoff = (size_t)h * hd;
       size_t hw = (size_t)h * bs;
       /* d_a_h[t] = sum_d d_x_attn[hoff+d] * V[t][hoff+d] */
-      scalar_t d_attn_h[bs];
+      scalar_t d_attn_h[BLOCK_SIZE];
       for (size_t t = 0; t < TL; t++) {
         const scalar_t *vt = KV_READ(values, L, t, ne);
         scalar_t s = 0;
@@ -1959,7 +1960,7 @@ scalar_t forward_backward_one(const Model *model, size_t token_id,
       scalar_t dot_ad = 0;
       for (size_t t = 0; t < TL; t++)
         dot_ad += sv_attn_w[L][hw + t] * d_attn_h[t];
-      scalar_t d_score_h[bs];
+      scalar_t d_score_h[BLOCK_SIZE];
       for (size_t t = 0; t < TL; t++)
         d_score_h[t] =
             sv_attn_w[L][hw + t] * (d_attn_h[t] - dot_ad) * attn_scale;
@@ -1979,7 +1980,7 @@ scalar_t forward_backward_one(const Model *model, size_t token_id,
 #endif
 
     /* Backward through Q = Wq @ x_norm1 */
-    scalar_t d_x_norm1[ne];
+    scalar_t d_x_norm1[N_EMBD];
     memset(d_x_norm1, 0, sizeof(d_x_norm1));
     lin_bwd(sv_x_norm1[L],
             get_W(model, model->attn_wq[L], 3 + L * 6, ne * ne, W_tmp), d_q, ne,
@@ -1993,7 +1994,7 @@ scalar_t forward_backward_one(const Model *model, size_t token_id,
             ne, ne, d_x_norm1, grad_buffer + off_wv);
 
     /* Backward through pre-attention RMSNorm */
-    scalar_t d_x_pre[ne];
+    scalar_t d_x_pre[N_EMBD];
     memset(d_x_pre, 0, sizeof(d_x_pre));
     rmsnorm_bwd(sv_x_pre[L], d_x_norm1, ne, d_x_pre);
 
@@ -2006,7 +2007,7 @@ scalar_t forward_backward_one(const Model *model, size_t token_id,
   }
 
   /* Backward through initial RMSNorm */
-  scalar_t d_embed[ne];
+  scalar_t d_embed[N_EMBD];
   memset(d_embed, 0, sizeof(d_embed));
   rmsnorm_bwd(sv_x_embed, d_x, ne, d_embed);
 
@@ -2044,13 +2045,11 @@ void forward_inference(const Model *model, size_t token_id, size_t pos_id,
   const size_t md = (size_t)MLP_DIM;
   const size_t hd = ne / (size_t)nh;
   size_t T = cache_len[0] + 1; /* total positions including current */
-#if !defined(QUANTIZATION_INT8) && !defined(QUANTISATION_INT8)
-  scalar_t W_tmp[md * ne];
-  (void)W_tmp;
-#endif
-  scalar_t x0[ne], x_norm1[ne], q[ne], k[ne], v[ne];
-  scalar_t attn_weights[nh * bs], x_attn[ne], x1[ne], x_norm2[ne];
-  scalar_t mlp1[md], x2[ne];
+  scalar_t W_tmp[_MGPT_MAX_W];
+  scalar_t x0[N_EMBD], x_norm1[N_EMBD], q[N_EMBD], k[N_EMBD], v[N_EMBD];
+  scalar_t attn_weights[N_HEAD * BLOCK_SIZE], x_attn[N_EMBD], x1[N_EMBD],
+      x_norm2[N_EMBD];
+  scalar_t mlp1[MLP_DIM], x2[N_EMBD];
 
 #if defined(QUANTIZATION_INT8) || defined(QUANTISATION_INT8)
   int8_t x_i8[md];
@@ -2496,7 +2495,7 @@ void adam_step(Model *model, const scalar_t *grads, scalar_t *m, scalar_t *v,
  */
 size_t sample_token(const scalar_t *logits, size_t vocab_size,
                     scalar_t temperature) {
-  scalar_t buf[vocab_size];
+  scalar_t buf[MAX_VOCAB];
   /* Clamp temperature to prevent underflow in M_EXP() */
   if (temperature < 1e-4)
     temperature = 1e-4;

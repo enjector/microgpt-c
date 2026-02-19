@@ -309,6 +309,10 @@ typedef struct {
 #define MAX_DOC_LEN 64
 #endif
 
+/* ---- Compile-time helpers (MSVC has no VLAs) ---- */
+#define _MGPT_MAX(a, b) ((a) > (b) ? (a) : (b))
+#define _MGPT_MAX_W _MGPT_MAX((MLP_DIM) * (N_EMBD), (N_EMBD) * (N_EMBD))
+
 /* ---- Optimizer ---- */
 #ifndef BETA1
 #define BETA1 0.85
