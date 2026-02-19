@@ -116,9 +116,8 @@
 #include "microgpt_metal.h"
 #endif
 
-#ifdef MICROGPT_HEAD_PARALLEL
 #include "microgpt_thread.h"
-#endif
+
 
 #ifdef MICROGPT_BLAS
 #ifdef __APPLE__
@@ -689,10 +688,11 @@ Model *model_create(size_t vocab_size, const MicrogptConfig *cfg) {
     return NULL;
   m->cfg = *cfg;
   m->vocab_size = vocab_size;
-  const size_t ne = (size_t)N_EMBD;
-  const size_t bs = (size_t)BLOCK_SIZE;
-  const size_t md = (size_t)MLP_DIM;
-  const int nl = N_LAYER;
+  const size_t ne = (size_t)cfg->n_embd;
+  const size_t bs = (size_t)cfg->block_size;
+  const size_t md = (size_t)cfg->mlp_dim;
+  const int nl = cfg->n_layer;
+
   scalar_t std = INIT_STD;
 
   if (alloc_layer_ptrs(m, nl) != 0) {

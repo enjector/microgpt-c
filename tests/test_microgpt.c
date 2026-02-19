@@ -26,6 +26,11 @@
 #define SCALAR_TOL 1e-10
 #endif
 
+/* MSVC does not support Variable Length Arrays (VLAs).
+ * We use fixed maximum capacities for test buffers. */
+#define MAX_LAYER_VAL 32
+#define MAX_VOCAB_VAL 1024
+
 /* ---- File-scoped runtime config (shared by all test functions) ---- */
 static MicrogptConfig g_cfg;
 
@@ -65,11 +70,15 @@ static int g_tests_failed = 0;
   static void run_##name(void) {                                               \
     g_tests_run++;                                                             \
     printf("  %-50s ", #name);                                                 \
+    fflush(stdout);                                                            \
     test_##name();                                                             \
     printf("PASS\n");                                                          \
+    fflush(stdout);                                                            \
     g_tests_passed++;                                                          \
   }                                                                            \
   static void test_##name(void)
+
+
 
 #define ASSERT(cond)                                                           \
   do {                                                                         \
@@ -93,7 +102,7 @@ static int g_tests_failed = 0;
 /* ---- Helper: create a temp file with given content ---- */
 
 static const char *write_temp_file(const char *name, const char *content) {
-  FILE *f = fopen(name, "w");
+  FILE *f = fopen(name, "wb");
   if (f) {
     fputs(content, f);
     fclose(f);
@@ -320,18 +329,19 @@ TEST(tokenize_words_basic) {
 }
 
 TEST(tokenize_words_unknown_maps_to_unk) {
-  const char *text = "aaa bbb ccc";
+  const char *text = "aaa aaa bbb bbb ccc";
   size_t len = strlen(text);
   WordVocab wv;
   memset(&wv, 0, sizeof(wv));
-  /* Only keep 2 words */
+  /* Keep top 2 words (aaa, bbb) */
   build_word_vocab(text, len, 2, &wv);
 
   /* Tokenize original — "ccc" should be OOV */
   size_t ids[16];
   size_t n = tokenize_words(text, len, &wv, ids, 16);
-  ASSERT_EQ(n, 3);
-  ASSERT_EQ(ids[2], wv.unk_id); /* "ccc" not in top 2 */
+  /* "aaa" "aaa" "bbb" "bbb" "ccc" = 5 tokens */
+  ASSERT_EQ(n, 5);
+  ASSERT_EQ(ids[4], wv.unk_id); /* "ccc" not in top 2 (aaa, bbb) */
 
   free_word_vocab(&wv);
 }
@@ -415,8 +425,8 @@ TEST(forward_backward_returns_positive_loss) {
   size_t np = model_num_params(m);
 
   scalar_t *grads = (scalar_t *)calloc(np, sizeof(scalar_t));
-  scalar_t *keys[g_cfg.n_layer], *vals[g_cfg.n_layer];
-  size_t cl[g_cfg.n_layer];
+  scalar_t *keys[MAX_LAYER_VAL], *vals[MAX_LAYER_VAL];
+  size_t cl[MAX_LAYER_VAL] = {0};
   for (int L = 0; L < g_cfg.n_layer; L++) {
     TEST_KV_ALLOC(keys, L);
     TEST_KV_ALLOC(vals, L);
@@ -449,8 +459,8 @@ TEST(training_reduces_loss) {
   scalar_t *grads = (scalar_t *)calloc(np, sizeof(scalar_t));
   scalar_t *mom = (scalar_t *)calloc(np, sizeof(scalar_t));
   scalar_t *vel = (scalar_t *)calloc(np, sizeof(scalar_t));
-  scalar_t *keys[g_cfg.n_layer], *vals[g_cfg.n_layer];
-  size_t cl[g_cfg.n_layer];
+  scalar_t *keys[MAX_LAYER_VAL], *vals[MAX_LAYER_VAL];
+  size_t cl[MAX_LAYER_VAL] = {0};
   for (int L = 0; L < g_cfg.n_layer; L++) {
     TEST_KV_ALLOC(keys, L);
     TEST_KV_ALLOC(vals, L);
@@ -505,9 +515,9 @@ TEST(forward_inference_produces_logits) {
   seed_rng(42);
   Model *m = model_create(10, &g_cfg);
 
-  scalar_t logits[g_cfg.max_vocab];
-  scalar_t *keys[g_cfg.n_layer], *vals[g_cfg.n_layer];
-  size_t cl[g_cfg.n_layer];
+  scalar_t logits[MAX_VOCAB_VAL];
+  scalar_t *keys[MAX_LAYER_VAL], *vals[MAX_LAYER_VAL];
+  size_t cl[MAX_LAYER_VAL] = {0};
   for (int L = 0; L < g_cfg.n_layer; L++) {
     TEST_KV_ALLOC(keys, L);
     TEST_KV_ALLOC(vals, L);
@@ -585,10 +595,10 @@ TEST(model_save_and_load_roundtrip) {
   ASSERT_NE(m2, NULL);
 
   /* Both models should produce the same logits for the same input */
-  scalar_t logits1[g_cfg.max_vocab], logits2[g_cfg.max_vocab];
-  scalar_t *k1[g_cfg.n_layer], *v1[g_cfg.n_layer], *k2[g_cfg.n_layer],
-      *v2[g_cfg.n_layer];
-  size_t cl1[g_cfg.n_layer], cl2[g_cfg.n_layer];
+  scalar_t logits1[MAX_VOCAB_VAL], logits2[MAX_VOCAB_VAL];
+  scalar_t *k1[MAX_LAYER_VAL], *v1[MAX_LAYER_VAL], *k2[MAX_LAYER_VAL],
+      *v2[MAX_LAYER_VAL];
+  size_t cl1[MAX_LAYER_VAL] = {0}, cl2[MAX_LAYER_VAL] = {0};
   for (int L = 0; L < g_cfg.n_layer; L++) {
     TEST_KV_ALLOC(k1, L);
     TEST_KV_ALLOC(v1, L);
@@ -625,8 +635,8 @@ TEST(checkpoint_save_and_load_roundtrip) {
   scalar_t *grads = (scalar_t *)calloc(np, sizeof(scalar_t));
   scalar_t *m_adam = (scalar_t *)calloc(np, sizeof(scalar_t));
   scalar_t *v_adam = (scalar_t *)calloc(np, sizeof(scalar_t));
-  scalar_t *keys[g_cfg.n_layer], *vals[g_cfg.n_layer];
-  size_t cl[g_cfg.n_layer];
+  scalar_t *keys[MAX_LAYER_VAL], *vals[MAX_LAYER_VAL];
+  size_t cl[MAX_LAYER_VAL] = {0};
   for (int L = 0; L < g_cfg.n_layer; L++) {
     TEST_KV_ALLOC(keys, L);
     TEST_KV_ALLOC(vals, L);
@@ -675,9 +685,9 @@ TEST(checkpoint_save_and_load_roundtrip) {
   }
 
   /* Verify model weights produce identical logits */
-  scalar_t logits1[g_cfg.max_vocab], logits2[g_cfg.max_vocab];
-  scalar_t *k2[g_cfg.n_layer], *v2[g_cfg.n_layer];
-  size_t cl1[g_cfg.n_layer], cl2[g_cfg.n_layer];
+  scalar_t logits1[MAX_VOCAB_VAL], logits2[MAX_VOCAB_VAL];
+  scalar_t *k2[MAX_LAYER_VAL], *v2[MAX_LAYER_VAL];
+  size_t cl1[MAX_LAYER_VAL] = {0}, cl2[MAX_LAYER_VAL] = {0};
   for (int L = 0; L < g_cfg.n_layer; L++) {
     cl[L] = 0;
     TEST_KV_ALLOC(k2, L);
@@ -732,8 +742,8 @@ TEST(gradient_direction_reduces_loss) {
   scalar_t *grads = (scalar_t *)calloc(np, sizeof(scalar_t));
   scalar_t *mom = (scalar_t *)calloc(np, sizeof(scalar_t));
   scalar_t *vel = (scalar_t *)calloc(np, sizeof(scalar_t));
-  scalar_t *keys[g_cfg.n_layer], *vals[g_cfg.n_layer];
-  size_t cl[g_cfg.n_layer];
+  scalar_t *keys[MAX_LAYER_VAL], *vals[MAX_LAYER_VAL];
+  size_t cl[MAX_LAYER_VAL] = {0};
   for (int L = 0; L < g_cfg.n_layer; L++) {
     TEST_KV_ALLOC(keys, L);
     TEST_KV_ALLOC(vals, L);
@@ -781,8 +791,8 @@ TEST(gradient_accumulates_over_positions) {
   size_t np = model_num_params(m);
   scalar_t *grads1 = (scalar_t *)calloc(np, sizeof(scalar_t));
   scalar_t *grads3 = (scalar_t *)calloc(np, sizeof(scalar_t));
-  scalar_t *keys[g_cfg.n_layer], *vals[g_cfg.n_layer];
-  size_t cl[g_cfg.n_layer];
+  scalar_t *keys[MAX_LAYER_VAL], *vals[MAX_LAYER_VAL];
+  size_t cl[MAX_LAYER_VAL] = {0};
 
   for (int L = 0; L < g_cfg.n_layer; L++) {
     TEST_KV_ALLOC(keys, L);
@@ -829,8 +839,8 @@ TEST(kv_cache_grows_with_positions) {
   Model *m = model_create(10, &g_cfg);
   size_t np = model_num_params(m);
   scalar_t *grads = (scalar_t *)calloc(np, sizeof(scalar_t));
-  scalar_t *keys[g_cfg.n_layer], *vals[g_cfg.n_layer];
-  size_t cl[g_cfg.n_layer];
+  scalar_t *keys[MAX_LAYER_VAL], *vals[MAX_LAYER_VAL];
+  size_t cl[MAX_LAYER_VAL] = {0};
   for (int L = 0; L < g_cfg.n_layer; L++) {
     TEST_KV_ALLOC(keys, L);
     TEST_KV_ALLOC(vals, L);
@@ -858,9 +868,9 @@ TEST(inference_kv_cache_autoregressive) {
    * and verify each step produces valid, finite logits */
   seed_rng(42);
   Model *m = model_create(10, &g_cfg);
-  scalar_t logits[g_cfg.max_vocab];
-  scalar_t *keys[g_cfg.n_layer], *vals[g_cfg.n_layer];
-  size_t cl[g_cfg.n_layer];
+  scalar_t logits[MAX_VOCAB_VAL];
+  scalar_t *keys[MAX_LAYER_VAL], *vals[MAX_LAYER_VAL];
+  size_t cl[MAX_LAYER_VAL] = {0};
   for (int L = 0; L < g_cfg.n_layer; L++) {
     TEST_KV_ALLOC(keys, L);
     TEST_KV_ALLOC(vals, L);
@@ -903,8 +913,8 @@ TEST(training_loss_decreases_monotonically_in_windows) {
   scalar_t *grads = (scalar_t *)calloc(np, sizeof(scalar_t));
   scalar_t *mom = (scalar_t *)calloc(np, sizeof(scalar_t));
   scalar_t *vel = (scalar_t *)calloc(np, sizeof(scalar_t));
-  scalar_t *keys[g_cfg.n_layer], *vals[g_cfg.n_layer];
-  size_t cl[g_cfg.n_layer];
+  scalar_t *keys[MAX_LAYER_VAL], *vals[MAX_LAYER_VAL];
+  size_t cl[MAX_LAYER_VAL] = {0};
   for (int L = 0; L < g_cfg.n_layer; L++) {
     TEST_KV_ALLOC(keys, L);
     TEST_KV_ALLOC(vals, L);
@@ -961,8 +971,8 @@ TEST(training_reproducible_with_same_seed) {
     scalar_t *grads = (scalar_t *)calloc(np, sizeof(scalar_t));
     scalar_t *mom = (scalar_t *)calloc(np, sizeof(scalar_t));
     scalar_t *vel = (scalar_t *)calloc(np, sizeof(scalar_t));
-    scalar_t *keys[g_cfg.n_layer], *vals[g_cfg.n_layer];
-    size_t cl[g_cfg.n_layer];
+    scalar_t *keys[MAX_LAYER_VAL], *vals[MAX_LAYER_VAL];
+    size_t cl[MAX_LAYER_VAL] = {0};
     for (int L = 0; L < g_cfg.n_layer; L++) {
       TEST_KV_ALLOC(keys, L);
       TEST_KV_ALLOC(vals, L);
@@ -1001,12 +1011,12 @@ TEST(forward_inference_matches_fwd_bwd_logits) {
   Model *m = model_create(10, &g_cfg);
   size_t np = model_num_params(m);
 
-  scalar_t logits_inf[g_cfg.max_vocab];
-  scalar_t logits_bwd[g_cfg.max_vocab];
+  scalar_t logits_inf[MAX_VOCAB_VAL];
+  scalar_t logits_bwd[MAX_VOCAB_VAL];
   scalar_t *grads = (scalar_t *)calloc(np, sizeof(scalar_t));
-  scalar_t *keys1[g_cfg.n_layer], *vals1[g_cfg.n_layer], *keys2[g_cfg.n_layer],
-      *vals2[g_cfg.n_layer];
-  size_t cl1[g_cfg.n_layer], cl2[g_cfg.n_layer];
+  scalar_t *keys1[MAX_LAYER_VAL], *vals1[MAX_LAYER_VAL], *keys2[MAX_LAYER_VAL],
+      *vals2[MAX_LAYER_VAL];
+  size_t cl1[MAX_LAYER_VAL] = {0}, cl2[MAX_LAYER_VAL] = {0};
   for (int L = 0; L < g_cfg.n_layer; L++) {
     TEST_KV_ALLOC(keys1, L);
     TEST_KV_ALLOC(vals1, L);
@@ -1128,8 +1138,8 @@ TEST(loss_is_log_vocab_for_uniform_predictions) {
   Model *m = model_create(vs, &g_cfg);
   size_t np = model_num_params(m);
   scalar_t *grads = (scalar_t *)calloc(np, sizeof(scalar_t));
-  scalar_t *keys[g_cfg.n_layer], *vals[g_cfg.n_layer];
-  size_t cl[g_cfg.n_layer];
+  scalar_t *keys[MAX_LAYER_VAL], *vals[MAX_LAYER_VAL];
+  size_t cl[MAX_LAYER_VAL] = {0};
   for (int L = 0; L < g_cfg.n_layer; L++) {
     TEST_KV_ALLOC(keys, L);
     TEST_KV_ALLOC(vals, L);
@@ -1158,8 +1168,8 @@ TEST(loss_different_targets_give_different_losses) {
   size_t np = model_num_params(m);
   scalar_t *grads1 = (scalar_t *)calloc(np, sizeof(scalar_t));
   scalar_t *grads2 = (scalar_t *)calloc(np, sizeof(scalar_t));
-  scalar_t *keys[g_cfg.n_layer], *vals[g_cfg.n_layer];
-  size_t cl[g_cfg.n_layer];
+  scalar_t *keys[MAX_LAYER_VAL], *vals[MAX_LAYER_VAL];
+  size_t cl[MAX_LAYER_VAL] = {0};
   for (int L = 0; L < g_cfg.n_layer; L++) {
     TEST_KV_ALLOC(keys, L);
     TEST_KV_ALLOC(vals, L);
@@ -1603,8 +1613,8 @@ TEST(multi_position_loss_accumulation) {
   size_t np = model_num_params(m);
   scalar_t *grads1 = (scalar_t *)calloc(np, sizeof(scalar_t));
   scalar_t *grads2 = (scalar_t *)calloc(np, sizeof(scalar_t));
-  scalar_t *keys[g_cfg.n_layer], *vals[g_cfg.n_layer];
-  size_t cl[g_cfg.n_layer];
+  scalar_t *keys[MAX_LAYER_VAL], *vals[MAX_LAYER_VAL];
+  size_t cl[MAX_LAYER_VAL] = {0};
   for (int L = 0; L < g_cfg.n_layer; L++) {
     TEST_KV_ALLOC(keys, L);
     TEST_KV_ALLOC(vals, L);
@@ -1653,9 +1663,9 @@ TEST(different_seeds_produce_different_models) {
   Model *m2 = model_create(10, &g_cfg);
 
   scalar_t logits1[10], logits2[10];
-  scalar_t *k1[g_cfg.n_layer], *v1[g_cfg.n_layer];
-  scalar_t *k2[g_cfg.n_layer], *v2[g_cfg.n_layer];
-  size_t cl1[g_cfg.n_layer], cl2[g_cfg.n_layer];
+  scalar_t *k1[MAX_LAYER_VAL], *v1[MAX_LAYER_VAL];
+  scalar_t *k2[MAX_LAYER_VAL], *v2[MAX_LAYER_VAL];
+  size_t cl1[MAX_LAYER_VAL] = {0}, cl2[MAX_LAYER_VAL] = {0};
   for (int L = 0; L < g_cfg.n_layer; L++) {
     TEST_KV_ALLOC(k1, L);
     TEST_KV_ALLOC(v1, L);
@@ -1738,8 +1748,8 @@ TEST(overfit_single_sequence_near_zero_loss) {
   scalar_t *grads = (scalar_t *)calloc(np, sizeof(scalar_t));
   scalar_t *mom = (scalar_t *)calloc(np, sizeof(scalar_t));
   scalar_t *vel = (scalar_t *)calloc(np, sizeof(scalar_t));
-  scalar_t *keys[g_cfg.n_layer], *vals[g_cfg.n_layer];
-  size_t cl[g_cfg.n_layer];
+  scalar_t *keys[MAX_LAYER_VAL], *vals[MAX_LAYER_VAL];
+  size_t cl[MAX_LAYER_VAL] = {0};
   for (int L = 0; L < g_cfg.n_layer; L++) {
     TEST_KV_ALLOC(keys, L);
     TEST_KV_ALLOC(vals, L);
@@ -1818,6 +1828,8 @@ int main(void) {
   /* Utility */
   printf("[Utility]\n");
   RUN(seed_rng_deterministic);
+
+
   RUN(load_file_success);
   RUN(load_file_missing);
 

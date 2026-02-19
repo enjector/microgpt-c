@@ -20,6 +20,12 @@
 
 static MicrogptConfig g_cfg;
 
+/* MSVC does not support Variable Length Arrays (VLAs).
+ * We use fixed maximum capacities for benchmark buffers. */
+#define MAX_LAYER_VAL 32
+#define MAX_VOCAB_VAL 1024
+
+
 /* ---- Timing helpers ---- */
 
 static scalar_t elapsed_ms(clock_t start) {
@@ -56,9 +62,9 @@ static void bench_forward_inference(void) {
 
   seed_rng(42);
   Model *m = model_create(50, &g_cfg);
-  scalar_t logits[g_cfg.max_vocab];
-  scalar_t *keys[g_cfg.n_layer], *vals[g_cfg.n_layer];
-  size_t cl[g_cfg.n_layer];
+  scalar_t logits[MAX_VOCAB_VAL];
+  scalar_t *keys[MAX_LAYER_VAL], *vals[MAX_LAYER_VAL];
+  size_t cl[MAX_LAYER_VAL];
   for (int L = 0; L < g_cfg.n_layer; L++) {
     keys[L] = (scalar_t *)calloc(
         (size_t)g_cfg.block_size * (size_t)g_cfg.n_embd, sizeof(scalar_t));
@@ -90,8 +96,8 @@ static void bench_forward_backward(void) {
   Model *m = model_create(50, &g_cfg);
   size_t np = model_num_params(m);
   scalar_t *grads = (scalar_t *)calloc(np, sizeof(scalar_t));
-  scalar_t *keys[g_cfg.n_layer], *vals[g_cfg.n_layer];
-  size_t cl[g_cfg.n_layer];
+  scalar_t *keys[MAX_LAYER_VAL], *vals[MAX_LAYER_VAL];
+  size_t cl[MAX_LAYER_VAL];
   for (int L = 0; L < g_cfg.n_layer; L++) {
     keys[L] = (scalar_t *)calloc(
         (size_t)g_cfg.block_size * (size_t)g_cfg.n_embd, sizeof(scalar_t));
@@ -305,8 +311,8 @@ static void bench_training_step(void) {
   scalar_t *grads = (scalar_t *)calloc(np, sizeof(scalar_t));
   scalar_t *mom = (scalar_t *)calloc(np, sizeof(scalar_t));
   scalar_t *vel = (scalar_t *)calloc(np, sizeof(scalar_t));
-  scalar_t *keys[g_cfg.n_layer], *vals[g_cfg.n_layer];
-  size_t cl[g_cfg.n_layer];
+  scalar_t *keys[MAX_LAYER_VAL], *vals[MAX_LAYER_VAL];
+  size_t cl[MAX_LAYER_VAL];
   for (int L = 0; L < g_cfg.n_layer; L++) {
     keys[L] = (scalar_t *)calloc(
         (size_t)g_cfg.block_size * (size_t)g_cfg.n_embd, sizeof(scalar_t));
@@ -356,9 +362,9 @@ static void bench_inference_sequence(void) {
 
   seed_rng(42);
   Model *m = model_create(30, &g_cfg);
-  scalar_t logits[g_cfg.max_vocab];
-  scalar_t *keys[g_cfg.n_layer], *vals[g_cfg.n_layer];
-  size_t cl[g_cfg.n_layer];
+  scalar_t logits[MAX_VOCAB_VAL];
+  scalar_t *keys[MAX_LAYER_VAL], *vals[MAX_LAYER_VAL];
+  size_t cl[MAX_LAYER_VAL];
   for (int L = 0; L < g_cfg.n_layer; L++) {
     keys[L] = (scalar_t *)calloc(
         (size_t)g_cfg.block_size * (size_t)g_cfg.n_embd, sizeof(scalar_t));
@@ -396,8 +402,8 @@ static void bench_multi_position_fwd_bwd(void) {
   Model *m = model_create(20, &g_cfg);
   size_t np = model_num_params(m);
   scalar_t *grads = (scalar_t *)calloc(np, sizeof(scalar_t));
-  scalar_t *keys[g_cfg.n_layer], *vals[g_cfg.n_layer];
-  size_t cl[g_cfg.n_layer];
+  scalar_t *keys[MAX_LAYER_VAL], *vals[MAX_LAYER_VAL];
+  size_t cl[MAX_LAYER_VAL];
   for (int L = 0; L < g_cfg.n_layer; L++) {
     keys[L] = (scalar_t *)calloc(
         (size_t)g_cfg.block_size * (size_t)g_cfg.n_embd, sizeof(scalar_t));
@@ -466,8 +472,8 @@ static void bench_convergence_speed(void) {
   scalar_t *grads = (scalar_t *)calloc(np, sizeof(scalar_t));
   scalar_t *mom = (scalar_t *)calloc(np, sizeof(scalar_t));
   scalar_t *vel = (scalar_t *)calloc(np, sizeof(scalar_t));
-  scalar_t *keys[g_cfg.n_layer], *vals[g_cfg.n_layer];
-  size_t cl[g_cfg.n_layer];
+  scalar_t *keys[MAX_LAYER_VAL], *vals[MAX_LAYER_VAL];
+  size_t cl[MAX_LAYER_VAL];
   for (int L = 0; L < g_cfg.n_layer; L++) {
     keys[L] = (scalar_t *)calloc(
         (size_t)g_cfg.block_size * (size_t)g_cfg.n_embd, sizeof(scalar_t));

@@ -80,6 +80,30 @@ static unsigned int mgpt_rand_r(unsigned int *seed) {
 #define rand_r(s) mgpt_rand_r(s)
 #endif
 
+/* clock_gettime is not available on older MSVC; provide a monotonic version */
+#ifndef CLOCK_MONOTONIC
+#define CLOCK_MONOTONIC 1
+#endif
+
+struct timespec; /* forward decl */
+
+static int mgpt_clock_gettime(int clk_id, struct timespec *tp);
+
+#include <time.h> /* for struct timespec */
+
+static int mgpt_clock_gettime(int clk_id, struct timespec *tp) {
+  if (clk_id != CLOCK_MONOTONIC)
+    return -1;
+  LARGE_INTEGER freq, count;
+  QueryPerformanceFrequency(&freq);
+  QueryPerformanceCounter(&count);
+  tp->tv_sec = count.QuadPart / freq.QuadPart;
+  tp->tv_nsec =
+      (long)(((count.QuadPart % freq.QuadPart) * 1000000000L) / freq.QuadPart);
+  return 0;
+}
+#define clock_gettime(id, tp) mgpt_clock_gettime(id, tp)
+
 #else
 /* ---- POSIX (Linux, macOS, etc.) ---- */
 #include <pthread.h>
