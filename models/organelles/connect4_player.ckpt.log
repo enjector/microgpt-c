@@ -1,14 +1,43 @@
 
 ========================================
-Retroactive Log (training predates logging)
+Run: 2026-02-20 09:38:28
 ========================================
-Organelle: connect4_player
-Game: Connect-4 | Role: player
+Organelle: Player
+Corpus: 5000 docs | 389560 chars (380.4 KB)
+Vocab: 26 characters
 Architecture: N_EMBD=96 N_LAYER=4 N_HEAD=8 BLOCK_SIZE=128 MLP_DIM=384
-Params: ~460K
-Training: steps=25000 lr=0.001
-Corpus: ~5000 docs
-Checkpoint: connect4_player.ckpt (5515788 bytes)
-Result: 90% win
+Params: 459648
+Training: batch=8 steps=25000 lr=0.0010
+
+--- Training ---
+step     1 / 25000 | loss 4.9851
+step  1000 / 25000 | loss 0.2311
+step  2000 / 25000 | loss 0.2229
+step  3000 / 25000 | loss 0.2121
+step  4000 / 25000 | loss 0.1936
+step  5000 / 25000 | loss 0.1759
+step  6000 / 25000 | loss 0.1504
+step  7000 / 25000 | loss 0.1800
+step  8000 / 25000 | loss 0.1659
+step  9000 / 25000 | loss 0.1577
+step 10000 / 25000 | loss 0.1347
+step 11000 / 25000 | loss 0.1499
+step 12000 / 25000 | loss 0.1494
+step 13000 / 25000 | loss 0.1419
+step 14000 / 25000 | loss 0.1436
+step 15000 / 25000 | loss 0.1415
+step 16000 / 25000 | loss 0.1324
+step 17000 / 25000 | loss 0.1270
+step 18000 / 25000 | loss 0.1146
+step 19000 / 25000 | loss 0.1133
+step 20000 / 25000 | loss 0.1102
+step 21000 / 25000 | loss 0.1188
+step 22000 / 25000 | loss 0.1062
+step 23000 / 25000 | loss 0.1103
+step 24000 / 25000 | loss 0.1093
+step 25000 / 25000 | loss 0.1092
+
+Training complete: 309.0s | best loss: 0.1041
+Checkpoint: connect4_player.ckpt
 ========================================
 

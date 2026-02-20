@@ -1,14 +1,43 @@
 
 ========================================
-Retroactive Log (training predates logging)
+Run: 2026-02-20 09:28:40
 ========================================
-Organelle: mastermind_player
-Game: Mastermind | Role: player
+Organelle: Player
+Corpus: 1975 docs | 117646 chars (114.9 KB)
+Vocab: 28 characters
 Architecture: N_EMBD=48 N_LAYER=3 N_HEAD=4 BLOCK_SIZE=128 MLP_DIM=192
-Params: ~92K
-Training: steps=25000 lr=0.001
-Corpus: ~2000 docs
-Checkpoint: mastermind_player.ckpt (1101324 bytes)
-Result: 79% solve
+Params: 91776
+Training: batch=8 steps=25000 lr=0.0010
+
+--- Training ---
+step     1 / 25000 | loss 3.4790
+step  1000 / 25000 | loss 0.3656
+step  2000 / 25000 | loss 0.3749
+step  3000 / 25000 | loss 0.2694
+step  4000 / 25000 | loss 0.2692
+step  5000 / 25000 | loss 0.2136
+step  6000 / 25000 | loss 0.2180
+step  7000 / 25000 | loss 0.1954
+step  8000 / 25000 | loss 0.2106
+step  9000 / 25000 | loss 0.1648
+step 10000 / 25000 | loss 0.1710
+step 11000 / 25000 | loss 0.1937
+step 12000 / 25000 | loss 0.1579
+step 13000 / 25000 | loss 0.1606
+step 14000 / 25000 | loss 0.1469
+step 15000 / 25000 | loss 0.1451
+step 16000 / 25000 | loss 0.1523
+step 17000 / 25000 | loss 0.1342
+step 18000 / 25000 | loss 0.1702
+step 19000 / 25000 | loss 0.1495
+step 20000 / 25000 | loss 0.1378
+step 21000 / 25000 | loss 0.1234
+step 22000 / 25000 | loss 0.1561
+step 23000 / 25000 | loss 0.1302
+step 24000 / 25000 | loss 0.1298
+step 25000 / 25000 | loss 0.1332
+
+Training complete: 62.0s | best loss: 0.1102
+Checkpoint: mastermind_player.ckpt
 ========================================
 

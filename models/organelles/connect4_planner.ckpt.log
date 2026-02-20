@@ -1,14 +1,43 @@
 
 ========================================
-Retroactive Log (training predates logging)
+Run: 2026-02-20 09:30:50
 ========================================
-Organelle: connect4_planner
-Game: Connect-4 | Role: planner
+Organelle: Planner
+Corpus: 5000 docs | 509521 chars (497.6 KB)
+Vocab: 30 characters
 Architecture: N_EMBD=96 N_LAYER=4 N_HEAD=8 BLOCK_SIZE=128 MLP_DIM=384
-Params: ~460K
-Training: steps=25000 lr=0.001
-Corpus: ~5000 docs
-Checkpoint: connect4_planner.ckpt (5525004 bytes)
-Result: 90% win
+Params: 460416
+Training: batch=8 steps=25000 lr=0.0010
+
+--- Training ---
+step     1 / 25000 | loss 5.1600
+step  1000 / 25000 | loss 0.1829
+step  2000 / 25000 | loss 0.4494
+step  3000 / 25000 | loss 0.1812
+step  4000 / 25000 | loss 0.1849
+step  5000 / 25000 | loss 0.1661
+step  6000 / 25000 | loss 0.2085
+step  7000 / 25000 | loss 0.2618
+step  8000 / 25000 | loss 0.2530
+step  9000 / 25000 | loss 0.1892
+step 10000 / 25000 | loss 0.2194
+step 11000 / 25000 | loss 0.2158
+step 12000 / 25000 | loss 0.2273
+step 13000 / 25000 | loss 0.1639
+step 14000 / 25000 | loss 0.1931
+step 15000 / 25000 | loss 0.2282
+step 16000 / 25000 | loss 0.2277
+step 17000 / 25000 | loss 0.2455
+step 18000 / 25000 | loss 0.2270
+step 19000 / 25000 | loss 0.2160
+step 20000 / 25000 | loss 0.1658
+step 21000 / 25000 | loss 0.2194
+step 22000 / 25000 | loss 0.2121
+step 23000 / 25000 | loss 0.1925
+step 24000 / 25000 | loss 0.1828
+step 25000 / 25000 | loss 0.1717
+
+Training complete: 458.0s | best loss: 0.1131
+Checkpoint: connect4_planner.ckpt
 ========================================
 

@@ -1,14 +1,43 @@
 
 ========================================
-Retroactive Log (training predates logging)
+Run: 2026-02-20 09:27:18
 ========================================
-Organelle: mastermind_planner
-Game: Mastermind | Role: planner
+Organelle: Planner
+Corpus: 988 docs | 78905 chars (77.1 KB)
+Vocab: 35 characters
 Architecture: N_EMBD=48 N_LAYER=3 N_HEAD=4 BLOCK_SIZE=128 MLP_DIM=192
-Params: ~92K
-Training: steps=25000 lr=0.001
-Corpus: ~2000 docs
-Checkpoint: mastermind_planner.ckpt (1109388 bytes)
-Result: 79% solve
+Params: 92448
+Training: batch=8 steps=25000 lr=0.0010
+
+--- Training ---
+step     1 / 25000 | loss 3.6821
+step  1000 / 25000 | loss 0.2164
+step  2000 / 25000 | loss 0.1897
+step  3000 / 25000 | loss 0.1818
+step  4000 / 25000 | loss 0.1892
+step  5000 / 25000 | loss 0.1636
+step  6000 / 25000 | loss 0.1410
+step  7000 / 25000 | loss 0.1479
+step  8000 / 25000 | loss 0.1796
+step  9000 / 25000 | loss 0.1314
+step 10000 / 25000 | loss 0.1499
+step 11000 / 25000 | loss 0.1481
+step 12000 / 25000 | loss 0.1247
+step 13000 / 25000 | loss 0.1284
+step 14000 / 25000 | loss 0.1209
+step 15000 / 25000 | loss 0.1221
+step 16000 / 25000 | loss 0.1357
+step 17000 / 25000 | loss 0.1479
+step 18000 / 25000 | loss 0.1064
+step 19000 / 25000 | loss 0.1105
+step 20000 / 25000 | loss 0.1001
+step 21000 / 25000 | loss 0.1054
+step 22000 / 25000 | loss 0.1234
+step 23000 / 25000 | loss 0.1033
+step 24000 / 25000 | loss 0.1029
+step 25000 / 25000 | loss 0.1178
+
+Training complete: 82.0s | best loss: 0.0819
+Checkpoint: mastermind_planner.ckpt
 ========================================
 

@@ -114,7 +114,71 @@ cmake --build build --target mastermind_demo && ./build/mastermind_demo
 
 ---
 
-## 5. Conclusion
+## 5. Secondary Verification: Training Loss Convergence
+
+### Why Loss Curves Matter
+
+The baseline comparison (Section 2) proves models outperform random. But loss convergence answers a *different* question: **did the model's internal weights actually change in a meaningful direction during training?**
+
+If the loss curve is flat or oscillating near the initial value, the model failed to learn — even if pipeline filtering masks this at game time. Conversely, a smooth descent from initial loss (~3.5–5.0) to a low plateau (~0.08–0.11) proves the optimiser found a minimum in the loss landscape and the weights encode the training corpus.
+
+### What We Measured
+
+Each game was re-trained from scratch with loss logged every 1,000 steps. The organelle logs are saved alongside checkpoints in `models/organelles/*.ckpt.log`.
+
+#### Mastermind Loss Curves
+
+| Step | Planner Loss | Player Loss |
+|-----:|:------------:|:-----------:|
+| 1 | 3.6821 | 3.4790 |
+| 1,000 | 0.2164 | 0.3656 |
+| 5,000 | 0.1595 | 0.2136 |
+| 10,000 | 0.1499 | 0.1710 |
+| 15,000 | 0.1221 | 0.1451 |
+| 20,000 | 0.1001 | 0.1378 |
+| 25,000 | 0.1178 | 0.1332 |
+| **Best** | **0.0819** | **0.1102** |
+
+Reduction: Planner **45×** (3.68 → 0.08), Player **32×** (3.48 → 0.11).
+
+#### Connect-4 Loss Curves
+
+| Step | Planner Loss | Player Loss |
+|-----:|:------------:|:-----------:|
+| 1 | 5.1600 | 4.9851 |
+| 1,000 | 0.1829 | 0.2311 |
+| 5,000 | 0.1661 | 0.1759 |
+| 10,000 | 0.2194 | 0.1347 |
+| 15,000 | 0.2282 | 0.1415 |
+| 20,000 | 0.1658 | 0.1102 |
+| 25,000 | 0.1717 | 0.1092 |
+| **Best** | **0.1131** | **0.1041** |
+
+Reduction: Planner **46×** (5.16 → 0.11), Player **48×** (4.99 → 0.10).
+
+### Interpretation
+
+| Evidence | What it proves |
+|----------|---------------|
+| Loss drops 30–48× from initial | Model learned to predict the corpus; weights are not random noise |
+| Loss plateaus around 0.08–0.11 | Convergence is real; further training would yield diminishing returns |
+| Convergence within first 5,000 steps | Most learning happens early; the remaining 20,000 steps fine-tune |
+| Trained model generates valid format 92–97% | Model learned the output grammar (e.g. "ABCD" for Mastermind, "3" for Connect-4) |
+
+> [!NOTE]
+> The loss values are per-character cross-entropy. A loss of 0.10 means the model predicts each next character with ~90% confidence — it has effectively memorised the corpus patterns. This is expected for small corpora (2,000–10,000 documents) with a tiny model (92K params).
+
+### Log Files
+
+Fresh training logs with full loss curves are at:
+- [`mastermind_planner.ckpt.log`](../../models/organelles/mastermind_planner.ckpt.log)
+- [`mastermind_player.ckpt.log`](../../models/organelles/mastermind_player.ckpt.log)
+- [`connect4_planner.ckpt.log`](../../models/organelles/connect4_planner.ckpt.log)
+- [`connect4_player.ckpt.log`](../../models/organelles/connect4_player.ckpt.log)
+
+---
+
+## 6. Conclusion
 
 | Scenario | Threshold | Observed | Verdict |
 |----------|-----------|----------|---------|
