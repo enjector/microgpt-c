@@ -182,7 +182,9 @@ cmake --build . --config Release
 
 ## Pretrained Models
 
-Three pretrained checkpoints ship in [`models/`](models/) — copy one into your `build/` directory and the demo skips training entirely:
+Three pretrained checkpoints ship in [`models/`](models/) — copy one into your `build/` directory and the demo skips training entirely.
+
+> **Note:** Checkpoint files (`.ckpt`) are stored via [Git LFS](https://git-lfs.github.com/). After cloning, run `git lfs pull` to download them. If you don't need the pretrained weights, skip this step — the demos will train from scratch.
 
 | Model | Params | Size | Trained On | Inference Speed |
 |-------|--------|------|-----------|----------------|
@@ -583,6 +585,7 @@ DATA_LICENSE.md                         Training data provenance & checkpoint li
 - **CMake 3.10+**
 - **pthreads** (Linux/macOS) or **Win32 threads** (Windows) — for multi-threaded demos
 - No other dependencies
+- **Optional:** [Git LFS](https://git-lfs.github.com/) — to download pretrained checkpoints (`git lfs pull`)
 - **Optional:** Metal.framework + Foundation.framework (macOS, for `-DMICROGPT_METAL=ON`)
 - **Optional:** Accelerate.framework / OpenBLAS / MKL (for `-DMICROGPT_BLAS=ON`)
 

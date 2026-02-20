@@ -24,6 +24,7 @@ Thank you for your interest in MicroGPT-C! We welcome contributions from everyon
 4. **Add tests** if touching core engine code — see `tests/test_microgpt.c`
 5. **Run the test suite** before submitting:
    ```bash
+   git lfs pull            # Download pretrained checkpoints (optional)
    mkdir build && cd build
    cmake ..
    cmake --build .
