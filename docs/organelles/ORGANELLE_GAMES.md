@@ -20,6 +20,10 @@ Based on OPA's proven scaling—90% on 8-Puzzle (search/local minima), 87% win+d
 | **7** | **Pentago** (6x6 spin) | ~10^13 | 12+6 | 92K | 85-95% | **91% win** — twist creates easy 5-in-a-row |
 | **8** | **Red Donkey** (sliding) | ~10^9 | 4 | 30K | 70-85% | **12% solve** — tiny corpus (199 entries) |
 
+The results reveal three distinct performance tiers: games where coordination dominates (90%+), games where right-sizing unlocks gains (60–79%), and games limited by encoding or corpus quality (<15%). The pattern is clear — the pipeline is the intelligence, and matching model capacity to corpus complexity matters more than raw parameter count.
+
+![Organelle Game Leaderboard — 11 games ranked by performance tier, with strategic takeaways on right-sizing and the coordination funnel](images/MicroGPT-C%20Organelle%20Game%20Leaderboard.jpg)
+
 #### Why This Progression?
 - **Builds on Demos**: Lights Out/Mastermind test validation loops (post-C4 invalids); Klotski/Sudoku add constraints (post-8-Puzzle minima); Othello/Hex/Pentago ramp strategy (post-TTT threats).
 - **OPA Strengths**: Kanban shines on backtracking/invalids (50%→90% in C4); 15 organelles enable sim Workers (e.g., shallow MCTS in Planner).
