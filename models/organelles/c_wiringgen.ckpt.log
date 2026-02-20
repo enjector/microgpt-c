@@ -1,0 +1,14 @@
+
+========================================
+Run: 2026-02-20 08:05:02
+========================================
+Corpus: 864 compositions | 173080 chars (169.0 KB)
+Vocab: 63 characters
+Architecture: N_EMBD=128 N_LAYER=4 N_HEAD=4 BLOCK_SIZE=512
+Params: 868096
+Training: batch=16 steps=50000 lr=0.0003 threads=12
+Seeds: train=42 infer=1771574702
+Inference: temp=0.30 gen_len=400
+
+--- Training ---
+step     1 / 50000 | loss 6.6080 [BEST]

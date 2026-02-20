@@ -20,7 +20,6 @@
 #define MICROGPT_ORGANELLE_H
 
 #include "microgpt.h"
-#include "microgpt_thread.h"
 #include <stddef.h>
 
 /* ======================== Organelle ====================================== */
@@ -144,5 +143,49 @@ int opa_pipe_starts_with(const char *buf, const char *prefix);
  * Returns 0 on success, -1 on failure.
  */
 int opa_load_docs_multiline(const char *path, Docs *docs, int max_docs);
+
+/* ======================== Ensemble Voting ================================ */
+/*
+ * Generate a response by running N inferences with temperature jitter and
+ * majority-voting the result.  This is domain-agnostic: workers remain
+ * generalists, but ensemble agreement filters out low-confidence outliers.
+ *
+ * n_votes:     number of inference runs (odd recommended, e.g. 3 or 5)
+ * base_temp:   centre temperature; each vote jitters ±OPA_TEMP_JITTER
+ * confidence:  if non-NULL, receives the fraction of votes that agreed
+ *              with the winning answer (e.g. 0.67 for 2/3 agreement)
+ */
+
+#ifndef OPA_TEMP_JITTER
+#define OPA_TEMP_JITTER 0.05
+#endif
+
+#ifndef OPA_MAX_VOTES
+#define OPA_MAX_VOTES 7
+#endif
+
+void organelle_generate_ensemble(const Organelle *org,
+                                 const MicrogptConfig *cfg, const char *prompt,
+                                 char *output, int max_len, int n_votes,
+                                 scalar_t base_temp, scalar_t *confidence);
+
+/* ======================== Valid-Move Filter =============================== */
+/*
+ * Check whether a proposed action appears in a comma-separated valid list.
+ * Returns 1 if action is found, 0 if not.
+ * If valid_csv is NULL or empty, returns 1 (no constraint = all valid).
+ *
+ * Example: opa_valid_filter("3", "0,2,3,5") → 1
+ *          opa_valid_filter("4", "0,2,3,5") → 0
+ */
+int opa_valid_filter(const char *action, const char *valid_csv);
+
+/*
+ * Pick the first valid action from valid_csv that is NOT blocked in kb.
+ * Writes the result to fallback (must be at least 16 bytes).
+ * Returns 1 if a fallback was found, 0 if all valid actions are blocked.
+ */
+int opa_valid_fallback(const OpaKanban *kb, const char *valid_csv,
+                       char *fallback, size_t fallback_sz);
 
 #endif /* MICROGPT_ORGANELLE_H */

@@ -1,0 +1,29 @@
+========================================
+Run: 2026-02-19 22:41:25
+========================================
+Corpus: 32033 docs
+Vocab: 27 characters
+Architecture: N_EMBD=16 N_LAYER=1 N_HEAD=4 BLOCK_SIZE=16
+Params: 4192
+Training: batch=8 steps=1000 lr=0.0100
+Inference: temp=0.50 samples=20
+
+--- Training ---
+step    1 / 1000 | loss 3.4408
+step  100 / 1000 | loss 2.5616
+step  200 / 1000 | loss 2.4792
+step  300 / 1000 | loss 2.2520
+step  400 / 1000 | loss 2.0801
+step  500 / 1000 | loss 2.1113
+step  600 / 1000 | loss 2.1320
+step  700 / 1000 | loss 2.2754
+step  800 / 1000 | loss 2.2042
+step  900 / 1000 | loss 2.3124
+step 1000 / 1000 | loss 2.4290
+
+Training complete: 0.10s | 9642.6 steps/s | 549.8k tok/s
+
+--- Inference Summary ---
+samples: 20 | tokens: 110 | time: 0.00s | 110000.0 tok/s
+========================================
+

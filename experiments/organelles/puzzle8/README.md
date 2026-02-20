@@ -1,16 +1,16 @@
 # 8-Puzzle Multi-Organelle Pipeline
 
-Three tiny neural networks solve sliding tile puzzles by learning **structural heuristics** — not memorising board states.
+Five 460K-parameter neural networks solve sliding tile puzzles by learning **structural heuristics** — not memorising board states. **90% solve rate** with zero parse errors after capacity scaling.
 
 ---
 
 ## Spear Summary
 
-**Point:** Five 64K-parameter organelles coordinating via plain-text messages solve 60% of randomly scrambled 8-puzzles, including **100% of easy** and **30% of hard** configurations they never saw during training.
+**Point:** Scaling from 64K→460K params per organelle (N_EMBD=96, N_LAYER=4) combined with ensemble voting + valid-move pre-filtering achieves **90% solve rate** with **zero parse errors** — up from 0% when the same valid-filter was tried at 64K params.
 
-**Picture:** It's like two people solving a puzzle by passing notes — the Strategist identifies which tile is most out of place, and the Mover picks which direction to slide based on the *consequences* of each move (how much closer each option gets to the goal). Neither memorises specific board positions; they learn general rules. When they get stuck oscillating, the pipeline breaks the cycle automatically.
+**Picture:** It's like two people solving a puzzle by passing notes — the Strategist identifies which tile is most out of place, and the Mover picks which direction to slide based on the *consequences* of each move. At 64K params, the valid-move prompt made the notes too long to read. At 460K, the model handles the extra information and solves 90% of puzzles.
 
-**Proof:** 18/30 unseen puzzles solved (100% easy, 50% medium, 30% hard). Zero parse errors, zero out-of-bounds rejections. 73 oscillation breaks fired to escape local minima. Pipeline executes in 0.16s. The clean greedy signal (v3b) + orchestration-level cycle breaking recovers the same 60% as the noisy mixed corpus — but with a fully explainable decision path.
+**Proof:** 27/30 unseen puzzles solved (100% easy, 100% medium, 70% hard). Zero parse errors (was 1,176 at 64K), zero out-of-bounds rejections. 23 cycle breaks. Pipeline executes in 1.20s.
 
 **Push:** Add `trap=1` detour signal to let the model learn *when* to deviate from greedy descent. Feed Strategist output as priority hint to Mover for multi-step planning.
 
@@ -42,7 +42,9 @@ m=3,5,x,4    ← "if you go up→md=3, down→md=5, left→illegal, right→md=4
 The model's job reduces from "parse a 9-digit string and somehow figure out which tile goes where" to **"mostly pick the smallest number"** — a structural rule that generalises across all 181,440 board states using just 428 unique input patterns.
 
 - **Strategist** sees md-deltas → outputs the best direction (priority hint)
-- **Mover** sees md-deltas + blank position → outputs a direction word
+- **Mover** sees md-deltas + blank position + `valid=` directions → outputs a direction word
+- **Ensemble** runs 3 inferences with temperature jitter, majority-votes the result
+- **Valid Filter** checks result against `valid=` list; falls back to first valid non-blocked direction
 - **Judge** is deterministic: `apply_move()` boundary check
 - **Blocked tracker** prevents repeating invalid moves; clears after 6 stalls
 
@@ -51,13 +53,13 @@ The model's job reduces from "parse a 9-digit string and somehow figure out whic
 | Parameter | Value |
 |-----------|-------|
 | Organelles | 5 (Strategist + Greedy-Mover + Detour-Detector + Detour-Mover + Judge) |
-| N_EMBD | 48 |
-| N_HEAD | 4 |
-| N_LAYER | 2 |
-| MLP_DIM | 192 |
+| N_EMBD | 96 |
+| N_HEAD | 8 |
+| N_LAYER | 4 |
+| MLP_DIM | 384 |
 | BLOCK_SIZE | 128 |
-| Params/organelle | ~64,000 |
-| Total params | ~192,000 |
+| Params/organelle | ~460,000 |
+| Total params | ~2,300,000 |
 | Inference temp | 0.2 |
 
 ## Training
@@ -92,7 +94,7 @@ Corpora generated from BFS-optimal solutions of 5,000 unique solvable puzzles (m
 | **HARD** | 9+ | 2/10 | **20%** | 11.0 |
 | **Overall** | — | **16/30** | **53%** | — |
 
-### v3b + Oscillation Breaker (current)
+### v3b + Oscillation Breaker (64K params)
 
 | Band | MD Range | Solved | Rate | Avg Moves |
 |------|----------|--------|------|-----------|
@@ -101,27 +103,41 @@ Corpora generated from BFS-optimal solutions of 5,000 unique solvable puzzles (m
 | **HARD** | 9+ | 3/10 | **30%** | 11.7 |
 | **Overall** | — | **18/30** | **60%** | — |
 
-Cycle breaks: **73** (detected A↔B oscillation and forced exploration of a third direction).
+Cycle breaks: **73**.
+
+### v3b + Ensemble+Valid at 64K params (FAILED)
+
+Adding `valid=` to mover prompts at 64K params caused **98% parse errors** — the prompts were too long for the model. Fallback picks random valid directions → **0% solve rate**. This was the motivation for capacity scaling.
+
+### v3b + Ensemble+Valid + Capacity (96/4, 460K params) — CURRENT
+
+| Band | MD Range | Solved | Rate | Avg Moves |
+|------|----------|--------|------|-----------|
+| **EASY** | 1–4 | 10/10 | **100%** ✓ | 2.9 |
+| **MEDIUM** | 5–8 | 10/10 | **100%** ✓ | 6.1 |
+| **HARD** | 9+ | 7/10 | **70%** | 9.7 |
+| **Overall** | — | **27/30** | **90%** | — |
+
+Cycle breaks: **23** (↓69% from 73). Parse errors: **0**. Pipeline time: **1.20s**.
 
 ### Full Iteration History
 
-| Version | Encoding | Unique Inputs | Solve Rate | Key Change |
-|---------|----------|---------------|------------|------------|
-| v2 (baseline) | Raw board string | 1,649 | 96.7% (train overlap) | Memorisation, not generalisation |
-| v3-disp | Per-tile displacement | 10,744 | 17% | Too many patterns for 64K params |
-| v3-md | MD-delta (mixed) | 428 | 60% | Structural rule becomes learnable |
-| v3b-dispatch | MD-delta (dual Mover) | 428 | 43% | Detour Mover too weak, causes oscillation |
-| v3b-greedy | MD-delta (clean) | 428 | 53% (100% easy) | Clean signal → perfect easy, loses accidental detours |
-| **v3b+cycle** | **MD-delta (clean + breaker)** | **428** | **60% (100% easy)** | **Orchestration → +10% medium, +10% hard** |
+| Version | Encoding | Params | Solve Rate | Key Change |
+|---------|----------|--------|------------|------------|
+| v2 (baseline) | Raw board string | 64K | 96.7% (train overlap) | Memorisation, not generalisation |
+| v3-disp | Per-tile displacement | 64K | 17% | Too many patterns for 64K params |
+| v3-md | MD-delta (mixed) | 64K | 60% | Structural rule becomes learnable |
+| v3b+cycle | MD-delta (clean + breaker) | 64K | 60% (100% easy) | Orchestration → +10% medium, +10% hard |
+| v3b+valid | MD-delta + ensemble+valid | 64K | **0%** | Prompt too long → 98% parse errors |
+| **v3b+valid+cap** | **MD-delta + ensemble+valid** | **460K** | **90% (100%/100%/70%)** | **Capacity → 0 parse errors, +30%** |
 
 ### Key Observations
 
-1. **Zero parse errors, zero OOB rejections** — the model reliably produces valid direction words
-2. **Greedy descent works** — Puzzle #28 (md=9) solved in 9 consecutive improving moves (v3)
-3. **Oscillation was the dominant failure mode** — the breaker fires 73 times across 30 puzzles, breaking up↔down and left↔right cycles
+1. **Capacity scaling was transformative** — 0% → 90% solve rate by going from 64K to 460K params
+2. **Zero parse errors at 460K** — the model handles `valid=` prompt extension perfectly
+3. **Cycle breaks dropped 69%** (73 → 23) — the model makes fewer oscillation-prone moves
 4. **428 unique MD-delta patterns** vs 181,440 possible board states — 424× input space compression
-5. **Clean signal tradeoff** — removing 12.4% contradictory detour examples gives 100% easy but costs medium accuracy (70% → 40%)
-6. **Orchestration recovers the gap** — the cycle breaker adds +10% medium and +10% hard with zero model changes
+5. **Medium puzzles: 50% → 100%** — the largest improvement from capacity; hard went 30% → 70%
 
 ## Forensic Corpus Analysis
 
@@ -217,10 +233,13 @@ Generates five corpus files (strategist, greedy mover, detour detector, detour m
 
 | Priority | Change | Expected Impact |
 |----------|--------|-----------------|
-| ~~P1~~ | ~~Oscillation breaker: detect cycle → force unexplored direction~~ | ✅ Done — 73 breaks, +10% medium, +10% hard |
-| ~~P1~~ | ~~Split corpus: train a pure greedy model with no contradictory detour examples~~ | ✅ Done — 100% easy, 40% medium, 20% hard |
-| **P1** | **Detour signal**: add `trap=1` flag to input when greedy leads to backtracking, giving the model the missing disambiguation signal | Lets the model learn *when* to deviate from greedy |
-| **P2** | Feed Strategist output into Mover prompt as priority hint | Enables multi-step planning to overcome local minima |
+| ~~P1~~ | ~~Oscillation breaker~~ | ✅ Done — 73 breaks, +10% medium, +10% hard |
+| ~~P1~~ | ~~Split corpus (greedy/detour)~~ | ✅ Done — 100% easy, 40% medium, 20% hard |
+| ~~P1~~ | ~~Increase model capacity (N_EMBD=96, N_LAYER=4)~~ | ✅ Done — **0% → 90% solve, 0 parse errors** |
+| **P1** | **Detour signal**: add `trap=1` flag to input when greedy leads to backtracking | Lets the model learn *when* to deviate from greedy |
+| **P2** | Feed Strategist output into Mover prompt as priority hint | Multi-step planning to overcome local minima |
+| **P3** | More training steps (50K+) at 460K params | Better convergence |
+| **P3** | Solve the remaining 30% hard puzzles | May need lookahead or A* integration |
 
 ---
 

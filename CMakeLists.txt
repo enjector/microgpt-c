@@ -274,6 +274,23 @@ add_demo(
 #  Organelle: 8-Puzzle multi-organelle pipeline
 # ==================================================================
 
+# ==================================================================
+#  Organelle: OPA Code Composition Pipeline
+# ==================================================================
+
+add_demo(
+  NAME    c_compose
+  SOURCE  experiments/organelles/c_compose/main.c
+  THREADS METAL BLAS
+  COPY    experiments/organelles/c_compose/c_planner.txt
+          experiments/organelles/c_compose/c_judge.txt
+          experiments/organelles/c_compose/c_registry.txt
+          experiments/organelles/c_compose/test_intents.txt
+  DEFINES N_EMBD=128 N_HEAD=8 N_LAYER=6 BLOCK_SIZE=128 MLP_DIM=512
+          NUM_STEPS=50000 LEARNING_RATE=0.0005 BATCH_SIZE=8 WARMUP_STEPS=2500
+          MAX_VOCAB=200 MAX_DOCS=5000 MAX_DOC_LEN=256
+)
+
 add_demo(
   NAME    puzzle8_demo
   SOURCE  experiments/organelles/puzzle8/main.c
@@ -283,7 +300,7 @@ add_demo(
           experiments/organelles/puzzle8/puzzle8_detour_detector.txt
           experiments/organelles/puzzle8/puzzle8_detour_mover.txt
           experiments/organelles/puzzle8/puzzle8_judge.txt
-  DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=2 BLOCK_SIZE=128 MLP_DIM=192
+  DEFINES N_EMBD=96 N_HEAD=8 N_LAYER=4 BLOCK_SIZE=128 MLP_DIM=384
           NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
           MAX_VOCAB=50 MAX_DOCS=60000 MAX_DOC_LEN=128
 )
@@ -298,7 +315,7 @@ add_demo(
   THREADS
   COPY    experiments/organelles/tictactoe/tictactoe_planner.txt
           experiments/organelles/tictactoe/tictactoe_player.txt
-  DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=2 BLOCK_SIZE=128 MLP_DIM=192
+  DEFINES N_EMBD=96 N_HEAD=8 N_LAYER=4 BLOCK_SIZE=128 MLP_DIM=384
           NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
           MAX_VOCAB=50 MAX_DOCS=5000 MAX_DOC_LEN=128
 )
@@ -313,9 +330,129 @@ add_demo(
   THREADS
   COPY    experiments/organelles/connect4/connect4_planner.txt
           experiments/organelles/connect4/connect4_player.txt
-  DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=2 BLOCK_SIZE=128 MLP_DIM=192
+  DEFINES N_EMBD=96 N_HEAD=8 N_LAYER=4 BLOCK_SIZE=128 MLP_DIM=384
           NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
           MAX_VOCAB=50 MAX_DOCS=5000 MAX_DOC_LEN=128
+)
+
+# ==================================================================
+#  Organelle: Lights Out multi-organelle pipeline
+# ==================================================================
+
+add_demo(
+  NAME    lightsout_demo
+  SOURCE  experiments/organelles/lightsout/main.c
+  THREADS
+  COPY    experiments/organelles/lightsout/lightsout_planner.txt
+          experiments/organelles/lightsout/lightsout_player.txt
+  DEFINES N_EMBD=64 N_HEAD=4 N_LAYER=3 BLOCK_SIZE=128 MLP_DIM=256
+          NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
+          MAX_VOCAB=50 MAX_DOCS=20000 MAX_DOC_LEN=128
+)
+
+# ==================================================================
+#  Organelle: Mastermind multi-organelle pipeline
+# ==================================================================
+
+add_demo(
+  NAME    mastermind_demo
+  SOURCE  experiments/organelles/mastermind/main.c
+  THREADS
+  COPY    experiments/organelles/mastermind/mastermind_planner.txt
+          experiments/organelles/mastermind/mastermind_player.txt
+  DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=3 BLOCK_SIZE=128 MLP_DIM=192
+          NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
+          MAX_VOCAB=50 MAX_DOCS=10000 MAX_DOC_LEN=128
+)
+
+# ==================================================================
+#  Organelle: Klotski simplified multi-organelle pipeline
+# ==================================================================
+
+add_demo(
+  NAME    klotski_demo
+  SOURCE  experiments/organelles/klotski/main.c
+  THREADS
+  COPY    experiments/organelles/klotski/klotski_planner.txt
+          experiments/organelles/klotski/klotski_player.txt
+  DEFINES N_EMBD=32 N_HEAD=4 N_LAYER=2 BLOCK_SIZE=128 MLP_DIM=128
+          NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
+          MAX_VOCAB=50 MAX_DOCS=10000 MAX_DOC_LEN=128
+)
+
+# ==================================================================
+#  Organelle: Sudoku 4x4 multi-organelle pipeline
+# ==================================================================
+
+add_demo(
+  NAME    sudoku_demo
+  SOURCE  experiments/organelles/sudoku/main.c
+  THREADS
+  COPY    experiments/organelles/sudoku/sudoku_planner.txt
+          experiments/organelles/sudoku/sudoku_player.txt
+  DEFINES N_EMBD=64 N_HEAD=4 N_LAYER=3 BLOCK_SIZE=128 MLP_DIM=256
+          NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
+          MAX_VOCAB=50 MAX_DOCS=20000 MAX_DOC_LEN=128
+)
+
+# ==================================================================
+#  Organelle: Othello 6x6 multi-organelle pipeline
+# ==================================================================
+
+add_demo(
+  NAME    othello_demo
+  SOURCE  experiments/organelles/othello/main.c
+  THREADS
+  COPY    experiments/organelles/othello/othello_planner.txt
+          experiments/organelles/othello/othello_player.txt
+  DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=3 BLOCK_SIZE=128 MLP_DIM=192
+          NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
+          MAX_VOCAB=50 MAX_DOCS=10000 MAX_DOC_LEN=128
+)
+
+# ==================================================================
+#  Organelle: Hex 7x7 multi-organelle pipeline
+# ==================================================================
+
+add_demo(
+  NAME    hex_demo
+  SOURCE  experiments/organelles/hex/main.c
+  THREADS
+  COPY    experiments/organelles/hex/hex_planner.txt
+          experiments/organelles/hex/hex_player.txt
+  DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=3 BLOCK_SIZE=128 MLP_DIM=192
+          NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
+          MAX_VOCAB=50 MAX_DOCS=10000 MAX_DOC_LEN=128
+)
+
+# ==================================================================
+#  Organelle: Pentago multi-organelle pipeline
+# ==================================================================
+
+add_demo(
+  NAME    pentago_demo
+  SOURCE  experiments/organelles/pentago/main.c
+  THREADS
+  COPY    experiments/organelles/pentago/pentago_planner.txt
+          experiments/organelles/pentago/pentago_player.txt
+  DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=3 BLOCK_SIZE=128 MLP_DIM=192
+          NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
+          MAX_VOCAB=50 MAX_DOCS=10000 MAX_DOC_LEN=128
+)
+
+# ==================================================================
+#  Organelle: Red Donkey (Huarong Dao) multi-organelle pipeline
+# ==================================================================
+
+add_demo(
+  NAME    reddonkey_demo
+  SOURCE  experiments/organelles/reddonkey/main.c
+  THREADS
+  COPY    experiments/organelles/reddonkey/reddonkey_planner.txt
+          experiments/organelles/reddonkey/reddonkey_player.txt
+  DEFINES N_EMBD=32 N_HEAD=4 N_LAYER=2 BLOCK_SIZE=128 MLP_DIM=128
+          NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
+          MAX_VOCAB=50 MAX_DOCS=10000 MAX_DOC_LEN=128
 )
 
 # ==================================================================

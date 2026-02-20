@@ -1,0 +1,14 @@
+
+========================================
+Retroactive Log (training predates logging)
+========================================
+Organelle: reddonkey_player
+Game: Red Donkey | Role: player
+Architecture: N_EMBD=32 N_LAYER=2 N_HEAD=4 BLOCK_SIZE=128 MLP_DIM=128
+Params: ~30K
+Training: steps=25000 lr=0.001
+Corpus: ~199 docs
+Checkpoint: reddonkey_player.ckpt (360972 bytes)
+Result: 12% solve
+========================================
+

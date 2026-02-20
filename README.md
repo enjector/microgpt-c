@@ -6,7 +6,7 @@ What if you could train a model on a $5 chip — and what if *teams* of those ti
 
 That's the question behind MicroGPT-C.
 
-> 📄 [The Stem Cell Philosophy](VISION.md) · 💡 [Why This Matters](VALUE_PROPOSITION.md) · 🗺️ [Roadmap](ROADMAP.md)
+> 📄 [The Stem Cell Philosophy](VISION.md) · 💡 [Why This Matters](VALUE_PROPOSITION.md) · 🗺️ [Roadmap](ROADMAP.md) · 📖 [Technical Guide](docs/book/0.md)
 
 ---
 
@@ -61,7 +61,7 @@ A single model of the same size wins ~55%. Two models cooperating through a shar
 
 ## Proven Results
 
-These aren't aspirational claims. Five experiments have run to completion:
+These aren't aspirational claims — every experiment below has run to completion with measured results:
 
 | Experiment | What It Proves | Key Result |
 |-----------|---------------|-----------|
@@ -73,6 +73,28 @@ These aren't aspirational claims. Five experiments have run to completion:
 | [Connect-4 Pipeline](experiments/organelles/connect4/) | System coordination rescues a weak model | **90%** wins vs random |
 
 > The code generation result is the most telling: one model is a **perfect librarian** but a **terrible inventor**. That's exactly why organelle pipelines exist — a planner decomposes the problem, a retrieval engine finds the pieces, and a judge validates the output. Composition beats capacity. All game experiments share a [generic organelle library](src/microgpt_organelle.h) for training, inference, and kanban coordination.
+
+### 🏆 Organelle Game Leaderboard
+
+Eleven organelle demos — each a Planner→Player→Judge pipeline — tested across puzzles, strategy games, and code synthesis. Parameters were **right-sized** from the original 460K to match each game's corpus complexity (30K–160K), proving that smaller models often perform *better*.
+
+| Rank | Game | Params | Result | Corpus | Tier | Δ vs 460K |
+|:----:|------|-------:|-------:|-------:|------|:---------:|
+| 🥇 | [**Pentago**](experiments/organelles/pentago/) | 92K | **91% win** | 3,477 | Small | ✅ +1% |
+| 🥈 | [**Connect-4**](experiments/organelles/connect4/) | 460K | **90% win** | 1,911 | Original | — |
+| 🥉 | [**Tic-Tac-Toe**](experiments/organelles/tictactoe/) | 460K | **90% w+d** | 576 | Original | — |
+| 4 | [**Mastermind**](experiments/organelles/mastermind/) | 92K | **79% solve** | 1,975 | Small | ↓ 7% |
+| 5 | [**Sudoku**](experiments/organelles/sudoku/) | 160K | **78% solve** | 20,000 | Standard | ✅ +2% |
+| 6 | [**Othello**](experiments/organelles/othello/) | 92K | **67% win** | 4,496 | Small | ✅ +11% |
+| 7 | [**Klotski**](experiments/organelles/klotski/) | 30K | **62% solve** | 232 | Micro | ✅ +3% |
+| 8 | [**8-Puzzle**](experiments/organelles/puzzle8/) | 460K | **60% solve** | 1,000 | Original | — |
+| 9 | [**Red Donkey**](experiments/organelles/reddonkey/) | 30K | **12% solve** | 199 | Micro | ↓ 18% |
+| 10 | [**Lights Out**](experiments/organelles/lightsout/) | 160K | **10% solve** | 15,000 | Standard | ↓ 2% |
+| 11 | [**Hex**](experiments/organelles/hex/) | 92K | **4% win** | 4,981 | Small | ↓ 6% |
+
+**Key finding:** 4 of 8 right-sized games **improved** with 65–93% fewer parameters. Over-parameterisation hurts when a tiny corpus can't fill the model's capacity — the model memorises noise instead of learning patterns.
+
+> **Parameter tiers:** Micro (30K) for corpora < 500 · Small (92K) for 1K–5K · Standard (160K) for 5K+ · Original 3 games remain at 460K
 
 ### The Coordination Funnel
 
@@ -93,8 +115,8 @@ These aren't aspirational claims. Five experiments have run to completion:
 MicroGPT-C is a **production-quality implementation** of a GPT-2 Transformer in plain C99, based on [Karpathy's `microgpt.py`](https://gist.github.com/karpathy/8627fe009c40f57531cb18360106ce95):
 
 - **Full training pipeline** — forward pass, backward pass, Adam optimiser with cosine LR + warmup
-- **39 unit tests** covering every public API function
-- **15 performance benchmarks** with measured throughput
+- **97 unit tests** covering every public API function (60 core + 37 organelle)
+- **22 performance benchmarks** with measured throughput (17 core + 5 organelle)
 - **Two tokenisation strategies** — character-level and word-level (with O(1) hash lookup)
 - **Configurable precision** — `float` (default, 2× faster) or `double` via `-DMICROGPT_USE_FLOAT=OFF`
 - **INT8 quantisation** support for memory-constrained devices
@@ -130,16 +152,26 @@ cmake --build . --config Release
 # C code generation (875K params, multi-threaded)
 ./c_codegen
 
-# Multi-organelle experiments
+# Multi-organelle experiments (11 games)
 ./puzzle8_demo       # 5-organelle 8-puzzle solver (60% solve rate)
 ./tictactoe_demo     # 2-organelle tic-tac-toe (90% win+draw)
 ./connect4_demo      # 2-organelle Connect-4 (90% wins)
+./pentago_demo       # 2-organelle Pentago (91% wins, 92K params)
+./mastermind_demo    # 2-organelle Mastermind (79% solve, 92K params)
+./sudoku_demo        # 2-organelle Sudoku 4x4 (78% solve, 160K params)
+./othello_demo       # 2-organelle Othello 6x6 (67% wins, 92K params)
+./klotski_demo       # 2-organelle Klotski (62% solve, 30K params)
+./reddonkey_demo     # 2-organelle Red Donkey (12% solve, 30K params)
+./lightsout_demo     # 2-organelle Lights Out (10% solve, 160K params)
+./hex_demo           # 2-organelle Hex 7x7 (4% wins, 92K params)
 
-# Run unit tests (39 tests)
+# Run unit tests (97 tests total)
 ./test_microgpt
+./test_microgpt_organelle
 
-# Run benchmarks (15 benchmarks)
+# Run benchmarks (22 benchmarks total)
 ./bench_microgpt
+./bench_microgpt_organelle
 
 # Build with double precision (if needed for research)
 cmake -DMICROGPT_USE_FLOAT=OFF ..
@@ -422,7 +454,7 @@ The engine includes several optimisations for training throughput:
 - **`restrict` + vectorisation hints** — C99 `restrict` qualifiers and Clang loop pragmas on all hot-path functions (`lin_fwd`, `lin_bwd`, `rmsnorm_fwd/bwd`) to enable full auto-vectorisation
 - **Compiler flags** — `-O3 -ffast-math -march=native -flto -funroll-loops` for Release builds (LTO enables cross-file inlining)
 - **Shared training helpers** — `TrainWorker` struct + `train_worker_run` thread entry, `shuffle_docs` — extracted from demos into the core library to eliminate duplication
-- **Cross-platform multi-threaded batches** — all demos auto-detect CPU count and parallelise batch processing via portable `microgpt_thread.h` (pthread on Linux/macOS, Win32 threads on Windows)
+- **Cross-platform multi-threaded batches** — all demos auto-detect CPU count and parallelise batch processing via the portable threading layer built into `microgpt.h` (pthread on Linux/macOS, Win32 threads on Windows)
 - **Optional Metal GPU** — Apple Silicon GPU compute shaders for `lin_fwd`/`lin_bwd` matmuls via `-DMICROGPT_METAL=ON`
 - **Optional BLAS** — Hardware-accelerated BLAS (Accelerate, OpenBLAS) for single-threaded inference via `-DMICROGPT_BLAS=ON`
 
@@ -492,23 +524,30 @@ cmake -DN_EMBD=128 -DN_HEAD=8 -DN_LAYER=4 -DBLOCK_SIZE=256 ..
 
 ```
 src/                                    FOUNDATION — Core engine
-  microgpt.h                            Public API — scalar_t, compile-time macros, all functions
+  microgpt.h                            Public API + portable threading (pthread / Win32)
   microgpt.c                            Core engine (~2,700 lines)
   microgpt_organelle.h                  Organelle Pipeline Architecture (OPA) library API
   microgpt_organelle.c                  OPA implementation (training, inference, kanban, cycle detection)
-  microgpt_thread.h                     Portable threading (pthread / Win32)
   microgpt_metal.h / .m / .metal        Metal GPU acceleration (optional)
 
 demos/character-level/                  FOUNDATION — Core demos
   names/main.c                          Character-level name generation
   shakespeare/main.c                    Character-level Shakespeare (multi-threaded)
 
-experiments/organelles/                 ORGANELLES — Multi-agent experiments
+experiments/organelles/                 ORGANELLES — Multi-agent experiments (11 games)
   c_codegen/                            Single organelle: C code generation (875K params)
   c_wiringgen/                          Single organelle: C wiring generation
   puzzle8/                              Multi-organelle: 8-Puzzle (Planner + Mover + Judge)
   tictactoe/                            Multi-organelle: Tic-Tac-Toe (Planner + Player)
   connect4/                             Multi-organelle: Connect-4 (Planner + Player)
+  pentago/                              Multi-organelle: Pentago — 91% win (92K params)
+  mastermind/                           Multi-organelle: Mastermind — 79% solve (92K params)
+  sudoku/                               Multi-organelle: Sudoku 4×4 — 78% solve (160K params)
+  othello/                              Multi-organelle: Othello 6×6 — 67% win (92K params)
+  klotski/                              Multi-organelle: Klotski — 62% solve (30K params)
+  reddonkey/                            Multi-organelle: Red Donkey — 12% solve (30K params)
+  lightsout/                            Multi-organelle: Lights Out — 10% solve (160K params)
+  hex/                                  Multi-organelle: Hex 7×7 — 4% win (92K params)
 
 models/                                 PRETRAINED — Ready-to-use checkpoints
   shakespeare.ckpt                      840K params, character-level Shakespeare
@@ -516,10 +555,13 @@ models/                                 PRETRAINED — Ready-to-use checkpoints
   c_wiringgen.ckpt                      875K params, C wiring generation
 
 tests/
-  test_microgpt.c                       Unit tests (39 tests, zero dependencies)
-  bench_microgpt.c                      Performance benchmarks (15 benchmarks)
+  test_microgpt.c                       Core unit tests (60 tests, zero dependencies)
+  test_microgpt_organelle.c             OPA unit tests (37 tests)
+  bench_microgpt.c                      Core benchmarks (17 benchmarks)
+  bench_microgpt_organelle.c            OPA benchmarks (5 benchmarks)
 
 docs/
+  book/                                 Technical Guide — 14-chapter journal of the project
   foundation/                           Tokenisation guides, attention mechanisms, optimisation
   organelles/                           Pipeline design, planner architecture, CLI vision
 

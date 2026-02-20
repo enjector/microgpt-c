@@ -55,6 +55,7 @@
 #define NUM_TEST_PUZZLES                                                       \
   (NUM_EASY_PUZZLES + NUM_MEDIUM_PUZZLES + NUM_HARD_PUZZLES)
 #define REPLAN_THRESHOLD 6 /* stalls before clearing blocked */
+#define ENSEMBLE_VOTES 3   /* worker votes per move (odd for tiebreak) */
 
 /* ---- File-scoped runtime config ---- */
 static MicrogptConfig g_cfg;
@@ -62,6 +63,25 @@ static MicrogptConfig g_cfg;
 /* ---- Forward declarations ---- */
 static int apply_move(int *board, const char *dir);
 static int manhattan_distance(const int *board);
+
+/* Build comma-separated list of valid directions for the current board. */
+static void get_valid_dirs(const int *board, char *out, size_t out_sz) {
+  const char *dir_names[] = {"up", "down", "left", "right"};
+  int pos = 0;
+  int first = 1;
+  for (int d = 0; d < 4; d++) {
+    int test[9];
+    memcpy(test, board, 9 * sizeof(int));
+    if (apply_move(test, dir_names[d])) {
+      if (!first)
+        pos += snprintf(out + pos, out_sz - (size_t)pos, ",");
+      pos += snprintf(out + pos, out_sz - (size_t)pos, "%s", dir_names[d]);
+      first = 0;
+    }
+  }
+  if (first)
+    out[0] = '\0';
+}
 
 /* ---- Board Helpers ---- */
 
@@ -192,10 +212,10 @@ int main(void) {
 
   /* Runtime configuration */
   g_cfg = microgpt_default_config();
-  g_cfg.n_embd = 48;
-  g_cfg.n_head = 4;
-  g_cfg.mlp_dim = 192;
-  g_cfg.n_layer = 2;
+  g_cfg.n_embd = N_EMBD;
+  g_cfg.n_head = N_HEAD;
+  g_cfg.mlp_dim = MLP_DIM;
+  g_cfg.n_layer = N_LAYER;
   g_cfg.block_size = 128;
   g_cfg.batch_size = 8;
   g_cfg.num_steps = 25000;
@@ -341,19 +361,24 @@ int main(void) {
         else
           total_greedy_uses++;
 
-        /* Build Mover prompt with MD-delta encoding */
+        /* Build Mover prompt with MD-delta encoding + valid directions */
+        char valid_dirs[32];
+        get_valid_dirs(board, valid_dirs, sizeof(valid_dirs));
         char mover_prompt[128];
         if (kb.blocked[0] != '\0') {
-          snprintf(mover_prompt, sizeof(mover_prompt), "%s|b=%d|x=%s", dstr,
-                   blank, kb.blocked);
+          snprintf(mover_prompt, sizeof(mover_prompt), "%s|b=%d|valid=%s|x=%s",
+                   dstr, blank, valid_dirs, kb.blocked);
         } else {
-          snprintf(mover_prompt, sizeof(mover_prompt), "%s|b=%d", dstr, blank);
+          snprintf(mover_prompt, sizeof(mover_prompt), "%s|b=%d|valid=%s", dstr,
+                   blank, valid_dirs);
         }
 
-        /* Always use greedy Mover */
+        /* Generate move via ensemble voting */
         char move_output[INF_GEN_LEN + 1];
-        organelle_generate(mover, &g_cfg, mover_prompt, move_output,
-                           INF_GEN_LEN, ORGANELLE_TEMP);
+        scalar_t vote_conf = 0;
+        organelle_generate_ensemble(mover, &g_cfg, mover_prompt, move_output,
+                                    INF_GEN_LEN, ENSEMBLE_VOTES, ORGANELLE_TEMP,
+                                    &vote_conf);
 
         /* Parse direction */
         const char *dir = NULL;
@@ -366,20 +391,26 @@ int main(void) {
         else if (strncmp(move_output, "right", 5) == 0)
           dir = "right";
 
+        /* Validate against valid directions list */
+        if (dir && !opa_valid_filter(dir, valid_dirs)) {
+          dir = NULL;
+        }
+
         if (!dir) {
           printf("   [%d] Mover -> \"%s\" (PARSE ERROR)\n", iter + 1,
                  move_output);
           total_parse_errors++;
-          const char *fallback_dirs[] = {"up", "down", "left", "right"};
-          for (int d = 0; d < 4; d++) {
-            if (opa_kanban_is_blocked(&kb, fallback_dirs[d]))
-              continue;
-            int test[9];
-            memcpy(test, board, sizeof(board));
-            if (apply_move(test, fallback_dirs[d])) {
-              dir = fallback_dirs[d];
-              break;
-            }
+          /* Use opa_valid_fallback for first valid non-blocked direction */
+          char fb[16];
+          if (opa_valid_fallback(&kb, valid_dirs, fb, sizeof(fb))) {
+            if (strcmp(fb, "up") == 0)
+              dir = "up";
+            else if (strcmp(fb, "down") == 0)
+              dir = "down";
+            else if (strcmp(fb, "left") == 0)
+              dir = "left";
+            else if (strcmp(fb, "right") == 0)
+              dir = "right";
           }
           if (!dir) {
             kb.stalls++;

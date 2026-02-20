@@ -873,4 +873,143 @@ typedef struct {
  */
 void *train_worker_run(void *arg);
 
+/* ======================== Portable Threading ============================== */
+/*
+ * Cross-platform threading abstraction (previously microgpt_thread.h).
+ *
+ * Provides a minimal API over:
+ *   - Thread creation / join  (pthread on POSIX, Win32 on Windows)
+ *   - CPU core count detection (sysconf / GetSystemInfo)
+ *   - Default thread count recommendation
+ *
+ * On Windows, the user-facing function signature void*(*fn)(void*) is
+ * wrapped into the __stdcall unsigned(void*) convention that
+ * _beginthreadex expects, using a trampoline struct.  On POSIX the
+ * trampoline is a no-op but kept for API uniformity.
+ */
+
+#ifdef _WIN32
+/* ---- Windows ---- */
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
 #endif
+#include <process.h>
+#include <windows.h>
+
+typedef HANDLE mgpt_thread_t;
+
+/* Win32 thread proc signature: unsigned __stdcall fn(void*) */
+typedef unsigned(__stdcall *mgpt_win32_fn)(void *);
+
+/*
+ * Trampoline: wraps the portable void*(*fn)(void*) signature into the
+ * __stdcall unsigned(void*) convention required by _beginthreadex.
+ * Caller must keep the trampoline struct alive until thread completes.
+ */
+typedef struct {
+  void *(*fn)(void *);
+  void *arg;
+} mgpt_thread_trampoline_t;
+
+static unsigned __stdcall mgpt_thread_trampoline_(void *p) {
+  mgpt_thread_trampoline_t *t = (mgpt_thread_trampoline_t *)p;
+  t->fn(t->arg);
+  return 0;
+}
+
+static int mgpt_thread_create(mgpt_thread_t *thread,
+                              mgpt_thread_trampoline_t *tramp,
+                              void *(*fn)(void *), void *arg) {
+  tramp->fn = fn;
+  tramp->arg = arg;
+  *thread =
+      (HANDLE)_beginthreadex(NULL, 0, mgpt_thread_trampoline_, tramp, 0, NULL);
+  return (*thread == 0) ? -1 : 0;
+}
+
+static int mgpt_thread_join(mgpt_thread_t thread) {
+  WaitForSingleObject(thread, INFINITE);
+  CloseHandle(thread);
+  return 0;
+}
+
+static int mgpt_cpu_count(void) {
+  SYSTEM_INFO si;
+  GetSystemInfo(&si);
+  return (int)si.dwNumberOfProcessors;
+}
+
+/* rand_r is not available on Windows; provide a simple replacement */
+#ifndef HAVE_RAND_R
+static unsigned int mgpt_rand_r(unsigned int *seed) {
+  *seed = *seed * 1103515245u + 12345u;
+  return (*seed >> 16) & 0x7fff;
+}
+#define rand_r(s) mgpt_rand_r(s)
+#endif
+
+/* clock_gettime is not available on older MSVC; provide a monotonic version */
+#ifndef CLOCK_MONOTONIC
+#define CLOCK_MONOTONIC 1
+#endif
+
+struct timespec; /* forward decl */
+
+static int mgpt_clock_gettime(int clk_id, struct timespec *tp);
+
+#include <time.h> /* for struct timespec */
+
+static int mgpt_clock_gettime(int clk_id, struct timespec *tp) {
+  if (clk_id != CLOCK_MONOTONIC)
+    return -1;
+  LARGE_INTEGER freq, count;
+  QueryPerformanceFrequency(&freq);
+  QueryPerformanceCounter(&count);
+  tp->tv_sec = count.QuadPart / freq.QuadPart;
+  tp->tv_nsec =
+      (long)(((count.QuadPart % freq.QuadPart) * 1000000000L) / freq.QuadPart);
+  return 0;
+}
+#define clock_gettime(id, tp) mgpt_clock_gettime(id, tp)
+
+#else
+/* ---- POSIX (Linux, macOS, etc.) ---- */
+#include <pthread.h>
+#include <unistd.h>
+
+typedef pthread_t mgpt_thread_t;
+
+/* Dummy trampoline struct — not needed on POSIX, but keeps API uniform */
+typedef struct {
+  void *(*fn)(void *);
+  void *arg;
+} mgpt_thread_trampoline_t;
+
+static int mgpt_thread_create(mgpt_thread_t *thread,
+                              mgpt_thread_trampoline_t *tramp,
+                              void *(*fn)(void *), void *arg) {
+  (void)tramp; /* unused on POSIX */
+  return pthread_create(thread, NULL, fn, arg);
+}
+
+static int mgpt_thread_join(mgpt_thread_t thread) {
+  return pthread_join(thread, NULL);
+}
+
+static int mgpt_cpu_count(void) {
+  long n = sysconf(_SC_NPROCESSORS_ONLN);
+  return (n > 0) ? (int)n : 1;
+}
+
+#endif /* _WIN32 */
+
+/*
+ * mgpt_default_threads — Recommend a thread count for training.
+ *   Returns min(cpu_count, batch_size) so we never have idle threads.
+ */
+static int mgpt_default_threads(int batch_size) {
+  int ncpu = mgpt_cpu_count();
+  return (ncpu < batch_size) ? ncpu : batch_size;
+}
+
+#endif /* MICROGPT_H */

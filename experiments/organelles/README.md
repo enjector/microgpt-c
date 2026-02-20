@@ -10,9 +10,9 @@ Sub-1M parameter Transformers that can't compose alone — but chain into pipeli
 
 **Picture:** It's like having a team where each person only knows one thing. The librarian finds the book, the architect draws the plan, and the builder follows instructions. Alone they're useless at novel tasks — together they build things none of them could imagine.
 
-**Proof:** The c_codegen model scores 0/10 on novel prompts despite byte-perfect recall of 2,081 known functions. But the 8-puzzle pipeline (5 organelles × 64K params each) solves 60% of unseen test puzzles, and Connect-4 wins 90% against random — both through kanban coordination of weak models.
+**Proof:** The c_codegen model scores 0/10 on novel prompts despite byte-perfect recall of 2,081 known functions. But the c_compose pipeline (1.2M params with LR scheduling) achieves **83% exact match** on function composition plans, the 8-puzzle pipeline (5 organelles) solves 90% of unseen test puzzles, and Connect-4 wins 88% against random — all through kanban coordination of weak models. Across 14 experiments covering 11 game domains and 3 code generation tasks, pipelines consistently elevate weak models.
 
-**Push:** Apply MD-delta encoding (pre-computed evaluation per action) to tic-tac-toe and connect-4 to give models structural heuristics instead of raw board strings.
+**Push:** Apply the LR scheduling patterns (see `TRAINING_STRATEGIES.md`) to all scaled-up experiments. Expand the game portfolio to test OPA across more complex planning and adversarial domains.
 
 ---
 
@@ -20,9 +20,18 @@ Sub-1M parameter Transformers that can't compose alone — but chain into pipeli
 
 | Experiment | What It Tests | Key Result |
 |-----------|---------------|------------|
-| [Tic-Tac-Toe](tictactoe/) | Planner→Player→Judge pipeline | **90% win+draw** vs random |
-| [8-Puzzle](puzzle8/) | 5-organelle pipeline + cycle breaking | **60% solve rate** (100% easy, 50% med, 30% hard) |
-| [Connect-4](connect4/) | Pipeline rescue of weak models | **90% wins** despite 50% invalid moves |
+| [C Code Composition](c_compose/) | Planner→Judge pipeline + LR scheduling | **83% exact match**, 98% parse, 1.2M params |
+| [Tic-Tac-Toe](tictactoe/) | Planner→Player→Judge pipeline | **87% win+draw** vs random |
+| [8-Puzzle](puzzle8/) | 5-organelle pipeline + cycle breaking | **90% solve rate** (100% easy, 100% med, 70% hard) |
+| [Connect-4](connect4/) | Pipeline rescue of weak models | **88% wins** despite 50% invalid moves |
+| [Lights Out](lightsout/) | Toggle logic + constraint validation | OPA pipeline |
+| [Mastermind](mastermind/) | Feedback loops + hypothesis tracking | OPA pipeline |
+| [Klotski](klotski/) | Multi-piece sliding block puzzle | OPA pipeline |
+| [Sudoku](sudoku/) | Constraint satisfaction (row/col/box) | OPA pipeline |
+| [Othello](othello/) | Adversarial flipping + strategy | OPA pipeline |
+| [Hex](hex/) | Connectivity-based strategy | OPA pipeline |
+| [Pentago](pentago/) | Move + rotation combined actions | OPA pipeline |
+| [Red Donkey](reddonkey/) | Asymmetric sliding blocks | OPA pipeline |
 | [C Code Generation](c_codegen/) | Retrieval fidelity + novel composition | 7/7 byte-perfect recall, 0/10 novel |
 | [C Wiring Generation](c_wiringgen/) | Composition grammar hypothesis | Training in progress |
 

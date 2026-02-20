@@ -79,7 +79,7 @@ The hot paths in `microgpt.c` read compile-time `#define` macros (`N_EMBD`, `N_L
 - **Runner mode**: For training workloads, `microgpt train` invokes CMake to compile an optimised per-config binary (or uses a pre-compiled one). This is analogous to how `cargo build` compiles specialised release binaries.
 
 > [!NOTE]
-> Phase 1 can ship with runtime-only (Approach B) for simplicity. The ~2× perf hit is acceptable when N_EMBD ≤ 48. Tiered compilation can be added later for larger models.
+> Phase 1 can ship with runtime-only (Approach B) for simplicity. The ~2× perf hit is acceptable when N_EMBD ≤ 96. Tiered compilation can be added later for larger models.
 
 ---
 

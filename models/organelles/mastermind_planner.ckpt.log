@@ -1,0 +1,14 @@
+
+========================================
+Retroactive Log (training predates logging)
+========================================
+Organelle: mastermind_planner
+Game: Mastermind | Role: planner
+Architecture: N_EMBD=48 N_LAYER=3 N_HEAD=4 BLOCK_SIZE=128 MLP_DIM=192
+Params: ~92K
+Training: steps=25000 lr=0.001
+Corpus: ~2000 docs
+Checkpoint: mastermind_planner.ckpt (1109388 bytes)
+Result: 79% solve
+========================================
+

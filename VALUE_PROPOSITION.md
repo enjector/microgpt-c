@@ -84,21 +84,23 @@ MicroGPT-C's **organelle architecture** takes this further. Instead of one large
 ```
 ┌──────────┐     ┌──────────┐     ┌──────────┐
 │ Planner  │────▶│  Mover   │────▶│  Judge   │
-│ (64K)    │     │  (64K)   │     │  (64K)   │
+│(30K-160K)│     │(30K-160K)│     │(30K-160K)│
 └──────────┘     └──────────┘     └──────────┘
      │                │                │
      ▼                ▼                ▼
   "What to do"    "How to do it"  "Did it work?"
 ```
 
-**Total: ~200K parameters solving problems that normally require millions.**
+**Total: 60K–480K parameters per pipeline. Right-sized by corpus complexity. Zero invalid moves.**
 
-This is proven in six experiments:
-- **8-Puzzle solver** — 60% solve rate with 5 organelles (100% easy, 50% medium, 30% hard)
-- **Tic-Tac-Toe** — 90% win+draw rate with 2 organelles
-- **Connect-4** — 90% win rate with 2 organelles
+This is proven in fourteen experiments:
+- **C Code Composition** — **83% exact match** on function plans, 98% parse rate (1.2M params with LR scheduling)
+- **8-Puzzle solver** — **90% solve rate** with 5 organelles (100% easy, 100% medium, 70% hard) and zero parse errors
+- **Tic-Tac-Toe** — **87% win+draw** rate with 2 organelles, zero invalid moves
+- **Connect-4** — **88% win rate** with 2 organelles, zero invalid moves
 - **C Code Generation** — byte-perfect function recall
 - **C Wiring Generation** — multi-function composition
+- **8 additional games** — Pentago (**91% win**, 92K), Mastermind (**79% solve**, 92K), Sudoku (**78%**, 160K), Othello (**67% win**, 92K), Klotski (**62%**, 30K), Red Donkey (**12%**, 30K), Lights Out (**10%**, 160K), Hex (**4%**, 92K) — right-sized parameters per game
 
 ---
 
@@ -127,7 +129,7 @@ MicroGPT-C makes AI accessible to anyone with a C compiler.
 - **For edge:** Deploy intelligent agents on hardware that can't run Python
 - **For education:** Train a GPT from scratch in under a minute
 
-The organelle architecture shows that **small, specialised models composed into pipelines can solve problems that individual models cannot** — at a fraction of the parameter cost.
+The organelle architecture shows that **small, specialised models composed into pipelines can solve problems that individual models cannot** — at a fraction of the parameter cost. From game-playing to autonomous code composition, the evidence spans 14 experiments across 11 game domains and 3 code generation tasks.
 
 This is not a toy. This is a foundation.
 

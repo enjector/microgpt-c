@@ -1,0 +1,14 @@
+
+========================================
+Retroactive Log (training predates logging)
+========================================
+Organelle: lightsout_planner
+Game: Lights Out | Role: planner
+Architecture: N_EMBD=64 N_LAYER=3 N_HEAD=4 BLOCK_SIZE=128 MLP_DIM=256
+Params: ~160K
+Training: steps=25000 lr=0.001
+Corpus: ~10000 docs
+Checkpoint: lightsout_planner.ckpt (1912332 bytes)
+Result: 10% solve
+========================================
+

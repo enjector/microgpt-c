@@ -1,0 +1,14 @@
+
+========================================
+Retroactive Log (training predates logging)
+========================================
+Organelle: puzzle8_mover
+Game: 8-Puzzle | Role: mover
+Architecture: N_EMBD=96 N_LAYER=4 N_HEAD=8 BLOCK_SIZE=128 MLP_DIM=384
+Params: ~460K
+Training: steps=25000 lr=0.001
+Corpus: ~1000 docs
+Checkpoint: puzzle8_mover_v3b.ckpt (5534220 bytes)
+Result: 60% solve
+========================================
+

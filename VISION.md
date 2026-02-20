@@ -14,7 +14,7 @@
 
 **Picture:** A stem cell doesn't know what it will become until it encounters its environment. Hand it muscle tissue signals and it becomes muscle. Hand MicroGPT-C a shipping address corpus and it becomes an address validator. Same engine, infinite specialisations.
 
-**Proof:** Six working experiments — name generation (trains in < 1s), Shakespeare text (840K params, zero `<unk>`), C code retrieval (byte-perfect on 2,081 functions), 8-puzzle solving (60% via 5-organelle pipeline), Tic-Tac-Toe (90% win+draw), and Connect-4 (90% win rate) — prove the stem cell differentiates into real, testable intelligence. All game experiments share a [generic organelle library](src/microgpt_organelle.h).
+**Proof:** Fourteen working experiments — name generation (trains in < 1s), Shakespeare text (840K params, zero `<unk>`), C code retrieval (byte-perfect on 2,081 functions), C code composition (**83% exact match**, 1.2M params with LR scheduling), 8-puzzle solving (**90% via 5-organelle pipeline, 460K params**), Tic-Tac-Toe (**87% win+draw**), Connect-4 (**88% win rate**), plus 8 game extensions (Lights Out, Mastermind, Klotski, Sudoku, Othello, Hex, Pentago, Red Donkey) — prove the stem cell differentiates into real, testable intelligence. All game experiments share a [generic organelle library](src/microgpt_organelle.h) with ensemble voting + valid-move pre-filtering achieving **zero invalid moves**.
 
 **Push:** Read [VALUE_PROPOSITION.md](VALUE_PROPOSITION.md) for the business case, or jump straight to `experiments/organelles/` to see the experimental evidence.
 
@@ -268,6 +268,7 @@ This means differentiation of a LEGO block from a 10,000-example corpus takes se
 - **Model distillation pipeline**: Use a large cloud model to generate high-quality training corpora, then distill into a MicroGPT-C block
 - **INT8 quantised organelles**: 4× smaller `.bin` files for the most constrained MCUs
 - **Organelle chaining protocol**: Lightweight IPC for composing multiple blocks into pipelines
+- **LR scheduling auto-tuning**: Automatic warmup ratio (5–10% of steps) and lr scaling (lr ∝ 1/√params) for models above 500K parameters
 
 ---
 

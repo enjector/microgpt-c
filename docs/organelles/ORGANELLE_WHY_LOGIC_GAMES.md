@@ -119,6 +119,9 @@ The 50% invalid-move rate is the pipeline's main bottleneck. Three approaches, i
 
 Pre-filtering is the immediate next step: pass `valid_moves=up,left` in the prompt so the worker can only propose from a legal subset. This is already supported by the pipe-string format.
 
+> [!NOTE]
+> Active research on this problem is tracked in [Reducing Invalid Moves Progress](../../journals/Reducing%20Invalid%20Moves%20Progress.md).
+
 ### Phase 2: New Game Domains (Validation)
 
 To confirm that the pipeline generalises, test on games with different combinatorial profiles:

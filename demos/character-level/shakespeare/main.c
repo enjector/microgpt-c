@@ -19,7 +19,6 @@
 #define _CRT_SECURE_NO_WARNINGS 1
 
 #include "microgpt.h"
-#include "microgpt_thread.h"
 
 #include <stdio.h>
 #include <stdlib.h>

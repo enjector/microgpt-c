@@ -90,6 +90,67 @@ static void bench_pipe_string_parse(void) {
 }
 
 /* ==================================================================== */
+/*                    VALID-MOVE FILTER                                   */
+/* ==================================================================== */
+
+static void bench_valid_filter(void) {
+  BENCH_HEADER("valid_filter + valid_fallback");
+
+  OpaKanban kb;
+  int iters = 500000;
+  clock_t t0 = clock();
+  for (int i = 0; i < iters; i++) {
+    opa_valid_filter("3", "0,1,2,3,4,5,6,7,8");
+    opa_valid_filter("9", "0,1,2,3,4,5,6,7,8");
+    opa_kanban_init(&kb, 3);
+    opa_kanban_add_blocked(&kb, "0");
+    opa_kanban_add_blocked(&kb, "2");
+    char fb[16];
+    opa_valid_fallback(&kb, "0,1,2,3,4", fb, sizeof(fb));
+  }
+  scalar_t ms = elapsed_ms(t0);
+  BENCH_RESULT(ms / 1000.0, (scalar_t)iters / (ms / 1000.0), "cycles/s");
+}
+
+/* ==================================================================== */
+/*                   MULTI-LINE CORPUS LOADER                             */
+/* ==================================================================== */
+
+/* Helper to write a temp file for benchmarking */
+static const char *bench_write_temp(const char *name, const char *content) {
+  FILE *f = fopen(name, "wb");
+  if (f) {
+    fputs(content, f);
+    fclose(f);
+  }
+  return name;
+}
+
+static void bench_multiline_loader(void) {
+  BENCH_HEADER("opa_load_docs_multiline (50 docs)");
+
+  /* Create a corpus with 50 short documents */
+  char corpus[4096];
+  int pos = 0;
+  for (int d = 0; d < 50; d++) {
+    pos += snprintf(corpus + pos, sizeof(corpus) - (size_t)pos,
+                    "prompt %d\nresponse %d\n\n", d, d);
+  }
+  bench_write_temp("_bench_ml.txt", corpus);
+
+  int iters = 5000;
+  clock_t t0 = clock();
+  for (int i = 0; i < iters; i++) {
+    Docs docs = {0};
+    opa_load_docs_multiline("_bench_ml.txt", &docs, 100);
+    free_docs(&docs);
+  }
+  scalar_t ms = elapsed_ms(t0);
+  remove("_bench_ml.txt");
+  BENCH_RESULT(ms / iters, (scalar_t)iters / (ms / 1000.0), "loads/s");
+}
+
+/* ==================================================================== */
 /*                            MAIN                                       */
 /* ==================================================================== */
 
@@ -104,6 +165,12 @@ int main(void) {
 
   printf("\n[Pipe-String Parsing]\n");
   bench_pipe_string_parse();
+
+  printf("\n[Valid-Move Filter]\n");
+  bench_valid_filter();
+
+  printf("\n[Multi-Line Corpus Loader]\n");
+  bench_multiline_loader();
 
   printf("\n=== Done ===\n\n");
   return 0;

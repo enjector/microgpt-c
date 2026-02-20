@@ -1,0 +1,4356 @@
+/* smooth then compute zero crossings */
+seq|rolling_mean|zero_crossings
+
+/* bandpass filter then compute envelope of array */
+seq|bandpass_filter|hilbert_envelope
+
+/* compute clamp vector values to range */
+seq|clamp
+
+/* compute array to noise ratio */
+seq|signal_rms
+
+/* apply window function then compute FFT */
+seq|hamming_window|fft_radix2
+
+/* horner evaluation applied to array */
+seq|horner
+
+/* perform window function */
+seq|hamming_window|fft_radix2
+
+/* calculate proportion of fast to slow moving averages */
+seq|rolling_mean
+
+/* calculate cumulative sum then normalize of array */
+seq|cumsum|zscore_normalize
+
+/* compute average of two arrays then difference */
+seq|mean
+
+/* compute variance ratio of two arrays */
+seq|variance
+
+/* compute power spectral density */
+seq|fft_radix2|fft_magnitude
+
+/* execute polynomial evaluation to each element */
+seq|poly_eval
+
+/* generate sine wave then add jitter of array */
+seq|gen_sine|add_noise
+
+/* generate chirp waveform by sweeping frequency */
+seq|lerp
+
+/* fill sine wave */
+seq|gen_sine|add_noise
+
+/* populate sine then compute spectrum */
+seq|gen_sine|fft_radix2|fft_magnitude
+
+/* sort then return of array */
+seq|bubble_sort
+
+/* sma followed by of array */
+seq|sma|ema_series
+
+/* calculate peak frequency in signal */
+seq|fft_radix2|fft_magnitude|argmax
+
+/* compute rolling max function */
+seq|moving_max
+
+/* evaluate min and max of array */
+seq|min_val|max_val
+
+/* compute convolution then normalize */
+seq|conv|zscore_normalize
+
+/* compute bandpass filter then compute envelope */
+seq|bandpass_filter|hilbert_envelope
+
+/* evaluate histogram then apply softmax */
+seq|histogram|softmax
+
+/* compute Euclidean norm of vector */
+seq|vec_norm
+
+/* evaluate range of vector values */
+seq|max_val|min_val
+
+/* compute exponential moving mean then subtract from original of array */
+seq|ema_series
+
+/* smooth then apply middle value filter */
+seq|rolling_mean|median_filter
+
+/* compute cumulative sum then normalize */
+seq|cumsum|zscore_normalize
+
+/* compute rolling z-score function of array */
+seq|rolling_mean|running_stddev
+
+/* cumulative product then function */
+seq|cumulative_product|max_val
+
+/* calculate Euclidean norm of array */
+seq|vec_norm
+
+/* welford update then extract mean of array */
+seq|welford_update
+
+/* evaluate rolling covariance between two vectors */
+seq|covariance
+
+/* evaluate difference between fast and slow moving means */
+seq|rolling_mean
+
+/* execute linear regression and predict of array */
+seq|linreg
+
+/* process then compute cumulative sum */
+seq|rolling_mean|cumsum
+
+/* compute residual after projection of array */
+seq|dot|vec_scale
+
+/* convolve then downsample */
+seq|conv|downsample
+
+/* multiply array by scalar factor */
+seq|vec_scale
+
+/* compute two layer linear transform */
+seq|mat_vec|relu
+
+/* sort then return */
+seq|bubble_sort
+
+/* execute polynomial evaluation to each value */
+seq|poly_eval
+
+/* calculate differentiate then lowpass filter */
+seq|diff_central|lowpass
+
+/* evaluate power spectral density of array */
+seq|fft_radix2|fft_magnitude
+
+/* evaluate map values to range zero to one */
+seq|minmax_normalize
+
+/* evaluate two arrays then return their cosine similarity */
+seq|cosine_similarity
+
+/* normalize signal then compute fft magnitude */
+seq|zscore_normalize|fft_radix2|fft_magnitude
+
+/* subtract mean from array */
+seq|mean
+
+/* apply tanh to each element of array */
+seq|tanh_approx
+
+/* compute gradient then smooth with ema */
+seq|diff_central|ema_series
+
+/* evaluate mean and variance in single pass */
+seq|mean|variance
+
+/* order then compute median */
+seq|bubble_sort|median
+
+/* compute prefix sum */
+seq|prefix_sum|max_val
+
+/* calculate cumulative product then normalize */
+seq|cumulative_product|max_val
+
+/* detrend then compute fft */
+seq|rolling_mean|fft_radix2
+
+/* horner evaluation applied */
+seq|horner
+
+/* fill sine wave then add jitter */
+seq|gen_sine|add_noise
+
+/* process then apply middle value filter */
+seq|rolling_mean|median_filter
+
+/* process then compute zero crossings of array */
+seq|rolling_mean|zero_crossings
+
+/* matrix array multiply then softmax of array */
+seq|mat_vec|softmax
+
+/* increase rate vector to doubled length */
+seq|lerp
+
+/* scale vector to unit length of array */
+seq|vec_normalize
+
+/* calculate squared deviation from average */
+seq|mean
+
+/* execute softplus to each value */
+seq|softplus
+
+/* scale array by constant factor */
+seq|vec_scale
+
+/* compute rolling z-score */
+seq|rolling_mean|running_stddev
+
+/* calculate subtract mean from array */
+seq|mean
+
+/* project array a onto vector b */
+seq|dot|vec_scale
+
+/* evaluate cumulative sum */
+seq|cumsum|zscore_normalize
+
+/* compute cumulative sum of array */
+seq|cumsum|zscore_normalize
+
+/* compute two-stage smoothing with */
+seq|rolling_mean
+
+/* compute median then ratio to mean */
+seq|bubble_sort|median|mean
+
+/* compute lowpass filter then differentiate of array */
+seq|lowpass|diff_central
+
+/* compute covariance then normalize to correlation of vector */
+seq|covariance|stddev
+
+/* calculate range of array values */
+seq|max_val|min_val
+
+/* compute moving average of absolute differences of vector */
+seq|moving_avg
+
+/* horner evaluation applied to array of array */
+seq|horner
+
+/* compute subtract ema then compute standard deviation of array */
+seq|ema_series|stddev
+
+/* compute rolling squared deviation of vector */
+seq|variance
+
+/* matrix vector multiply */
+seq|mat_vec|vec_normalize
+
+/* evaluate histogram then normalize to probability */
+seq|histogram
+
+/* compute matrix vector multiply then apply relu */
+seq|mat_vec|relu
+
+/* multiply array to unit length */
+seq|vec_normalize
+
+/* normalize then compute */
+seq|zscore_normalize|autocorrelation
+
+/* matrix vector multiply then apply relu of buffer */
+seq|mat_vec|relu
+
+/* smooth array with ema then compute rms */
+seq|ema_series|signal_rms
+
+/* order then return n-th smallest */
+seq|bubble_sort
+
+/* compute correlation between */
+seq|rolling_mean|correlation
+
+/* normalise two vectors then compute dot product */
+seq|vec_normalize|dot
+
+/* pipe two fir filters of array */
+seq|fir_filter
+
+/* sort then compute interquartile range of array */
+seq|bubble_sort|iqr
+
+/* compute coefficient of variation */
+seq|stddev|mean
+
+/* compute rolling squared deviation of array */
+seq|variance
+
+/* calculate rolling coefficient of variation */
+seq|rolling_mean|running_stddev
+
+/* compute rolling correlation between two arrays */
+seq|correlation
+
+/* upsample then smooth with moving mean */
+seq|upsample|moving_avg
+
+/* compute index of maximum element */
+seq|argmax
+
+/* prefix sum then normalize */
+seq|prefix_sum|max_val
+
+/* compute softmax normalize then */
+seq|softmax|entropy
+
+/* compute power frequency density of array */
+seq|fft_radix2|fft_magnitude
+
+/* apply relu to each element of vector */
+seq|relu
+
+/* calculate rolling correlation between two arrays */
+seq|correlation
+
+/* sort then compute trimmed average of array */
+seq|bubble_sort|trimmed_mean
+
+/* extract filter based on array energy */
+seq|signal_energy|lowpass
+
+/* calculate differentiate then lowpass filter of array */
+seq|diff_central|lowpass
+
+/* smooth waveform with rolling average then normalize */
+seq|rolling_mean|zscore_normalize
+
+/* calculate waveform to noise ratio */
+seq|signal_rms
+
+/* calculate absolute deviation from median of array */
+seq|bubble_sort|median
+
+/* arrange then compute trimmed mean */
+seq|bubble_sort|trimmed_mean
+
+/* two-stage smoothing with different periods of vector */
+seq|rolling_mean
+
+/* compute welford update then extract mean of array */
+seq|welford_update
+
+/* calculate add noise then lowpass filter of array */
+seq|add_noise|lowpass
+
+/* linear interpolation between two vectors */
+seq|lerp
+
+/* apply softplus to each value */
+seq|softplus
+
+/* matrix vector multiply then normalize */
+seq|mat_vec|vec_normalize
+
+/* normalize then apply sigmoid of array */
+seq|mean|stddev|sigmoid
+
+/* evaluate waveform to noise ratio */
+seq|signal_rms
+
+/* calculate subtract mean from vector */
+seq|mean
+
+/* evaluate mean and squared deviation in single pass */
+seq|mean|variance
+
+/* execute linear regression and extract residuals */
+seq|linreg
+
+/* compute matrix array multiply then apply relu */
+seq|mat_vec|relu
+
+/* calculate index of maximum value */
+seq|argmax
+
+/* smooth then differentiate waveform */
+seq|rolling_mean|diff_central
+
+/* calculate rolling z-score function */
+seq|rolling_mean|running_stddev
+
+/* compute Euclidean norm */
+seq|vec_norm
+
+/* calculate cross entropy between two distributions of array */
+seq|cross_entropy
+
+/* calculate softmax normalize then */
+seq|softmax|entropy
+
+/* pipe lowpass filter then downsample of array */
+seq|lowpass|downsample
+
+/* compute histogram then apply softmax */
+seq|histogram|softmax
+
+/* calculate linear interpolation between two arrays */
+seq|lerp
+
+/* compute outer product then scale of vector */
+seq|outer_product
+
+/* apply median filter then smooth of vector */
+seq|median_filter|rolling_mean
+
+/* calculate bandpass filter then compute amplitude */
+seq|bandpass_filter|hilbert_envelope
+
+/* project vector a */
+seq|dot|vec_scale
+
+/* compute welford update then extract average */
+seq|welford_update
+
+/* evaluate min and */
+seq|min_val|max_val
+
+/* triple smoothing cascade of vector */
+seq|rolling_mean
+
+/* pipe lowpass filter then downsample */
+seq|lowpass|downsample
+
+/* compute two vectors then return their cosine similarity of array */
+seq|cosine_similarity
+
+/* differentiate then lowpass filter of array */
+seq|diff_central|lowpass
+
+/* arspan then compute percentile */
+seq|bubble_sort|percentile
+
+/* compute outer product function */
+seq|outer_product
+
+/* calculate matrix array multiply then apply sigmoid */
+seq|mat_vec|sigmoid
+
+/* evaluate absolute deviation from median */
+seq|bubble_sort|median
+
+/* calculate map elements to range zero to one */
+seq|minmax_normalize
+
+/* compute average and variance in single pass */
+seq|mean|variance
+
+/* chain lowpass filter function */
+seq|lowpass|downsample
+
+/* perform softplus to each element of array */
+seq|softplus
+
+/* compute average and squared deviation in single pass */
+seq|mean|variance
+
+/* calculate root mean square difference of two arrays */
+seq|mse
+
+/* compute absolute deviation from median of array */
+seq|bubble_sort|median
+
+/* evaluate rolling correlation between two vectors */
+seq|correlation
+
+/* calculate covariance then normalize to correlation */
+seq|covariance|stddev
+
+/* project vector a onto vector b of buffer */
+seq|dot|vec_scale
+
+/* fraction of values above average */
+seq|mean
+
+/* perform window function then compute FFT */
+seq|hamming_window|fft_radix2
+
+/* process then apply median filter of array */
+seq|rolling_mean|median_filter
+
+/* compute mean then ratio to maximum */
+seq|mean|max_val
+
+/* filter then apply median filter of array */
+seq|rolling_mean|median_filter
+
+/* evaluate rolling coefficient of variation */
+seq|rolling_mean|running_stddev
+
+/* normalise two arrays then compute dot product */
+seq|vec_normalize|dot
+
+/* calculate two-stage smoothing */
+seq|rolling_mean
+
+/* order then compute trimmed mean */
+seq|bubble_sort|trimmed_mean
+
+/* demean then scale by maximum */
+seq|mean|max_val|min_val
+
+/* compute waveform to noise ratio */
+seq|signal_rms
+
+/* calculate subtract rolling mean then compute squared deviation */
+seq|rolling_mean|variance
+
+/* subtract ema then compute stddev */
+seq|ema_series|stddev
+
+/* calculate clamp array elements to range */
+seq|clamp
+
+/* prefix sum then normalize of vector */
+seq|prefix_sum|max_val
+
+/* apply sigmoid to each element of array */
+seq|sigmoid
+
+/* calculate bandpass filter then compute envelope of array */
+seq|bandpass_filter|hilbert_envelope
+
+/* compute histogram then normalize to probability of vector */
+seq|histogram
+
+/* filter then compute zero crossings */
+seq|rolling_mean|zero_crossings
+
+/* compute covariance then normalize to correlation of array */
+seq|covariance|stddev
+
+/* compute range of vector values */
+seq|max_val|min_val
+
+/* evaluate rolling weight of variation */
+seq|rolling_mean|running_stddev
+
+/* find peak frequency in signal of array */
+seq|fft_radix2|fft_magnitude|argmax
+
+/* fill chirp signal by sweeping frequency of array */
+seq|lerp
+
+/* compute fraction of elements above mean */
+seq|mean
+
+/* sort then return n-th smallest of array */
+seq|bubble_sort
+
+/* two-stage smoothing with different periods of array */
+seq|rolling_mean
+
+/* compute FFT envelope spectrum */
+seq|fft_radix2|fft_magnitude
+
+/* execute leaky relu to each element of array */
+seq|leaky_relu
+
+/* compute matrix multiply */
+seq|mat_vec
+
+/* compute variance from average */
+seq|mean
+
+/* compute coefficient of variation of array */
+seq|stddev|mean
+
+/* normalize then compute autocorrelation */
+seq|zscore_normalize|autocorrelation
+
+/* calculate rolling covariance between two vectors */
+seq|covariance
+
+/* filter then compute cumulative sum of array */
+seq|rolling_mean|cumsum
+
+/* generate sine then function */
+seq|gen_sine|fft_radix2|fft_magnitude
+
+/* compute differentiate then lowpass filter of array */
+seq|diff_central|lowpass
+
+/* sort then compute median */
+seq|bubble_sort|median
+
+/* calculate min and */
+seq|min_val|max_val
+
+/* process signal with ema then compute rms */
+seq|ema_series|signal_rms
+
+/* triple smoothing cascade */
+seq|rolling_mean
+
+/* compute cumulative sum function */
+seq|cumsum|zscore_normalize
+
+/* calculate min-max normalize then apply relu of array */
+seq|minmax_normalize|relu
+
+/* evaluate mean then ratio to maximum */
+seq|mean|max_val
+
+/* compute linear interpolation between two arrays of array */
+seq|lerp
+
+/* calculate rolling squared deviation of array */
+seq|variance
+
+/* take away ema then compute standard deviation of array */
+seq|ema_series|stddev
+
+/* project array a onto vector b of array */
+seq|dot|vec_scale
+
+/* calculate map values from one range to another */
+seq|map_range
+
+/* ema followed by sma of array */
+seq|ema_series|sma
+
+/* welford update then extract squared deviation */
+seq|welford_update
+
+/* compute rolling covariance between two arrays */
+seq|covariance
+
+/* compute index of maximum value */
+seq|argmax
+
+/* compute rolling standard deviation */
+seq|stddev
+
+/* apply linear regression and predict of array */
+seq|linreg
+
+/* process then differentiate array */
+seq|rolling_mean|diff_central
+
+/* extract filter based on waveform energy */
+seq|signal_energy|lowpass
+
+/* compute subtract mean from array */
+seq|mean
+
+/* compute min and function */
+seq|min_val|max_val
+
+/* calculate prefix sum then normalize */
+seq|prefix_sum|max_val
+
+/* take away rolling mean then compute squared deviation */
+seq|rolling_mean|variance
+
+/* compute convolution then */
+seq|conv|zscore_normalize
+
+/* differentiate then lowpass filter of vector */
+seq|diff_central|lowpass
+
+/* cumulative product then normalize of vector */
+seq|cumulative_product|max_val
+
+/* compute variance ratio of two vectors */
+seq|variance
+
+/* filter then apply middle value filter */
+seq|rolling_mean|median_filter
+
+/* map values from one span to another */
+seq|map_range
+
+/* interpolate then smooth with moving average of array */
+seq|upsample|moving_avg
+
+/* evaluate rolling max of array */
+seq|moving_max
+
+/* amplify array to unit length */
+seq|vec_normalize
+
+/* remove ema then compute standard deviation */
+seq|ema_series|stddev
+
+/* smooth then differentiate signal */
+seq|rolling_mean|diff_central
+
+/* welford update then extract variance */
+seq|welford_update
+
+/* calculate residual after projection of array */
+seq|dot|vec_scale
+
+/* pick filter based on array energy */
+seq|signal_energy|lowpass
+
+/* lowpass filter then differentiate of vector */
+seq|lowpass|diff_central
+
+/* differencing then cumulative sum to reconstruct of array */
+seq|diff_central|cumsum
+
+/* calculate matrix vector multiply then apply relu */
+seq|mat_vec|relu
+
+/* fill sine wave then add noise of array */
+seq|gen_sine|add_noise
+
+/* compute rolling max */
+seq|moving_max
+
+/* evaluate convolution then normalize of array */
+seq|conv|zscore_normalize
+
+/* compute two-stage smoothing with different periods */
+seq|rolling_mean
+
+/* filter then differentiate waveform */
+seq|rolling_mean|diff_central
+
+/* compute matrix array multiply then softmax */
+seq|mat_vec|softmax
+
+/* two layer linear */
+seq|mat_vec|relu
+
+/* calculate absolute deviation from middle value */
+seq|bubble_sort|median
+
+/* execute middle value filter then smooth */
+seq|median_filter|rolling_mean
+
+/* perform relu to each value */
+seq|relu
+
+/* calculate histogram then apply softmax */
+seq|histogram|softmax
+
+/* calculate map elements from one range to another */
+seq|map_range
+
+/* filter waveform then compute energy */
+seq|lowpass|signal_energy
+
+/* calculate KL divergence between two distributions of array */
+seq|kl_divergence
+
+/* compute outer product then scale of array */
+seq|outer_product
+
+/* take away ema then compute stddev */
+seq|ema_series|stddev
+
+/* compute FFT then function */
+seq|fft_radix2|fft_phase
+
+/* perform leaky relu to each element */
+seq|leaky_relu
+
+/* compute rolling standard deviation of array */
+seq|stddev
+
+/* evaluate residual after projection */
+seq|dot|vec_scale
+
+/* evaluate rolling z-score of array */
+seq|rolling_mean|running_stddev
+
+/* compute exponential moving mean then subtract from original */
+seq|ema_series
+
+/* calculate index of maximum value of array */
+seq|argmax
+
+/* multiply array by constant factor */
+seq|vec_scale
+
+/* process then differentiate waveform */
+seq|rolling_mean|diff_central
+
+/* calculate rolling coefficient of variation of array */
+seq|rolling_mean|running_stddev
+
+/* evaluate subtract ema then compute standard deviation */
+seq|ema_series|stddev
+
+/* apply linear regression and extract remainders */
+seq|linreg
+
+/* evaluate gradient then smooth with ema of array */
+seq|diff_central|ema_series
+
+/* generate sine then of array */
+seq|gen_sine|fft_radix2|fft_magnitude
+
+/* evaluate absolute deviation from average */
+seq|mean
+
+/* select filter based on waveform energy */
+seq|signal_energy|lowpass
+
+/* calculate mean and squared deviation in single pass */
+seq|mean|variance
+
+/* calculate matrix array multiply then apply relu */
+seq|mat_vec|relu
+
+/* calculate cosquared deviation then normalize to correlation */
+seq|covariance|stddev
+
+/* compute map values from one range to another */
+seq|map_range
+
+/* process signal then compute energy */
+seq|lowpass|signal_energy
+
+/* cumulative product then normalize */
+seq|cumulative_product|max_val
+
+/* compute two arrays then return their cosine similarity */
+seq|cosine_similarity
+
+/* lowpass filter then */
+seq|lowpass|diff_central
+
+/* compute power frequency density */
+seq|fft_radix2|fft_magnitude
+
+/* calculate exponential moving average then subtract from original of array */
+seq|ema_series
+
+/* select filter based on array energy */
+seq|signal_energy|lowpass
+
+/* calculate matrix multiply */
+seq|mat_vec
+
+/* calculate peak frequency in waveform */
+seq|fft_radix2|fft_magnitude|argmax
+
+/* average of absolute element-wise differences */
+seq|mae
+
+/* calculate moving average of absolute differences of array */
+seq|moving_avg
+
+/* compute detrend then compute fft of array */
+seq|rolling_mean|fft_radix2
+
+/* normalize then compute of array */
+seq|zscore_normalize|autocorrelation
+
+/* generate chirp signal by sweeping frequency of array */
+seq|lerp
+
+/* compute project vector a onto vector b */
+seq|dot|vec_scale
+
+/* calculate add jitter then lowpass filter */
+seq|add_noise|lowpass
+
+/* compute matrix vector multiply then apply relu of array */
+seq|mat_vec|relu
+
+/* calculate FFT magnitude spectrum of array */
+seq|fft_radix2|fft_magnitude
+
+/* interpolate vector to doubled length of array */
+seq|lerp
+
+/* differencing then cumulative sum to reconstruct of vector */
+seq|diff_central|cumsum
+
+/* subtract ema then compute standard deviation of vector */
+seq|ema_series|stddev
+
+/* compute absolute deviation from median of vector */
+seq|bubble_sort|median
+
+/* smooth signal with rolling mean then normalize */
+seq|rolling_mean|zscore_normalize
+
+/* compute matrix vector multiply then apply sigmoid of array */
+seq|mat_vec|sigmoid
+
+/* compute demean then scale by maximum of array */
+seq|mean|max_val|min_val
+
+/* scale vector to unit variance */
+seq|stddev
+
+/* populate chirp waveform by sweeping frequency */
+seq|lerp
+
+/* evaluate cross entropy between two distributions */
+seq|cross_entropy
+
+/* compute squared deviation from mean */
+seq|mean
+
+/* sma followed by */
+seq|sma|ema_series
+
+/* execute linear regression */
+seq|linreg
+
+/* apply derivative descent then clamp output */
+seq|gradient_descent|clamp
+
+/* evaluate subtract mean from array */
+seq|mean
+
+/* compute signal to noise ratio */
+seq|signal_rms
+
+/* evaluate coefficient of variation of array */
+seq|stddev|mean
+
+/* compute absolute deviation from median */
+seq|bubble_sort|median
+
+/* evaluate histogram then normalize to probability of array */
+seq|histogram
+
+/* populate sine wave */
+seq|gen_sine|add_noise
+
+/* arrange then compute middle value */
+seq|bubble_sort|median
+
+/* compute derivative then smooth with ema of array */
+seq|diff_central|ema_series
+
+/* calculate two-stage smoothing with different periods of array */
+seq|rolling_mean
+
+/* calculate differentiate then */
+seq|diff_central|lowpass
+
+/* compute difference between fast and slow moving averages */
+seq|rolling_mean
+
+/* evaluate index of maximum element */
+seq|argmax
+
+/* perform derivative descent then clamp result */
+seq|gradient_descent|clamp
+
+/* interpolate array to */
+seq|lerp
+
+/* evaluate rolling variance of vector */
+seq|variance
+
+/* compute mean of absolute value-wise differences */
+seq|mae
+
+/* find peak frequency in signal */
+seq|fft_radix2|fft_magnitude|argmax
+
+/* calculate matrix vector multiply then normalize of array */
+seq|mat_vec|vec_normalize
+
+/* calculate outer product then scale */
+seq|outer_product
+
+/* compute median then ratio to average */
+seq|bubble_sort|median|mean
+
+/* evaluate outer product */
+seq|outer_product
+
+/* horner evaluation applied to vector */
+seq|horner
+
+/* welford update then extract variance of vector */
+seq|welford_update
+
+/* take away ema then compute standard deviation */
+seq|ema_series|stddev
+
+/* filter then differentiate array */
+seq|rolling_mean|diff_central
+
+/* compute mean and squared deviation in single pass */
+seq|mean|variance
+
+/* prefix sum then */
+seq|prefix_sum|max_val
+
+/* mean of absolute value-wise differences */
+seq|mae
+
+/* sort then compute interquartile range */
+seq|bubble_sort|iqr
+
+/* evaluate correlation between original and smoothed */
+seq|rolling_mean|correlation
+
+/* differencing then cumulative of array */
+seq|diff_central|cumsum
+
+/* detrend then compute fft of vector */
+seq|rolling_mean|fft_radix2
+
+/* calculate cumulative product then */
+seq|cumulative_product|max_val
+
+/* apply sigmoid to each element */
+seq|sigmoid
+
+/* evaluate cumulative product then normalize */
+seq|cumulative_product|max_val
+
+/* triple smoothing cascade function of array */
+seq|rolling_mean
+
+/* apply linear regression and extract remainders of array */
+seq|linreg
+
+/* compute mean of absolute element-wise differences */
+seq|mae
+
+/* smooth then differentiate signal of vector */
+seq|rolling_mean|diff_central
+
+/* normalize array to zero average unit variance */
+seq|mean|stddev
+
+/* compute fraction of values above mean */
+seq|mean
+
+/* populate sine then compute spectrum of array */
+seq|gen_sine|fft_radix2|fft_magnitude
+
+/* remove ema then compute standard deviation of array */
+seq|ema_series|stddev
+
+/* blend two signals with crossfade of vector */
+seq|lerp
+
+/* compute variance from mean */
+seq|mean
+
+/* execute sign function to each element of array */
+seq|sign
+
+/* sort then compute median of vector */
+seq|bubble_sort|median
+
+/* sort then compute */
+seq|bubble_sort|percentile
+
+/* apply window function then compute FFT of array */
+seq|hamming_window|fft_radix2
+
+/* compute bandpass filter then compute envelope of array */
+seq|bandpass_filter|hilbert_envelope
+
+/* apply sigmoid to each value */
+seq|sigmoid
+
+/* evaluate welford update then extract variance */
+seq|welford_update
+
+/* compute ema followed by sma of array */
+seq|ema_series|sma
+
+/* subtract ema then compute stddev of array */
+seq|ema_series|stddev
+
+/* rescale array then compute fft magnitude */
+seq|zscore_normalize|fft_radix2|fft_magnitude
+
+/* compute differencing then cumulative */
+seq|diff_central|cumsum
+
+/* calculate mean of two arrays then difference */
+seq|mean
+
+/* compute cumulative product then */
+seq|cumulative_product|max_val
+
+/* evaluate rolling correlation between two arrays */
+seq|correlation
+
+/* compute KL divergence */
+seq|kl_divergence
+
+/* evaluate rolling min of vector */
+seq|moving_min
+
+/* matrix multiply then add bias of vector */
+seq|mat_vec
+
+/* compute rolling average then subtract from original of array */
+seq|rolling_mean
+
+/* execute polynomial evaluation to each element of array */
+seq|poly_eval
+
+/* amplify vector to unit length of array */
+seq|vec_normalize
+
+/* min-max normalize then apply relu of array */
+seq|minmax_normalize|relu
+
+/* apply linear regression and predict */
+seq|linreg
+
+/* compute conditional smoothing based on squared deviation */
+seq|variance|rolling_mean
+
+/* calculate linear interpolation between two arrays of array */
+seq|lerp
+
+/* evaluate proportion of fast to slow moving averages */
+seq|rolling_mean
+
+/* calculate rolling max */
+seq|moving_max
+
+/* populate chirp signal by sweeping frequency */
+seq|lerp
+
+/* mix two arrays at fixed ratio */
+seq|lerp
+
+/* compute index of maximum element of array */
+seq|argmax
+
+/* execute tanh to each element of array */
+seq|tanh_approx
+
+/* rescale waveform then compute fft magnitude */
+seq|zscore_normalize|fft_radix2|fft_magnitude
+
+/* evaluate outer product then scale */
+seq|outer_product
+
+/* calculate rolling range */
+seq|moving_max|moving_min
+
+/* apply median filter then smooth of array */
+seq|median_filter|rolling_mean
+
+/* subtract rolling average then compute variance */
+seq|rolling_mean|variance
+
+/* fill chirp array by sweeping frequency */
+seq|lerp
+
+/* evaluate scale array to unit variance */
+seq|stddev
+
+/* evaluate histogram then */
+seq|histogram
+
+/* bandpass filter then */
+seq|bandpass_filter|hilbert_envelope
+
+/* calculate demean then scale by maximum */
+seq|mean|max_val|min_val
+
+/* calculate z-score normalize then clamp */
+seq|zscore_normalize|clamp
+
+/* matrix array multiply then softmax */
+seq|mat_vec|softmax
+
+/* process signal with ema then compute rms of array */
+seq|ema_series|signal_rms
+
+/* calculate add noise then lowpass filter */
+seq|add_noise|lowpass
+
+/* calculate rolling min */
+seq|moving_min
+
+/* compute rolling coefficient of variation of array */
+seq|rolling_mean|running_stddev
+
+/* calculate sma followed */
+seq|sma|ema_series
+
+/* bandpass filter then compute envelope of vector */
+seq|bandpass_filter|hilbert_envelope
+
+/* map values to range zero to one */
+seq|minmax_normalize
+
+/* sort then compute trimmed mean */
+seq|bubble_sort|trimmed_mean
+
+/* compute FFT then extract phase of array */
+seq|fft_radix2|fft_phase
+
+/* process then differentiate signal of array */
+seq|rolling_mean|diff_central
+
+/* compute subtract ema then compute standard deviation */
+seq|ema_series|stddev
+
+/* compute rolling average then subtract from original */
+seq|rolling_mean
+
+/* compute proportion of standard deviations */
+seq|stddev
+
+/* subtract average from vector */
+seq|mean
+
+/* find peak frequency in array */
+seq|fft_radix2|fft_magnitude|argmax
+
+/* ema followed by sma of vector */
+seq|ema_series|sma
+
+/* compute moving mean of absolute differences of array */
+seq|moving_avg
+
+/* z-score normalize then */
+seq|zscore_normalize|clamp
+
+/* compute welford update then extract variance of array */
+seq|welford_update
+
+/* calculate FFT magnitude spectrum */
+seq|fft_radix2|fft_magnitude
+
+/* compute rolling weight of variation */
+seq|rolling_mean|running_stddev
+
+/* fill sine then compute spectrum */
+seq|gen_sine|fft_radix2|fft_magnitude
+
+/* normalise array to zero mean unit squared deviation */
+seq|mean|stddev
+
+/* scale vector by scalar factor */
+seq|vec_scale
+
+/* calculate rolling min of vector */
+seq|moving_min
+
+/* demean then scale by maximum of vector */
+seq|mean|max_val|min_val
+
+/* normalize then apply sigmoid of vector */
+seq|mean|stddev|sigmoid
+
+/* normalize waveform then compute fft magnitude */
+seq|zscore_normalize|fft_radix2|fft_magnitude
+
+/* compute ratio of fast to slow moving means */
+seq|rolling_mean
+
+/* compute scale array to unit variance */
+seq|stddev
+
+/* calculate gradient then smooth with ema */
+seq|diff_central|ema_series
+
+/* filter array with ema then compute rms */
+seq|ema_series|signal_rms
+
+/* execute softplus to each element */
+seq|softplus
+
+/* calculate difference between fast and slow moving averages */
+seq|rolling_mean
+
+/* chain lowpass filter then downsample of vector */
+seq|lowpass|downsample
+
+/* calculate z-score normalize then clamp of array */
+seq|zscore_normalize|clamp
+
+/* perform tanh to each value */
+seq|tanh_approx
+
+/* filter then apply median filter */
+seq|rolling_mean|median_filter
+
+/* evaluate min-max normalize then apply relu */
+seq|minmax_normalize|relu
+
+/* upsample array to doubled length of array */
+seq|lerp
+
+/* triple smoothing cascade of array */
+seq|rolling_mean
+
+/* compute convolve then downsample */
+seq|conv|downsample
+
+/* calculate matrix vector multiply then softmax */
+seq|mat_vec|softmax
+
+/* smooth then apply median filter */
+seq|rolling_mean|median_filter
+
+/* calculate mean then proportion to maximum */
+seq|mean|max_val
+
+/* compute z-score normalize then clamp of array */
+seq|zscore_normalize|clamp
+
+/* scale array to unit length */
+seq|vec_normalize
+
+/* calculate ema followed by sma of array */
+seq|ema_series|sma
+
+/* compute FFT then */
+seq|fft_radix2|fft_phase
+
+/* generate chirp waveform by sweeping frequency of array */
+seq|lerp
+
+/* process then differentiate signal */
+seq|rolling_mean|diff_central
+
+/* evaluate FFT magnitude spectrum of array */
+seq|fft_radix2|fft_magnitude
+
+/* calculate welford update then extract variance */
+seq|welford_update
+
+/* calculate horner evaluation applied to array */
+seq|horner
+
+/* calculate lowpass filter then differentiate of array */
+seq|lowpass|diff_central
+
+/* calculate cumulative sum then normalize */
+seq|cumsum|zscore_normalize
+
+/* compute min-max normalize */
+seq|minmax_normalize|relu
+
+/* evaluate detrend then compute fft */
+seq|rolling_mean|fft_radix2
+
+/* smooth then compute */
+seq|rolling_mean|cumsum
+
+/* convolve then downsample function of array */
+seq|conv|downsample
+
+/* evaluate KL divergence */
+seq|kl_divergence
+
+/* apply linear regression of array */
+seq|linreg
+
+/* mix two signals with crossfade of array */
+seq|lerp
+
+/* normalise then apply sigmoid of array */
+seq|mean|stddev|sigmoid
+
+/* rescale array to zero mean unit squared deviation */
+seq|mean|stddev
+
+/* calculate two-stage smoothing with different periods */
+seq|rolling_mean
+
+/* matrix array multiply then normalize */
+seq|mat_vec|vec_normalize
+
+/* execute relu to each value */
+seq|relu
+
+/* rescale then apply */
+seq|mean|stddev|sigmoid
+
+/* z-score normalize then clamp of vector */
+seq|zscore_normalize|clamp
+
+/* evaluate average and standard deviation */
+seq|mean|stddev
+
+/* calculate horner evaluation applied to array of array */
+seq|horner
+
+/* smooth signal with rolling average then normalize */
+seq|rolling_mean|zscore_normalize
+
+/* calculate cumulative product then normalize of array */
+seq|cumulative_product|max_val
+
+/* rescale two arrays then compute dot product */
+seq|vec_normalize|dot
+
+/* compute rolling range of array */
+seq|moving_max|moving_min
+
+/* compute proportion of stddevs */
+seq|stddev
+
+/* evaluate peak frequency in signal */
+seq|fft_radix2|fft_magnitude|argmax
+
+/* differencing then cumulative */
+seq|diff_central|cumsum
+
+/* normalise signal then compute fft magnitude */
+seq|zscore_normalize|fft_radix2|fft_magnitude
+
+/* calculate range of vector values */
+seq|max_val|min_val
+
+/* compute project vector a onto vector b of array */
+seq|dot|vec_scale
+
+/* compute rolling correlation */
+seq|correlation
+
+/* calculate peak frequency in signal of array */
+seq|fft_radix2|fft_magnitude|argmax
+
+/* compute correlation between original and smoothed */
+seq|rolling_mean|correlation
+
+/* evaluate signal to noise ratio */
+seq|signal_rms
+
+/* matrix multiply then */
+seq|mat_vec
+
+/* perform linear regression and predict of array */
+seq|linreg
+
+/* scale vector to unit length */
+seq|vec_normalize
+
+/* calculate ratio of standard deviations */
+seq|stddev
+
+/* calculate histogram then normalize to probability of array */
+seq|histogram
+
+/* normalize array then compute fft magnitude */
+seq|zscore_normalize|fft_radix2|fft_magnitude
+
+/* normalize two arrays then compute dot product of array */
+seq|vec_normalize|dot
+
+/* remove mean from array */
+seq|mean
+
+/* triple smoothing cascade function */
+seq|rolling_mean
+
+/* calculate histogram then */
+seq|histogram
+
+/* compute FFT then extract phase of vector */
+seq|fft_radix2|fft_phase
+
+/* populate sine wave then add noise of array */
+seq|gen_sine|add_noise
+
+/* evaluate convolve then downsample */
+seq|conv|downsample
+
+/* evaluate variance ratio of two arrays */
+seq|variance
+
+/* normalize array to zero mean unit variance */
+seq|mean|stddev
+
+/* calculate matrix array multiply then softmax */
+seq|mat_vec|softmax
+
+/* execute leaky relu to each value */
+seq|leaky_relu
+
+/* calculate exponential moving average then subtract from original */
+seq|ema_series
+
+/* apply derivative descent then clamp result */
+seq|gradient_descent|clamp
+
+/* calculate rolling z-score */
+seq|rolling_mean|running_stddev
+
+/* compute difference between fast and slow moving means */
+seq|rolling_mean
+
+/* amplify vector by constant factor */
+seq|vec_scale
+
+/* execute relu to each element */
+seq|relu
+
+/* calculate middle value then ratio to mean */
+seq|bubble_sort|median|mean
+
+/* apply sign function to each element of array */
+seq|sign
+
+/* compute rolling cosquared deviation between two arrays */
+seq|covariance
+
+/* calculate welford update then extract average */
+seq|welford_update
+
+/* apply window function */
+seq|hamming_window|fft_radix2
+
+/* calculate derivative then smooth with ema */
+seq|diff_central|ema_series
+
+/* compute two vectors */
+seq|cosine_similarity
+
+/* calculate absolute deviation from mean */
+seq|mean
+
+/* evaluate demean then scale by maximum */
+seq|mean|max_val|min_val
+
+/* arrange then compute percentile of array */
+seq|bubble_sort|percentile
+
+/* ema followed by function */
+seq|ema_series|sma
+
+/* smooth waveform then compute energy */
+seq|lowpass|signal_energy
+
+/* evaluate subtract rolling mean then compute variance */
+seq|rolling_mean|variance
+
+/* calculate absolute deviation from average */
+seq|mean
+
+/* calculate two layer linear transform */
+seq|mat_vec|relu
+
+/* compute outer product of array */
+seq|outer_product
+
+/* compute min and max */
+seq|min_val|max_val
+
+/* evaluate histogram then apply softmax of array */
+seq|histogram|softmax
+
+/* normalize two vectors then compute dot product */
+seq|vec_normalize|dot
+
+/* compute lowpass filter then */
+seq|lowpass|diff_central
+
+/* evaluate map values from one range to another */
+seq|map_range
+
+/* perform middle value filter then smooth */
+seq|median_filter|rolling_mean
+
+/* process signal with rolling mean then normalize */
+seq|rolling_mean|zscore_normalize
+
+/* interpolate then smooth with moving mean */
+seq|upsample|moving_avg
+
+/* compute matrix multiply then */
+seq|mat_vec
+
+/* compute triple smoothing cascade of array */
+seq|rolling_mean
+
+/* populate chirp array by sweeping frequency */
+seq|lerp
+
+/* compute rolling min function */
+seq|moving_min
+
+/* bandpass filter then compute envelope */
+seq|bandpass_filter|hilbert_envelope
+
+/* normalize two arrays then compute dot product */
+seq|vec_normalize|dot
+
+/* compute add noise then lowpass filter */
+seq|add_noise|lowpass
+
+/* compute subtract rolling mean then compute variance */
+seq|rolling_mean|variance
+
+/* convolve then downsample function */
+seq|conv|downsample
+
+/* process signal with rolling average then normalize */
+seq|rolling_mean|zscore_normalize
+
+/* calculate rolling standard deviation of array */
+seq|stddev
+
+/* arrange then compute interquartile range of array */
+seq|bubble_sort|iqr
+
+/* evaluate ratio of standard deviations */
+seq|stddev
+
+/* matrix vector multiply then apply relu of array */
+seq|mat_vec|relu
+
+/* filter array with rolling mean then normalize */
+seq|rolling_mean|zscore_normalize
+
+/* compute rolling span of array */
+seq|moving_max|moving_min
+
+/* matrix vector multiply then normalize of buffer */
+seq|mat_vec|vec_normalize
+
+/* calculate power spectral density of array */
+seq|fft_radix2|fft_magnitude
+
+/* fill chirp waveform by sweeping frequency */
+seq|lerp
+
+/* calculate welford update then extract mean of array */
+seq|welford_update
+
+/* rescale two vectors then compute dot product of array */
+seq|vec_normalize|dot
+
+/* arrange then compute rank correlation of array */
+seq|compute_ranks|correlation
+
+/* compute cumulative product then normalize of array */
+seq|cumulative_product|max_val
+
+/* amplify vector to unit variance */
+seq|stddev
+
+/* compute average and stddev */
+seq|mean|stddev
+
+/* compute correlation between original and smoothed of array */
+seq|rolling_mean|correlation
+
+/* execute linear regression and predict */
+seq|linreg
+
+/* perform sign function to each element of array */
+seq|sign
+
+/* calculate index of maximum element */
+seq|argmax
+
+/* compute signal to noise proportion */
+seq|signal_rms
+
+/* evaluate cross entropy */
+seq|cross_entropy
+
+/* evaluate ratio of fast to slow moving averages */
+seq|rolling_mean
+
+/* amplify array to unit variance */
+seq|stddev
+
+/* calculate absolute deviation from mean of array */
+seq|mean
+
+/* compute rolling z-score of array */
+seq|rolling_mean|running_stddev
+
+/* compute clamp array elements to range */
+seq|clamp
+
+/* arrange then compute rank correlation */
+seq|compute_ranks|correlation
+
+/* calculate squared deviation ratio of two arrays */
+seq|variance
+
+/* calculate median then ratio to mean */
+seq|bubble_sort|median|mean
+
+/* ema followed by sma */
+seq|ema_series|sma
+
+/* calculate mean of absolute value-wise differences */
+seq|mae
+
+/* compute convolution then normalize of vector */
+seq|conv|zscore_normalize
+
+/* compute horner evaluation applied to array of array */
+seq|horner
+
+/* evaluate matrix vector multiply then apply relu */
+seq|mat_vec|relu
+
+/* order then compute rank correlation of array */
+seq|compute_ranks|correlation
+
+/* normalise then compute autocorrelation */
+seq|zscore_normalize|autocorrelation
+
+/* apply polynomial evaluation to each element */
+seq|poly_eval
+
+/* increase rate array to doubled length of array */
+seq|lerp
+
+/* interpolate array to doubled length of array */
+seq|lerp
+
+/* order then compute percentile */
+seq|bubble_sort|percentile
+
+/* compute derivative then smooth with ema */
+seq|diff_central|ema_series
+
+/* compute detrend then */
+seq|rolling_mean|fft_radix2
+
+/* compute rolling min of vector of array */
+seq|moving_min
+
+/* cascade two fir filters of array */
+seq|fir_filter
+
+/* calculate prefix sum then */
+seq|prefix_sum|max_val
+
+/* calculate rolling weight of variation */
+seq|rolling_mean|running_stddev
+
+/* compute Euclidean norm of array */
+seq|vec_norm
+
+/* compute Euclidean norm of vector of array */
+seq|vec_norm
+
+/* evaluate mean of absolute element-wise differences */
+seq|mae
+
+/* remove rolling average then compute variance */
+seq|rolling_mean|variance
+
+/* perform relu to each element */
+seq|relu
+
+/* calculate subtract ema then compute standard deviation of array */
+seq|ema_series|stddev
+
+/* calculate coefficient of variation */
+seq|stddev|mean
+
+/* evaluate scale vector to unit length */
+seq|vec_normalize
+
+/* calculate difference between fast and slow moving averages of array */
+seq|rolling_mean
+
+/* evaluate two vectors then return their cosine similarity of array */
+seq|cosine_similarity
+
+/* evaluate residual after projection of array */
+seq|dot|vec_scale
+
+/* calculate convolution then normalize of array */
+seq|conv|zscore_normalize
+
+/* apply gradient descent then clamp result */
+seq|gradient_descent|clamp
+
+/* evaluate fraction of elements above mean */
+seq|mean
+
+/* normalize two vectors then compute dot product of buffer */
+seq|vec_normalize|dot
+
+/* map elements from one span to another */
+seq|map_range
+
+/* welford update then extract squared deviation of array */
+seq|welford_update
+
+/* bandpass filter then of array */
+seq|bandpass_filter|hilbert_envelope
+
+/* calculate detrend then */
+seq|rolling_mean|fft_radix2
+
+/* evaluate welford update then extract mean */
+seq|welford_update
+
+/* evaluate rolling z-score */
+seq|rolling_mean|running_stddev
+
+/* subtract rolling mean then compute variance */
+seq|rolling_mean|variance
+
+/* evaluate rolling min */
+seq|moving_min
+
+/* apply linear regression and extract residuals of array */
+seq|linreg
+
+/* evaluate exponential moving average then subtract from original */
+seq|ema_series
+
+/* evaluate convolution then normalize */
+seq|conv|zscore_normalize
+
+/* add jitter then lowpass filter */
+seq|add_noise|lowpass
+
+/* filter signal then compute energy of array */
+seq|lowpass|signal_energy
+
+/* map values from one range to another */
+seq|map_range
+
+/* evaluate outer product then scale of array */
+seq|outer_product
+
+/* evaluate signal to noise proportion */
+seq|signal_rms
+
+/* compute absolute deviation from mean */
+seq|mean
+
+/* evaluate range of array elements */
+seq|max_val|min_val
+
+/* calculate differencing then cumulative */
+seq|diff_central|cumsum
+
+/* compute outer product */
+seq|outer_product
+
+/* evaluate mean and standard deviation */
+seq|mean|stddev
+
+/* interpolate array to doubled length */
+seq|lerp
+
+/* min-max normalize then apply relu */
+seq|minmax_normalize|relu
+
+/* add noise then lowpass filter */
+seq|add_noise|lowpass
+
+/* evaluate ratio of fast to slow moving means */
+seq|rolling_mean
+
+/* matrix vector multiply then apply sigmoid */
+seq|mat_vec|sigmoid
+
+/* subtract rolling mean then compute squared deviation */
+seq|rolling_mean|variance
+
+/* scale vector by constant factor */
+seq|vec_scale
+
+/* process waveform then compute energy */
+seq|lowpass|signal_energy
+
+/* calculate rolling max of vector */
+seq|moving_max
+
+/* evaluate rolling z-score function */
+seq|rolling_mean|running_stddev
+
+/* calculate correlation between original and smoothed */
+seq|rolling_mean|correlation
+
+/* evaluate lowpass filter then differentiate */
+seq|lowpass|diff_central
+
+/* compute detrend then compute fft */
+seq|rolling_mean|fft_radix2
+
+/* compute rolling standard deviation of vector */
+seq|stddev
+
+/* differencing then cumulative function */
+seq|diff_central|cumsum
+
+/* compute triple smoothing */
+seq|rolling_mean
+
+/* project vector a onto vector b */
+seq|dot|vec_scale
+
+/* process then compute zero crossings */
+seq|rolling_mean|zero_crossings
+
+/* smooth then compute function */
+seq|rolling_mean|cumsum
+
+/* calculate difference between fast and slow moving means */
+seq|rolling_mean
+
+/* map elements to span zero to one */
+seq|minmax_normalize
+
+/* calculate fraction of elements above mean */
+seq|mean
+
+/* generate chirp signal by sweeping frequency */
+seq|lerp
+
+/* smooth then compute zero crossings of array */
+seq|rolling_mean|zero_crossings
+
+/* calculate project array a onto vector b */
+seq|dot|vec_scale
+
+/* conditional smoothing based on variance of array */
+seq|variance|rolling_mean
+
+/* arspan then return n-th smallest */
+seq|bubble_sort
+
+/* evaluate scale array by constant factor */
+seq|vec_scale
+
+/* compute cross entropy of array */
+seq|cross_entropy
+
+/* apply middle value filter then smooth */
+seq|median_filter|rolling_mean
+
+/* compute correlation between original and smoothed of vector */
+seq|rolling_mean|correlation
+
+/* compute deaverage then scale by maximum */
+seq|mean|max_val|min_val
+
+/* evaluate project vector a onto vector b */
+seq|dot|vec_scale
+
+/* compute average of absolute element-wise differences */
+seq|mae
+
+/* take away mean from vector */
+seq|mean
+
+/* linear interpolation between two vectors of array */
+seq|lerp
+
+/* smooth then compute cumulative sum of vector */
+seq|rolling_mean|cumsum
+
+/* perform median filter then smooth */
+seq|median_filter|rolling_mean
+
+/* execute linear regression and extract remainders */
+seq|linreg
+
+/* matrix vector multiply then apply sigmoid of array */
+seq|mat_vec|sigmoid
+
+/* matrix vector multiply then normalize of array */
+seq|mat_vec|vec_normalize
+
+/* calculate fraction of elements above average */
+seq|mean
+
+/* ema followed by of array */
+seq|ema_series|sma
+
+/* evaluate covariance then normalize to correlation */
+seq|covariance|stddev
+
+/* softmax normalize then function */
+seq|softmax|entropy
+
+/* compute map elements from one range to another */
+seq|map_range
+
+/* evaluate Euclidean norm */
+seq|vec_norm
+
+/* apply linear regression and predict of vector */
+seq|linreg
+
+/* lowpass filter then function */
+seq|lowpass|diff_central
+
+/* compute power spectral density of array */
+seq|fft_radix2|fft_magnitude
+
+/* evaluate rolling mean then subtract from original */
+seq|rolling_mean
+
+/* blend two waveforms at fixed ratio */
+seq|lerp
+
+/* calculate subtract average from array */
+seq|mean
+
+/* compute FFT envelope spectrum of array */
+seq|fft_radix2|fft_magnitude
+
+/* matrix multiply then of array */
+seq|mat_vec
+
+/* sort then return n-th smallest */
+seq|bubble_sort
+
+/* sort then compute rank correlation of array */
+seq|compute_ranks|correlation
+
+/* order then compute */
+seq|bubble_sort|percentile
+
+/* detrend then compute fft of array */
+seq|rolling_mean|fft_radix2
+
+/* bandpass filter then function */
+seq|bandpass_filter|hilbert_envelope
+
+/* apply tanh to each value of array */
+seq|tanh_approx
+
+/* apply sigmoid to each value of array */
+seq|sigmoid
+
+/* compute rolling weight of variation of array */
+seq|rolling_mean|running_stddev
+
+/* calculate min and max of array */
+seq|min_val|max_val
+
+/* evaluate rolling standard deviation of array */
+seq|stddev
+
+/* compute bandpass filter then compute amplitude */
+seq|bandpass_filter|hilbert_envelope
+
+/* compute softmax normalize then compute entropy */
+seq|softmax|entropy
+
+/* compute matrix vector multiply then softmax of array */
+seq|mat_vec|softmax
+
+/* calculate mean and variance in single pass */
+seq|mean|variance
+
+/* apply leaky relu to each element */
+seq|leaky_relu
+
+/* apply tanh to each value */
+seq|tanh_approx
+
+/* calculate rolling variance of vector */
+seq|variance
+
+/* compute FFT magnitude spectrum */
+seq|fft_radix2|fft_magnitude
+
+/* blend two signals with crossfade of array */
+seq|lerp
+
+/* apply gradient descent then clamp output */
+seq|gradient_descent|clamp
+
+/* arrange then compute interquartile span */
+seq|bubble_sort|iqr
+
+/* evaluate horner evaluation applied to array */
+seq|horner
+
+/* apply softplus to each element */
+seq|softplus
+
+/* calculate scale array by constant factor */
+seq|vec_scale
+
+/* order then compute median of array */
+seq|bubble_sort|median
+
+/* compute rolling mean then subtract from original */
+seq|rolling_mean
+
+/* compute rolling z-score function */
+seq|rolling_mean|running_stddev
+
+/* calculate scale array to unit variance */
+seq|stddev
+
+/* evaluate rolling span */
+seq|moving_max|moving_min
+
+/* smooth then differentiate signal of array */
+seq|rolling_mean|diff_central
+
+/* calculate sma followed by ema of array */
+seq|sma|ema_series
+
+/* execute tanh to each element */
+seq|tanh_approx
+
+/* calculate mean and standard deviation */
+seq|mean|stddev
+
+/* calculate weight of variation */
+seq|stddev|mean
+
+/* compute peak frequency in waveform */
+seq|fft_radix2|fft_magnitude|argmax
+
+/* smooth then compute of array */
+seq|rolling_mean|cumsum
+
+/* compute triple smoothing cascade */
+seq|rolling_mean
+
+/* perform linear regression and extract residuals */
+seq|linreg
+
+/* compute FFT magnitude spectrum of vector */
+seq|fft_radix2|fft_magnitude
+
+/* calculate proportion of standard deviations */
+seq|stddev
+
+/* gradient of then lowpass filter */
+seq|diff_central|lowpass
+
+/* smooth signal then compute energy of array */
+seq|lowpass|signal_energy
+
+/* project vector a onto vector b of array */
+seq|dot|vec_scale
+
+/* calculate scale vector to unit length */
+seq|vec_normalize
+
+/* pipe lowpass filter */
+seq|lowpass|downsample
+
+/* compute mean of two vectors then difference */
+seq|mean
+
+/* evaluate FFT then extract phase of array */
+seq|fft_radix2|fft_phase
+
+/* evaluate differentiate then lowpass filter */
+seq|diff_central|lowpass
+
+/* add jitter then lowpass filter of array */
+seq|add_noise|lowpass
+
+/* arrange then compute trimmed average */
+seq|bubble_sort|trimmed_mean
+
+/* compute linear interpolation between two arrays */
+seq|lerp
+
+/* welford update then extract mean */
+seq|welford_update
+
+/* calculate FFT then extract phase */
+seq|fft_radix2|fft_phase
+
+/* scale array to unit variance */
+seq|stddev
+
+/* calculate conditional smoothing based on variance */
+seq|variance|rolling_mean
+
+/* smooth waveform with ema then compute rms of array */
+seq|ema_series|signal_rms
+
+/* scale vector to unit squared deviation */
+seq|stddev
+
+/* calculate correlation between original and smoothed of array */
+seq|rolling_mean|correlation
+
+/* compute proportion of fast to slow moving averages */
+seq|rolling_mean
+
+/* execute leaky relu to each element */
+seq|leaky_relu
+
+/* remove mean from vector */
+seq|mean
+
+/* calculate lowpass filter */
+seq|lowpass|diff_central
+
+/* calculate ratio of fast to slow moving averages */
+seq|rolling_mean
+
+/* evaluate softmax normalize then compute entropy */
+seq|softmax|entropy
+
+/* evaluate FFT then extract phase */
+seq|fft_radix2|fft_phase
+
+/* execute relu to each element of array */
+seq|relu
+
+/* evaluate min and max */
+seq|min_val|max_val
+
+/* populate chirp signal by sweeping frequency of array */
+seq|lerp
+
+/* apply middle value filter then smooth of array */
+seq|median_filter|rolling_mean
+
+/* compute ema followed by */
+seq|ema_series|sma
+
+/* compute mean and stddev */
+seq|mean|stddev
+
+/* compute waveform to noise proportion */
+seq|signal_rms
+
+/* evaluate mean and stddev */
+seq|mean|stddev
+
+/* chain two fir filters of vector */
+seq|fir_filter
+
+/* calculate rolling mean then subtract from original */
+seq|rolling_mean
+
+/* calculate welford update then extract mean */
+seq|welford_update
+
+/* calculate cumulative product */
+seq|cumulative_product|max_val
+
+/* sort then compute interquartile span */
+seq|bubble_sort|iqr
+
+/* perform polynomial evaluation to each value */
+seq|poly_eval
+
+/* filter signal with ema then compute rms of array */
+seq|ema_series|signal_rms
+
+/* chain lowpass filter */
+seq|lowpass|downsample
+
+/* perform sign function to each element */
+seq|sign
+
+/* select filter based on signal energy */
+seq|signal_energy|lowpass
+
+/* min-max normalize then */
+seq|minmax_normalize|relu
+
+/* perform gradient descent then clamp result */
+seq|gradient_descent|clamp
+
+/* compute peak frequency in signal */
+seq|fft_radix2|fft_magnitude|argmax
+
+/* calculate rolling stddev */
+seq|stddev
+
+/* perform sigmoid to each element */
+seq|sigmoid
+
+/* cumulative product then of array */
+seq|cumulative_product|max_val
+
+/* evaluate Euclidean norm of vector */
+seq|vec_norm
+
+/* compute rolling range of vector */
+seq|moving_max|moving_min
+
+/* cumulative product then normalize of array */
+seq|cumulative_product|max_val
+
+/* calculate variance from mean */
+seq|mean
+
+/* compute FFT then of array */
+seq|fft_radix2|fft_phase
+
+/* compute peak frequency in array */
+seq|fft_radix2|fft_magnitude|argmax
+
+/* matrix array multiply then apply sigmoid */
+seq|mat_vec|sigmoid
+
+/* apply polynomial evaluation to each element of vector */
+seq|poly_eval
+
+/* apply linear regression and extract residuals */
+seq|linreg
+
+/* welford update then extract average of array */
+seq|welford_update
+
+/* cascade two fir filters */
+seq|fir_filter
+
+/* normalise then apply */
+seq|zscore_normalize|fir_filter
+
+/* compute difference between fast and slow moving means of array */
+seq|rolling_mean
+
+/* compute range of vector elements */
+seq|max_val|min_val
+
+/* subtract ema then compute standard deviation */
+seq|ema_series|stddev
+
+/* apply sign function to each value */
+seq|sign
+
+/* execute gradient descent then clamp result */
+seq|gradient_descent|clamp
+
+/* compute histogram then normalize to probability of array */
+seq|histogram
+
+/* calculate two vectors then return their cosine similarity */
+seq|cosine_similarity
+
+/* evaluate rolling range */
+seq|moving_max|moving_min
+
+/* apply leaky relu to each element of array */
+seq|leaky_relu
+
+/* calculate rolling max of array */
+seq|moving_max
+
+/* calculate power spectral density */
+seq|fft_radix2|fft_magnitude
+
+/* perform softplus to each value */
+seq|softplus
+
+/* normalize then apply fir filter of vector */
+seq|zscore_normalize|fir_filter
+
+/* compute exponential moving average then subtract from original of array */
+seq|ema_series
+
+/* evaluate middle value then ratio to mean */
+seq|bubble_sort|median|mean
+
+/* sma followed by ema of array */
+seq|sma|ema_series
+
+/* cascade lowpass filter then downsample of array */
+seq|lowpass|downsample
+
+/* populate sine wave then add noise */
+seq|gen_sine|add_noise
+
+/* compute cosquared deviation then normalize to correlation of array */
+seq|covariance|stddev
+
+/* compute scale array to unit length */
+seq|vec_normalize
+
+/* calculate outer product then scale of array */
+seq|outer_product
+
+/* compute map values to range zero to one */
+seq|minmax_normalize
+
+/* add noise then lowpass filter of vector */
+seq|add_noise|lowpass
+
+/* compute exponential moving average then subtract from original */
+seq|ema_series
+
+/* apply relu to each element of array */
+seq|relu
+
+/* calculate residual after projection */
+seq|dot|vec_scale
+
+/* compute mean then proportion to maximum */
+seq|mean|max_val
+
+/* compute squared deviation from average */
+seq|mean
+
+/* populate sine wave then add jitter */
+seq|gen_sine|add_noise
+
+/* compute proportion of fast to slow moving means */
+seq|rolling_mean
+
+/* filter signal then compute energy of vector */
+seq|lowpass|signal_energy
+
+/* conditional smoothing based on variance of vector */
+seq|variance|rolling_mean
+
+/* compute cross entropy function */
+seq|cross_entropy
+
+/* order then return */
+seq|bubble_sort
+
+/* calculate matrix vector multiply then softmax of array */
+seq|mat_vec|softmax
+
+/* calculate scale array by scalar factor */
+seq|vec_scale
+
+/* arspan then compute rank correlation */
+seq|compute_ranks|correlation
+
+/* root mean square difference of two vectors */
+seq|mse
+
+/* chain two fir function */
+seq|fir_filter
+
+/* upsample then smooth with moving average of array */
+seq|upsample|moving_avg
+
+/* compute histogram then normalize to probability */
+seq|histogram
+
+/* compute cross entropy between two distributions */
+seq|cross_entropy
+
+/* calculate ratio of fast to slow moving means */
+seq|rolling_mean
+
+/* compute rolling range */
+seq|moving_max|moving_min
+
+/* evaluate exponential moving mean then subtract from original */
+seq|ema_series
+
+/* calculate conditional smoothing based on squared deviation */
+seq|variance|rolling_mean
+
+/* evaluate FFT magnitude spectrum */
+seq|fft_radix2|fft_magnitude
+
+/* compute peak frequency in signal of array */
+seq|fft_radix2|fft_magnitude|argmax
+
+/* lowpass filter then of array */
+seq|lowpass|diff_central
+
+/* normalise then compute autocorrelation of array */
+seq|zscore_normalize|autocorrelation
+
+/* perform polynomial evaluation to each element */
+seq|poly_eval
+
+/* compute rolling max of vector of array */
+seq|moving_max
+
+/* normalize then compute autocorrelation of array */
+seq|zscore_normalize|autocorrelation
+
+/* evaluate squared deviation from mean */
+seq|mean
+
+/* calculate lowpass filter then differentiate */
+seq|lowpass|diff_central
+
+/* filter signal with rolling mean then normalize */
+seq|rolling_mean|zscore_normalize
+
+/* clamp vector elements to range */
+seq|clamp
+
+/* evaluate matrix vector multiply then softmax */
+seq|mat_vec|softmax
+
+/* compute prefix sum then normalize of array */
+seq|prefix_sum|max_val
+
+/* filter then compute cumulative sum */
+seq|rolling_mean|cumsum
+
+/* deaverage then scale by maximum of array */
+seq|mean|max_val|min_val
+
+/* compute clamp array values to range */
+seq|clamp
+
+/* mix two signals at fixed ratio */
+seq|lerp
+
+/* perform softplus to each element */
+seq|softplus
+
+/* compute rolling correlation between two vectors of array */
+seq|correlation
+
+/* execute sigmoid to each element of array */
+seq|sigmoid
+
+/* apply softplus to each value of array */
+seq|softplus
+
+/* arrange then compute interquartile range */
+seq|bubble_sort|iqr
+
+/* compute two-stage smoothing with different periods of array */
+seq|rolling_mean
+
+/* calculate moving average of absolute differences */
+seq|moving_avg
+
+/* normalise array to zero mean unit variance */
+seq|mean|stddev
+
+/* multiply vector to unit length of array */
+seq|vec_normalize
+
+/* order then compute middle value */
+seq|bubble_sort|median
+
+/* calculate KL divergence */
+seq|kl_divergence
+
+/* order then return n-th smallest of array */
+seq|bubble_sort
+
+/* calculate triple smoothing cascade */
+seq|rolling_mean
+
+/* two layer linear transform of array */
+seq|mat_vec|relu
+
+/* calculate triple smoothing */
+seq|rolling_mean
+
+/* compute moving mean of absolute differences */
+seq|moving_avg
+
+/* calculate min-max normalize then apply relu */
+seq|minmax_normalize|relu
+
+/* perform linear regression and predict */
+seq|linreg
+
+/* calculate peak frequency in array */
+seq|fft_radix2|fft_magnitude|argmax
+
+/* process then apply median filter */
+seq|rolling_mean|median_filter
+
+/* evaluate moving average of absolute differences of array */
+seq|moving_avg
+
+/* evaluate array to noise ratio */
+seq|signal_rms
+
+/* calculate KL divergence between two distributions */
+seq|kl_divergence
+
+/* compute differencing then cumulative sum to reconstruct */
+seq|diff_central|cumsum
+
+/* compute add jitter then lowpass filter */
+seq|add_noise|lowpass
+
+/* normalise array to zero average unit variance */
+seq|mean|stddev
+
+/* normalize two vectors then compute dot product of array */
+seq|vec_normalize|dot
+
+/* rescale array to zero average unit variance */
+seq|mean|stddev
+
+/* select filter based on waveform energy of array */
+seq|signal_energy|lowpass
+
+/* calculate triple smoothing cascade function */
+seq|rolling_mean
+
+/* compute matrix multiply then add bias of array */
+seq|mat_vec
+
+/* compute covariance then normalize to correlation */
+seq|covariance|stddev
+
+/* calculate rolling mean then subtract from original of array */
+seq|rolling_mean
+
+/* smooth then apply median filter of array */
+seq|rolling_mean|median_filter
+
+/* calculate matrix multiply then add bias of array */
+seq|mat_vec
+
+/* order then compute interquartile range */
+seq|bubble_sort|iqr
+
+/* calculate variance ratio of two vectors */
+seq|variance
+
+/* calculate ratio of stddevs */
+seq|stddev
+
+/* evaluate rolling covariance between two arrays */
+seq|covariance
+
+/* subtract rolling average then compute squared deviation */
+seq|rolling_mean|variance
+
+/* cumulative product then */
+seq|cumulative_product|max_val
+
+/* derive then lowpass filter of array */
+seq|diff_central|lowpass
+
+/* compute gradient then smooth with ema of array */
+seq|diff_central|ema_series
+
+/* compute differencing then */
+seq|diff_central|cumsum
+
+/* compute prefix sum then */
+seq|prefix_sum|max_val
+
+/* combine two signals with crossfade of array */
+seq|lerp
+
+/* perform leaky relu to each element of array */
+seq|leaky_relu
+
+/* rescale signal then compute fft magnitude */
+seq|zscore_normalize|fft_radix2|fft_magnitude
+
+/* compute matrix vector multiply then softmax */
+seq|mat_vec|softmax
+
+/* sort then compute trimmed mean of vector */
+seq|bubble_sort|trimmed_mean
+
+/* compute root average square difference of two arrays */
+seq|mse
+
+/* compute differencing then cumulative sum to reconstruct of array */
+seq|diff_central|cumsum
+
+/* sort then compute rank correlation */
+seq|compute_ranks|correlation
+
+/* evaluate root mean square difference of two arrays */
+seq|mse
+
+/* clamp vector values to range */
+seq|clamp
+
+/* calculate horner evaluation applied to vector */
+seq|horner
+
+/* calculate signal to noise proportion */
+seq|signal_rms
+
+/* calculate median then ratio to average */
+seq|bubble_sort|median|mean
+
+/* matrix vector multiply then apply relu */
+seq|mat_vec|relu
+
+/* evaluate range of array values */
+seq|max_val|min_val
+
+/* compute map elements to range zero to one */
+seq|minmax_normalize
+
+/* compute squared deviation ratio of two vectors */
+seq|variance
+
+/* apply relu to each value of array */
+seq|relu
+
+/* sort then compute percentile */
+seq|bubble_sort|percentile
+
+/* calculate bandpass filter then */
+seq|bandpass_filter|hilbert_envelope
+
+/* matrix vector multiply then softmax of buffer */
+seq|mat_vec|softmax
+
+/* extract filter based on signal energy */
+seq|signal_energy|lowpass
+
+/* bandpass filter then compute amplitude of array */
+seq|bandpass_filter|hilbert_envelope
+
+/* evaluate rolling mean then subtract from original of array */
+seq|rolling_mean
+
+/* smooth then differentiate waveform of array */
+seq|rolling_mean|diff_central
+
+/* calculate rolling average then subtract from original */
+seq|rolling_mean
+
+/* calculate gradient then smooth with ema of array */
+seq|diff_central|ema_series
+
+/* normalize then apply of array */
+seq|mean|stddev|sigmoid
+
+/* order then compute trimmed average */
+seq|bubble_sort|trimmed_mean
+
+/* sort then return n-th smallest of vector */
+seq|bubble_sort
+
+/* evaluate KL divergence between two distributions */
+seq|kl_divergence
+
+/* evaluate cross entropy between two distributions of array */
+seq|cross_entropy
+
+/* interpolate vector to doubled length */
+seq|lerp
+
+/* apply linear regression function */
+seq|linreg
+
+/* order then compute rank correlation */
+seq|compute_ranks|correlation
+
+/* execute sigmoid to each element */
+seq|sigmoid
+
+/* compute subtract ema then compute stddev */
+seq|ema_series|stddev
+
+/* filter waveform with ema then compute rms */
+seq|ema_series|signal_rms
+
+/* execute gradient descent then clamp output */
+seq|gradient_descent|clamp
+
+/* mix two waveforms at fixed proportion */
+seq|lerp
+
+/* cascade lowpass filter */
+seq|lowpass|downsample
+
+/* sort then compute trimmed mean of array */
+seq|bubble_sort|trimmed_mean
+
+/* calculate detrend then compute fft */
+seq|rolling_mean|fft_radix2
+
+/* scale vector to unit length of buffer */
+seq|vec_normalize
+
+/* execute sign function to each element */
+seq|sign
+
+/* compute differentiate then */
+seq|diff_central|lowpass
+
+/* normalise then compute */
+seq|zscore_normalize|autocorrelation
+
+/* generate sine then compute spectrum of array */
+seq|gen_sine|fft_radix2|fft_magnitude
+
+/* evaluate ema followed by sma */
+seq|ema_series|sma
+
+/* smooth waveform with ema then compute rms */
+seq|ema_series|signal_rms
+
+/* compute min and max of array */
+seq|min_val|max_val
+
+/* calculate rolling span */
+seq|moving_max|moving_min
+
+/* compute rolling variance of vector */
+seq|variance
+
+/* evaluate correlation between original and smoothed of array */
+seq|rolling_mean|correlation
+
+/* remove rolling mean then compute squared deviation */
+seq|rolling_mean|variance
+
+/* compute average then ratio to maximum */
+seq|mean|max_val
+
+/* scale array by scalar factor */
+seq|vec_scale
+
+/* perform gradient descent then clamp output */
+seq|gradient_descent|clamp
+
+/* evaluate absolute deviation from middle value */
+seq|bubble_sort|median
+
+/* calculate average of two arrays then difference */
+seq|mean
+
+/* apply middle element filter then smooth */
+seq|median_filter|rolling_mean
+
+/* apply softplus to each element of vector */
+seq|softplus
+
+/* filter waveform with rolling mean then normalize */
+seq|rolling_mean|zscore_normalize
+
+/* compute cross entropy between two distributions of array */
+seq|cross_entropy
+
+/* compute differentiate then lowpass filter */
+seq|diff_central|lowpass
+
+/* compute convolution then function */
+seq|conv|zscore_normalize
+
+/* detrend then compute */
+seq|rolling_mean|fft_radix2
+
+/* compute conditional smoothing based on variance of array */
+seq|variance|rolling_mean
+
+/* calculate convolve then downsample function */
+seq|conv|downsample
+
+/* calculate matrix vector multiply then apply sigmoid of array */
+seq|mat_vec|sigmoid
+
+/* normalize then apply fir filter of array */
+seq|zscore_normalize|fir_filter
+
+/* compute absolute deviation from average */
+seq|mean
+
+/* compute correlation between of array */
+seq|rolling_mean|correlation
+
+/* smooth waveform with rolling mean then normalize */
+seq|rolling_mean|zscore_normalize
+
+/* calculate root mean square difference of two vectors */
+seq|mse
+
+/* find peak frequency in waveform of array */
+seq|fft_radix2|fft_magnitude|argmax
+
+/* calculate project vector a onto vector b of array */
+seq|dot|vec_scale
+
+/* two layer linear transform */
+seq|mat_vec|relu
+
+/* evaluate squared deviation ratio of two arrays */
+seq|variance
+
+/* calculate bandpass filter then compute envelope */
+seq|bandpass_filter|hilbert_envelope
+
+/* apply linear regression */
+seq|linreg
+
+/* compute outer product then scale */
+seq|outer_product
+
+/* compute conditional smoothing based on variance */
+seq|variance|rolling_mean
+
+/* compute sma followed by */
+seq|sma|ema_series
+
+/* compute FFT then extract phase */
+seq|fft_radix2|fft_phase
+
+/* cascade lowpass filter then downsample */
+seq|lowpass|downsample
+
+/* evaluate linear interpolation between two arrays */
+seq|lerp
+
+/* compute matrix multiply then add bias */
+seq|mat_vec
+
+/* execute median filter then smooth */
+seq|median_filter|rolling_mean
+
+/* apply tanh to each element */
+seq|tanh_approx
+
+/* compute absolute deviation from average of array */
+seq|mean
+
+/* map elements to range zero to one */
+seq|minmax_normalize
+
+/* evaluate variance from mean */
+seq|mean
+
+/* calculate variance ratio of two arrays */
+seq|variance
+
+/* calculate map values to range zero to one */
+seq|minmax_normalize
+
+/* execute window function */
+seq|hamming_window|fft_radix2
+
+/* scale vector to */
+seq|vec_normalize
+
+/* remove ema then compute stddev */
+seq|ema_series|stddev
+
+/* scale array to unit squared deviation */
+seq|stddev
+
+/* rescale then compute autocorrelation of array */
+seq|zscore_normalize|autocorrelation
+
+/* calculate rolling variance of array */
+seq|variance
+
+/* sort then compute trimmed average */
+seq|bubble_sort|trimmed_mean
+
+/* evaluate Euclidean norm of array */
+seq|vec_norm
+
+/* compute root mean square difference of two vectors */
+seq|mse
+
+/* calculate triple smoothing cascade of array */
+seq|rolling_mean
+
+/* compute FFT magnitude spectrum of array */
+seq|fft_radix2|fft_magnitude
+
+/* evaluate ratio of stddevs */
+seq|stddev
+
+/* compute horner evaluation applied to array */
+seq|horner
+
+/* evaluate exponential moving average then subtract from original of array */
+seq|ema_series
+
+/* welford update then extract average */
+seq|welford_update
+
+/* compute matrix vector multiply then normalize */
+seq|mat_vec|vec_normalize
+
+/* calculate detrend then compute fft of array */
+seq|rolling_mean|fft_radix2
+
+/* calculate rolling covariance between two arrays */
+seq|covariance
+
+/* take away mean from array */
+seq|mean
+
+/* execute sign function to each value */
+seq|sign
+
+/* upsample then smooth with moving average */
+seq|upsample|moving_avg
+
+/* compute average then proportion to maximum */
+seq|mean|max_val
+
+/* smooth array then compute energy */
+seq|lowpass|signal_energy
+
+/* calculate welford update then extract variance of array */
+seq|welford_update
+
+/* execute median filter then smooth of array */
+seq|median_filter|rolling_mean
+
+/* pipe two fir */
+seq|fir_filter
+
+/* normalise array then compute fft magnitude */
+seq|zscore_normalize|fft_radix2|fft_magnitude
+
+/* filter signal with ema then compute rms */
+seq|ema_series|signal_rms
+
+/* compute matrix array multiply then apply sigmoid */
+seq|mat_vec|sigmoid
+
+/* multiply vector by constant factor */
+seq|vec_scale
+
+/* evaluate matrix vector multiply then normalize */
+seq|mat_vec|vec_normalize
+
+/* calculate differencing then */
+seq|diff_central|cumsum
+
+/* add noise then lowpass filter of array */
+seq|add_noise|lowpass
+
+/* arrange then return n-th smallest of array */
+seq|bubble_sort
+
+/* compute residual after projection of vector */
+seq|dot|vec_scale
+
+/* calculate softmax normalize */
+seq|softmax|entropy
+
+/* normalize then apply */
+seq|mean|stddev|sigmoid
+
+/* evaluate squared deviation from average */
+seq|mean
+
+/* two-stage smoothing with of array */
+seq|rolling_mean
+
+/* arrange then return n-th smallest */
+seq|bubble_sort
+
+/* chain lowpass filter then downsample of array */
+seq|lowpass|downsample
+
+/* generate sine wave of array */
+seq|gen_sine|add_noise
+
+/* compute project array a onto vector b */
+seq|dot|vec_scale
+
+/* compute rolling stddev */
+seq|stddev
+
+/* evaluate two vectors then return their cosine similarity */
+seq|cosine_similarity
+
+/* evaluate median then ratio to mean */
+seq|bubble_sort|median|mean
+
+/* compute residual after projection */
+seq|dot|vec_scale
+
+/* combine two arrays at fixed ratio */
+seq|lerp
+
+/* average of absolute value-wise differences */
+seq|mae
+
+/* fraction of elements above average */
+seq|mean
+
+/* ema followed by */
+seq|ema_series|sma
+
+/* calculate cross entropy between two distributions */
+seq|cross_entropy
+
+/* evaluate rolling average then subtract from original */
+seq|rolling_mean
+
+/* generate sine then compute spectrum */
+seq|gen_sine|fft_radix2|fft_magnitude
+
+/* evaluate index of maximum value of array */
+seq|argmax
+
+/* welford update then extract mean of vector */
+seq|welford_update
+
+/* compute sma followed by ema */
+seq|sma|ema_series
+
+/* generate chirp signal by sweeping frequency of vector */
+seq|lerp
+
+/* process signal then compute energy of array */
+seq|lowpass|signal_energy
+
+/* increase rate then smooth with moving average of array */
+seq|upsample|moving_avg
+
+/* calculate Euclidean norm */
+seq|vec_norm
+
+/* calculate ema followed by sma */
+seq|ema_series|sma
+
+/* filter signal with rolling average then normalize */
+seq|rolling_mean|zscore_normalize
+
+/* execute tanh to each value */
+seq|tanh_approx
+
+/* execute sigmoid to each value */
+seq|sigmoid
+
+/* compute middle value then ratio to average */
+seq|bubble_sort|median|mean
+
+/* welford update then extract variance of array */
+seq|welford_update
+
+/* calculate histogram then apply softmax of array */
+seq|histogram|softmax
+
+/* evaluate rolling squared deviation of array */
+seq|variance
+
+/* evaluate index of maximum value */
+seq|argmax
+
+/* compute rolling correlation between two vectors */
+seq|correlation
+
+/* matrix multiply then add bias of array */
+seq|mat_vec
+
+/* matrix multiply then function */
+seq|mat_vec
+
+/* evaluate rolling max */
+seq|moving_max
+
+/* evaluate matrix multiply then add bias */
+seq|mat_vec
+
+/* evaluate sma followed by ema */
+seq|sma|ema_series
+
+/* apply leaky relu to each value of array */
+seq|leaky_relu
+
+/* smooth then differentiate array */
+seq|rolling_mean|diff_central
+
+/* multiply vector to unit variance */
+seq|stddev
+
+/* calculate subtract ema then compute standard deviation */
+seq|ema_series|stddev
+
+/* compute map values to span zero to one */
+seq|minmax_normalize
+
+/* multiply vector to unit length */
+seq|vec_normalize
+
+/* sort then compute rank correlation of vector */
+seq|compute_ranks|correlation
+
+/* compute cumulative sum then normalize of vector */
+seq|cumsum|zscore_normalize
+
+/* compute absolute deviation from middle value of array */
+seq|bubble_sort|median
+
+/* perform polynomial evaluation to each element of array */
+seq|poly_eval
+
+/* calculate convolution then */
+seq|conv|zscore_normalize
+
+/* evaluate rolling range of array */
+seq|moving_max|moving_min
+
+/* amplify array by constant factor */
+seq|vec_scale
+
+/* apply polynomial evaluation to each value */
+seq|poly_eval
+
+/* softmax normalize then */
+seq|softmax|entropy
+
+/* calculate array to noise ratio */
+seq|signal_rms
+
+/* rescale then apply sigmoid */
+seq|mean|stddev|sigmoid
+
+/* compute absolute deviation from middle value */
+seq|bubble_sort|median
+
+/* softmax normalize then compute entropy */
+seq|softmax|entropy
+
+/* process waveform with rolling mean then normalize */
+seq|rolling_mean|zscore_normalize
+
+/* prefix sum then of array */
+seq|prefix_sum|max_val
+
+/* perform sigmoid to each value */
+seq|sigmoid
+
+/* filter array then compute energy */
+seq|lowpass|signal_energy
+
+/* normalize then compute autocorrelation of vector */
+seq|zscore_normalize|autocorrelation
+
+/* compute rolling coefficient of variation */
+seq|rolling_mean|running_stddev
+
+/* calculate prefix sum then normalize of array */
+seq|prefix_sum|max_val
+
+/* compute linear interpolation between two vectors */
+seq|lerp
+
+/* blend two signals at fixed ratio */
+seq|lerp
+
+/* calculate convolve then downsample */
+seq|conv|downsample
+
+/* compute rolling correlation between two arrays of array */
+seq|correlation
+
+/* apply window function function */
+seq|hamming_window|fft_radix2
+
+/* calculate signal to noise ratio */
+seq|signal_rms
+
+/* calculate subtract ema then compute stddev */
+seq|ema_series|stddev
+
+/* arrange then compute median of array */
+seq|bubble_sort|median
+
+/* cascade two fir */
+seq|fir_filter
+
+/* calculate outer product */
+seq|outer_product
+
+/* calculate two arrays then return their cosine similarity */
+seq|cosine_similarity
+
+/* matrix vector multiply then softmax */
+seq|mat_vec|softmax
+
+/* pick filter based on signal energy */
+seq|signal_energy|lowpass
+
+/* evaluate clamp array values to range */
+seq|clamp
+
+/* calculate rolling standard deviation */
+seq|stddev
+
+/* evaluate remainder after projection */
+seq|dot|vec_scale
+
+/* calculate coefficient of variation of array */
+seq|stddev|mean
+
+/* compute softmax normalize then compute entropy of array */
+seq|softmax|entropy
+
+/* compute convolution then normalize of array */
+seq|conv|zscore_normalize
+
+/* evaluate absolute deviation from median of array */
+seq|bubble_sort|median
+
+/* calculate min and max */
+seq|min_val|max_val
+
+/* arrange then compute trimmed mean of array */
+seq|bubble_sort|trimmed_mean
+
+/* perform linear regression and extract remainders */
+seq|linreg
+
+/* compute convolve then downsample function */
+seq|conv|downsample
+
+/* evaluate average and variance in single pass */
+seq|mean|variance
+
+/* calculate rolling correlation between two arrays of array */
+seq|correlation
+
+/* calculate absolute deviation from median */
+seq|bubble_sort|median
+
+/* compute rolling cosquared deviation between two vectors */
+seq|covariance
+
+/* apply polynomial evaluation to each value of array */
+seq|poly_eval
+
+/* evaluate covariance then normalize to correlation of array */
+seq|covariance|stddev
+
+/* z-score normalize then clamp of array */
+seq|zscore_normalize|clamp
+
+/* smooth signal with ema then compute rms of vector */
+seq|ema_series|signal_rms
+
+/* calculate moving mean of absolute differences */
+seq|moving_avg
+
+/* smooth signal with ema then compute rms of array */
+seq|ema_series|signal_rms
+
+/* compute add noise then lowpass filter of array */
+seq|add_noise|lowpass
+
+/* sort then return function */
+seq|bubble_sort
+
+/* normalize array to zero average unit squared deviation */
+seq|mean|stddev
+
+/* clamp array elements to range */
+seq|clamp
+
+/* matrix array multiply then apply relu of array */
+seq|mat_vec|relu
+
+/* apply leaky relu to each value */
+seq|leaky_relu
+
+/* filter then compute */
+seq|rolling_mean|cumsum
+
+/* compute two arrays then return their cosine similarity of array */
+seq|cosine_similarity
+
+/* sort then compute interquartile span of array */
+seq|bubble_sort|iqr
+
+/* compute histogram then apply softmax of vector */
+seq|histogram|softmax
+
+/* compute sma followed by ema of array */
+seq|sma|ema_series
+
+/* differentiate then lowpass filter */
+seq|diff_central|lowpass
+
+/* map values to span zero to one */
+seq|minmax_normalize
+
+/* calculate matrix multiply then */
+seq|mat_vec
+
+/* compute matrix vector multiply then normalize of array */
+seq|mat_vec|vec_normalize
+
+/* derive then lowpass filter */
+seq|diff_central|lowpass
+
+/* evaluate FFT then */
+seq|fft_radix2|fft_phase
+
+/* calculate two-stage smoothing with */
+seq|rolling_mean
+
+/* evaluate gradient then smooth with ema */
+seq|diff_central|ema_series
+
+/* differentiate then lowpass */
+seq|diff_central|lowpass
+
+/* normalize then apply function */
+seq|mean|stddev|sigmoid
+
+/* mix two waveforms at fixed ratio */
+seq|lerp
+
+/* find peak spectral in waveform */
+seq|fft_radix2|fft_magnitude|argmax
+
+/* evaluate KL divergence between two distributions of array */
+seq|kl_divergence
+
+/* evaluate rolling correlation between two arrays of array */
+seq|correlation
+
+/* arrange then return */
+seq|bubble_sort
+
+/* apply polynomial evaluation to each element of array */
+seq|poly_eval
+
+/* compute rolling coefficient of variation of vector */
+seq|rolling_mean|running_stddev
+
+/* evaluate two-stage smoothing with different periods */
+seq|rolling_mean
+
+/* evaluate cumulative sum then normalize */
+seq|cumsum|zscore_normalize
+
+/* rescale then apply fir filter */
+seq|zscore_normalize|fir_filter
+
+/* compute ratio of stddevs */
+seq|stddev
+
+/* two-stage smoothing with function */
+seq|rolling_mean
+
+/* perform sigmoid to each element of array */
+seq|sigmoid
+
+/* chain two fir of array */
+seq|fir_filter
+
+/* evaluate median then ratio to average */
+seq|bubble_sort|median|mean
+
+/* mean of absolute element-wise differences */
+seq|mae
+
+/* compute index of maximum value of array */
+seq|argmax
+
+/* populate sine then */
+seq|gen_sine|fft_radix2|fft_magnitude
+
+/* calculate fraction of values above mean */
+seq|mean
+
+/* process then compute */
+seq|rolling_mean|cumsum
+
+/* generate sine wave then add noise */
+seq|gen_sine|add_noise
+
+/* calculate scale array to unit squared deviation */
+seq|stddev
+
+/* calculate demean then scale by maximum of array */
+seq|mean|max_val|min_val
+
+/* compute correlation between function */
+seq|rolling_mean|correlation
+
+/* process array then compute energy */
+seq|lowpass|signal_energy
+
+/* pipe two fir filters */
+seq|fir_filter
+
+/* compute coefficient of variation of vector */
+seq|stddev|mean
+
+/* softmax normalize then compute entropy of vector */
+seq|softmax|entropy
+
+/* min-max normalize then apply relu of vector */
+seq|minmax_normalize|relu
+
+/* subtract mean from vector */
+seq|mean
+
+/* compute cross entropy */
+seq|cross_entropy
+
+/* compute rolling min of vector */
+seq|moving_min
+
+/* evaluate rolling min of array */
+seq|moving_min
+
+/* evaluate variance ratio of two vectors */
+seq|variance
+
+/* execute derivative descent then clamp result */
+seq|gradient_descent|clamp
+
+/* evaluate mean of two arrays then difference */
+seq|mean
+
+/* upsample then smooth with moving average of vector */
+seq|upsample|moving_avg
+
+/* compute rolling max of vector */
+seq|moving_max
+
+/* evaluate weight of variation */
+seq|stddev|mean
+
+/* chain two fir */
+seq|fir_filter
+
+/* calculate convolve then downsample of array */
+seq|conv|downsample
+
+/* lowpass filter then differentiate */
+seq|lowpass|diff_central
+
+/* compute min and */
+seq|min_val|max_val
+
+/* subtract average from array */
+seq|mean
+
+/* smooth array with rolling average then normalize */
+seq|rolling_mean|zscore_normalize
+
+/* calculate softmax normalize then compute entropy of array */
+seq|softmax|entropy
+
+/* subtract ema then compute standard deviation of array */
+seq|ema_series|stddev
+
+/* calculate sma followed by ema */
+seq|sma|ema_series
+
+/* calculate cross entropy */
+seq|cross_entropy
+
+/* evaluate z-score normalize then clamp */
+seq|zscore_normalize|clamp
+
+/* project buffer a onto vector b */
+seq|dot|vec_scale
+
+/* calculate exponential moving mean then subtract from original */
+seq|ema_series
+
+/* calculate rolling min of array */
+seq|moving_min
+
+/* calculate project vector a onto vector b */
+seq|dot|vec_scale
+
+/* compute welford update then extract mean */
+seq|welford_update
+
+/* execute linear regression and extract residuals of array */
+seq|linreg
+
+/* root average square difference of two arrays */
+seq|mse
+
+/* clamp array values to range */
+seq|clamp
+
+/* lowpass filter then differentiate of array */
+seq|lowpass|diff_central
+
+/* compute KL divergence between two distributions of array */
+seq|kl_divergence
+
+/* compute rolling variance of array */
+seq|variance
+
+/* two-stage smoothing with */
+seq|rolling_mean
+
+/* linear interpolation between two arrays */
+seq|lerp
+
+/* compute prefix sum then normalize */
+seq|prefix_sum|max_val
+
+/* compute moving average of absolute differences */
+seq|moving_avg
+
+/* calculate range of array elements */
+seq|max_val|min_val
+
+/* evaluate cumulative sum then normalize of array */
+seq|cumsum|zscore_normalize
+
+/* calculate deaverage then scale by maximum */
+seq|mean|max_val|min_val
+
+/* calculate rolling cosquared deviation between two arrays */
+seq|covariance
+
+/* compute KL divergence between two distributions of vector */
+seq|kl_divergence
+
+/* calculate average and standard deviation */
+seq|mean|stddev
+
+/* compute cross entropy between two distributions of vector */
+seq|cross_entropy
+
+/* upsample then smooth with moving mean of array */
+seq|upsample|moving_avg
+
+/* matrix array multiply then apply relu */
+seq|mat_vec|relu
+
+/* compute min and of array */
+seq|min_val|max_val
+
+/* perform median filter then smooth of array */
+seq|median_filter|rolling_mean
+
+/* normalize then apply sigmoid */
+seq|mean|stddev|sigmoid
+
+/* smooth then compute cumulative sum of array */
+seq|rolling_mean|cumsum
+
+/* compute rolling span */
+seq|moving_max|moving_min
+
+/* evaluate matrix vector multiply then apply sigmoid */
+seq|mat_vec|sigmoid
+
+/* calculate ema followed by */
+seq|ema_series|sma
+
+/* calculate mean of absolute element-wise differences */
+seq|mae
+
+/* filter then differentiate signal */
+seq|rolling_mean|diff_central
+
+/* calculate matrix multiply then add bias */
+seq|mat_vec
+
+/* calculate ema followed */
+seq|ema_series|sma
+
+/* compute weight of variation */
+seq|stddev|mean
+
+/* apply relu to each element */
+seq|relu
+
+/* blend two waveforms with crossfade of array */
+seq|lerp
+
+/* demean then scale by maximum of array */
+seq|mean|max_val|min_val
+
+/* prefix sum then normalize of array */
+seq|prefix_sum|max_val
+
+/* normalise waveform then compute fft magnitude */
+seq|zscore_normalize|fft_radix2|fft_magnitude
+
+/* calculate welford update then extract squared deviation */
+seq|welford_update
+
+/* normalize array to zero mean unit squared deviation */
+seq|mean|stddev
+
+/* sort then compute median of array */
+seq|bubble_sort|median
+
+/* calculate rolling correlation between two vectors */
+seq|correlation
+
+/* compute index of maximum value of vector */
+seq|argmax
+
+/* evaluate prefix sum then normalize */
+seq|prefix_sum|max_val
+
+/* compute z-score normalize then clamp */
+seq|zscore_normalize|clamp
+
+/* filter then differentiate signal of array */
+seq|rolling_mean|diff_central
+
+/* upsample vector to doubled length */
+seq|lerp
+
+/* find peak frequency in signal of vector */
+seq|fft_radix2|fft_magnitude|argmax
+
+/* compute remainder after projection */
+seq|dot|vec_scale
+
+/* compute rolling z-score of vector */
+seq|rolling_mean|running_stddev
+
+/* increase rate array to doubled length */
+seq|lerp
+
+/* calculate linear interpolation between two vectors */
+seq|lerp
+
+/* compute subtract mean from vector */
+seq|mean
+
+/* rescale then compute autocorrelation */
+seq|zscore_normalize|autocorrelation
+
+/* arrange then compute percentile */
+seq|bubble_sort|percentile
+
+/* evaluate rolling coefficient of variation of array */
+seq|rolling_mean|running_stddev
+
+/* generate sine wave */
+seq|gen_sine|add_noise
+
+/* compute subtract average from array */
+seq|mean
+
+/* softmax normalize then compute entropy of array */
+seq|softmax|entropy
+
+/* evaluate differencing then cumulative sum to reconstruct */
+seq|diff_central|cumsum
+
+/* compute ratio of standard deviations */
+seq|stddev
+
+/* calculate average and variance in single pass */
+seq|mean|variance
+
+/* combine two signals at fixed ratio */
+seq|lerp
+
+/* evaluate rolling stddev */
+seq|stddev
+
+/* compute average and standard deviation */
+seq|mean|stddev
+
+/* compute mean of two arrays then difference */
+seq|mean
+
+/* arspan then compute trimmed mean */
+seq|bubble_sort|trimmed_mean
+
+/* calculate scale vector by constant factor */
+seq|vec_scale
+
+/* execute softplus to each element of array */
+seq|softplus
+
+/* calculate correlation between */
+seq|rolling_mean|correlation
+
+/* calculate FFT then extract phase of array */
+seq|fft_radix2|fft_phase
+
+/* calculate remainder after projection */
+seq|dot|vec_scale
+
+/* smooth signal with ema then compute rms */
+seq|ema_series|signal_rms
+
+/* compute KL divergence between two distributions */
+seq|kl_divergence
+
+/* fill sine wave then add noise */
+seq|gen_sine|add_noise
+
+/* arrange then compute median */
+seq|bubble_sort|median
+
+/* chain lowpass filter then downsample */
+seq|lowpass|downsample
+
+/* multiply array to unit variance */
+seq|stddev
+
+/* calculate softmax normalize then compute entropy */
+seq|softmax|entropy
+
+/* linear interpolation between two arrays of array */
+seq|lerp
+
+/* compute welford update then extract variance */
+seq|welford_update
+
+/* apply sigmoid to each element of vector */
+seq|sigmoid
+
+/* arspan then compute interquartile range */
+seq|bubble_sort|iqr
+
+/* compute histogram then */
+seq|histogram
+
+/* compute two vectors then return their cosine similarity of buffer */
+seq|cosine_similarity
+
+/* amplify vector to unit length */
+seq|vec_normalize
+
+/* sma followed by ema of vector */
+seq|sma|ema_series
+
+/* softmax normalize then of array */
+seq|softmax|entropy
+
+/* compute weight of variation of array */
+seq|stddev|mean
+
+/* perform leaky relu to each value */
+seq|leaky_relu
+
+/* calculate mean then ratio to maximum */
+seq|mean|max_val
+
+/* perform linear regression and extract residuals of array */
+seq|linreg
+
+/* upsample array to doubled length */
+seq|lerp
+
+/* sma followed by function */
+seq|sma|ema_series
+
+/* calculate convolve then */
+seq|conv|downsample
+
+/* compute min-max normalize then apply relu of array */
+seq|minmax_normalize|relu
+
+/* compute moving average of absolute differences of array */
+seq|moving_avg
+
+/* normalize then compute function */
+seq|zscore_normalize|autocorrelation
+
+/* chain two fir filters */
+seq|fir_filter
+
+/* chain lowpass filter of array */
+seq|lowpass|downsample
+
+/* sort then compute middle value */
+seq|bubble_sort|median
+
+/* evaluate rolling standard deviation */
+seq|stddev
+
+/* calculate rolling range of array */
+seq|moving_max|moving_min
+
+/* calculate differencing then cumulative sum to reconstruct of array */
+seq|diff_central|cumsum
+
+/* perform tanh to each element of array */
+seq|tanh_approx
+
+/* calculate convolution then normalize */
+seq|conv|zscore_normalize
+
+/* evaluate coefficient of variation */
+seq|stddev|mean
+
+/* compute average of two vectors then difference */
+seq|mean
+
+/* compute fraction of elements above average */
+seq|mean
+
+/* rescale two vectors then compute dot product */
+seq|vec_normalize|dot
+
+/* root mean square difference of two arrays */
+seq|mse
+
+/* compute ratio of fast to slow moving averages */
+seq|rolling_mean
+
+/* perform relu to each element of array */
+seq|relu
+
+/* compute rolling min of array */
+seq|moving_min
+
+/* perform sign function to each value */
+seq|sign
+
+/* generate chirp waveform by sweeping spectral */
+seq|lerp
+
+/* compute scale array by constant factor */
+seq|vec_scale
+
+/* sort then compute percentile of array */
+seq|bubble_sort|percentile
+
+/* evaluate convolution then */
+seq|conv|zscore_normalize
+
+/* calculate map values from one span to another */
+seq|map_range
+
+/* compute map values from one span to another */
+seq|map_range
+
+/* compute scale vector to unit length */
+seq|vec_normalize
+
+/* calculate mean of two vectors then difference */
+seq|mean
+
+/* apply window function of array */
+seq|hamming_window|fft_radix2
+
+/* evaluate power frequency density */
+seq|fft_radix2|fft_magnitude
+
+/* order then compute interquartile span */
+seq|bubble_sort|iqr
+
+/* evaluate power spectral density */
+seq|fft_radix2|fft_magnitude
+
+/* calculate clamp array values to range */
+seq|clamp
+
+/* evaluate average of two arrays then difference */
+seq|mean
+
+/* order then compute trimmed mean of array */
+seq|bubble_sort|trimmed_mean
+
+/* calculate average of absolute element-wise differences */
+seq|mae
+
+/* sort then compute middle element */
+seq|bubble_sort|median
+
+/* calculate squared deviation from mean */
+seq|mean
+
+/* calculate mean and stddev */
+seq|mean|stddev
+
+/* calculate conditional smoothing based on variance of array */
+seq|variance|rolling_mean
+
+/* map elements from one range to another */
+seq|map_range
+
+/* compute mean and standard deviation */
+seq|mean|stddev
+
+/* evaluate add noise then lowpass filter */
+seq|add_noise|lowpass
+
+/* normalise then apply fir filter of array */
+seq|zscore_normalize|fir_filter
+
+/* horner evaluation applied to vector of array */
+seq|horner
+
+/* fill sine then */
+seq|gen_sine|fft_radix2|fft_magnitude
+
+/* compute power spectral density of vector */
+seq|fft_radix2|fft_magnitude
+
+/* bandpass filter then compute amplitude */
+seq|bandpass_filter|hilbert_envelope
+
+/* compute triple smoothing cascade function */
+seq|rolling_mean
+
+/* calculate rolling z-score of array */
+seq|rolling_mean|running_stddev
+
+/* compute two-stage smoothing */
+seq|rolling_mean
+
+/* increase rate then smooth with moving mean */
+seq|upsample|moving_avg
+
+/* normalise then apply sigmoid */
+seq|mean|stddev|sigmoid
+
+/* apply sign function to each element of vector */
+seq|sign
+
+/* compute lowpass filter then differentiate */
+seq|lowpass|diff_central
+
+/* evaluate derivative then smooth with ema */
+seq|diff_central|ema_series
+
+/* scale array to unit length of array */
+seq|vec_normalize
+
+/* compute mean and variance in single pass */
+seq|mean|variance
+
+/* compute array to noise proportion */
+seq|signal_rms
+
+/* calculate differencing then cumulative sum to reconstruct */
+seq|diff_central|cumsum
+
+/* calculate map values to span zero to one */
+seq|minmax_normalize
+
+/* evaluate triple smoothing cascade */
+seq|rolling_mean
+
+/* calculate histogram then normalize to probability */
+seq|histogram
+
+/* compute convolution then of array */
+seq|conv|zscore_normalize
+
+/* calculate subtract rolling average then compute variance */
+seq|rolling_mean|variance
+
+/* take away rolling average then compute variance */
+seq|rolling_mean|variance
+
+/* compute histogram then apply softmax of array */
+seq|histogram|softmax
+
+/* normalize two vectors */
+seq|vec_normalize|dot
+
+/* execute window function then compute FFT */
+seq|hamming_window|fft_radix2
+
+/* generate sine wave function */
+seq|gen_sine|add_noise
+
+/* calculate FFT then */
+seq|fft_radix2|fft_phase
+
+/* compute demean then scale by maximum */
+seq|mean|max_val|min_val
+
+/* evaluate correlation between */
+seq|rolling_mean|correlation
+
+/* apply softplus to each element of array */
+seq|softplus
+
+/* compute rolling mean then subtract from original of vector */
+seq|rolling_mean
+
+/* generate sine wave then add noise of vector */
+seq|gen_sine|add_noise
+
+/* filter signal then compute energy */
+seq|lowpass|signal_energy
+
+/* generate sine then */
+seq|gen_sine|fft_radix2|fft_magnitude
+
+/* sort then compute middle value of array */
+seq|bubble_sort|median
+
+/* process waveform with ema then compute rms */
+seq|ema_series|signal_rms
+
+/* deaverage then scale by maximum */
+seq|mean|max_val|min_val
+
+/* two-stage smoothing with different periods */
+seq|rolling_mean
+
+/* root average square difference of two vectors */
+seq|mse
+
+/* rescale then apply sigmoid of array */
+seq|mean|stddev|sigmoid
+
+/* filter then compute zero crossings of array */
+seq|rolling_mean|zero_crossings
+
+/* apply median filter then smooth */
+seq|median_filter|rolling_mean
+
+/* compute middle value then ratio to mean */
+seq|bubble_sort|median|mean
+
+/* compute lowpass filter */
+seq|lowpass|diff_central
+
+/* compute rolling max of array */
+seq|moving_max
+
+/* calculate two vectors then return their cosine similarity of array */
+seq|cosine_similarity
+
+/* compute rolling mean then subtract from original of array */
+seq|rolling_mean
+
+/* conditional smoothing based on squared deviation of array */
+seq|variance|rolling_mean
+
+/* evaluate difference between fast and slow moving averages */
+seq|rolling_mean
+
+/* evaluate average then ratio to maximum */
+seq|mean|max_val
+
+/* evaluate rolling variance of array */
+seq|variance
+
+/* normalise two vectors then compute dot product of array */
+seq|vec_normalize|dot
+
+/* evaluate bandpass filter then compute envelope */
+seq|bandpass_filter|hilbert_envelope
+
+/* calculate Euclidean norm of vector */
+seq|vec_norm
+
+/* fill chirp signal by sweeping frequency */
+seq|lerp
+
+/* compute exponential moving average then subtract from original of vector */
+seq|ema_series
+
+/* compute min-max normalize then apply relu */
+seq|minmax_normalize|relu
+
+/* calculate sma followed by */
+seq|sma|ema_series
+
+/* compute cumulative product then normalize */
+seq|cumulative_product|max_val
+
+/* z-score normalize then clamp */
+seq|zscore_normalize|clamp
+
+/* perform tanh to each element */
+seq|tanh_approx
+
+/* compute cumulative sum then normalize of array */
+seq|cumsum|zscore_normalize
+
+/* compute softmax normalize */
+seq|softmax|entropy
+
+/* calculate matrix vector multiply then apply sigmoid */
+seq|mat_vec|sigmoid
+
+/* calculate subtract rolling mean then compute variance */
+seq|rolling_mean|variance
+
+/* normalize then apply fir filter */
+seq|zscore_normalize|fir_filter
+
+/* compute squared deviation ratio of two arrays */
+seq|variance
+
+/* evaluate absolute deviation from mean */
+seq|mean
+
+/* calculate lowpass filter then */
+seq|lowpass|diff_central
+
+/* compute cumulative sum */
+seq|cumsum|zscore_normalize
+
+/* gradient of then lowpass filter of array */
+seq|diff_central|lowpass
+
+/* find peak frequency in waveform */
+seq|fft_radix2|fft_magnitude|argmax
+
+/* rescale then apply fir filter of array */
+seq|zscore_normalize|fir_filter
+
+/* compute two vectors then return their cosine similarity */
+seq|cosine_similarity
+
+/* process then compute cumulative sum of array */
+seq|rolling_mean|cumsum
+
+/* generate sine wave then add noise of array */
+seq|gen_sine|add_noise
+
+/* calculate z-score normalize */
+seq|zscore_normalize|clamp
+
+/* smooth signal then compute energy */
+seq|lowpass|signal_energy
+
+/* compute welford update then extract squared deviation */
+seq|welford_update
+
+/* perform linear regression */
+seq|linreg
+
+/* evaluate conditional smoothing based on variance */
+seq|variance|rolling_mean
+
+/* calculate average then ratio to maximum */
+seq|mean|max_val
+
+/* compute matrix array multiply then normalize */
+seq|mat_vec|vec_normalize
+
+/* calculate matrix vector multiply then apply relu of array */
+seq|mat_vec|relu
+
+/* evaluate rolling max of vector */
+seq|moving_max
+
+/* chain two fir filters of array */
+seq|fir_filter
+
+/* compute absolute deviation from mean of array */
+seq|mean
+
+/* evaluate mean then proportion to maximum */
+seq|mean|max_val
+
+/* order then compute percentile of array */
+seq|bubble_sort|percentile
+
+/* compute root mean square difference of two arrays */
+seq|mse
+
+/* compute rolling min */
+seq|moving_min
+
+/* calculate covariance then normalize to correlation of array */
+seq|covariance|stddev
+
+/* fraction of elements above mean */
+seq|mean
+
+/* calculate root average square difference of two arrays */
+seq|mse
+
+/* prefix sum then function */
+seq|prefix_sum|max_val
+
+/* rescale array to zero mean unit variance */
+seq|mean|stddev
+
+/* compute rolling stddev of array */
+seq|stddev
+
+/* normalize waveform then compute fft envelope */
+seq|zscore_normalize|fft_radix2|fft_magnitude
+
+/* compute bandpass filter then */
+seq|bandpass_filter|hilbert_envelope
+
+/* compute horner evaluation applied to vector */
+seq|horner
+
+/* evaluate moving average of absolute differences */
+seq|moving_avg
+
+/* apply sign function to each element */
+seq|sign
+
+/* amplify array by scalar factor */
+seq|vec_scale
+
+/* combine two waveforms at fixed ratio */
+seq|lerp
+
+/* compute matrix vector multiply then apply sigmoid */
+seq|mat_vec|sigmoid
+
+/* evaluate rolling cosquared deviation between two arrays */
+seq|covariance
+
+/* compute rolling covariance between two vectors */
+seq|covariance
+
+/* evaluate moving mean of absolute differences */
+seq|moving_avg
+
+/* pick filter based on waveform energy */
+seq|signal_energy|lowpass
+
+/* compute scale vector to unit length of array */
+seq|vec_normalize
+
+/* calculate matrix vector multiply then normalize */
+seq|mat_vec|vec_normalize
+
+/* apply leaky relu to each element of vector */
+seq|leaky_relu
+
+/* differencing then cumulative sum to reconstruct */
+seq|diff_central|cumsum
+
+/* compute remainder after projection of array */
+seq|dot|vec_scale
+
+/* apply sign function to each value of array */
+seq|sign
+
+/* calculate scale vector to unit variance */
+seq|stddev
+
+/* fraction of values above mean */
+seq|mean
+
+/* evaluate mean of two vectors then difference */
+seq|mean
+
+/* matrix vector multiply then softmax of array */
+seq|mat_vec|softmax
+
+/* filter waveform then compute energy of array */
+seq|lowpass|signal_energy
+
+/* compute Euclidean norm function */
+seq|vec_norm
+
+/* smooth then compute cumulative sum */
+seq|rolling_mean|cumsum
+
+/* compute range of array values */
+seq|max_val|min_val
+
+/* calculate cumulative sum */
+seq|cumsum|zscore_normalize
+
+/* evaluate proportion of standard deviations */
+seq|stddev
+
+/* evaluate absolute deviation from mean of array */
+seq|mean
+
+/* normalise then apply fir filter */
+seq|zscore_normalize|fir_filter
+
+/* apply tanh to each element of vector */
+seq|tanh_approx
+
+/* rescale then compute */
+seq|zscore_normalize|autocorrelation
+
+/* compute ema followed by sma */
+seq|ema_series|sma
+

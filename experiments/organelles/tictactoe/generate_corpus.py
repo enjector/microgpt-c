@@ -169,13 +169,13 @@ def generate_planner_corpus(x_states):
 # ---- Player Corpus ----
 
 def generate_player_corpus(x_states):
-    """Player: board + context → position (just the number).
+    """Player: board + valid + context → position (just the number).
 
     Output is ONLY a number 0-8. Nothing else.
 
     Variants:
-    1. Base: board → optimal_pos
-    2. Blocked: board|blocked=X → next-best pos
+    1. Base: board|valid=... → optimal_pos
+    2. Blocked: board|valid=...|blocked=X → next-best pos
     """
     entries = []
     seen = set()
@@ -187,19 +187,22 @@ def generate_player_corpus(x_states):
             continue
 
         optimal_score, optimal_pos = ranked[0]
+        empties = get_empties(board)
+        valid_str = ','.join(str(p) for p in empties)
 
         # ---- Type 1: Base (no blocked) ----
-        prompt = f"board={board_str}"
+        prompt = f"board={board_str}|valid={valid_str}"
         if prompt not in seen:
             entries.append(f"{prompt}\n{optimal_pos}")
             seen.add(prompt)
 
         # ---- Type 2: Non-optimal positions blocked ----
-        empties = get_empties(board)
         for blocked_pos in empties:
             if blocked_pos == optimal_pos:
                 continue
-            prompt_b = f"board={board_str}|blocked={blocked_pos}"
+            remaining = [p for p in empties if p != blocked_pos]
+            remaining_str = ','.join(str(p) for p in remaining)
+            prompt_b = f"board={board_str}|valid={remaining_str}|blocked={blocked_pos}"
             if prompt_b not in seen:
                 entries.append(f"{prompt_b}\n{optimal_pos}")
                 seen.add(prompt_b)
@@ -207,7 +210,9 @@ def generate_player_corpus(x_states):
         # ---- Type 3: Optimal blocked → next-best ----
         if len(ranked) > 1:
             _, next_best = ranked[1]
-            prompt_b = f"board={board_str}|blocked={optimal_pos}"
+            remaining = [p for p in empties if p != optimal_pos]
+            remaining_str = ','.join(str(p) for p in remaining)
+            prompt_b = f"board={board_str}|valid={remaining_str}|blocked={optimal_pos}"
             if prompt_b not in seen:
                 entries.append(f"{prompt_b}\n{next_best}")
                 seen.add(prompt_b)
@@ -215,7 +220,9 @@ def generate_player_corpus(x_states):
             # Two blocked
             if len(ranked) > 2:
                 _, third_best = ranked[2]
-                prompt_b2 = f"board={board_str}|blocked={optimal_pos},{next_best}"
+                remaining2 = [p for p in empties if p != optimal_pos and p != next_best]
+                remaining2_str = ','.join(str(p) for p in remaining2)
+                prompt_b2 = f"board={board_str}|valid={remaining2_str}|blocked={optimal_pos},{next_best}"
                 if prompt_b2 not in seen:
                     entries.append(f"{prompt_b2}\n{third_best}")
                     seen.add(prompt_b2)

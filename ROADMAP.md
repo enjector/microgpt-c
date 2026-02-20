@@ -1,4 +1,4 @@
-# MicroGPT-C Project Roadmap
+ # MicroGPT-C Project Roadmap
 
 A living roadmap for MicroGPT-C — a zero-dependency C99 GPT engine designed for composable, autonomous edge intelligence. See [VISION.md](VISION.md) for the full "Stem Cell" philosophy and [VALUE_PROPOSITION.md](VALUE_PROPOSITION.md) for the business case.
 
@@ -6,13 +6,13 @@ A living roadmap for MicroGPT-C — a zero-dependency C99 GPT engine designed fo
 
 ## Spear Summary
 
-**Point:** The engine works — five experiments prove it. Now it needs tooling (CLI, organelle API) to go from research demos to production pipelines.
+**Point:** The engine works — fourteen experiments prove it across games, puzzles, and code generation. Now it needs tooling (CLI, organelle API) to go from research demos to production pipelines.
 
-**Picture:** We've built the LEGO bricks and proved they snap together. The next step is the instruction manual and the box.
+**Picture:** We've built the LEGO bricks and proved they snap together in 14 different configurations. The next step is the instruction manual and the box.
 
-**Proof:** Names (trains in < 1s), Shakespeare (840K params), 8-puzzle (60% solve, 5-organelle pipeline), Tic-Tac-Toe (90% win+draw), Connect-4 (90% wins), C code generation (byte-perfect retrieval of 2,081 functions) — all validated. Shared organelle library (`microgpt_organelle.c|h`) eliminates 300–500 lines of boilerplate per demo.
+**Proof:** Names (trains in < 1s), Shakespeare (840K params), 8-puzzle (**90% solve**, 5-organelle pipeline), Tic-Tac-Toe (**87% win+draw**), Connect-4 (**88% wins**), C code composition (**83% exact match**, 1.2M params with LR scheduling), plus 8 new game experiments (Lights Out, Mastermind, Klotski, Sudoku, Othello, Hex, Pentago, Red Donkey) — all validated. Shared organelle library (`microgpt_organelle.c|h`) eliminates 300–500 lines of boilerplate per demo. Ensemble voting + valid-move pre-filtering achieve **zero invalid moves** across all games.
 
-**Push:** The Q2 2026 organelle toolkit is the critical next step — it turns five separate `main.c` files into a single `microgpt create/train/infer` CLI.
+**Push:** The Q2 2026 organelle toolkit is the critical next step — it turns fourteen separate `main.c` files into a single `microgpt create/train/infer` CLI.
 
 ---
 
@@ -43,6 +43,7 @@ A living roadmap for MicroGPT-C — a zero-dependency C99 GPT engine designed fo
 - [x] 15 performance benchmarks with measured throughput
 - [x] Comprehensive README with build instructions, examples, and benchmarks
 - [x] [Optimisation Strategies](docs/foundation/OPTIMISATION_STRATEGIES.md) technical white paper (9 strategies documented)
+- [x] [Training Strategies](docs/foundation/TRAINING_STRATEGIES.md) — LR scheduling guidelines, warmup ratio tuning, capacity scaling rules
 - [x] Character-level and word-level tokenisation guides
 
 ### Demos & Experiments
@@ -50,9 +51,20 @@ A living roadmap for MicroGPT-C — a zero-dependency C99 GPT engine designed fo
 - [x] **shakespeare** — character-level Shakespeare (840K params, multi-threaded, zero `<unk>`)
 - [x] **c_codegen** — C code generation from prompts (875K params, byte-perfect recall of 2,081 functions)
 - [x] **c_wiringgen** — C function composition grammar (875K params, training in progress)
-- [x] **tic-tac-toe** — 2-organelle pipeline: Planner → Player (**90% win+draw** vs random)
-- [x] **8-puzzle** — 5-organelle pipeline: Strategist → Mover → Judge → Detector → DetourMover with kanban + cycle breaking (**60% solve rate**: 100% easy, 50% med, 30% hard)
-- [x] **Connect-4** — 2-organelle pipeline: Planner → Player (**90% wins** despite 50% invalid moves)
+- [x] **c_compose** — C function composition pipeline: Planner → Judge (**98% parse**, **83% exact match**, 1.2M params with LR scheduling)
+- [x] **tic-tac-toe** — 2-organelle pipeline: Planner → Player (**87% win+draw** vs random, zero invalid moves, 460K params)
+- [x] **8-puzzle** — 5-organelle pipeline: Strategist → Mover → Judge → Detector → DetourMover with kanban + cycle breaking (**90% solve rate**: 100% easy, 100% med, 70% hard, 460K params)
+- [x] **Connect-4** — 2-organelle pipeline: Planner → Player (**88% wins**, zero invalid moves, 460K params)
+- [x] **Lights Out** — 5×5 toggle puzzle with OPA pipeline (**10% solve**, 160K params — encoding-limited)
+- [x] **Mastermind** — code-breaking with feedback loops and Kanban hypothesis tracking (**79% solve**, 92K params)
+- [x] **Klotski** — sliding block puzzle with multi-piece constraints (**62% solve**, 30K params)
+- [x] **Sudoku** — constraint satisfaction with row/column/box validation (**78% solve**, 160K params)
+- [x] **Othello** — adversarial flipping with strategic planning (**67% win** vs random, 92K params)
+- [x] **Hex** — connectivity-based strategy on hexagonal grid (**4% win** — spatial encoding challenge, 92K params)
+- [x] **Pentago** — rotation-based strategy with combined move+rotate actions (**91% win** vs random, 92K params)
+- [x] **Red Donkey** — sliding block variant with asymmetric piece constraints (**12% solve**, 30K params)
+- [x] **Capacity scaling experiment** — 7× capacity increase (64K→460K) reduced parse errors by 32–100% across all games; fixed runtime config bug that prevented scaling
+- [x] **LR scheduling tuning** — Warmup ratio (5% of steps) + lr capacity scaling (lr ∝ 1/√params) stabilised 1.2M-parameter training
 - [x] Multi-organelle [experiment READMEs](experiments/organelles/) with Spear summaries
 - [x] [Design documents](docs/organelles/) — pipeline wire format, kanban planner, CLI vision
 

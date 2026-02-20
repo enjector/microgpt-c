@@ -12,8 +12,7 @@ build_*/
 tmp/
 
 # Saved models
-models/*.ckpt
-models/*.bin
+# models/*.ckpt
 
 # Prerequisites
 *.d

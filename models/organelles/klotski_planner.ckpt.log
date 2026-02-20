@@ -1,0 +1,14 @@
+
+========================================
+Retroactive Log (training predates logging)
+========================================
+Organelle: klotski_planner
+Game: Klotski | Role: planner
+Architecture: N_EMBD=32 N_LAYER=2 N_HEAD=4 BLOCK_SIZE=128 MLP_DIM=128
+Params: ~30K
+Training: steps=25000 lr=0.001
+Corpus: ~199 docs
+Checkpoint: klotski_planner.ckpt (367116 bytes)
+Result: 62% solve
+========================================
+

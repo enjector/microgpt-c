@@ -1814,6 +1814,90 @@ TEST(kv_cache_reset_zeroes_data) {
 }
 
 /* ==================================================================== */
+/*                   PORTABLE THREADING API                               */
+/* ==================================================================== */
+
+TEST(cpu_count_positive) {
+  int ncpu = mgpt_cpu_count();
+  ASSERT_GT(ncpu, 0);
+}
+
+TEST(default_threads_capped_by_batch) {
+  /* When batch_size < cpu_count, should return batch_size */
+  int ncpu = mgpt_cpu_count();
+  if (ncpu > 1) {
+    int nt = mgpt_default_threads(1);
+    ASSERT_EQ(nt, 1);
+  }
+  /* When batch_size >= cpu_count, should return cpu_count */
+  int nt = mgpt_default_threads(9999);
+  ASSERT_EQ(nt, ncpu);
+}
+
+static int g_thread_result = 0;
+static void *thread_test_worker(void *arg) {
+  int *p = (int *)arg;
+  *p = 42;
+  return NULL;
+}
+
+TEST(thread_create_and_join) {
+  /* Verify basic thread creation and join roundtrip */
+  mgpt_thread_t th;
+  mgpt_thread_trampoline_t tramp;
+  g_thread_result = 0;
+  int rc =
+      mgpt_thread_create(&th, &tramp, thread_test_worker, &g_thread_result);
+  ASSERT_EQ(rc, 0);
+  rc = mgpt_thread_join(th);
+  ASSERT_EQ(rc, 0);
+  ASSERT_EQ(g_thread_result, 42);
+}
+
+/* ==================================================================== */
+/*                       SHUFFLE DOCS                                     */
+/* ==================================================================== */
+
+TEST(shuffle_docs_preserves_all_entries) {
+  /* After shuffle, all original docs must still be present */
+  static char buf0[] = "aaa";
+  static char buf1[] = "bbb";
+  static char buf2[] = "ccc";
+  static char buf3[] = "ddd";
+  static char buf4[] = "eee";
+  char *orig_lines[] = {buf0, buf1, buf2, buf3, buf4};
+  size_t orig_lens[] = {3, 3, 3, 3, 3};
+
+  /* Make working copies that shuffle_docs can rearrange */
+  char *lines[5];
+  size_t lens[5];
+  for (int i = 0; i < 5; i++) {
+    lines[i] = orig_lines[i];
+    lens[i] = orig_lens[i];
+  }
+
+  Docs docs;
+  docs.num_docs = 5;
+  docs.data = NULL;
+  docs.lines = lines;
+  docs.doc_lens = lens;
+
+  seed_rng(42);
+  shuffle_docs(&docs);
+
+  /* Every original pointer must still appear exactly once */
+  int found[5] = {0};
+  for (int i = 0; i < 5; i++) {
+    for (int j = 0; j < 5; j++) {
+      if (docs.lines[i] == orig_lines[j] && docs.doc_lens[i] == orig_lens[j])
+        found[j] = 1;
+    }
+  }
+  for (int i = 0; i < 5; i++)
+    ASSERT_EQ(found[i], 1);
+}
+
+/* ==================================================================== */
 /*                            MAIN                                       */
 /* ==================================================================== */
 
@@ -1941,6 +2025,16 @@ int main(void) {
   printf("\n[KV Cache Edge Cases]\n");
   RUN(kv_cache_alloc_free_roundtrip);
   RUN(kv_cache_reset_zeroes_data);
+
+  /* Portable Threading API */
+  printf("\n[Portable Threading]\n");
+  RUN(cpu_count_positive);
+  RUN(default_threads_capped_by_batch);
+  RUN(thread_create_and_join);
+
+  /* Shuffle docs */
+  printf("\n[Shuffle Docs]\n");
+  RUN(shuffle_docs_preserves_all_entries);
 
   /* Summary */
   printf("\n=== Results: %d/%d passed", g_tests_passed, g_tests_run);

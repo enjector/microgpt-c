@@ -1,0 +1,14 @@
+
+========================================
+Retroactive Log (training predates logging)
+========================================
+Organelle: sudoku_player
+Game: Sudoku | Role: player
+Architecture: N_EMBD=64 N_LAYER=3 N_HEAD=4 BLOCK_SIZE=128 MLP_DIM=256
+Params: ~160K
+Training: steps=25000 lr=0.001
+Corpus: ~20000 docs
+Checkpoint: sudoku_player.ckpt (1904652 bytes)
+Result: 78% solve
+========================================
+

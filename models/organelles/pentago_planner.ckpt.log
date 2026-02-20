@@ -1,0 +1,14 @@
+
+========================================
+Retroactive Log (training predates logging)
+========================================
+Organelle: pentago_planner
+Game: Pentago | Role: planner
+Architecture: N_EMBD=48 N_LAYER=3 N_HEAD=4 BLOCK_SIZE=128 MLP_DIM=192
+Params: ~92K
+Training: steps=25000 lr=0.001
+Corpus: ~5000 docs
+Checkpoint: pentago_planner.ckpt (1102476 bytes)
+Result: 91% win
+========================================
+

@@ -1,0 +1,14 @@
+
+========================================
+Retroactive Log (training predates logging)
+========================================
+Organelle: connect4_player
+Game: Connect-4 | Role: player
+Architecture: N_EMBD=96 N_LAYER=4 N_HEAD=8 BLOCK_SIZE=128 MLP_DIM=384
+Params: ~460K
+Training: steps=25000 lr=0.001
+Corpus: ~5000 docs
+Checkpoint: connect4_player.ckpt (5515788 bytes)
+Result: 90% win
+========================================
+

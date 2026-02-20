@@ -116,9 +116,6 @@
 #include "microgpt_metal.h"
 #endif
 
-#include "microgpt_thread.h"
-
-
 #ifdef MICROGPT_BLAS
 #ifdef __APPLE__
 #define ACCELERATE_NEW_LAPACK

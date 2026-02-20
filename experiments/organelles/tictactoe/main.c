@@ -40,6 +40,7 @@
 #define NUM_TEST_GAMES 100 /* games to play against random */
 #define REPLAN_THRESHOLD 3 /* stalls before re-invoking Planner */
 #define MAX_LAST_HISTORY 3 /* keep last N moves in history */
+#define ENSEMBLE_VOTES 3   /* worker votes per move (odd for tiebreak) */
 
 /* ---- Board Constants ---- */
 #define EMPTY '_'
@@ -117,10 +118,10 @@ int main(void) {
 
   /* Runtime configuration */
   g_cfg = microgpt_default_config();
-  g_cfg.n_embd = 48;
-  g_cfg.n_head = 4;
-  g_cfg.mlp_dim = 192;
-  g_cfg.n_layer = 2;
+  g_cfg.n_embd = N_EMBD;
+  g_cfg.n_head = N_HEAD;
+  g_cfg.mlp_dim = MLP_DIM;
+  g_cfg.n_layer = N_LAYER;
   g_cfg.block_size = 128;
   g_cfg.batch_size = 8;
   g_cfg.num_steps = 25000;
@@ -235,19 +236,35 @@ int main(void) {
         kb.stalls = 0;
       }
 
-      /* Build Player prompt */
-      char player_prompt[128];
-      if (kb.blocked[0] != '\0') {
-        snprintf(player_prompt, sizeof(player_prompt), "board=%s|blocked=%s",
-                 board_str, kb.blocked);
-      } else {
-        snprintf(player_prompt, sizeof(player_prompt), "board=%s", board_str);
+      /* Build valid-move string from empties */
+      char valid_str[32] = "";
+      int vs_pos = 0;
+      for (int i = 0; i < num_empties; i++) {
+        if (i > 0)
+          vs_pos += snprintf(valid_str + vs_pos,
+                             sizeof(valid_str) - (size_t)vs_pos, ",");
+        vs_pos +=
+            snprintf(valid_str + vs_pos, sizeof(valid_str) - (size_t)vs_pos,
+                     "%d", empties_arr[i]);
       }
 
-      /* Generate move */
+      /* Build Player prompt with valid= field */
+      char player_prompt[128];
+      if (kb.blocked[0] != '\0') {
+        snprintf(player_prompt, sizeof(player_prompt),
+                 "board=%s|valid=%s|blocked=%s", board_str, valid_str,
+                 kb.blocked);
+      } else {
+        snprintf(player_prompt, sizeof(player_prompt), "board=%s|valid=%s",
+                 board_str, valid_str);
+      }
+
+      /* Generate move via ensemble voting */
       char move_output[INF_GEN_LEN + 1];
-      organelle_generate(player, &g_cfg, player_prompt, move_output,
-                         INF_GEN_LEN, ORGANELLE_TEMP);
+      scalar_t vote_conf = 0;
+      organelle_generate_ensemble(player, &g_cfg, player_prompt, move_output,
+                                  INF_GEN_LEN, ENSEMBLE_VOTES, ORGANELLE_TEMP,
+                                  &vote_conf);
 
       /* Parse position — output should be just "0"-"8" */
       int proposed_pos = -1;
@@ -255,19 +272,24 @@ int main(void) {
         proposed_pos = move_output[0] - '0';
       }
 
+      /* Validate against valid list */
+      if (proposed_pos >= 0) {
+        char pos_str[4];
+        snprintf(pos_str, sizeof(pos_str), "%d", proposed_pos);
+        if (!opa_valid_filter(pos_str, valid_str)) {
+          proposed_pos = -1;
+        }
+      }
+
       if (proposed_pos < 0) {
         total_parse_errors++;
-        /* Fallback: pick first available empty not blocked */
-        for (int i = 0; i < num_empties; i++) {
-          char pos_str[4];
-          snprintf(pos_str, sizeof(pos_str), "%d", empties_arr[i]);
-          if (!opa_kanban_is_blocked(&kb, pos_str)) {
-            proposed_pos = empties_arr[i];
-            break;
-          }
-        }
-        if (proposed_pos < 0 && num_empties > 0)
+        /* Use opa_valid_fallback to pick first valid non-blocked position */
+        char fb[16];
+        if (opa_valid_fallback(&kb, valid_str, fb, sizeof(fb))) {
+          proposed_pos = fb[0] - '0';
+        } else if (num_empties > 0) {
           proposed_pos = empties_arr[0];
+        }
         if (proposed_pos < 0)
           break;
       }

@@ -273,6 +273,147 @@ TEST(load_docs_multiline_missing) {
 }
 
 /* ==================================================================== */
+/*                     VALID-MOVE FILTER TESTS                            */
+/* ==================================================================== */
+
+TEST(valid_filter_match) { ASSERT_EQ(opa_valid_filter("3", "0,2,3,5"), 1); }
+
+TEST(valid_filter_no_match) { ASSERT_EQ(opa_valid_filter("4", "0,2,3,5"), 0); }
+
+TEST(valid_filter_empty_list) {
+  /* empty list = no constraint, returns 1 */
+  ASSERT_EQ(opa_valid_filter("4", ""), 1);
+  ASSERT_EQ(opa_valid_filter("4", NULL), 1);
+}
+
+TEST(valid_filter_single_item) {
+  ASSERT_EQ(opa_valid_filter("3", "3"), 1);
+  ASSERT_EQ(opa_valid_filter("4", "3"), 0);
+}
+
+TEST(valid_filter_direction_strings) {
+  ASSERT_EQ(opa_valid_filter("up", "up,down,left"), 1);
+  ASSERT_EQ(opa_valid_filter("right", "up,down,left"), 0);
+}
+
+TEST(valid_fallback_picks_first_unblocked) {
+  OpaKanban kb;
+  opa_kanban_init(&kb, 3);
+  opa_kanban_add_blocked(&kb, "0");
+  opa_kanban_add_blocked(&kb, "2");
+  char fb[16];
+  int found = opa_valid_fallback(&kb, "0,2,3,5", fb, sizeof(fb));
+  ASSERT_EQ(found, 1);
+  ASSERT_STREQ(fb, "3");
+}
+
+TEST(valid_fallback_all_blocked) {
+  OpaKanban kb;
+  opa_kanban_init(&kb, 3);
+  opa_kanban_add_blocked(&kb, "0");
+  opa_kanban_add_blocked(&kb, "1");
+  char fb[16];
+  int found = opa_valid_fallback(&kb, "0,1", fb, sizeof(fb));
+  ASSERT_EQ(found, 0);
+}
+
+/* ==================================================================== */
+/*              MULTI-LINE LOADER EDGE CASES                              */
+/* ==================================================================== */
+
+TEST(load_docs_multiline_single_doc) {
+  /* A corpus with no blank lines should produce exactly one document */
+  write_temp_file("_test_ml_single.txt", "line one\nline two\nline three\n");
+  Docs docs = {0};
+  int rc = opa_load_docs_multiline("_test_ml_single.txt", &docs, 100);
+  ASSERT_EQ(rc, 0);
+  ASSERT_EQ(docs.num_docs, 1);
+  ASSERT(docs.doc_lens[0] > 0);
+  free_docs(&docs);
+  remove("_test_ml_single.txt");
+}
+
+TEST(load_docs_multiline_trailing_newlines) {
+  /* Multiple trailing newlines should not create extra empty docs */
+  write_temp_file("_test_ml_trail.txt", "doc one\n\n\n\ndoc two\n\n\n\n\n");
+  Docs docs = {0};
+  int rc = opa_load_docs_multiline("_test_ml_trail.txt", &docs, 100);
+  ASSERT_EQ(rc, 0);
+  ASSERT_EQ(docs.num_docs, 2);
+  free_docs(&docs);
+  remove("_test_ml_trail.txt");
+}
+
+TEST(load_docs_multiline_max_docs_limit) {
+  /* max_docs should cap the number of documents loaded */
+  write_temp_file("_test_ml_max.txt", "doc1\n\ndoc2\n\ndoc3\n\ndoc4\n\ndoc5\n");
+  Docs docs = {0};
+  int rc = opa_load_docs_multiline("_test_ml_max.txt", &docs, 2);
+  ASSERT_EQ(rc, 0);
+  ASSERT_EQ(docs.num_docs, 2);
+  free_docs(&docs);
+  remove("_test_ml_max.txt");
+}
+
+TEST(load_docs_multiline_empty_file) {
+  /* An empty file should produce zero documents, not crash */
+  write_temp_file("_test_ml_empty.txt", "");
+  Docs docs = {0};
+  int rc = opa_load_docs_multiline("_test_ml_empty.txt", &docs, 100);
+  ASSERT_EQ(rc, 0);
+  ASSERT_EQ(docs.num_docs, 0);
+  free_docs(&docs);
+  remove("_test_ml_empty.txt");
+}
+
+/* ==================================================================== */
+/*                     ORGANELLE LIFECYCLE TESTS                          */
+/* ==================================================================== */
+
+TEST(organelle_free_null_safe) {
+  /* organelle_free(NULL) must be a no-op, not a crash */
+  organelle_free(NULL);
+  /* If we reach here, the test passed */
+}
+
+/* ==================================================================== */
+/*                   VALID-FILTER EDGE CASES                              */
+/* ==================================================================== */
+
+TEST(valid_filter_empty_action) {
+  /* Empty action should never match anything */
+  ASSERT_EQ(opa_valid_filter("", "0,2,3"), 0);
+  ASSERT_EQ(opa_valid_filter(NULL, "0,2,3"), 0);
+}
+
+TEST(valid_filter_no_partial_substring_match) {
+  /* "up" should NOT match "updown" — requires exact field match */
+  ASSERT_EQ(opa_valid_filter("up", "updown,left,right"), 0);
+  ASSERT_EQ(opa_valid_filter("updown", "up,left,right"), 0);
+}
+
+TEST(valid_fallback_empty_csv) {
+  OpaKanban kb;
+  opa_kanban_init(&kb, 3);
+  char fb[16];
+  int found = opa_valid_fallback(&kb, "", fb, sizeof(fb));
+  ASSERT_EQ(found, 0);
+  found = opa_valid_fallback(&kb, NULL, fb, sizeof(fb));
+  ASSERT_EQ(found, 0);
+}
+
+/* ==================================================================== */
+/*                   ENSEMBLE VOTING CONSTANTS                            */
+/* ==================================================================== */
+
+TEST(ensemble_constants_valid) {
+  /* OPA_MAX_VOTES must be positive */
+  ASSERT_GT(OPA_MAX_VOTES, 0);
+  /* OPA_TEMP_JITTER must be non-negative */
+  ASSERT(OPA_TEMP_JITTER >= 0.0);
+}
+
+/* ==================================================================== */
 /*                              MAIN                                     */
 /* ==================================================================== */
 
@@ -307,6 +448,28 @@ int main(void) {
   printf("\n[Multi-Line Corpus Loader]\n");
   RUN(load_docs_multiline_basic);
   RUN(load_docs_multiline_missing);
+  RUN(load_docs_multiline_single_doc);
+  RUN(load_docs_multiline_trailing_newlines);
+  RUN(load_docs_multiline_max_docs_limit);
+  RUN(load_docs_multiline_empty_file);
+
+  printf("\n[Organelle Lifecycle]\n");
+  RUN(organelle_free_null_safe);
+
+  printf("\n[Valid-Move Filter]\n");
+  RUN(valid_filter_match);
+  RUN(valid_filter_no_match);
+  RUN(valid_filter_empty_list);
+  RUN(valid_filter_single_item);
+  RUN(valid_filter_direction_strings);
+  RUN(valid_filter_empty_action);
+  RUN(valid_filter_no_partial_substring_match);
+  RUN(valid_fallback_picks_first_unblocked);
+  RUN(valid_fallback_all_blocked);
+  RUN(valid_fallback_empty_csv);
+
+  printf("\n[Ensemble Voting]\n");
+  RUN(ensemble_constants_valid);
 
   /* Summary */
   printf("\n=== Results: %d/%d passed", g_tests_passed, g_tests_run);

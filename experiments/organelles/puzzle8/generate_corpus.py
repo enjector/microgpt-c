@@ -198,6 +198,8 @@ def generate_all_corpora(puzzles_with_solutions):
             else:
                 stats["detour"] += 1
 
+            valid_str = ','.join(valid)
+
             # ---- Strategist (greedy-only) ----
             if greedy:
                 prompt = mds
@@ -207,7 +209,7 @@ def generate_all_corpora(puzzles_with_solutions):
 
             # ---- Mover (greedy-only, including blocked variants) ----
             if greedy:
-                prompt = f"{mds}|b={blank}"
+                prompt = f"{mds}|b={blank}|valid={valid_str}"
                 if prompt not in seen_mover:
                     mover_greedy.append(f"{prompt}\n{optimal_dir}")
                     seen_mover.add(prompt)
@@ -216,7 +218,9 @@ def generate_all_corpora(puzzles_with_solutions):
                 for blocked_dir in valid:
                     if blocked_dir == optimal_dir:
                         continue
-                    prompt_b = f"{mds}|b={blank}|x={blocked_dir}"
+                    remaining_valid = [d for d in valid if d != blocked_dir]
+                    remaining_str = ','.join(remaining_valid)
+                    prompt_b = f"{mds}|b={blank}|valid={remaining_str}|x={blocked_dir}"
                     if prompt_b not in seen_mover:
                         mover_greedy.append(f"{prompt_b}\n{optimal_dir}")
                         seen_mover.add(prompt_b)
@@ -225,7 +229,8 @@ def generate_all_corpora(puzzles_with_solutions):
                 remaining = [d for d in valid if d != optimal_dir]
                 if remaining:
                     best_alt = min(remaining, key=lambda d: valid_mds.get(d, 999))
-                    prompt_b = f"{mds}|b={blank}|x={optimal_dir}"
+                    remaining_str = ','.join(remaining)
+                    prompt_b = f"{mds}|b={blank}|valid={remaining_str}|x={optimal_dir}"
                     if prompt_b not in seen_mover:
                         mover_greedy.append(f"{prompt_b}\n{best_alt}")
                         seen_mover.add(prompt_b)
@@ -239,7 +244,7 @@ def generate_all_corpora(puzzles_with_solutions):
 
             # ---- Detour Mover (detour-only) ----
             if not greedy:
-                prompt = f"{mds}|b={blank}"
+                prompt = f"{mds}|b={blank}|valid={valid_str}"
                 if prompt not in seen_detour:
                     mover_detour.append(f"{prompt}\n{optimal_dir}")
                     seen_detour.add(prompt)

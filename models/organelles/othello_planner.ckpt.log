@@ -1,0 +1,14 @@
+
+========================================
+Retroactive Log (training predates logging)
+========================================
+Organelle: othello_planner
+Game: Othello | Role: planner
+Architecture: N_EMBD=48 N_LAYER=3 N_HEAD=4 BLOCK_SIZE=128 MLP_DIM=192
+Params: ~92K
+Training: steps=25000 lr=0.001
+Corpus: ~3000 docs
+Checkpoint: othello_planner.ckpt (1104780 bytes)
+Result: 67% win
+========================================
+

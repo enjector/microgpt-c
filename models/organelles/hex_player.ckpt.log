@@ -1,0 +1,14 @@
+
+========================================
+Retroactive Log (training predates logging)
+========================================
+Organelle: hex_player
+Game: Hex | Role: player
+Architecture: N_EMBD=48 N_LAYER=3 N_HEAD=4 BLOCK_SIZE=128 MLP_DIM=192
+Params: ~92K
+Training: steps=25000 lr=0.001
+Corpus: ~5000 docs
+Checkpoint: hex_player.ckpt (1097868 bytes)
+Result: 4% win
+========================================
+

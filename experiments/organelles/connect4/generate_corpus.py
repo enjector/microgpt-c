@@ -330,11 +330,11 @@ def generate_planner_corpus(positions):
 
 
 def generate_player_corpus(positions):
-    """Player: board + context → column number (just the number 0-6).
+    """Player: board + valid + context → column number (just the number 0-6).
 
     Variants:
-    1. Base: board → optimal_col
-    2. Blocked: board|blocked=X → next-best col
+    1. Base: board|valid=... → optimal_col
+    2. Blocked: board|valid=...|blocked=X → next-best col
     """
     entries = []
     seen = set()
@@ -346,20 +346,24 @@ def generate_player_corpus(positions):
         if count % 500 == 0:
             print(f"  Player corpus: {count}/{total} positions", file=sys.stderr)
 
+        valid_cols = get_valid_columns(board)
+        valid_str = ','.join(str(c) for c in valid_cols)
+
         # ---- Type 1: Base (no blocked) ----
-        prompt = f"board={board_str}"
+        prompt = f"board={board_str}|valid={valid_str}"
         if prompt not in seen:
             entries.append(f"{prompt}\n{optimal_col}")
             seen.add(prompt)
 
         # ---- Type 2: Simple blocked variants (no expensive rank_columns) ----
-        valid_cols = get_valid_columns(board)
 
         # Block non-optimal columns → still output optimal
         for col in valid_cols:
             if col == optimal_col:
                 continue
-            prompt_b = f"board={board_str}|blocked={col}"
+            remaining_valid = [c for c in valid_cols if c != col]
+            remaining_str = ','.join(str(c) for c in remaining_valid)
+            prompt_b = f"board={board_str}|valid={remaining_str}|blocked={col}"
             if prompt_b not in seen:
                 entries.append(f"{prompt_b}\n{optimal_col}")
                 seen.add(prompt_b)
@@ -369,7 +373,8 @@ def generate_player_corpus(positions):
         if remaining:
             # Prefer centre columns as fallback
             fallback = min(remaining, key=lambda c: abs(c - COLS // 2))
-            prompt_b = f"board={board_str}|blocked={optimal_col}"
+            remaining_str = ','.join(str(c) for c in remaining)
+            prompt_b = f"board={board_str}|valid={remaining_str}|blocked={optimal_col}"
             if prompt_b not in seen:
                 entries.append(f"{prompt_b}\n{fallback}")
                 seen.add(prompt_b)
@@ -381,8 +386,11 @@ def generate_player_corpus(positions):
         m_board = mirror_board(board)
         m_str = board_to_str(m_board)
         m_col = mirror_col(optimal_col)
+        m_valid = [mirror_col(c) for c in get_valid_columns(board)]
+        m_valid.sort()
+        m_valid_str = ','.join(str(c) for c in m_valid)
 
-        prompt = f"board={m_str}"
+        prompt = f"board={m_str}|valid={m_valid_str}"
         if prompt not in seen and prompt not in mirrored_seen:
             mirrored_entries.append(f"{prompt}\n{m_col}")
             mirrored_seen.add(prompt)

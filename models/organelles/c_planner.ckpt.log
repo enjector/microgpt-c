@@ -1,0 +1,14 @@
+
+========================================
+Retroactive Log (training predates logging)
+========================================
+Organelle: c_planner
+Game: c_compose | Role: planner
+Architecture: N_EMBD=128 N_LAYER=6 N_HEAD=8 BLOCK_SIZE=128 MLP_DIM=512
+Params: ~1.2M
+Training: steps=50000 lr=0.0003
+Corpus: ~1886 docs
+Checkpoint: c_planner.ckpt (14475276 bytes)
+Result: 83% exact match
+========================================
+

@@ -44,7 +44,9 @@ proportion of model capacity available for semantic learning.
 > `OpaKanban`, `OpaCycleDetector`, `organelle_train`, `organelle_generate`) are now
 > implemented as a shared C library in [`microgpt_organelle.c|h`](../../src/microgpt_organelle.h).
 > Three game experiments (puzzle8, tictactoe, connect4) validate the architecture
-> with 60–90% success rates using 64K-param organelles.
+> with **87–90% success rates** using 460K-param organelles (N_EMBD=96, N_LAYER=4).
+> Ensemble voting + valid-move pre-filtering eliminate invalid moves entirely.
+> The 8-Puzzle achieves **90% solve** with zero parse errors after capacity scaling.
 
 ### 1. The Communication Problem
 
@@ -585,8 +587,8 @@ representation, we:
    errors, pure linear token sequences
 3. **Enable instant error detection** through trivial field-count validation
 4. **Support graceful degradation** through fuzzy matching and feedback loops
-5. **Maintain edge deployment** — the entire pipeline (5–6 organelles × ~800K
-   params each) fits in under 25 MB of RAM
+5. **Maintain edge deployment** — the entire pipeline (5–6 organelles × ~460K
+   params each) fits in under 50 MB of RAM
 
 The architecture follows a proven pattern from AI agent systems — Planner → Workers
 → Judge — adapted for the extreme constraints of sub-1M parameter models. Each
