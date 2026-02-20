@@ -263,13 +263,19 @@ int main(void) {
 
       /* Build valid-move string: all cells 0-24 */
       char valid_str[128] = "";
-      int vs_pos = 0;
+      size_t vs_pos = 0;
       for (int i = 0; i < NUM_CELLS; i++) {
-        if (i > 0)
-          vs_pos += snprintf(valid_str + vs_pos,
-                             sizeof(valid_str) - (size_t)vs_pos, ",");
-        vs_pos += snprintf(valid_str + vs_pos,
-                           sizeof(valid_str) - (size_t)vs_pos, "%d", i);
+        if (i > 0 && vs_pos < sizeof(valid_str)) {
+          int n = snprintf(valid_str + vs_pos, sizeof(valid_str) - vs_pos, ",");
+          if (n > 0)
+            vs_pos += (size_t)n;
+        }
+        if (vs_pos < sizeof(valid_str)) {
+          int n =
+              snprintf(valid_str + vs_pos, sizeof(valid_str) - vs_pos, "%d", i);
+          if (n > 0)
+            vs_pos += (size_t)n;
+        }
       }
 
       /* Build Player prompt */

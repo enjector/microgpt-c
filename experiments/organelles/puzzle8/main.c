@@ -67,15 +67,22 @@ static int manhattan_distance(const int *board);
 /* Build comma-separated list of valid directions for the current board. */
 static void get_valid_dirs(const int *board, char *out, size_t out_sz) {
   const char *dir_names[] = {"up", "down", "left", "right"};
-  int pos = 0;
+  size_t pos = 0;
   int first = 1;
   for (int d = 0; d < 4; d++) {
     int test[9];
     memcpy(test, board, 9 * sizeof(int));
     if (apply_move(test, dir_names[d])) {
-      if (!first)
-        pos += snprintf(out + pos, out_sz - (size_t)pos, ",");
-      pos += snprintf(out + pos, out_sz - (size_t)pos, "%s", dir_names[d]);
+      if (!first && pos < out_sz) {
+        int n = snprintf(out + pos, out_sz - pos, ",");
+        if (n > 0)
+          pos += (size_t)n;
+      }
+      if (pos < out_sz) {
+        int n = snprintf(out + pos, out_sz - pos, "%s", dir_names[d]);
+        if (n > 0)
+          pos += (size_t)n;
+      }
       first = 0;
     }
   }

@@ -187,13 +187,20 @@ int main(void) {
         }
 
         char valid_str[256] = "";
-        int vs = 0;
+        size_t vs = 0;
         int limit = nempty < 20 ? nempty : 20;
         for (int i = 0; i < limit; i++) {
-          if (i > 0)
-            vs += snprintf(valid_str + vs, sizeof(valid_str) - (size_t)vs, ",");
-          vs += snprintf(valid_str + vs, sizeof(valid_str) - (size_t)vs,
-                         "R%dC%d", empties[i][0], empties[i][1]);
+          if (i > 0 && vs < sizeof(valid_str)) {
+            int n = snprintf(valid_str + vs, sizeof(valid_str) - vs, ",");
+            if (n > 0)
+              vs += (size_t)n;
+          }
+          if (vs < sizeof(valid_str)) {
+            int n = snprintf(valid_str + vs, sizeof(valid_str) - vs, "R%dC%d",
+                             empties[i][0], empties[i][1]);
+            if (n > 0)
+              vs += (size_t)n;
+          }
         }
 
         char player_prompt[256];
