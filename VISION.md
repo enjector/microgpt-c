@@ -36,6 +36,8 @@ In biology, a stem cell is a blank slate with the potential to become any specia
 * **Differentiation:** Given a small, specific corpus (e.g., 500 examples of valid shipping addresses), the block "specializes" through on-device training.
 * **Maturity:** The result is a high-confidence, low-power micro-model that performs one task—and only one task—with focused precision.
 
+![The Biological Blueprint for Tiny AI — stem cell differentiation, the Planner-Worker-Judge triad, and the coordination funnel](docs/organelles/OPA_Biology_Analogy.jpg)
+
 ---
 
 ### 2. Technical Differentiation

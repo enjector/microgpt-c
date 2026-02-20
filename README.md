@@ -45,6 +45,8 @@ The breakthrough isn't any single model — it's what happens when they **work t
 
 A single model of the same size wins ~55%. Two models cooperating through a shared kanban protocol hit **90%**. The coordination is the intelligence.
 
+![The Biological Blueprint for Tiny AI — stem cell differentiation, the Planner-Worker-Judge triad, kanban shared state, and the coordination funnel](docs/organelles/OPA_Biology_Analogy.jpg)
+
 ---
 
 ## What Does This Mean For You?
