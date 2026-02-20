@@ -8,6 +8,8 @@ That's the question behind MicroGPT-C.
 
 > 📄 [The Stem Cell Philosophy](VISION.md) · 💡 [Why This Matters](VALUE_PROPOSITION.md) · 🗺️ [Roadmap](ROADMAP.md) · 📖 [Technical Guide](docs/book/0.md)
 
+![Composable Intelligence — the four phases of MicroGPT-C: stem cell foundation, targeted differentiation, organelle pipeline coordination, and proven results across logic games and code composition](docs/organelles/images/Composable%20Intelligence%20Small%20AI%20Infographic.jpg)
+
 ---
 
 ## The Idea
