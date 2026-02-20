@@ -1,0 +1,82 @@
+
+========================================
+Run: 2026-02-20 16:55:54
+========================================
+Organelle: Analyser
+Corpus: 7634 docs | 1084078 chars (1058.7 KB)
+Vocab: 30 characters
+Architecture: N_EMBD=64 N_LAYER=3 N_HEAD=4 BLOCK_SIZE=128 MLP_DIM=256
+Params: 159488
+Training: batch=8 steps=50000 lr=0.0010
+
+--- Training ---
+step     1 / 50000 | loss 3.7392
+step  1000 / 50000 | loss 0.8987
+
+========================================
+Run: 2026-02-20 16:56:12
+========================================
+Organelle: Analyser
+Corpus: 7634 docs | 1084078 chars (1058.7 KB)
+Vocab: 30 characters
+Architecture: N_EMBD=64 N_LAYER=3 N_HEAD=4 BLOCK_SIZE=128 MLP_DIM=256
+Params: 159488
+Training: batch=8 steps=50000 lr=0.0010
+
+--- Training ---
+step     1 / 50000 | loss 3.7392
+step  1000 / 50000 | loss 0.8987
+step  2000 / 50000 | loss 0.8496
+step  3000 / 50000 | loss 0.8141
+step  4000 / 50000 | loss 0.7715
+step  5000 / 50000 | loss 0.7739
+step  6000 / 50000 | loss 0.7474
+step  7000 / 50000 | loss 0.7768
+step  8000 / 50000 | loss 0.7749
+step  9000 / 50000 | loss 0.7460
+step 10000 / 50000 | loss 0.7569
+step 11000 / 50000 | loss 0.7286
+step 12000 / 50000 | loss 0.7494
+step 13000 / 50000 | loss 0.7265
+step 14000 / 50000 | loss 0.7575
+step 15000 / 50000 | loss 0.7428
+step 16000 / 50000 | loss 0.7336
+step 17000 / 50000 | loss 0.7245
+step 18000 / 50000 | loss 0.7376
+step 19000 / 50000 | loss 0.7011
+step 20000 / 50000 | loss 0.6901
+step 21000 / 50000 | loss 0.7195
+step 22000 / 50000 | loss 0.7048
+step 23000 / 50000 | loss 0.7241
+step 24000 / 50000 | loss 0.7219
+step 25000 / 50000 | loss 0.7088
+step 26000 / 50000 | loss 0.7057
+step 27000 / 50000 | loss 0.7024
+step 28000 / 50000 | loss 0.6999
+step 29000 / 50000 | loss 0.6879
+step 30000 / 50000 | loss 0.7040
+step 31000 / 50000 | loss 0.6654
+step 32000 / 50000 | loss 0.6901
+step 33000 / 50000 | loss 0.6771
+step 34000 / 50000 | loss 0.6541
+step 35000 / 50000 | loss 0.6707
+step 36000 / 50000 | loss 0.6648
+step 37000 / 50000 | loss 0.6475
+step 38000 / 50000 | loss 0.6809
+step 39000 / 50000 | loss 0.6565
+step 40000 / 50000 | loss 0.6699
+step 41000 / 50000 | loss 0.6494
+step 42000 / 50000 | loss 0.6533
+step 43000 / 50000 | loss 0.6539
+step 44000 / 50000 | loss 0.6496
+step 45000 / 50000 | loss 0.6624
+step 46000 / 50000 | loss 0.6467
+step 47000 / 50000 | loss 0.6664
+step 48000 / 50000 | loss 0.6743
+step 49000 / 50000 | loss 0.6785
+step 50000 / 50000 | loss 0.6601
+
+Training complete: 368.0s | best loss: 0.6137
+Checkpoint: lottery_analyser.ckpt
+========================================
+

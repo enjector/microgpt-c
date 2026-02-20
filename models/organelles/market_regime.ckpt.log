@@ -1,0 +1,84 @@
+
+========================================
+Run: 2026-02-20 20:33:39
+========================================
+Organelle: Regime Classifier
+Corpus: 7570 docs | 60560 chars (59.1 KB)
+Vocab: 14 characters
+Architecture: N_EMBD=128 N_LAYER=3 N_HEAD=8 BLOCK_SIZE=128 MLP_DIM=512
+Params: 609792
+Training: batch=8 steps=50000 lr=0.0003
+
+--- Training ---
+step     1 / 50000 | loss 5.1613
+step  1000 / 50000 | loss 0.4790
+step  2000 / 50000 | loss 0.5549
+step  3000 / 50000 | loss 0.4908
+step  4000 / 50000 | loss 0.4397
+step  5000 / 50000 | loss 0.4581
+step  6000 / 50000 | loss 0.4074
+step  7000 / 50000 | loss 0.4921
+step  8000 / 50000 | loss 0.4753
+step  9000 / 50000 | loss 0.3687
+step 10000 / 50000 | loss 0.4995
+step 11000 / 50000 | loss 0.4197
+step 12000 / 50000 | loss 0.4569
+step 13000 / 50000 | loss 0.4730
+step 14000 / 50000 | loss 0.4444
+step 15000 / 50000 | loss 0.3748
+step 16000 / 50000 | loss 0.5113
+step 17000 / 50000 | loss 0.5084
+step 18000 / 50000 | loss 0.4361
+step 19000 / 50000 | loss 0.4475
+step 20000 / 50000 | loss 0.4783
+step 21000 / 50000 | loss 0.4168
+step 22000 / 50000 | loss 0.4504
+step 23000 / 50000 | loss 0.4259
+step 24000 / 50000 | loss 0.4167
+step 25000 / 50000 | loss 0.4404
+step 26000 / 50000 | loss 0.4733
+step 27000 / 50000 | loss 0.4114
+step 28000 / 50000 | loss 0.4669
+step 29000 / 50000 | loss 0.4230
+step 30000 / 50000 | loss 0.4370
+step 31000 / 50000 | loss 0.4968
+step 32000 / 50000 | loss 0.4890
+step 33000 / 50000 | loss 0.4835
+step 34000 / 50000 | loss 0.4388
+step 35000 / 50000 | loss 0.3997
+step 36000 / 50000 | loss 0.4840
+step 37000 / 50000 | loss 0.4114
+step 38000 / 50000 | loss 0.4544
+step 39000 / 50000 | loss 0.4683
+step 40000 / 50000 | loss 0.4308
+step 41000 / 50000 | loss 0.4405
+step 42000 / 50000 | loss 0.4559
+step 43000 / 50000 | loss 0.4027
+step 44000 / 50000 | loss 0.4687
+step 45000 / 50000 | loss 0.4880
+step 46000 / 50000 | loss 0.4374
+step 47000 / 50000 | loss 0.3944
+step 48000 / 50000 | loss 0.4209
+step 49000 / 50000 | loss 0.4434
+step 50000 / 50000 | loss 0.4835
+
+Training complete: 156.0s | best loss: 0.3199
+Checkpoint: market_regime.ckpt
+========================================
+
+
+========================================
+Run: 2026-02-20 21:26:01
+========================================
+Organelle: Regime Classifier
+Loaded checkpoint: market_regime.ckpt (step 50000)
+========================================
+
+
+========================================
+Run: 2026-02-20 21:26:08
+========================================
+Organelle: Regime Classifier
+Loaded checkpoint: market_regime.ckpt (step 50000)
+========================================
+

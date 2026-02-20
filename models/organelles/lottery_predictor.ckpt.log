@@ -1,0 +1,68 @@
+
+========================================
+Run: 2026-02-20 17:02:20
+========================================
+Organelle: Predictor
+Corpus: 7634 docs | 673909 chars (658.1 KB)
+Vocab: 26 characters
+Architecture: N_EMBD=64 N_LAYER=3 N_HEAD=4 BLOCK_SIZE=128 MLP_DIM=256
+Params: 158976
+Training: batch=8 steps=50000 lr=0.0010
+
+--- Training ---
+step     1 / 50000 | loss 3.7913
+step  1000 / 50000 | loss 0.7602
+step  2000 / 50000 | loss 0.7232
+step  3000 / 50000 | loss 0.6855
+step  4000 / 50000 | loss 0.7061
+step  5000 / 50000 | loss 0.6653
+step  6000 / 50000 | loss 0.6931
+step  7000 / 50000 | loss 0.6617
+step  8000 / 50000 | loss 0.6616
+step  9000 / 50000 | loss 0.6631
+step 10000 / 50000 | loss 0.6313
+step 11000 / 50000 | loss 0.6252
+step 12000 / 50000 | loss 0.6186
+step 13000 / 50000 | loss 0.6148
+step 14000 / 50000 | loss 0.5989
+step 15000 / 50000 | loss 0.6280
+step 16000 / 50000 | loss 0.6315
+step 17000 / 50000 | loss 0.6242
+step 18000 / 50000 | loss 0.6121
+step 19000 / 50000 | loss 0.5989
+step 20000 / 50000 | loss 0.6265
+step 21000 / 50000 | loss 0.6539
+step 22000 / 50000 | loss 0.6347
+step 23000 / 50000 | loss 0.6293
+step 24000 / 50000 | loss 0.6459
+step 25000 / 50000 | loss 0.5923
+step 26000 / 50000 | loss 0.6338
+step 27000 / 50000 | loss 0.5964
+step 28000 / 50000 | loss 0.5981
+step 29000 / 50000 | loss 0.5786
+step 30000 / 50000 | loss 0.6064
+step 31000 / 50000 | loss 0.5804
+step 32000 / 50000 | loss 0.5733
+step 33000 / 50000 | loss 0.6344
+step 34000 / 50000 | loss 0.6047
+step 35000 / 50000 | loss 0.5974
+step 36000 / 50000 | loss 0.5873
+step 37000 / 50000 | loss 0.5704
+step 38000 / 50000 | loss 0.5735
+step 39000 / 50000 | loss 0.5716
+step 40000 / 50000 | loss 0.5821
+step 41000 / 50000 | loss 0.5708
+step 42000 / 50000 | loss 0.5910
+step 43000 / 50000 | loss 0.5629
+step 44000 / 50000 | loss 0.5737
+step 45000 / 50000 | loss 0.5981
+step 46000 / 50000 | loss 0.5672
+step 47000 / 50000 | loss 0.5678
+step 48000 / 50000 | loss 0.5409
+step 49000 / 50000 | loss 0.5863
+step 50000 / 50000 | loss 0.5360
+
+Training complete: 227.0s | best loss: 0.5060
+Checkpoint: lottery_predictor.ckpt
+========================================
+

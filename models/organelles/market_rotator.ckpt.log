@@ -1,0 +1,84 @@
+
+========================================
+Run: 2026-02-20 20:36:15
+========================================
+Organelle: Sector Rotator
+Corpus: 7570 docs | 128690 chars (125.7 KB)
+Vocab: 21 characters
+Architecture: N_EMBD=128 N_LAYER=3 N_HEAD=8 BLOCK_SIZE=128 MLP_DIM=512
+Params: 611584
+Training: batch=8 steps=50000 lr=0.0003
+
+--- Training ---
+step     1 / 50000 | loss 4.9434
+step  1000 / 50000 | loss 0.2666
+step  2000 / 50000 | loss 0.2687
+step  3000 / 50000 | loss 0.2071
+step  4000 / 50000 | loss 0.2328
+step  5000 / 50000 | loss 0.2282
+step  6000 / 50000 | loss 0.2904
+step  7000 / 50000 | loss 0.2196
+step  8000 / 50000 | loss 0.2292
+step  9000 / 50000 | loss 0.2484
+step 10000 / 50000 | loss 0.2073
+step 11000 / 50000 | loss 0.2327
+step 12000 / 50000 | loss 0.2253
+step 13000 / 50000 | loss 0.2331
+step 14000 / 50000 | loss 0.2507
+step 15000 / 50000 | loss 0.2181
+step 16000 / 50000 | loss 0.2417
+step 17000 / 50000 | loss 0.2224
+step 18000 / 50000 | loss 0.2374
+step 19000 / 50000 | loss 0.2739
+step 20000 / 50000 | loss 0.2641
+step 21000 / 50000 | loss 0.2279
+step 22000 / 50000 | loss 0.2670
+step 23000 / 50000 | loss 0.2673
+step 24000 / 50000 | loss 0.2641
+step 25000 / 50000 | loss 0.2619
+step 26000 / 50000 | loss 0.2188
+step 27000 / 50000 | loss 0.2589
+step 28000 / 50000 | loss 0.2325
+step 29000 / 50000 | loss 0.2275
+step 30000 / 50000 | loss 0.2063
+step 31000 / 50000 | loss 0.2522
+step 32000 / 50000 | loss 0.2045
+step 33000 / 50000 | loss 0.2142
+step 34000 / 50000 | loss 0.2064
+step 35000 / 50000 | loss 0.2248
+step 36000 / 50000 | loss 0.2352
+step 37000 / 50000 | loss 0.2285
+step 38000 / 50000 | loss 0.2535
+step 39000 / 50000 | loss 0.2608
+step 40000 / 50000 | loss 0.2618
+step 41000 / 50000 | loss 0.2497
+step 42000 / 50000 | loss 0.2155
+step 43000 / 50000 | loss 0.2216
+step 44000 / 50000 | loss 0.2430
+step 45000 / 50000 | loss 0.2628
+step 46000 / 50000 | loss 0.2205
+step 47000 / 50000 | loss 0.2048
+step 48000 / 50000 | loss 0.2402
+step 49000 / 50000 | loss 0.2124
+step 50000 / 50000 | loss 0.2301
+
+Training complete: 250.0s | best loss: 0.1645
+Checkpoint: market_rotator.ckpt
+========================================
+
+
+========================================
+Run: 2026-02-20 21:26:02
+========================================
+Organelle: Sector Rotator
+Loaded checkpoint: market_rotator.ckpt (step 50000)
+========================================
+
+
+========================================
+Run: 2026-02-20 21:26:08
+========================================
+Organelle: Sector Rotator
+Loaded checkpoint: market_rotator.ckpt (step 50000)
+========================================
+
