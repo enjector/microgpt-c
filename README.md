@@ -31,12 +31,6 @@ The breakthrough isn't any single model — it's what happens when they **work t
 
 A single model of the same size wins ~55%. Two models cooperating through a shared kanban protocol hit **90%**. The coordination is the intelligence.
 
-![The Biological Blueprint for Tiny AI — stem cell differentiation, the Planner-Worker-Judge triad, kanban shared state, and the coordination funnel](docs/organelles/OPA_Biology_Analogy.jpg)
-
-The contrast with conventional AI is stark. Large language models pay a 4,000× resource premium — billions of parameters consuming gigabytes of RAM — for general-purpose capability that dilutes expertise on any single task. Organelles flip this trade-off: each specialist is precise enough to be wrong half the time individually, yet the pipeline catches every mistake and delivers 90% system-level accuracy.
-
-![Monolith vs. Organelle — the 4,000× resource gap, dilution of expertise, and how pipeline coordination rescues weak models](docs/organelles/images/Monolith%20vs.%20Organelle%20Comparison%20Thesis.jpg)
-
 ---
 
 ## What Does This Mean For You?
