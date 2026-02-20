@@ -45,6 +45,11 @@ models/
     c_wiringgen.ckpt       /  .ckpt.log     875K — C wiring generation
     c_planner.ckpt         /  .ckpt.log     1.2M — c_compose planner
     c_judge.ckpt           /  .ckpt.log     1.2M — c_compose judge
+    lottery_analyser.ckpt  /  .ckpt.log     163K — Lottery analyser
+    lottery_predictor.ckpt /  .ckpt.log     163K — Lottery predictor
+    market_analyser.ckpt   /  .ckpt.log     615K — Market cross-asset analyser
+    market_regime.ckpt     /  .ckpt.log     621K — Market regime classifier
+    market_rotator.ckpt    /  .ckpt.log     618K — Market sector rotator
 ```
 
 Each `.ckpt` file contains model weights (float32) + Adam optimizer state + training step counter.
@@ -61,19 +66,23 @@ Each `.ckpt.log` file contains the full training history (loss per step, timings
 | `organelles/c_wiringgen.ckpt` | 19.9 MB | 875K | C function compositions | Multi-function pipeline generation |
 | `organelles/c_planner.ckpt` | 13.8 MB | 1.2M | Function composition plans | Planner for c_compose pipeline |
 | `organelles/c_judge.ckpt` | 13.8 MB | 1.2M | Plan validation pairs | Judge for c_compose pipeline |
+| `organelles/market_analyser.ckpt` | 7.1 MB | 615K | 18-instrument market data (10yr) | Cross-asset analysis → 5-char compact output |
+| `organelles/market_regime.ckpt` | 7.1 MB | 621K | Regime classification pairs | Regime classifier (R/O/I/D/T) |
+| `organelles/market_rotator.ckpt` | 7.1 MB | 618K | Sector rotation recommendations | Sector over/underweight (compact format) |
 
 ---
 
 ## Organelle Game Checkpoints
 
-**31 checkpoints** across 11 games, using 4 parameter tiers based on corpus complexity:
+**31 game checkpoints** across 11 games, plus **5 real-world data checkpoints** (2 lottery + 3 markets), using 5 parameter tiers:
 
 | Tier | Config (EMBD/HEAD/LAYER/MLP) | Params | Games |
 |------|------------------------------|--------|-------|
 | Micro | 32/4/2/128 | ~30K | Klotski, Red Donkey |
 | Small | 48/4/3/192 | ~92K | Mastermind, Pentago, Othello, Hex |
-| Standard | 64/4/3/256 | ~160K | Lights Out, Sudoku |
+| Standard | 64/4/3/256 | ~160K | Lights Out, Sudoku, Lottery |
 | Legacy | 96/8/4/384 | ~460K | Connect-4, Tic-Tac-Toe, 8-Puzzle |
+| Markets | 128/8/3/512 | ~615K | Market regime detection (3 organelles) |
 
 ### Game Results
 
@@ -90,6 +99,13 @@ Each `.ckpt.log` file contains the full training history (loss per step, timings
 | **Red Donkey** | `reddonkey_planner/player.ckpt` | 30K | **12% solve** |
 | **Lights Out** | `lightsout_planner/player.ckpt` | 160K | **10% solve** |
 | **Hex** | `hex_planner/player.ckpt` | 92K | **4% win** |
+
+### Real-World Data Results
+
+| Experiment | Checkpoints | Params | Result |
+|------------|-----------|-------:|-------:|
+| **Markets** | `market_analyser/regime/rotator.ckpt` | 615K | **57% holdout** (2.8× baseline) |
+| **Lottery** | `lottery_analyser/predictor.ckpt` | 163K | entropy floor ~0.50 (negative control) |
 
 ### Usage
 
@@ -180,6 +196,8 @@ Each checkpoint requires matching compile-time architecture. The demos handle th
 | `organelles/reddonkey_*.ckpt` | 32 | 4 | 2 | 128 | 128 |
 | `organelles/lightsout_*.ckpt` | 64 | 4 | 3 | 128 | 256 |
 | `organelles/sudoku_*.ckpt` | 64 | 4 | 3 | 128 | 256 |
+| `organelles/lottery_*.ckpt` | 64 | 4 | 3 | 128 | 256 |
+| `organelles/market_*.ckpt` | 128 | 8 | 3 | 128 | 512 |
 
 ---
 

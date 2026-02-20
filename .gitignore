@@ -2,6 +2,9 @@
 journals/
 REVIEW.md
 
+# Python
+__pycache__/
+
 # MacOS
 .DS_Store
 .idea

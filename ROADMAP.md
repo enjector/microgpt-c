@@ -6,13 +6,13 @@ A living roadmap for MicroGPT-C — a zero-dependency C99 GPT engine designed fo
 
 ## Spear Summary
 
-**Point:** The engine works — fourteen experiments prove it across games, puzzles, and code generation. Now it needs tooling (CLI, organelle API) to go from research demos to production pipelines.
+**Point:** The engine works — sixteen experiments prove it across games, puzzles, code generation, and real-world data. Now it needs tooling (CLI, organelle API) to go from research demos to production pipelines.
 
 **Picture:** We've built the LEGO bricks and proved they snap together in 14 different configurations. The next step is the instruction manual and the box.
 
-**Proof:** Names (trains in < 1s), Shakespeare (840K params), 8-puzzle (**90% solve**, 5-organelle pipeline), Tic-Tac-Toe (**87% win+draw**), Connect-4 (**88% wins**), C code composition (**83% exact match**, 1.2M params with LR scheduling), plus 8 new game experiments (Lights Out, Mastermind, Klotski, Sudoku, Othello, Hex, Pentago, Red Donkey) — all validated. Shared organelle library (`microgpt_organelle.c|h`) eliminates 300–500 lines of boilerplate per demo. Ensemble voting + valid-move pre-filtering achieve **zero invalid moves** across all games.
+**Proof:** Names (trains in < 1s), Shakespeare (840K params), 8-puzzle (**90% solve**, 5-organelle pipeline), Tic-Tac-Toe (**87% win+draw**), Connect-4 (**88% wins**), C code composition (**83% exact match**, 1.2M params with LR scheduling), plus 8 new game experiments — all validated. **Market regime detection** achieves **57% accuracy on unseen data** (2.8× baseline) while the **lottery experiment** proves OPA cannot learn from random data (entropy floor ~0.50). Shared organelle library (`microgpt_organelle.c|h`) eliminates 300–500 lines of boilerplate per demo. Ensemble voting + valid-move pre-filtering achieve **zero invalid moves** across all games.
 
-**Push:** The Q2 2026 organelle toolkit is the critical next step — it turns fourteen separate `main.c` files into a single `microgpt create/train/infer` CLI.
+**Push:** The Q2 2026 organelle toolkit is the critical next step — it turns sixteen separate `main.c` files into a single `microgpt create/train/infer` CLI.
 
 ---
 
@@ -63,6 +63,8 @@ A living roadmap for MicroGPT-C — a zero-dependency C99 GPT engine designed fo
 - [x] **Hex** — connectivity-based strategy on hexagonal grid (**4% win** — spatial encoding challenge, 92K params)
 - [x] **Pentago** — rotation-based strategy with combined move+rotate actions (**91% win** vs random, 92K params)
 - [x] **Red Donkey** — sliding block variant with asymmetric piece constraints (**12% solve**, 30K params)
+- [x] **Lottery prediction** — EuroMillions 2-organelle pipeline: negative control proving OPA **cannot learn from random data** (loss floor ~0.50, matching theoretical entropy)
+- [x] **Market regime detection** — 3-organelle pipeline with APL-inspired compact encoding: **57% holdout accuracy** (2.8× random baseline, 615K params), proving OPA **learns genuine signal from real-world cross-asset data**
 - [x] **Capacity scaling experiment** — 7× capacity increase (64K→460K) reduced parse errors by 32–100% across all games; fixed runtime config bug that prevented scaling
 - [x] **LR scheduling tuning** — Warmup ratio (5% of steps) + lr capacity scaling (lr ∝ 1/√params) stabilised 1.2M-parameter training
 - [x] Multi-organelle [experiment READMEs](experiments/organelles/) with Spear summaries

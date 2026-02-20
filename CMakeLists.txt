@@ -456,6 +456,39 @@ add_demo(
 )
 
 # ==================================================================
+#  Organelle: EuroMillions Lottery prediction pipeline
+# ==================================================================
+
+add_demo(
+  NAME    lottery_demo
+  SOURCE  experiments/organelles/lottery/main.c
+  THREADS
+  COPY    experiments/organelles/lottery/lottery_analyser.txt
+          experiments/organelles/lottery/lottery_predictor.txt
+          experiments/organelles/lottery/euromillions-draw-history.csv
+  DEFINES N_EMBD=64 N_HEAD=4 N_LAYER=3 BLOCK_SIZE=128 MLP_DIM=256
+          NUM_STEPS=50000 LEARNING_RATE=0.001 BATCH_SIZE=8
+          MAX_VOCAB=50 MAX_DOCS=8000 MAX_DOC_LEN=128
+)
+
+# ==================================================================
+#  Organelle: Market Regime Detection pipeline
+# ==================================================================
+
+add_demo(
+  NAME    markets_demo
+  SOURCE  experiments/organelles/markets/main.c
+  THREADS
+  COPY    experiments/organelles/markets/market_analyser.txt
+          experiments/organelles/markets/market_regime.txt
+          experiments/organelles/markets/market_rotator.txt
+          experiments/organelles/markets/market_data.csv
+  DEFINES N_EMBD=128 N_HEAD=8 N_LAYER=3 BLOCK_SIZE=128 MLP_DIM=512
+          NUM_STEPS=50000 LEARNING_RATE=0.0003 BATCH_SIZE=8
+          MAX_VOCAB=80 MAX_DOCS=8000 MAX_DOC_LEN=128
+)
+
+# ==================================================================
 #  Tests
 # ==================================================================
 

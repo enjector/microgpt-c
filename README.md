@@ -24,6 +24,12 @@ The result surprised us. A single organelle playing Connect-4 wins about 55% of 
 
 We've now tested this across [11 logic games](docs/organelles/ORGANELLE_GAMES.md), from Tic-Tac-Toe to Sudoku, with models ranging from 30K to 460K parameters. The pattern holds: right-sized specialists working together consistently outperform a single larger model working alone.
 
+Then we asked: **does it work on real-world data?**
+
+We ran two experiments back-to-back — a [lottery prediction](experiments/organelles/lottery/) pipeline (negative control) and a [market regime detection](experiments/organelles/markets/) pipeline (positive test). The lottery model hit an entropy floor at 0.50 loss — it learned nothing, because lottery draws are random. The market model reached 0.03–0.06 loss and **57% accuracy on unseen data** (2.8× the random baseline) — because cross-asset correlations are real, learnable signal.
+
+Same engine. Same architecture. One learns, one can't. **That's the proof.**
+
 ---
 
 ## Quick Start
@@ -45,7 +51,7 @@ cmake --build . --config Release
 ./connect4_demo
 ```
 
-All 11 game experiments, 3 pretrained checkpoints, 97 unit tests, and 22 benchmarks are included. See the full list in `experiments/organelles/`.
+All 11 game experiments, 2 real-world data experiments (lottery + markets), 3 pretrained checkpoints, 97 unit tests, and 22 benchmarks are included. See the full list in `experiments/organelles/`.
 
 ---
 
@@ -58,6 +64,8 @@ All 11 game experiments, 3 pretrained checkpoints, 97 unit tests, and 22 benchma
 | 🗺️ **Roadmap** | [ROADMAP.md](ROADMAP.md) |
 | 📖 **Technical guide** (14 chapters) | [docs/book/0.md](docs/book/0.md) |
 | 🏆 **Game leaderboard** (11 games) | [ORGANELLE_GAMES.md](docs/organelles/ORGANELLE_GAMES.md) |
+| 📈 **Market regime detection** (57% holdout) | [markets/README.md](experiments/organelles/markets/README.md) |
+| 🎲 **Lottery experiment** (entropy baseline) | [lottery/README.md](experiments/organelles/lottery/README.md) |
 | 🔬 **Pipeline architecture** (white paper) | [ORGANELLE_PIPELINE.md](docs/organelles/ORGANELLE_PIPELINE.md) |
 | 📚 **Using as a library** | [LIBRARY_GUIDE.md](docs/LIBRARY_GUIDE.md) |
 | ⚡ **Performance & benchmarks** | [PERFORMANCE.md](docs/PERFORMANCE.md) |
@@ -85,8 +93,20 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for ethics guidelines.
 
 ---
 
+## Research Team
+
+This project was built transparently with human–AI collaboration — the same philosophy of coordinated intelligence that MicroGPT-C explores.
+
+| Role | Member |
+|------|--------|
+| 🧭 Principal Research Manager | **Ajay Soni** — research direction, validation, and decisions |
+| 💻 Engineering & Documentation | **Claude** — coding, documentation, and junior research |
+| 🔬 Senior Research Assistant | **Grok** — in-depth analysis and insights |
+| 🎨 Senior Research Assistant | **Gemini** — creative synthesis and validation |
+| 📚 Community Education | **NotebookLM** — accessible explanations and education materials |
+
+---
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
-
-**Author:** Ajay Soni (ajay.soni@enjector.com), Enjector Software Ltd.
