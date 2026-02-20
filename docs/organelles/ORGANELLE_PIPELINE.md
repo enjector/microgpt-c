@@ -140,6 +140,10 @@ revision.
 | **Summarise** | `c_docgen` | Generates comments from code (reverse mapping) | ❌ Proposed |
 | **Judge** | `c_judge` | Validates output (compilability, structural correctness) | ❌ Proposed |
 
+The coordination between these roles is managed by a **kanban state machine** — a shared flat-string protocol that gives stateless models the equivalent of short-term memory. Each organelle reads a pipe-delimited state string containing the current task, blocked moves, and move history. This prevents repeated errors and breaks oscillation cycles, turning individually unreliable models into a system that achieves 87–90% success rates.
+
+![The Kanban State Machine — Planner-Worker-Judge loop, flat-string protocol, blocked move tracking, cycle breaking, and pipeline performance across 8-Puzzle, Connect-4, and Tic-Tac-Toe](images/The%20Kanban%20State%20Machine%20Infographic.jpg)
+
 ---
 
 ### 3. The Inter-Organelle Wire Format

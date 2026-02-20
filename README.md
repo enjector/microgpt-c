@@ -47,6 +47,10 @@ A single model of the same size wins ~55%. Two models cooperating through a shar
 
 ![The Biological Blueprint for Tiny AI — stem cell differentiation, the Planner-Worker-Judge triad, kanban shared state, and the coordination funnel](docs/organelles/OPA_Biology_Analogy.jpg)
 
+The contrast with conventional AI is stark. Large language models pay a 4,000× resource premium — billions of parameters consuming gigabytes of RAM — for general-purpose capability that dilutes expertise on any single task. Organelles flip this trade-off: each specialist is precise enough to be wrong half the time individually, yet the pipeline catches every mistake and delivers 90% system-level accuracy.
+
+![Monolith vs. Organelle — the 4,000× resource gap, dilution of expertise, and how pipeline coordination rescues weak models](docs/organelles/images/Monolith%20vs.%20Organelle%20Comparison%20Thesis.jpg)
+
 ---
 
 ## What Does This Mean For You?
@@ -97,6 +101,10 @@ Eleven organelle demos — each a Planner→Player→Judge pipeline — tested a
 **Key finding:** 4 of 8 right-sized games **improved** with 65–93% fewer parameters. Over-parameterisation hurts when a tiny corpus can't fill the model's capacity — the model memorises noise instead of learning patterns.
 
 > **Parameter tiers:** Micro (30K) for corpora < 500 · Small (92K) for 1K–5K · Standard (160K) for 5K+ · Original 3 games remain at 460K
+
+The leaderboard reveals a clear hierarchy: games where coordination dominates (top tier, 90%+) vs games limited by corpus quality or encoding (bottom tier). The strategic takeaway is that right-sizing parameters to match corpus complexity consistently outperforms the "bigger is better" assumption.
+
+![Organelle Game Leaderboard — 11 games ranked by performance tier, with strategic takeaways on right-sizing and the coordination funnel](docs/organelles/images/MicroGPT-C%20Organelle%20Game%20Leaderboard.jpg)
 
 ### The Coordination Funnel
 
@@ -256,6 +264,10 @@ Input → Token Embedding + Position Embedding
       → [RMSNorm → MLP (fc1 → ReLU → fc2, 4× width) → Residual] × N_LAYER
       → Linear (lm_head) → Softmax → next-token probabilities
 ```
+
+The architecture has two layers: a neural engine (the Transformer block) and a system layer (the Organelle Pipeline). The engine handles next-token prediction; the pipeline coordinates multiple engines into a reliable system. This separation is what allows 50%-accurate individual models to achieve 90% system-level success.
+
+![Composable Small AI for the Edge — the Transformer block architecture, the Organelle Pipeline with Planner-Worker-Judge loop, and a comparison with massive LLMs](docs/organelles/images/MicroGPT-C%20Composable%20Edge%20AI.jpg)
 
 **Training** uses cross-entropy loss with the Adam optimiser and cosine learning-rate schedule (linear warmup → cosine decay). The entire forward + backward pass is implemented manually — no autograd, no computational graph.
 
