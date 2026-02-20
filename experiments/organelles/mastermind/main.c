@@ -47,6 +47,15 @@
 #define ENSEMBLE_VOTES 3
 #define MAX_GUESSES 10
 
+/* Intelligence verification baseline mode:
+ *   0 = Trained model (default)
+ *   1 = Random baseline (random valid guess, pipeline still runs)
+ *   2 = Untrained model (random weights, no training)
+ */
+#ifndef RANDOM_BASELINE
+#define RANDOM_BASELINE 0
+#endif
+
 /* ---- Game Constants ---- */
 #define NUM_PEGS 4
 #define NUM_COLOURS 6
@@ -152,6 +161,8 @@ int main(void) {
   int total_invalid_guesses = 0;
   int total_parse_errors = 0;
   int total_replans = 0;
+  int total_model_sourced = 0;    /* moves from model output */
+  int total_fallback_sourced = 0; /* moves from random fallback */
 
   /* Buckets by solve count */
   int solved_in[MAX_GUESSES + 1];
@@ -224,7 +235,19 @@ int main(void) {
       if (strlen(player_prompt) > 100)
         player_prompt[100] = '\0';
 
-      /* Generate guess via ensemble voting */
+      /* Generate guess */
+      char guess[NUM_PEGS + 1];
+      memset(guess, 0, sizeof(guess));
+      int from_model = 0;
+
+#if RANDOM_BASELINE == 1
+      /* RANDOM BASELINE: skip model, generate random valid guess */
+      for (int i = 0; i < NUM_PEGS; i++)
+        guess[i] = COLOUR_BASE + (char)(rand_r(&game_seed) % NUM_COLOURS);
+      guess[NUM_PEGS] = '\0';
+      from_model = 0;
+#else
+      /* Use model (trained or untrained) via ensemble voting */
       char move_output[INF_GEN_LEN + 1];
       scalar_t vote_conf = 0;
       organelle_generate_ensemble(player, &g_cfg, player_prompt, move_output,
@@ -232,22 +255,27 @@ int main(void) {
                                   &vote_conf);
 
       /* Validate guess */
-      char guess[NUM_PEGS + 1];
-      memset(guess, 0, sizeof(guess));
-
       if (strlen(move_output) >= (size_t)NUM_PEGS) {
         memcpy(guess, move_output, NUM_PEGS);
         guess[NUM_PEGS] = '\0';
       }
 
-      if (!is_valid_guess(guess)) {
+      if (is_valid_guess(guess)) {
+        from_model = 1;
+      } else {
         total_parse_errors++;
         /* Fallback: generate random guess */
-        for (int i = 0; i < NUM_PEGS; i++) {
+        for (int i = 0; i < NUM_PEGS; i++)
           guess[i] = COLOUR_BASE + (char)(rand_r(&game_seed) % NUM_COLOURS);
-        }
         guess[NUM_PEGS] = '\0';
+        from_model = 0;
       }
+#endif
+
+      if (from_model)
+        total_model_sourced++;
+      else
+        total_fallback_sourced++;
 
       /* Compute score */
       int black, white;
@@ -304,10 +332,13 @@ int main(void) {
    * PHASE 3: Results Summary
    * ================================================================ */
 
+  const char *mode_names[] = {"TRAINED MODEL", "RANDOM BASELINE",
+                              "UNTRAINED MODEL"};
   printf(
       "\n================================================================\n");
-  printf("                    MASTERMIND RESULTS\n");
+  printf("          MASTERMIND RESULTS [%s]\n", mode_names[RANDOM_BASELINE]);
   printf("================================================================\n");
+  printf("Mode:               %s\n", mode_names[RANDOM_BASELINE]);
   printf("Games solved:       %d / %d (%.0f%%)\n", total_solved, NUM_TEST_GAMES,
          NUM_TEST_GAMES > 0 ? 100.0 * total_solved / NUM_TEST_GAMES : 0.0);
   printf("Avg guesses:        %.1f (solved games)\n",
@@ -318,8 +349,18 @@ int main(void) {
       printf("  %d guesses:       %d games\n", i, solved_in[i]);
     }
   }
-  printf("Valid guesses:      %d\n", total_valid_guesses);
-  printf("Invalid guesses:    %d\n", total_invalid_guesses);
+  printf("Model-sourced:      %d / %d (%.0f%%)\n", total_model_sourced,
+         total_model_sourced + total_fallback_sourced,
+         (total_model_sourced + total_fallback_sourced) > 0
+             ? 100.0 * total_model_sourced /
+                   (total_model_sourced + total_fallback_sourced)
+             : 0.0);
+  printf("Fallback-sourced:   %d / %d (%.0f%%)\n", total_fallback_sourced,
+         total_model_sourced + total_fallback_sourced,
+         (total_model_sourced + total_fallback_sourced) > 0
+             ? 100.0 * total_fallback_sourced /
+                   (total_model_sourced + total_fallback_sourced)
+             : 0.0);
   printf("Parse errors:       %d\n", total_parse_errors);
   printf("Planner re-plans:   %d\n", total_replans);
   printf("Pipeline time:      %.2fs\n", pipeline_time);

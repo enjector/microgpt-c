@@ -43,6 +43,14 @@
 #define MAX_LAST_HISTORY 3 /* keep last N moves in history */
 #define ENSEMBLE_VOTES 3   /* worker votes per move (odd for tiebreak) */
 
+/* Intelligence verification baseline mode:
+ *   0 = Trained model (default)
+ *   1 = Random baseline (random valid move, pipeline still runs)
+ */
+#ifndef RANDOM_BASELINE
+#define RANDOM_BASELINE 0
+#endif
+
 /* ---- Board Constants ---- */
 #define BOARD_ROWS 6
 #define BOARD_COLS 7
@@ -209,6 +217,8 @@ int main(void) {
   int total_invalid_moves = 0;
   int total_parse_errors = 0;
   int total_replans = 0;
+  int total_model_sourced = 0;
+  int total_fallback_sourced = 0;
 
   struct timespec pipeline_start, pipeline_end;
   clock_gettime(CLOCK_MONOTONIC, &pipeline_start);
@@ -304,6 +314,14 @@ int main(void) {
                  board_str, valid_str);
       }
 
+      int proposed_col = -1;
+      int from_model = 0;
+
+#if RANDOM_BASELINE == 1
+      /* RANDOM BASELINE: pick random valid column */
+      proposed_col = valid_cols[rand_r(&game_seed) % num_valid];
+      from_model = 0;
+#else
       /* Generate move via ensemble voting */
       char move_output[INF_GEN_LEN + 1];
       scalar_t vote_conf = 0;
@@ -312,7 +330,6 @@ int main(void) {
                                   &vote_conf);
 
       /* Parse column */
-      int proposed_col = -1;
       if (move_output[0] >= '0' && move_output[0] <= '6') {
         proposed_col = move_output[0] - '0';
       }
@@ -322,13 +339,17 @@ int main(void) {
         char col_str[4];
         snprintf(col_str, sizeof(col_str), "%d", proposed_col);
         if (!opa_valid_filter(col_str, valid_str)) {
-          /* Ensemble picked an invalid column — use fallback */
           proposed_col = -1;
         }
       }
 
+      if (proposed_col >= 0) {
+        from_model = 1;
+      }
+
       if (proposed_col < 0) {
         total_parse_errors++;
+        from_model = 0;
         /* Use opa_valid_fallback to pick first valid non-blocked column */
         char fb[16];
         if (opa_valid_fallback(&kb, valid_str, fb, sizeof(fb))) {
@@ -339,6 +360,12 @@ int main(void) {
         if (proposed_col < 0)
           break;
       }
+#endif
+
+      if (from_model)
+        total_model_sourced++;
+      else
+        total_fallback_sourced++;
 
       /* Deterministic Judge: is column valid? */
       int row = drop_piece(board, proposed_col, PLAYER_X);
@@ -453,10 +480,13 @@ int main(void) {
    * PHASE 3: Results Summary
    * ================================================================ */
 
+  const char *mode_names[] = {"TRAINED MODEL", "RANDOM BASELINE",
+                              "UNTRAINED MODEL"};
   printf(
       "\n================================================================\n");
-  printf("                    CONNECT-4 RESULTS\n");
+  printf("          CONNECT-4 RESULTS [%s]\n", mode_names[RANDOM_BASELINE]);
   printf("================================================================\n");
+  printf("Mode:               %s\n", mode_names[RANDOM_BASELINE]);
   printf("Games won (X):      %d / %d (%.0f%%)\n", total_wins, NUM_TEST_GAMES,
          NUM_TEST_GAMES > 0 ? 100.0 * total_wins / NUM_TEST_GAMES : 0.0);
   printf("Games drawn:        %d / %d (%.0f%%)\n", total_draws, NUM_TEST_GAMES,
@@ -469,8 +499,18 @@ int main(void) {
              : 0.0);
   printf("Total moves:        %d (avg %.1f per game)\n", total_moves,
          NUM_TEST_GAMES > 0 ? (double)total_moves / NUM_TEST_GAMES : 0.0);
-  printf("Valid moves:        %d\n", total_valid_moves);
-  printf("Invalid moves:      %d\n", total_invalid_moves);
+  printf("Model-sourced:      %d / %d (%.0f%%)\n", total_model_sourced,
+         total_model_sourced + total_fallback_sourced,
+         (total_model_sourced + total_fallback_sourced) > 0
+             ? 100.0 * total_model_sourced /
+                   (total_model_sourced + total_fallback_sourced)
+             : 0.0);
+  printf("Fallback-sourced:   %d / %d (%.0f%%)\n", total_fallback_sourced,
+         total_model_sourced + total_fallback_sourced,
+         (total_model_sourced + total_fallback_sourced) > 0
+             ? 100.0 * total_fallback_sourced /
+                   (total_model_sourced + total_fallback_sourced)
+             : 0.0);
   printf("Parse errors:       %d\n", total_parse_errors);
   printf("Planner re-plans:   %d\n", total_replans);
   printf("Pipeline time:      %.2fs\n", pipeline_time);
