@@ -59,6 +59,7 @@ All 11 game experiments, 2 real-world data experiments (lottery + markets), 3 pr
 
 | Topic | Link |
 |-------|------|
+| ❓ **FAQ** | [FAQ.md](FAQ.md) |
 | 🧬 **The stem cell philosophy** | [VISION.md](VISION.md) |
 | 💡 **Why this matters** | [VALUE_PROPOSITION.md](VALUE_PROPOSITION.md) |
 | 🗺️ **Roadmap** | [ROADMAP.md](ROADMAP.md) |
