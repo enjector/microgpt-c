@@ -97,19 +97,40 @@ static void md_delta_str(const int *board, char *out, size_t out_sz) {
   /* Compute md after each possible move. 'x' means illegal.
    * Format: m=U,D,L,R  where values are the resulting md or 'x'. */
   const char *dir_names[] = {"up", "down", "left", "right"};
-  int pos = 0;
-  pos += snprintf(out + pos, out_sz - (size_t)pos, "m=");
+  size_t pos = 0;
+  int n = snprintf(out + pos, out_sz - pos, "m=");
+  if (n < 0 || (size_t)n >= out_sz - pos) {
+    if (out_sz > 0) {
+      out[out_sz - 1] = '\0';
+    }
+    return;
+  }
+  pos += (size_t)n;
   for (int d = 0; d < 4; d++) {
-    if (d > 0)
-      pos += snprintf(out + pos, out_sz - (size_t)pos, ",");
+    if (d > 0) {
+      n = snprintf(out + pos, out_sz - pos, ",");
+      if (n < 0 || (size_t)n >= out_sz - pos) {
+        if (out_sz > 0) {
+          out[out_sz - 1] = '\0';
+        }
+        return;
+      }
+      pos += (size_t)n;
+    }
     int test[9];
     memcpy(test, board, 9 * sizeof(int));
     if (apply_move(test, dir_names[d])) {
-      pos += snprintf(out + pos, out_sz - (size_t)pos, "%d",
-                      manhattan_distance(test));
+      n = snprintf(out + pos, out_sz - pos, "%d", manhattan_distance(test));
     } else {
-      pos += snprintf(out + pos, out_sz - (size_t)pos, "x");
+      n = snprintf(out + pos, out_sz - pos, "x");
     }
+    if (n < 0 || (size_t)n >= out_sz - pos) {
+      if (out_sz > 0) {
+        out[out_sz - 1] = '\0';
+      }
+      return;
+    }
+    pos += (size_t)n;
   }
 }
 
