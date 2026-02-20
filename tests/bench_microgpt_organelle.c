@@ -133,8 +133,18 @@ static void bench_multiline_loader(void) {
   char corpus[4096];
   int pos = 0;
   for (int d = 0; d < 50; d++) {
-    pos += snprintf(corpus + pos, sizeof(corpus) - (size_t)pos,
-                    "prompt %d\nresponse %d\n\n", d, d);
+    int n = snprintf(corpus + pos, sizeof(corpus) - (size_t)pos,
+                     "prompt %d\nresponse %d\n\n", d, d);
+    if (n < 0 || (size_t)n >= sizeof(corpus) - (size_t)pos) {
+      /* Truncation or error: stop appending to avoid overflow */
+      break;
+    }
+    pos += n;
+  }
+  if ((size_t)pos >= sizeof(corpus)) {
+    corpus[sizeof(corpus) - 1] = '\0';
+  } else {
+    corpus[pos] = '\0';
   }
   bench_write_temp("_bench_ml.txt", corpus);
 
