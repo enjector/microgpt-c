@@ -1,10 +1,8 @@
 # MicroGPT-C
 
-### What if AI didn't need a data centre?
+### Tiny specialist models, coordinated by a pipeline, outperform monoliths on focused tasks — using 4,000× fewer resources.
 
-What if you could train a model on a $5 chip — and what if *teams* of those tiny models could do things none of them could do alone?
-
-That's the question behind MicroGPT-C.
+MicroGPT-C is a zero-dependency C99 framework that trains sub-1M parameter Transformers on-device in seconds and wires them into intelligent pipelines.
 
 > 📄 [The Stem Cell Philosophy](VISION.md) · 💡 [Why This Matters](VALUE_PROPOSITION.md) · 🗺️ [Roadmap](ROADMAP.md) · 📖 [Technical Guide](docs/book/0.md)
 
