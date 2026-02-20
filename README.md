@@ -27,21 +27,7 @@ Same engine + Puzzle moves   →  Game solver             (64K params each, 3 mo
 
 The breakthrough isn't any single model — it's what happens when they **work together**:
 
-```
-   "solve this 8-puzzle"
-          │
-          ▼
-   ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-   │  PLANNER     │ ──→ │  MOVER      │ ──→ │  JUDGE      │
-   │  picks the   │     │  executes   │     │  checks if  │
-   │  direction   │     │  the slide  │     │  it's valid │
-   └─────────────┘     └─────────────┘     └─────────────┘
-                                                  │
-                                        ┌─────────┘
-                                        ▼
-                                  90% win rate
-                                  (Connect-4 vs random)
-```
+![MicroGPT-C Coordination Flow — Planner picks direction, Mover executes, Judge validates, with retry loop and 90% system success from 50%-accurate models](docs/organelles/images/MicroGPT-C%20Coordination%20Flow.png)
 
 A single model of the same size wins ~55%. Two models cooperating through a shared kanban protocol hit **90%**. The coordination is the intelligence.
 
