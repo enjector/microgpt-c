@@ -248,6 +248,47 @@ This reframes how to think about LLM "reasoning":
 
 **The OPA verdict:** Rather than training a model to internalize BFS, train a small model to generate BFS-interpretable outputs, and wrap it in a BFS orchestrator. The model handles the fuzzy (what direction looks promising?) and the code handles the exact (is this move valid? have we visited this state?). This is not a workaround — it is the correct factoring of the problem.
 
+### 5.6 Prior Art: Neural Algorithmic Reasoning (NAR)
+
+> **The research community has been here before.** The field of **Neural Algorithmic Reasoning (NAR)** and **Mechanistic Interpretability** has studied this exact question: what deterministic algorithms do transformers build internally, and how accurately do they replicate them?
+
+#### What Research Has Found Inside LLMs
+
+Mechanistic interpretability has identified several classes of internal "circuits" — fuzzy neural approximations of deterministic algorithms:
+
+| Neural Circuit | Algorithm Approximated | Reliability | Evidence |
+|---|---|---|---|
+| **Induction heads** | Sequence matching / copy-paste lookup | High (limited to seen patterns) | Anthropic, 2022 |
+| **Attention-based BFS** | Graph reachability via layer-by-layer expansion | Degrades with graph size | Xu et al., 2019 |
+| **Implicit bit-comparison circuits** | Numerical comparison (is X > Y?) | Brittle — fails on distribution shift | Various |
+| **Emergent symbol-processing** | Variable binding and substitution | Unreliable — emerges inconsistently | Smolensky et al., 2022 |
+| **Chain-of-thought scratchpad** | Kanban-style stateful planning | Reliable but context-window bounded | Wei et al., 2022 |
+
+**Key finding:** Transformers can *learn* BFS, DFS, and sorting from stepwise execution traces — but they fail to *generalise* these algorithms to larger inputs. The CLRS-30 benchmark (DeepMind, 2022) specifically tests 30 classical algorithms (sorting, searching, graph traversal) against neural models, and consistently finds that models trained on small instances fail on larger ones, even after extensive scaling.
+
+#### The Taxonomy of Neural Operators
+
+When categorised, the algorithms LLMs must replicate internally fall into four classes:
+
+1. **Logic operators** — AND, OR, NOT, IMPLIES. LLMs approximate these as attention patterns; deterministically they are one line of C.
+2. **Status/comparison operators** — `>`, `==`, `in-bounds`. LLMs learn fuzzy "Neural Status Registers"; deterministically they are a branch instruction.
+3. **Search operators** — BFS, DFS, A\*. LLMs simulate layer-by-layer expansion; deterministically they are 30 lines with a queue/stack.
+4. **State-tracking operators** — Kanban, cycle detection, visited-set. LLMs use context-window tokens as working memory; deterministically they are a struct.
+
+The OPA architecture externalises all four classes:
+- `OpaKanban` → state-tracking
+- `OpaCycleDetector` → cycle detection (subset of state-tracking)
+- `apply_move()` / `Judge` → status/comparison (validity checking)
+- `generate_corpus.py` (BFS) → search (used at training time, not inference)
+
+This is not a novel architectural insight — it is the explicit engineering of what the NAR community argues neural networks are inefficiently approximating at significant parameter cost.
+
+#### The Scalability Barrier
+
+NAR research shows a consistent pattern: neural network performance on algorithmic tasks *degrades* as problem size increases, and scaling the model does not fix this. This is the same phenomenon observed in the 8-puzzle experiments — the model's ceiling at 90% is not a training data limitation, it is a structural one. The 3 unsolved hard puzzles require search depth that transformer attention cannot efficiently represent, regardless of how many more parameters are added.
+
+The OPA response is to not ask the neural model to do search at all — handle depth via the orchestrator's move-limit loop and early-stopping logic, and let the model answer only the question it was trained on: *"given this local board state, which direction looks best?"*
+
 ---
 
 ## 6. Implications for the Project
