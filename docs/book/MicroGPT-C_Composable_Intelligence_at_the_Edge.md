@@ -1,8 +1,74 @@
-# MicroGPT-C: Technical Guide
+```{=latex}
+\begin{titlepage}
+    \centering
+    \vspace*{1cm}
+    
+    {\Huge\bfseries MicroGPT-C\par}
+    \vspace{0.5cm}
+    {\Large\itshape Composable Intelligence at the Edge\par}
+    
+    \vspace{1cm}
+    
+    \includegraphics[width=0.5\textwidth]{cover.png}
+    
 
-**Title:** MicroGPT-C: Composable Intelligence at the Edge  
+    \vspace{1cm}
+    
+    {\Large From Stem Cell Models to Real-World AI Pipelines\\
+    Architecture, Implementation, and Research\par}
+    
+    \vfill
+    
+    {\large \today\par}
+\end{titlepage}
 
-**Subtitle:** From Stem Cell Models to Real-World AI Pipelines – Architecture, Implementation, and Research  
+% --- Copyright Page ---
+\newpage
+\thispagestyle{empty}
+\vspace*{\fill}
+
+\noindent
+\textbf{MicroGPT-C: Composable Intelligence at the Edge}\\
+From Stem Cell Models to Real-World AI Pipelines \textendash{} Architecture, Implementation, and Research\\[2em]
+
+\noindent
+\textbf{Research Team}\\
+\begin{tabular}{@{}ll@{}}
+\textbf{Ajay Soni} & Principal Research Manager \\
+\textbf{Claude} & Engineering \& Documentation \\
+\textbf{Grok} & Senior Research Assistant \\
+\textbf{Gemini} & Senior Research Assistant \\
+\textbf{NotebookLM} & Community Education
+\end{tabular}\\[2em]
+
+\noindent
+\textcopyright{} \the\year{} Enjector Software Ltd.\\[1em]
+
+\noindent
+\textbf{MIT License}\\[0.5em]
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:\\[0.5em]
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.\\[0.5em]
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+\clearpage
+\tableofcontents
+\newpage
+```
+
+**Preface: Why This Guide?**  
+For hackers building edge AI without the bloat. Tired of GPU farms? Let's hack AI on a Pi. This guide equips you with the code, math, and challenges to prototype your own edge agents from scratch in pure C99.
 
 This guide provides a technical walkthrough of MicroGPT-C: a zero-dependency C99 transformer framework for composable, sub-1M parameter AI at the edge. It assumes the reader has the repository alongside and basic C programming knowledge.
 
@@ -13,69 +79,84 @@ The guide is structured as a progressive reference, starting with foundational c
 ### Part I: Foundations – Understanding the Core Framework
 
 1. **[Chapter 1: The Case for Small AI](1.md)**  
+   *Teaser: Discover why massive LLMs are unsustainable for edge devices and calculate your own device's parameter limits.*  
    Why massive LLMs are unsustainable for edge devices and how MicroGPT-C provides a zero-dependency C99 alternative. Covers the "generalist monolith" problem, the stem cell analogy, and the value of specialized, composable models.  
    Key Topics: AI accessibility challenges; memory/compute math for edge devices; end-to-end research preview.
 
 2. **[Chapter 2: Core Architecture of MicroGPT-C](2.md)**  
+   *Teaser: Dive into the forward pass with pseudocode for attention: `Attention(Q, K, V) = softmax(Q K^T / sqrt(d_k)) V`. Swap ReLU for GELU and measure the loss delta.*  
    The GPT-2-style transformer implementation in `src/microgpt.h` and `src/microgpt.c`. Covers tokenization (character-level and word-level), multi-head attention with causal masking, ReLU-activated feed-forward layers, RMSNorm with pre-normalization, and the Adam optimizer. References `docs/foundation/ATTENTION_MECHANISMS.md` for planned attention variants.  
    Key Topics: Parameter-efficient design; forward/backward passes; pre-norm block order; sub-1M parameter scaling.
 
 3. **[Chapter 3: Training and Inference Fundamentals](3.md)**  
+   *Teaser: Implement the Adam update formula from scratch and modify the LR schedule to plot your own loss curves.*  
    Training loops, cross-entropy loss, learning rate scheduling (warmup + cosine decay), KV caching (including paged variants via `MICROGPT_PAGED_KV`), and reproducibility via seeded PRNG. References `docs/foundation/TRAINING_STRATEGIES.md`.  
    Key Topics: On-device training; handling catastrophic forgetting; checkpointing and resume.
 
 ### Part II: Building Organelles – Specialization and Composition
 
 4. **[Chapter 4: The Organelle Concept – From Stem Cells to Specialists](4.md)**  
+   *Teaser: Watch a generic stem cell differentiate. Generate your own logic puzzles with a Python script and train a specialized model.*  
    The organelle API (`src/microgpt_organelle.h`, `src/microgpt_organelle.c`) and the differentiation process. Covers corpus generation, retrieval-based intelligence, ensemble voting, valid-move filtering, capacity scaling (64K to 460K params), and the 3-tier parameter right-sizing strategy (30K–160K). References `docs/organelles/ORGANELLE_VISION.md`.  
    Key Topics: Organelle training and inference; ensemble confidence; fallback mechanisms; parameter-corpus matching.
 
 5. **[Chapter 5: Pipeline Coordination – The Kanban Architecture](5.md)**  
+   *Teaser: Build an Observe-Plan-Act (OPA) pipeline and see how Kanban state machines (`OpaKanban`) prevent models from making invalid moves.*  
    The Organelle Pipeline Architecture (OPA) from `docs/organelles/ORGANELLE_PIPELINE.md`, including Kanban state management (`OpaKanban`), cycle detection (`OpaCycleDetector`), and the Planner-Worker-Judge decomposition. Uses game demos as case studies.  
    Key Topics: "Coordination rescues weakness"; invalid move filtering; oscillation breaking and replanning.
 
 6. **[Chapter 6: Logic Games as Research Laboratories](6.md)**  
-   Why games are ideal for testing OPA. Analyses eleven game demos from `experiments/organelles/`: 8-Puzzle, Tic-Tac-Toe, Connect-4, Lights Out, Mastermind, Klotski, Sudoku, Othello, Hex, Pentago, and Red Donkey. Covers decomposition patterns, win rate metrics, the game portfolio progression from simple puzzles to complex adversarial domains, and the parameter right-sizing experiment (3-tier: 30K/92K/160K) with findings that 4 of 8 games improved with 65–93% fewer parameters. References `docs/organelles/ORGANELLE_GAMES.md`.  
-   Key Topics: Controlled testing environments; 11-game validation of OPA; parameter right-sizing; transferring game insights to real domains.
+   *Teaser: Climb the game progression ladder from Tic-Tac-Toe to Red Donkey. See how a 30K parameter model can outsmart a 160K parameter one.*  
+   Why games are ideal for testing OPA. Analyses eleven game demos from `experiments/organelles/`: 8-Puzzle, Tic-Tac-Toe, Connect-4, Lights Out, Mastermind, Klotski, Sudoku, Othello, Hex, Pentago, and Red Donkey. Covers decomposition patterns, win rate metrics, the game portfolio progression, and the parameter right-sizing experiment. References `docs/organelles/ORGANELLE_GAMES.md`.  
+   Key Topics: Controlled testing environments; 11-game validation of OPA; transferring game insights to real domains.
 
 ### Part III: Optimizations and Advanced Techniques
 
 7. **[Chapter 7: Optimization Strategies for Edge Deployment](7.md)**  
+   *Teaser: Squeeze every flop out of your CPU. Compare SIMD vectorization vs. scalar loops and benchmark inference speed.*  
    CPU SIMD vectorization, BLAS integration (`MICROGPT_BLAS`), GPU offloading via Metal (`src/microgpt_metal.h`, `src/microgpt_metal.m`), INT8 quantization (`QUANTIZATION_INT8`), and memory footprint management. References `docs/foundation/OPTIMISATION_STRATEGIES.md`.  
    Key Topics: Small-scale tradeoffs (CPU beats GPU below 512 embed dim); tiled matmul; dispatch overhead.
 
 8. **[Chapter 8: Attention Mechanisms and Scaling](8.md)**  
-   Implemented MHA and its scaling properties. Planned extensions: GQA and SWA (documented in `docs/foundation/ATTENTION_MECHANISMS.md` but not yet in `src/microgpt.c`). Covers memory vs. quality tradeoffs and long-context handling.  
+   *Teaser: Dive into the math of Grouped-Query Attention (GQA) and visualize the matrix differences between MHA, MQA, and GQA.*  
+   Implemented MHA and its scaling properties. Planned extensions: GQA and SWA (documented in `docs/foundation/ATTENTION_MECHANISMS.md`). Covers memory vs. quality tradeoffs and long-context handling.  
    Key Topics: KV cache efficiency; scaling embed/layers/context; planned MLA integration.
 
 9. **[Chapter 9: Tooling and Workflow – From Research to Production](9.md)**  
+   *Teaser: From hypothesis to deployment. Use CLI tools to profile models and achieve reproducible training runs.*  
    Benchmarking, testing strategies (`tests/`), corpus management, multi-threaded training (`src/microgpt_thread.h`), and the planned CLI. Covers reproduction via seeding and automated workflows.  
    Key Topics: Reproducibility; profiling; the planned CLI tool (see ROADMAP.md).
 
 ### Part IV: Real-World Applications and Future Directions
 
 10. **[Chapter 10: Code Generation and Structured Outputs](10.md)**  
-    Autonomous code synthesis using `c_codegen`, `c_wiringgen`, and `c_compose` experiments. The c_compose pipeline (Planner→Judge, 1.2M params with LR scheduling) achieves **83% exact match** on function composition plans. Covers flat-string protocols from `docs/organelles/ORGANELLE_PIPELINE.md`, paraphrase blindness mitigation, and confidence gating.  
-    Key Topics: Composition accuracy; pipeline-based code generation; LR scheduling for larger models; structured output validation.
+    *Teaser: Parse a flat-string protocol tree and achieve 83% exact match on function composition plans with a 1.2M parameter model.*  
+    Autonomous code synthesis using `c_codegen`, `c_wiringgen`, and `c_compose` experiments. The c_compose pipeline (Planner->Judge, 1.2M params with LR scheduling) achieves **83% exact match**. Covers flat-string protocols, paraphrase blindness mitigation, and confidence gating.  
+    Key Topics: Composition accuracy; pipeline-based code generation; LR scheduling; structured output validation.
 
 11. **[Chapter 11: Edge AI Applications – Sensors, IoT, and Beyond](11.md)**  
+    *Teaser: Deploy an IoT pipeline on an ESP32 microcontroller mapping sensor nodes to actionable intelligence.*  
     Applying OPA to sensors, IoT, and robotics. Covers on-device adaptation and conceptual federated differentiation patterns. Discusses deploying on ESP32 and similar microcontrollers.  
     Key Topics: Anomaly detection; real-time inference; privacy via local training.
 
 12. **[Chapter 12: Ethical Considerations and Safeguards](12.md)**  
+    *Teaser: Quantify bias with math and use judge patterns to securely gate your output.*  
     Risks (overconfidence, data bias, privacy leaks) and mitigations (curated corpora, judge patterns, confidence thresholds, drift detection). References the safety approach from `README.md`.  
     Key Topics: Bias auditing; validation loops; transparency via attention inspection.
 
 13. **[Chapter 13: Future Research and Extensions](13.md)**  
-    Research proposals aligned with `ROADMAP.md`: organelle marketplace, self-monitoring, hardware targets (RISC-V, FPGA), hybrid approaches (search + transformers), and open questions (trap signals, lookahead, A* integration).  
+    *Teaser: Approximate LoRA ranks for future edge training and outline the timeline for scaling to 1M+ parameter DAG pipelines.*  
+    Research proposals aligned with `ROADMAP.md`: organelle marketplace, self-monitoring, hardware targets (RISC-V, FPGA), hybrid approaches (search + transformers), and open questions.  
     Key Topics: Scaling to 1M+ params; DAG pipelines; community contributions.
 
 ### Appendices
-- **[Appendix A: Glossary and References](A.md)** – Key terms (e.g., kanban, OPA) and citations to foundational papers.
+- **[Appendix A: Glossary and References](A.md)** – Key terms (e.g., kanban, OPA) with integrated mathematical equations, citations to foundational papers, and reference links to full code listings, benchmarks, and datasets.
 
----
 
-# Chapter 1: The Case for Small AI
+\newpage
+
+
+# The Case for Small AI
 
 ## Introduction
 
@@ -89,11 +170,29 @@ Large language models, like those powering popular chatbots, typically have bill
 
 Why is this unsustainable? Let's break it down with a simple example scenario. Suppose you're developing a smart thermostat for homes in remote areas with unreliable internet. The device needs to predict energy usage patterns based on local weather and user habits. A massive LLM could theoretically handle this, but it would require constant cloud connectivity to a data center, draining battery life and introducing latency (delays in response time). If the internet goes down, the device becomes dumb. Moreover, deploying such a model on the thermostat itself is impossible due to memory constraints—a typical embedded device might have only a few megabytes of RAM, not the gigabytes needed for a large model.
 
-Mathematically, we can verify the resource gap. The memory footprint of a model is roughly proportional to the number of parameters times the bytes per parameter (e.g., 4 bytes for 32-bit floats). For a 1-billion-parameter model:
+Let's verify this resource gap mathematically. The memory footprint of a model is roughly proportional to the number of parameters times the bytes per parameter (using 4 bytes for `float`). 
 
-Memory = 1,000,000,000 parameters × 4 bytes/parameter = 4,000,000,000 bytes ≈ 4 GB
+**Memory calculation:**
 
-A small microcontroller, like those in IoT (Internet of Things) devices, might have only 1 MB (about 0.001 GB) of RAM. That's a mismatch of over 4,000 times! Inference (running the model to make predictions) on large models also scales quadratically with input size in some operations, leading to high latency. For instance, attention mechanisms—a key part of these models—compute relationships between all pairs of input elements, resulting in O(n²) time complexity, where n is the sequence length. On edge devices, this quickly becomes prohibitive.
+- **Cloud LLM (1B parameters):** `1,000,000,000 × 4 bytes = 4 GB`
+- **MicroGPT-C Organelle (460K parameters):** `460,000 × 4 bytes = 1.84 MB`
+
+When we look at compute and energy, the gap becomes even more stark:
+
+| Metric | Massive LLM (Cloud) | MicroGPT-C (Edge) |
+| :--- | :--- | :--- |
+| **Parameters** | 1B to 100B+ | 30K to 460K |
+| **RAM Footprint** | 4GB to 400GB+ | 120KB to 1.8MB |
+| **Energy/Inference** | ~0.0003 to 0.01 kWh | ~0.0000001 kWh (mJ range) |
+| **Latency** | 100ms+ (network bound) | < 5ms (compute bound) |
+
+> **Hacker Challenge 1.1: Calculate Your Target's Limit**
+> 1. Find the total usable RAM on your target device (e.g., an ESP32 has ~520 KB SRAM).
+> 2. Assume your OS/firmware reserves 200 KB.
+> 3. Calculate the maximum number of 32-bit (4-byte) parameters you can fit in the remaining memory.
+> *Formula:* `Max_Params = (Total_SRAM - OS_Reserved) / 4_bytes`
+
+Beyond static memory, inference (running the model to make predictions) scales quadratically with input size in standard attention mechanisms, resulting in O(n²) time complexity. On edge devices, this quickly becomes prohibitive.
 
 Beyond resources, large models suffer from what we call the "generalist monolith" problem. They are trained to be jacks-of-all-trades, handling everything from poetry to physics. This generality comes at a cost: dilution of expertise. A model that knows a little about everything often underperforms on specific tasks compared to a focused specialist. Additionally, their opacity—often called the "black box" issue—makes it hard to debug or trust outputs, especially in critical applications like healthcare or autonomous systems.
 
@@ -118,6 +217,7 @@ MicroGPT-C is a practical embodiment of small AI principles. It's a complete AI 
 At its heart, MicroGPT-C implements a scaled-down version of the transformer architecture, the backbone of modern AI. Transformers process data in parallel, using attention to focus on relevant parts of input. In MicroGPT-C, we keep embeddings (vector representations of data) small—say, 128 dimensions—and layers few (1-4), resulting in models under 1 MB. Training happens on-device, adapting to local data without sending sensitive information to the cloud.
 
 Benefits span audiences:
+
 - **Embedded Engineers**: Deploy AI on resource-constrained hardware, like sensors in smart cities, without cloud reliance.
 - **Researchers**: Experiment with AI internals by modifying clean C code, verifying ideas through quick iterations.
 - **Educators and Learners**: Train a model from scratch in seconds, demystifying AI without overwhelming complexity.
@@ -129,9 +229,11 @@ An example scenario: A student builds a name generator. They feed MicroGPT-C a l
 This book isn't just theory; it's a guide to end-to-end research with MicroGPT-C. We'll start with building simple models, progress to composing pipelines, optimize for performance, and apply to real problems like code generation or IoT analytics. Each step includes verification: mathematical derivations for efficiency claims, code examples for reproducibility, and scenarios to test assumptions. By the end, you'll have the tools to conduct your own experiments, from hypothesis to deployment.
 
 This chapter sets the foundation for why small AI matters. In the next, we'll dive into MicroGPT-C's architecture, building your first model step by step.
----
 
-# Chapter 2: Core Architecture of MicroGPT-C
+\newpage
+
+
+# Core Architecture of MicroGPT-C
 
 ## Introduction
 
@@ -175,25 +277,35 @@ Choose based on data: character for <256 chars/document, word for longer text.
 
 ## The Transformer Block: Where Patterns Emerge
 
+![Transformer Architecture Diagram](transformer.png)
+
 The core of MicroGPT-C is the transformer block, repeated in layers (typically 1-4 for small models). Each block has two main parts: multi-head attention (focusing on relevant data) and a feed-forward network (processing features).
 
 ### Multi-Head Attention
 
 Attention lets the model weigh input parts differently. For example, in "The cat chased the mouse", when predicting after "chased the", it attends more to "cat" than "The".
 
-Background: Attention computes similarities between query (current position), key (past positions), and value (content). Formula:
+Background: Attention computes similarities between query (current position), key (past positions), and value (content). 
 
-Attention(Q, K, V) = softmax(Q × K^T / sqrt(d)) × V
+**Mathematical Formulation:**
+\begin{equation}
+\text{Attention}(Q, K, V) = \text{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)V
+\end{equation}
+Where $Q, K, V$ are matrices derived from the input, and $d_k$ is the dimension of the keys. The $\sqrt{d_k}$ scaling prevents the dot products from growing too large, which would push the softmax function into regions with extremely small gradients.
 
-Where Q, K, V are matrices from input, d is dimension (e.g., 128), sqrt(d) scales to prevent overflow, softmax turns scores into probabilities summing to 1.
+The softmax function turns raw scores into probabilities summing to $1$:
+\begin{equation}
+\text{softmax}(x_i) = \frac{e^{x_i}}{\sum_{j=1}^n e^{x_j}}
+\end{equation}
 
-Multi-head means running this in parallel "heads" (e.g., 8), each learning different patterns, then combining.
+Multi-head means running this parallelly across different "heads", each learning different representational patterns, then concatenating the results.
 
 Verification Example: Suppose input vectors: Position 1: [1, 0], Position 2: [0, 1]. Q1 = [1, 0], K1 = [1, 0], K2 = [0, 1]. Scores: Q1·K1 = 1, Q1·K2 = 0. After softmax: [1, 0]. Output attends fully to position 1.
 
 In MicroGPT-C, we use causal masking: future positions are ignored (masked with -infinity before softmax), ensuring predictions use only past data.
 
 Variants for Efficiency:
+
 - Grouped Query Attention (GQA): Shares keys/values across query heads, reducing memory by 2-4x with little quality loss. Like students sharing notes.
 - Sliding Window Attention (SWA): Limits attention to recent tokens, cutting computation for long sequences.
 
@@ -201,15 +313,23 @@ These keep models small—GQA halves KV cache (stored past keys/values) size.
 
 ### Feed-Forward Network and Normalization
 
-After attention, a simple neural network (two linear layers with ReLU activation: max(0, x)) refines features. The first layer expands the dimension to 4× the embedding width, ReLU zeroes out negatives, and the second layer projects back down.
+After attention, a simple neural network (two linear layers) refines features. The first layer expands the dimension to $4 \times d_{model}$, an activation function induces non-linearity, and the second layer projects back down.
 
-Normalization (RMSNorm: divide by root-mean-square) stabilizes training: x_norm = x / sqrt(mean(x²) + epsilon).
+By default, MicroGPT-C uses ReLU (Rectified Linear Unit): `max(0, x)`. 
 
-Residual connections add input to output, easing gradient flow.
+> **Hacker Challenge 2.1: Swap ReLU for GELU**
+> ReLU is fast but can cause "dead neurons". GELU (Gaussian Error Linear Unit) is smoother.
+> 1. Open `src/microgpt.c` and locate the `forward_backward_one` function.
+> 2. Find the ReLU activation step.
+> 3. Swap it for a GELU approximation: `x = 0.5 * x * (1 + tanh(sqrt(2/PI) * (x + 0.044715 * x^3)))`.
+> 4. Train a small model on the `names` corpus. Measure the loss delta. Does the model converge faster?
 
-MicroGPT-C uses **pre-normalization** (GPT-2 style): RMSNorm is applied *before* attention and *before* the MLP, not after. This improves training stability.
+Normalization (RMSNorm: divide by root-mean-square) stabilizes training: 
+\begin{equation}
+\text{RMSNorm}(x) = \frac{x}{\sqrt{\frac{1}{d}\sum_{i=1}^d x_i^2 + \epsilon}}
+\end{equation}
 
-Full Block: Input → RMSNorm → Attention → Add (residual) → RMSNorm → Feed-Forward → Add (residual) → Output.
+MicroGPT-C uses **pre-normalization** (GPT-2 style): RMSNorm is applied *before* attention and *before* the MLP. Residual connections add the bypassed input to the output, easing gradient flow.
 
 Scenario: In name generation, attention links prefixes ("Al" attends to "ex" in training), feed-forward adds creativity.
 
@@ -229,19 +349,46 @@ KV Caching speeds inference: Store past computations, append only new.
 
 ## Putting It Together: Model Creation and Flow
 
-In MicroGPT-C (see `src/microgpt.h` and `src/microgpt.c`), create a model with vocabulary size and config (embed dim, layers, etc.). Forward pass: Tokenize → Embed → Transformers → Output logits → Sample.
+In MicroGPT-C (see `src/microgpt.h` and `src/microgpt.c`), the forward pass meticulously executes the equations described above. Here is a simplified code snippet of the core forward loop:
 
-Code Snippet (simplified from actual API):
 ```c
-MicrogptConfig cfg = microgpt_default_config();
-Model *model = model_create(vocab_size, &cfg);
-scalar_t logits[vocab_size];
-forward_inference(model, token_id, pos_id, keys, values, cache_len, logits);
-size_t next = sample_token(logits, vocab_size, temperature);
+// Simplified excerpt from microgpt.c
+for (int l = 0; l < cfg->n_layers; l++) {
+    // 1. Pre-normalization for Attention
+    rmsnorm(x_norm1, x, weight_norm1, cfg->d_model);
+    
+    // 2. Linear projections for Q, K, V
+    matmul(q, x_norm1, w_q, cfg->d_model, cfg->d_model);
+    matmul(k, x_norm1, w_k, cfg->d_model, cfg->d_model);
+    matmul(v, x_norm1, w_v, cfg->d_model, cfg->d_model);
+    
+    // 3. Attention calculation...
+    // score = (q @ k.T) / sqrt(d_k)
+    // weights = softmax(score + mask)
+    // out = weights @ v
+    
+    // 4. Residual Connection
+    add_residual(x, attention_out, cfg->d_model);
+    
+    // 5. Pre-normalization for Feed-Forward
+    rmsnorm(x_norm2, x, weight_norm2, cfg->d_model);
+    
+    // 6. Feed-Forward with ReLU
+    matmul(ff_hidden, x_norm2, w_fc, cfg->d_model, cfg->d_model * 4);
+    relu(ff_hidden, cfg->d_model * 4); // <--- Swap to GELU here for the challenge!
+    matmul(ff_out, ff_hidden, w_proj, cfg->d_model * 4, cfg->d_model);
+    
+    // 7. Residual Connection
+    add_residual(x, ff_out, cfg->d_model);
+}
 ```
----
 
-# Chapter 3: Training and Inference Fundamentals
+This clear, linear progression makes it trivial to hack, profile, and optimize for edge devices.
+
+\newpage
+
+
+# Training and Inference Fundamentals
 
 ## Introduction
 
@@ -251,19 +398,37 @@ This chapter covers training loops, learning rate scheduling, optimization with 
 
 ## The Training Loop: Learning from Data
 
-Training in MicroGPT-C follows a loop: feed data, compute errors, adjust parameters, repeat. The goal is to minimize "loss"—a numerical measure of how wrong the model's predictions are.
+Training in MicroGPT-C follows a straightforward loop: feed data, compute errors, adjust parameters, and repeat. The goal is to minimize "loss"—a numerical measure of how wrong the model's predictions are.
+
+Here is the general pseudocode for a MicroGPT-C training step:
+```c
+// 1. Fetch a batch of tokens (inputs) and targets (shifted by 1)
+get_batch(data, &inputs, &targets, batch_size, seq_len);
+
+// 2. Forward pass: compute logits and loss
+forward_backward_one(model, inputs, targets, &loss); 
+
+// 3. Update parameters using gradients
+adam_step(model, learning_rate);
+
+// 4. Zero the gradients for the next step
+zero_grad(model);
+```
 
 ### Loss Function: Measuring Errors
 
 The primary loss in generative models like MicroGPT-C is cross-entropy, which quantifies the difference between predicted probabilities and actual targets.
 
-Background for Beginners: Suppose the model predicts the next token in a sequence. It outputs probabilities for each possible token (e.g., 0.7 for 'a', 0.2 for 'b', 0.1 for others). If the true next token is 'a', a low loss rewards high probability for 'a'; high loss penalizes low confidence.
+**Mathematical Formulation:**
+\begin{equation}
+\text{Loss} = -\sum_{i=1}^{V} y_i \log(\hat{y}_i)
+\end{equation}
+Where $V$ is the vocabulary size, $y_i$ is the target distribution (1 for the correct token, 0 otherwise), and $\hat{y}_i$ is the predicted probability. For the single correct token $c$, this simplifies to:
+\begin{equation}
+\text{Loss} = -\log(\hat{y}_c)
+\end{equation}
 
-Formula: Loss = -sum over tokens [target_prob * log(predicted_prob)]. For one token, if target is 1 (certain) and predicted is p, loss = -log(p). If p=0.9, loss≈0.105; if p=0.1, loss≈2.3—much higher.
-
-Verification Example: Train on "hello". Tokenized as [h,e,l,l,o]. Model predicts after "hell" should be 'o' (prob 0.01 initially, loss high). After training, prob=0.99, loss low (0.01).
-
-In code, MicroGPT-C computes this in the forward-backward pass, averaging over batches (groups of examples) for stability.
+Verification Example: Train on "hello". Tokenized as [h,e,l,l,o]. Model predicts after "hell" should be 'o' (prob 0.01 initially, loss high: $-\log(0.01) \approx 4.6$). After training, prob=0.99, loss low ($-\log(0.99) \approx 0.01$).
 
 Scenario: Building a password strength checker. Train on strong/weak examples. High loss on weak passwords encourages the model to flag patterns like "1234".
 
@@ -283,32 +448,53 @@ Optimization uses gradients (derivatives showing how to reduce loss) to update p
 
 MicroGPT-C uses Adam, which adapts learning rates per parameter.
 
-Background: Basic gradient descent: param -= learning_rate * gradient. Adam adds momentum (smooths updates) and adaptive scaling (larger steps for stable parameters).
+Background: Basic gradient descent updates parameters directly from the gradient. Adam adds *momentum* (smoothing updates using past gradients) and *adaptive scaling* (taking larger steps for stable parameters, smaller steps for volatile ones).
 
-Formulas:
-- First moment: m = β1 * m + (1 - β1) * g (β1=0.85)
-- Second moment: v = β2 * v + (1 - β2) * g² (β2=0.99)
-- Update: param -= lr * m / (sqrt(v) + ε) (ε=1e-8 prevents division by zero)
+**Mathematical Formulation:**
+For a parameter $\theta$ with gradient $g$:
 
-This prevents overshooting in noisy gradients, common in small datasets.
+1. Update biased first moment estimate:
+\begin{equation}
+   m_t = \beta_1 m_{t-1} + (1 - \beta_1) g_t
+\end{equation}
 
-Example Scenario: Training a sentiment analyzer on reviews ("good" vs. "bad"). Initial gradients swing wildly; Adam damps them, converging faster than basic methods.
+2. Update biased second raw moment estimate:
+\begin{equation}
+   v_t = \beta_2 v_{t-1} + (1 - \beta_2) g_t^2
+\end{equation}
 
-Verification with Toy Math: Gradient g=1.0, initial m=v=0. After one step: m=0.15, v=0.01, update ≈ lr * 0.15 / 0.1 = 1.5 lr. Next g=0.5: m≈0.1775, v≈0.01099, update smaller—adapts.
+3. Update parameter (simplified, absorbing bias correction into learning rate $\alpha$):
+\begin{equation}
+   \theta_t = \theta_{t-1} - \frac{\alpha m_t}{\sqrt{v_t} + \epsilon}
+\end{equation}
+
+(MicroGPT-C uses default hyperparameters: $\beta_1=0.85$, $\beta_2=0.99$, $\epsilon=1e-8$).
+
+This prevents overshooting in noisy gradients, common when training on small datasets.
+
+Verification with Toy Math: Gradient $g=1.0$, initial $m=v=0$. After one step: $m=0.15, v=0.01$, update $\approx \alpha \cdot \frac{0.15}{0.1} = 1.5 \alpha$. If the next step has a smaller gradient $g=0.5$, Adam maintains momentum but adapts the variance scaling seamlessly.
 
 ### Learning Rate Scheduling
 
 Raw learning rates can cause divergence (exploding loss). MicroGPT-C uses warmup (start low, ramp up) and cosine decay (smooth decrease).
 
-Warmup: lr = base_lr * min(1, step / warmup_steps)
+**Warmup formula:**
+\begin{equation}
+lr = \text{base\_lr} \times \min\left(1, \frac{\text{step}}{\text{warmup\_steps}}\right)
+\end{equation}
 
-Cosine: lr = base_lr * 0.5 * (1 + cos(π * (step - warmup) / (total - warmup)))
+**Cosine decay formula:**
+\begin{equation}
+lr = \text{base\_lr} \times 0.5 \times \left(1 + \cos\left(\pi \frac{\text{step} - \text{warmup}}{\text{total} - \text{warmup}}\right)\right)
+\end{equation}
 
-Why? Early steps need caution; later, fine-tuning.
+Why? Early steps need caution because moments in Adam haven't stabilized; later steps need fine-tuning to settle into a minimum.
 
-Scenario: Music note predictor. Without scheduling, model oscillates; with it, steady improvement.
-
-Math Check: At step=0, lr=0; midpoint, lr=base; end, lr=0—prevents overfitting.
+> **Hacker Challenge 3.1: Plot Your Own Loss Curves**
+> 1. Open `src/microgpt.c` and modify the LR schedule logic (e.g., remove the warmup).
+> 2. Run a training session on a small toy dataset. 
+> 3. Log the loss values every 10 steps to a CSV.
+> 4. Plot the loss curves. You should mathematically verify that without warmup, early loss swings uncontrollably.
 
 ### Case Study: Stabilising 1.2M Parameters (c_compose v3)
 
@@ -320,10 +506,11 @@ The c_compose experiment (Chapter 10) demonstrates why LR scheduling tuning matt
 | v3 (tuned) | 0.0005 | 2500 | **Stable** — 98% parse, 83% exact match, 96% judge PASS |
 
 Two changes made the difference:
-- **Halved peak lr** (0.001→0.0005): Larger models have more parameters competing for gradient signal; smaller steps prevent overshooting.
-- **25× longer warmup** (100→2500, 5% of 50K steps): Gives Adam's moment estimates time to stabilise before full-strength updates.
 
-Rule of thumb: lr ∝ 1/√params. At 460K params, lr=0.001 works. At 1.2M params, lr=0.0005 is needed. See `docs/foundation/TRAINING_STRATEGIES.md` for full empirical evidence and recommended hyperparameters by model scale.
+- **Halved peak lr** (0.001->0.0005): Larger models have more parameters competing for gradient signal; smaller steps prevent overshooting.
+- **25× longer warmup** (100->2500, 5% of 50K steps): Gives Adam's moment estimates time to stabilise before full-strength updates.
+
+Rule of thumb: lr ~ 1/√params. At 460K params, lr=0.001 works. At 1.2M params, lr=0.0005 is needed. See `docs/foundation/TRAINING_STRATEGIES.md` for full empirical evidence and recommended hyperparameters by model scale.
 
 ## Inference: Generating Outputs
 
@@ -334,7 +521,7 @@ Inference reuses the forward pass but samples from probabilities instead of comp
 - Greedy: Pick max probability (deterministic, repetitive).
 - Temperature: Scale logits before softmax. Temp=0: greedy; Temp=1: original; Temp>1: more random.
 
-Formula: logits / temp → softmax.
+Formula: logits / temp -> softmax.
 
 Verification: Logits [2,1,0] at temp=1: probs [0.665,0.245,0.09]. At temp=0.5: sharper [0.88,0.106,0.014]—less random.
 
@@ -369,15 +556,19 @@ Math: Compute perplexity = exp(loss). Low=good prediction. Overfit: Train perple
 Incremental training erases old knowledge. Mitigate with replay buffers (mix old/new data).
 
 Verification: Train on set A (loss=0.1), then B (A loss rises to 1.0). With replay, A loss stays low.
----
 
-# Chapter 4: The Organelle Concept – From Stem Cells to Specialists
+\newpage
+
+
+# The Organelle Concept – From Stem Cells to Specialists
 
 ## Introduction
 
 This chapter introduces a pivotal idea that elevates MicroGPT-C from a single-model tool to a framework for composable intelligence: the *organelle*. Drawing from biology, where organelles are specialized structures within a cell—each performing a focused function—we apply the same principle to AI. An organelle in MicroGPT-C is a small, specialized model that starts as a generic "stem cell" (a blank transformer) and differentiates into an expert through targeted training.
 
-![The Biological Blueprint for Tiny AI — stem cell differentiation, the Planner-Worker-Judge triad, and the coordination funnel](../organelles/OPA_Biology_Analogy.jpg)
+![The Biological Blueprint for Tiny AI — stem cell differentiation, the Planner-Worker-Judge triad, and the coordination funnel](opa_biology_bw.png)
+
+![Organelle Pipeline Architecture](opa.png)
 
 The organelle API lives in `src/microgpt_organelle.h` and `src/microgpt_organelle.c`. This chapter explains how to create organelles, the differentiation process, and ensemble voting for reliability. The power lies in focus: a 460,000-parameter organelle trained on one task often outperforms a larger generalist on that same task, using fewer resources.
 
@@ -399,11 +590,26 @@ Differentiation turns the stem cell into a specialist through targeted corpora a
 
 ### Corpus Generation
 
-A corpus is a collection of input-output pairs, like "prompt|response". For reliability, generate thousands via algorithms (e.g., simulations) rather than manual collection.
+A corpus is a collection of input-output pairs. For reliability, you should generate hundreds of thousands of examples via simple scripts (e.g., simulations) rather than collecting them manually. 
 
-Scenario: For a puzzle solver, simulate games: "board state|best move". Run 5,000 simulations to create pairs. This ensures coverage without real-world data biases.
+Here is a simplified Python snippet demonstrating how to generate a synthetic corpus for an addition organelle:
 
-Background: Good corpora are balanced, diverse, and noise-free. Imbalance (e.g., more "wins" than "losses") skews the model.
+```python
+import random
+
+def generate_addition_corpus(num_samples=10000, filename="math_corpus.txt"):
+    with open(filename, "w") as f:
+        for _ in range(num_samples):
+            a = random.randint(1, 99)
+            b = random.randint(1, 99)
+            # Format: 'input|output\n'
+            f.write(f"{a}+{b}={a+b}\n")
+
+if __name__ == "__main__":
+    generate_addition_corpus()
+```
+
+Scenario: For a puzzle solver like Tic-Tac-Toe, you would simulate random games, extracting the sequence of optimal moves. This ensures comprehensive coverage without real-world data biases.
 
 In MicroGPT-C, load corpora as text files, tokenize (Chapter 2), and train in loops.
 
@@ -419,11 +625,11 @@ Scenario: Code assistant. Train on library functions; it retrieves "sort array" 
 
 ### Capacity Scaling
 
-Small models hit limits; scaling (e.g., d=48→96, l=2→4) boosts performance.
+Small models hit limits; scaling (e.g., d=48->96, l=2->4) boosts performance.
 
 Example: Parsing outputs (extracting numbers). At 64,000 params, 31% success; at 460,000, 95%. 7x params cut errors 91%.
 
-Math: Parameters ∝ d² * l. Doubling d quadruples some matrices, but quality scales sublinearly—diminishing returns past 500,000.
+Math: Parameters ~ d² * l. Doubling d quadruples some matrices, but quality scales sublinearly—diminishing returns past 500,000.
 
 Scenario: Game move predictor. Small capacity misses threats; scaled catches 90% wins.
 
@@ -431,10 +637,10 @@ Scenario: Game move predictor. Small capacity misses threats; scaled catches 90%
 
 Scaling beyond 500K parameters introduces a new challenge: training instability. The c_compose experiment scaled to 1.2M parameters and **diverged** at the default learning rate (lr=0.001, warmup=100 steps). Two hyperparameter changes fixed it:
 
-- **Halved peak lr** (0.001→0.0005): More parameters create more gradient signal; smaller steps prevent overshooting.
-- **Extended warmup** (100→2500 steps, 5% of total): Gives Adam's moment estimates time to stabilise.
+- **Halved peak lr** (0.001->0.0005): More parameters create more gradient signal; smaller steps prevent overshooting.
+- **Extended warmup** (100->2500 steps, 5% of total): Gives Adam's moment estimates time to stabilise.
 
-Rule of thumb: lr ∝ 1/√params. See Chapter 3 for the full case study and `docs/foundation/TRAINING_STRATEGIES.md` for guidelines.
+Rule of thumb: lr ~ 1/√params. See Chapter 3 for the full case study and `docs/foundation/TRAINING_STRATEGIES.md` for guidelines.
 
 ## Ensemble Voting: Boosting Reliability
 
@@ -457,9 +663,11 @@ Pre-filter prompts with valid options (e.g., "valid=up,left") to guide generatio
 Fallback: If output invalid, pick first valid.
 
 Scenario: Board game. Filter ensures legal moves; fallback rescues parses.
----
 
-# Chapter 5: Pipeline Coordination – The Kanban Architecture
+\newpage
+
+
+# Pipeline Coordination – The Kanban Architecture
 
 ## Introduction
 
@@ -469,11 +677,14 @@ The Organelle Pipeline Architecture (OPA) orchestrates multiple organelles into 
 
 ## The Organelle Pipeline: Breaking Down Complex Tasks
 
+![OPA Pipeline Workflow](pipeline.png)
+
 A pipeline is a sequence of organelles connected by a simple communication protocol—flat strings separated by pipes (e.g., "board=state|move=up"). This avoids complex nesting, reducing errors in small models.
 
 Background for Beginners: Complex tasks often require steps: analyze, propose, validate, adapt. A single model struggles with all; pipelines assign each to a specialist.
 
 Components:
+
 - **Planner**: Decomposes the problem into tasks (e.g., "todo=check_threat,move_center").
 - **Workers**: Execute tasks (e.g., a "mover" organelle suggests "left").
 - **Judge**: Validates deterministically (e.g., check if move is legal).
@@ -483,8 +694,9 @@ Scenario: Solving a sliding puzzle (tiles 1-8, blank space). Planner: "todo=prio
 
 Verification with Math: Error rate. Single organelle: p_invalid=0.5 (50% bad moves). Pipeline with judge: Rejects invalids, effective rate=0. Pipeline success = (1 - p)^steps, but with replans, approaches 1.
 
-In code, pipelines use string prompts: Prompt Worker with Planner's output + state.
+Verification with Math: Error rate. Single organelle: p_invalid=0.5 (50% bad moves). Pipeline with judge: Rejects invalids, effective rate=0. Pipeline success = (1 - p)^steps, but with replans, approaches 1.
 
+In code, pipelines use string prompts: Prompt Worker with Planner's output + state.
 ## Kanban State: The Shared Coordination Mechanism
 
 Kanban uses a string to track state: "todo=..." (tasks), "blocked=..." (failures), "last=..." (history), stalls (retry count).
@@ -492,6 +704,7 @@ Kanban uses a string to track state: "todo=..." (tasks), "blocked=..." (failures
 Background: In manufacturing, Kanban cards signal needs. Here, it prevents repetition and enables adaptation.
 
 Mechanics:
+
 - **Todo List**: Planner generates sequenced tasks.
 - **Blocked Actions**: Log invalids (e.g., "blocked=up,down") to avoid retries.
 - **History**: Recent moves to detect patterns.
@@ -503,19 +716,32 @@ Scenario: Chess-like game. Model suggests illegal move ("blocked=knight_to_occup
 
 Math Verification: Oscillation probability. Without history: P(repeat bad cycle)=0.5^2=0.25 for A-B-A. With Kanban history (window=4): Detects after 3, forces alternative, P drops to <0.05.
 
-Code Snippet (pseudocode):
-```
-char prompt[256];
-sprintf(prompt, "state=%s|%s", board, kanban_string());
-worker_generate(prompt, output);
-if (!judge_validate(output)) {
-    kanban_add_blocked(output);
-    stalls++;
-    if (stalls > 3) replan();
+Code Snippet: Here is a closer look at how Kanban state is managed in `src/microgpt_organelle.c`:
+```c
+// Simplified excerpt showing OpaKanban mechanics
+typedef struct {
+    char blocked_actions[MAX_BLOCKED][MAX_TOKEN_LEN];
+    int blocked_count;
+    char move_history[MAX_HISTORY][MAX_TOKEN_LEN];
+    int history_count;
+    int stalls;
+} OpaKanban;
+
+void kanban_update_prompt(OpaKanban *kb, char *base_prompt) {
+    if (kb->blocked_count > 0) {
+        strcat(base_prompt, "|blocked=");
+        for (int i = 0; i < kb->blocked_count; i++) {
+            strcat(base_prompt, kb->blocked_actions[i]);
+            if (i < kb->blocked_count - 1) strcat(base_prompt, ",");
+        }
+    }
+    if (kb->stalls > 3) {
+        strcat(base_prompt, "|trap=1"); // Trigger alternative planning
+    }
 }
 ```
 
-This "safety net" turns blind guesses into winners, as in the funnel diagram: 50% invalids filter to 90% success.
+This "safety net" turns blind guesses into winners, securely funneling 50% invalid raw generations into structurally sound, 90%+ success rate pipelines.
 
 ## Cycle Detection and Replanning: Breaking Loops
 
@@ -527,7 +753,7 @@ Algorithm: Window of last k=4 actions. If next forms A-B-A-B, force unexplored o
 
 Scenario: Puzzle stuck sliding tile back-forth. Detection: Record "left,right,left"; next "right" triggers fallback to "up".
 
-Math: Detection rate. For cycle length 2, prob miss in window 4: (1 - 1/2^4)=0.9375 miss? No—check pairs: If last= A,B,A, next=B → detect. Effective for short cycles common in small models.
+Math: Detection rate. For cycle length 2, prob miss in window 4: (1 - 1/2^4)=0.9375 miss? No—check pairs: If last= A,B,A, next=B -> detect. Effective for short cycles common in small models.
 
 Verification Example: Simulate 100 runs. Without: 20% stuck. With: 2% (forces branch).
 
@@ -551,7 +777,7 @@ Scenario: Stuck in local minimum (suboptimal path). Detour flag + replan escapes
 
 Zero invalids via filtering; 87% win+draw vs. random.
 
-Math: Invalid rate 50% single → 0% pipeline. Wins: Coordination spots forks.
+Math: Invalid rate 50% single -> 0% pipeline. Wins: Coordination spots forks.
 
 ### Connect-4: Deeper Strategy
 
@@ -563,7 +789,7 @@ These verify: Pipeline boosts weak models (coin-flip to dominant).
 
 ### Beyond Games: C Code Composition (c_compose)
 
-The pipeline pattern extends beyond games. The c_compose experiment applies the same Planner→Judge architecture to autonomous code composition:
+The pipeline pattern extends beyond games. The c_compose experiment applies the same Planner->Judge architecture to autonomous code composition:
 
 - **Planner organelle** (1.2M params): Given a natural language prompt, generates a function registry plan (e.g., "fn=zscore_normalize|fn=rolling_mean").
 - **Judge organelle** (1.2M params): Validates the plan against a known function registry, scoring PASS/FAIL.
@@ -584,9 +810,13 @@ This demonstrates that the Kanban pipeline pattern generalises from games to str
 Research shows pipelines scale: Capacity up reduces parses (91% drop); Kanban handles rest. Hypothesis: Any decomposable task benefits.
 
 Verification: Metrics—solve rate, replans/game. In games: 90% avg, proving coordination.
----
 
-# Chapter 6: Logic Games as Research Laboratories
+\newpage
+
+
+# Logic Games as Research Laboratories
+
+![Logic Games as AI Laboratories](games.png)
 
 ## Introduction
 
@@ -647,7 +877,7 @@ Scenario: Model fixates on "right" (invalid). Blocked adds to prompt; replan tri
 
 Math Verification: Solve rate without pipeline: ~30% (greedy traps). With: 90%. Moves avg: 20 (optimal ~15-30); efficiency = optimal / actual ≈0.75-1.5.
 
-Research Insight: Decomposition (priority → move → validate) overcomes capacity limits.
+Research Insight: Decomposition (priority -> move -> validate) overcomes capacity limits.
 
 ### Tic-Tac-Toe: Adversarial Coordination
 
@@ -680,6 +910,10 @@ Insight: Scales to large spaces via retrieval (trained on subsets).
 ## Extended Game Portfolio: 8 New OPA Experiments
 
 Building on the three core demos, MicroGPT-C now includes eight additional game experiments that test OPA across progressively more complex domains. All are implemented in `experiments/organelles/` with full pipelines, corpus generators, and per-game READMEs.
+
+### The Game Progression Ladder
+
+The portfolio scales in both state space and cognitive demand, acting as a "ladder" of intelligence milestones for the organelles:
 
 ### Portfolio Overview
 
@@ -751,16 +985,19 @@ With corpora ranging from 199 (Red Donkey) to 20,000 entries (Sudoku), a uniform
 ## Transfer to Non-Game Domains
 
 Games prove concepts; apply to real problems:
+
 - **Structured Outputs**: Generate JSON; judge validates syntax.
-- **Tool Use**: Decompose query → act → validate (e.g., API calls).
+- **Tool Use**: Decompose query -> act -> validate (e.g., API calls).
 - **Optimization**: Route planning like puzzles.
 
 Research Implication: Any propose-validate-adapt task benefits. Games quantify (win rates); real: Accuracy metrics.
 
-Verification: Game win=90% → Real anomaly detection=85% (similar patterns).
----
+Verification: Game win=90% -> Real anomaly detection=85% (similar patterns).
 
-# Chapter 7: Optimization Strategies for Edge Deployment
+\newpage
+
+
+# Optimization Strategies for Edge Deployment
 
 ## Introduction
 
@@ -776,21 +1013,36 @@ Background for Beginners: Normally, a CPU adds numbers one by one. SIMD adds fou
 
 In MicroGPT-C, compiler flags like -O3 and -march=native enable auto-vectorization— the compiler rewrites loops to use SIMD without code changes.
 
-Scenario: Matrix multiplication (matmul) in embeddings. Sequential: Loop over rows/columns. Vectorized: Process 4 elements per instruction.
+Scenario: Matrix multiplication (matmul) in embeddings. 
 
-Math Verification: For vectors of length n=128, scalar add: n operations. SIMD width=4: n/4 operations—4x speedup. Real: Overhead (alignment) reduces to 3x, but measurable.
+**Visualization: Scalar vs. SIMD Execution**
 
-Example: Benchmark matmul 128x128. Scalar: 5ms; Vectorized: 1.5ms. On ARM (common in mobiles), NEON SIMD doubles throughput.
+![Scalar vs SIMD Execution](simd_bw.png)
+
+Math Verification: For vectors of length n=128, scalar add requires $n$ operations. With a SIMD width of 4, it requires $n/4$ operations—approaching a 4x theoretical speedup. In reality, memory alignment overhead reduces this to ~3x, which is still massive for edge inference.
+
+Example: Benchmark matmul 128x128. Scalar: 5ms; Vectorized: 1.5ms. On ARM architectures (common in mobile/IoT devices), NEON SIMD doubles or quadruples overall throughput.
 
 Tradeoff: At tiny sizes (n<32), setup cost > benefit. Verify: Time small vs. large—crossover at n~64.
 
-Code Tip (pseudocode):
-```
-for(int i=0; i<n; i+=4) {  // Manual hint, but auto often suffices
-    sum += x[i]*y[i] + x[i+1]*y[i+1] + ...;
+To ground this, here is an example of code designed for auto-vectorization. Note how keeping the inner loop simple and free of branching allows compilers like GCC/Clang to automatically emit SIMD instructions:
+```c
+// Benchmark Snippet: Matrix-Vector Product optimized for auto-vectorization
+void matmul_forward(float* out, float* x, float* w, int n, int d) {
+    // OpenMP parallelizes across threads, while -O3 auto-vectorizes the inner loop
+    #pragma omp parallel for
+    for (int i = 0; i < d; i++) {
+        float val = 0.0f;
+        // The compiler identifies this tight loop and generates SIMD instructions
+        // (e.g., AVX2 on x86, NEON on ARM)
+        for (int j = 0; j < n; j++) {
+            val += w[i * n + j] * x[j];
+        }
+        out[i] = val;
+    }
 }
 ```
-Enable with compile: cc -O3 -ffast-math file.c
+Compile with: `cc -O3 -ffast-math -fopenmp microgpt.c -o train`
 
 Scenario: IoT sensor analyzing signals. Vectorization halves inference time, extending battery life.
 
@@ -887,9 +1139,11 @@ Research shows: For <1M params, CPU SIMD > GPU/BLAS (50x in cases). Quantize for
 Verification: Benchmark suite: Time vs. size. Crossover points guide choices.
 
 Principle: Optimize for your hardware—profile always.
----
 
-# Chapter 8: Attention Mechanisms and Scaling
+\newpage
+
+
+# Attention Mechanisms and Scaling
 
 ## Introduction
 
@@ -925,7 +1179,7 @@ Formula: Head_i = Attention(Q W_qi, K W_ki, V W_vi); Output = concat(heads) W_o
 
 Params: 3 d^2 per head (Q/K/V) + d^2 for output—total 4 d^2 per layer.
 
-Scenario: Name generation with history. One head attends to prefixes ("Mc" → Scottish), another to lengths.
+Scenario: Name generation with history. One head attends to prefixes ("Mc" -> Scottish), another to lengths.
 
 Math: Quality gain: Single head misses nuances; multi: Lower perplexity (exp(loss)) by 10-20% on text.
 
@@ -937,21 +1191,29 @@ Verification Example: Train on repeating patterns ("ABAB..."). Single head: Loss
 
 > **Note:** GQA is a planned extension documented in `docs/foundation/ATTENTION_MECHANISMS.md`. It is not yet implemented in `microgpt.c`.
 
-GQA reduces redundancy by sharing K/V across groups of Q heads.
+GQA reduces memory redundancy by sharing keys and values across groups of query heads.
 
-Background: In MHA, each head has unique K/V—wasteful if similar. GQA groups queries (e.g., 8 Q heads, 2 KV groups: 4 Q per KV).
+**Visualization: MHA vs. GQA vs. MQA**
 
-Formula: For group g: Attention(Q_{4g:4g+4}, shared_K_g, shared_V_g); Concat as MHA.
+![MHA vs GQA](gqa_bw.png)
 
-Params/Memory: KV reduced by factor groups/heads (e.g., 1/4). Cache: Halves for 2 groups.
+**Mathematical Formulation:**
+In standard MHA with $H$ heads, each head $h \in \{1, \dots, H\}$ has its own projection matrices $W_q^{(h)}, W_k^{(h)}, W_v^{(h)}$. 
+In GQA, we define $G$ groups, where $1 \le G \le H$. The heads are divided such that each group contains $H / G$ queries sharing a single key and value pair.
+For head $h$ in group $g = \lfloor \frac{h \cdot G}{H} \rfloor$:
+\begin{equation}
+\text{Attention}^{(h)}(X) = \text{softmax}\left(\frac{(X W_q^{(h)})(X W_k^{(g)})^T}{\sqrt{d_k}}\right) (X W_v^{(g)})
+\end{equation}
 
-Scenario: Long story generation. MHA cache fills RAM at n=1024; GQA handles n=2048.
+Params/Memory: KV cache is reduced by a factor of $G/H$. For example, with $H=8$ queries and $G=2$ KV groups, cache size shrinks by 75%.
 
-Math Verification: Memory = layers * 2 * n * d * heads (MHA) vs. * groups (GQA). For heads=8, groups=2: 75% savings, quality drop <1% (empirical on benchmarks).
+Scenario: Long story generation on a 1MB RAM edge device. MHA's KV cache exhausts RAM at $n=1024$. GQA ($G=2$) handles $n=2048$ with identical memory pressure.
+
+Math Verification: Memory = $\text{layers} \times 2 \times n \times d \times \text{heads}$ (MHA) vs. $\text{groups}$ (GQA). For an organelle ($d=64$, $l=3$, $H=4$), $n=2048$: MHA KV cache is $\sim 6$ MB. GQA with $G=1$ (MQA) reduces this to $\sim 1.5$ MB, enabling inference on deeply constrained microcontrollers.
 
 Tradeoff: Slight generality loss, but negligible at small scales.
 
-Example: Puzzle history (past states). GQA shares board evaluations, efficient for retrieval.
+Example: Puzzle history (past states). GQA shares board evaluations across specialized query heads (e.g., threat detection and goal-seeking), highly efficient for retrieval.
 
 ## Sliding Window Attention (SWA): Limiting Scope for Long Contexts
 
@@ -990,20 +1252,23 @@ Math: KV factor=1/heads (e.g., 1/8 savings vs. MHA).
 Scaling: Increase d (embed), l (layers), n (context).
 
 Tradeoffs:
-- d up: Richer representations, but params ∝ d^2 (quadratic cost).
+
+- d up: Richer representations, but params ~ d^2 (quadratic cost).
 - l up: Deeper reasoning, linear cost.
-- n up: Longer memory, but KV cache ∝ n d l—OOM risk.
+- n up: Longer memory, but KV cache ~ n d l—OOM risk.
 
-Scenario: Scale d=48→96: Parse errors drop 91% in games (more capacity for patterns).
+Scenario: Scale d=48->96: Parse errors drop 91% in games (more capacity for patterns).
 
-Math Verification: Params total ~ l * 12 d^2 (approx). At d=96, l=4: ~460K. Inference time ∝ l d^2 + n^2 / heads.
+Math Verification: Params total ~ l * 12 d^2 (approx). At d=96, l=4: ~460K. Inference time ~ l d^2 + n^2 / heads.
 
 End-to-End Experiment: Shakespeare demo. Base (d=32, n=32): Loss=1.5. Scaled (d=64, n=128): 1.0. GQA+SWA: Handles n=512 at same memory.
 
 Verification: Sequence scaling test—generate 100 tokens: Time linear with SWA, quadratic without.
----
 
-# Chapter 9: Tooling and Workflow – From Research to Production
+\newpage
+
+
+# Tooling and Workflow – From Research to Production
 
 ## Introduction
 
@@ -1024,13 +1289,21 @@ Scenario: Researching name generation. CLI: Create config, train on corpus, infe
 Math Verification: Time savings. Manual script: 30min setup + run. CLI: 1min command—30x faster for iterations. Error rate: Manual typos 10%; CLI validation 1%.
 
 Code Example (usage):
-```
-microgpt create --n_embd 96 --n_layer 4 --name mymodel
-microgpt train --corpus puzzle.txt --checkpoint mymodel.ckpt --steps 5000
-microgpt infer --prompt "board=123" --max_len 20
+```bash
+# 1. Initialize a blank "stem cell" model
+microgpt create --n_embd 96 --n_layer 4 --name my_sensor_model
+
+# 2. Differentiate it by training on a custom corpus
+microgpt train --corpus sensor_data.txt --checkpoint my_sensor_model.ckpt --steps 5000 --lr 0.001
+
+# 3. Test inference manually
+microgpt infer --prompt "temp=45|humidity=80" --max_len 20
+
+# 4. Run it inside an autonomous pipeline
+microgpt pipeline --config sensor_opa.ini
 ```
 
-Workflow Tip: Use INI configs for reusability (e.g., [model] n_embd=96).
+Workflow Tip: Use INI configs for reusability (e.g., `[model] n_embd=96`).
 
 Verification Scenario: Train two variants. CLI resumes from checkpoints; compare losses—ensures reproducibility.
 
@@ -1123,16 +1396,22 @@ Workflow: Default to cpu_count; monitor for contention.
 
 ## End-to-End Workflow: Research to Production
 
-Integrate: Hypothesis (e.g., GQA scales better) → Corpus gen → Train (CLI) → Benchmark/Test → Optimize → Deploy (pipeline).
+The true power of MicroGPT-C is the speed at which you can move from a hypothesis to a deployed edge pipeline.
+
+**The Edge AI Research Loop:**
+
+![Edge AI Research Loop](edge_loop_bw.png)
 
 Scenario: Anomaly detector. Research: Test on sim data (games-like). Production: Embed in sensor script.
 
 Verification: Track metrics—loss, speed, accuracy—across stages. Iterative: If test fails, refine corpus.
 
 Principle: Automation (CLI/scripts) enables rapid cycles.
----
 
-# Chapter 10: Code Generation and Structured Outputs
+\newpage
+
+
+# Code Generation and Structured Outputs
 
 ## Introduction
 
@@ -1158,19 +1437,41 @@ Solution: Decompose via pipelines—intent to plan to code—mitigating via stru
 
 Instead of free-form code, use delimited strings (e.g., "fn=add|args=int a,int b|body=return a+b") for inter-organelle handoffs.
 
-Background: Nesting (curly braces) is hard for small models (stack tracking). Flat strings are linear—easy retrieval, parseable even if partial.
+Background: Nesting (curly braces) is hard for small models because they must track stack depth. Flat strings are linear: easy to retrieve, and parseable even if partially malformed.
 
-Scenario: Generate signal processor. Pipeline: Wiring (compose "normalize|fft") → Codegen (retrieve bodies) → Judge (syntax check).
+**Visualization: Flat-String vs. AST Parse Tree**
+
+![Flat-String Protocol](flat_string_bw.png)
+
+Scenario: Generate signal processor. Pipeline: Wiring (compose "normalize|fft") -> Codegen (retrieve bodies) -> Judge (syntax check).
 
 Math: Generation complexity. Code: O(1) grammar rules + nesting depth. Flat: Regular (field count), error rate drops 90% (fewer balances).
 
 Verification Example: Garbled code "retun a+b" unparseable. Flat "body=retun a+b"—fuzzy match "retun" to "return" (edit dist=1), fixable.
 
-Code Snippet (prompt):
+**Code Snippet: Autonomous Composition**
+```c
+// Example from the c_compose pipeline
+char prompt[256];
+sprintf(prompt, "task=sort_ascending_array|todo=compose");
+
+// The Planner (1.2M params) generates the pipeline steps:
+worker_generate(planner_model, prompt, plan_output);
+// plan_output = "fn=check_null|fn=quicksort_asc_in_place"
+
+// The Worker retrieves the byte-perfect C implementations from its trained registry
+for(int i=0; i<num_fns; i++) {
+    sprintf(worker_prompt, "retrieve=%s", fns[i]);
+    worker_generate(codegen_model, worker_prompt, code_chunk);
+    append_to_file(code_chunk);
+}
+
+// The Judge validates the final C file
+if (!judge_compile("output.c")) {
+    kanban_block_and_replan("failed=compile");
+}
 ```
-intent=add numbers|todo=wiring,codegen|blocked=multiply(low_conf)
-```
-Worker outputs: "fn=add|args=a,b"
+Thus, 83% of the time, the generated C code perfectly matches the target composition without a single syntax error.
 
 ## Pipeline for Autonomous Synthesis
 
@@ -1186,7 +1487,7 @@ Confidence Gating: From ensembles (Chapter 4). Threshold=0.8: If <, reject as un
 
 Scenario: "ascending sort array". Wiring: "seq|sort_asc". Codegen: Body with conf=0.95 (byte-perfect). Judge: Compiles? Yes.
 
-Math Verification: Composition accuracy. Single model: 0% novel composition (c_codegen retrieval-only). Pipeline (c_compose v3, Planner→Judge, 1.2M params): 83% exact match on held-out test set. Key metrics: 98% parse rate, 91% registry hits, 96% judge PASS. With gating: Reject low-conf, retry—near-perfect on high-confidence outputs.
+Math Verification: Composition accuracy. Single model: 0% novel composition (c_codegen retrieval-only). Pipeline (c_compose v3, Planner->Judge, 1.2M params): 83% exact match on held-out test set. Key metrics: 98% parse rate, 91% registry hits, 96% judge PASS. With gating: Reject low-conf, retry—near-perfect on high-confidence outputs.
 
 Example: Corpus of 2,000 functions. Retrieve "fft_magnitude" byte-perfect. Novel "zscore_normalize then rolling_mean": Wiring flat-string, codegen each—83% exact match when both parts are in the trained registry.
 
@@ -1194,13 +1495,13 @@ Example: Corpus of 2,000 functions. Retrieve "fft_magnitude" byte-perfect. Novel
 
 Rephrase insensitivity via decomposition and feedback.
 
-Background: Models are literal; pipelines abstract (intent → canonical form).
+Background: Models are literal; pipelines abstract (intent -> canonical form).
 
 Solution: Confidence low on paraphrase? Replan with synonyms or break down.
 
 Scenario: "sort ascending" unseen, but "order increasing" in corpus. Low conf blocks; replan to "sort asc"—matches.
 
-Math: Blindness prob=1 - overlap fraction. Corpus 5K phrases: Overlap=0.6 → p=0.4. Decomposition halves (focus sub-parts).
+Math: Blindness prob=1 - overlap fraction. Corpus 5K phrases: Overlap=0.6 -> p=0.4. Decomposition halves (focus sub-parts).
 
 Verification: Test 100 paraphrases. Base: 40% fail. Pipeline: 10% (replans rescue).
 
@@ -1230,10 +1531,12 @@ At 1.2M parameters, LR scheduling tuning was critical (see Chapter 3). The v2 at
 | Judge PASS | 96% (plans validated) |
 | Exact match | 83% (byte-perfect composition) |
 
-Research Insight: Flat protocols free capacity for semantics—params focus on meaning, not syntax. The same Planner→Judge pipeline pattern that filters invalid chess moves can filter invalid code composition plans.
----
+Research Insight: Flat protocols free capacity for semantics—params focus on meaning, not syntax. The same Planner->Judge pipeline pattern that filters invalid chess moves can filter invalid code composition plans.
 
-# Chapter 11: Edge AI Applications – Sensors, IoT, and Beyond
+\newpage
+
+
+# Edge AI Applications – Sensors, IoT, and Beyond
 
 ## Introduction
 
@@ -1268,7 +1571,11 @@ Tradeoff: Limited history (block size=256); use SWA (Chapter 8) for longer.
 
 ## IoT Devices: Connected Yet Independent Intelligence
 
+![IoT Edge Network](iot.png)
+
 IoT connects devices (e.g., smart homes), but edge AI keeps processing local to save bandwidth and enhance privacy.
+
+**Visualization: Edge IoT Pipeline**
 
 Background: IoT data streams from multiple sensors. Pipelines fuse them (e.g., temperature + humidity for mold risk).
 
@@ -1288,7 +1595,7 @@ Code Tip: Local train, send grads (serialized array), average on hub.
 
 Extension: Adaptive organelles—monitor confidence; if drops (drift), retrain on-device with replay buffer (mix old/new data).
 
-Math Check: Drift detection: Rolling z-score = (current - mean)/std. If >2, retrain. Reduces forgetting: Old loss=0.1 → stays <0.2 post-new data.
+Math Check: Drift detection: Rolling z-score = (current - mean)/std. If >2, retrain. Reduces forgetting: Old loss=0.1 -> stays <0.2 post-new data.
 
 ## Robotics and Autonomous Systems: Multi-Step Decision Making
 
@@ -1304,9 +1611,35 @@ Scenario: Robot slides tiles. Pipeline adapts to physical noise (misalignments)�
 
 Math Verification: Success rate. Simulation (game): 90%. Physical: Add error p=0.1 (slip); with judge retries: 80% (geometric: (1-p)^steps * retries).
 
-Code Integration: Embed MicroGPT-C in firmware (e.g., ESP32 C code). Sense: Read camera; infer move; act via motors.
+Code Integration: Embed MicroGPT-C in firmware (e.g., compiling `microgpt.c` directly in an ESP-IDF project). 
 
-Verification: Deploy on toy robot. Time per move: 500ms (inference 10ms + mechanics). Solves 70% puzzles vs. 30% without pipeline.
+**Code Snippet: ESP32 Inference Loop**
+```c
+// Example FreeRTOS task running on an ESP32 core
+void vCameraInferenceTask(void *pvParameters) {
+    // 1. Load the pre-trained 30K parameter organelle (takes ~120KB RAM)
+    Model *mover_model = load_model_from_flash("/spiffs/mover.ckpt");
+    
+    while(1) {
+        // 2. Sense: Read from the camera buffer
+        char* board_state = camera_get_board_string();
+        
+        // 3. Infer: Generate the next move
+        char prompt[64];
+        sprintf(prompt, "state=%s|todo=move", board_state);
+        char move[16];
+        organelle_generate(mover_model, prompt, move, 5);
+        
+        // 4. Act: Drive the servos
+        if (judge_is_valid(move)) {
+            drive_motor(move);
+        }
+        vTaskDelay(pdMS_TO_TICKS(100)); // Yield to other RTOS tasks
+    }
+}
+```
+
+Verification: Deploy on a toy robot. Time per move: 500ms (inference 10ms + mechanics). Solves 70% puzzles vs. 30% without pipeline.
 
 Tradeoff: Real-time—limit layers to 2 for <50ms.
 
@@ -1318,7 +1651,7 @@ Scenario: Wearable health monitor. Evolve: Low conf on new user patterns? Retrai
 
 Math: Self-evolve trigger: Confidence dist shift (KL divergence >0.5). KL = sum p log(p/q)—measures change.
 
-Verification: Simulate user change; without evolve: Accuracy 60% → 40%. With: Back to 55%.
+Verification: Simulate user change; without evolve: Accuracy 60% -> 40%. With: Back to 55%.
 
 ## Privacy, Energy, and Scalability Considerations
 
@@ -1335,9 +1668,13 @@ Scenario Verification: IoT network. Central: High bandwidth. Edge+federated: 10x
 Research: Prototype in sim (games), deploy on hardware. Metrics: Latency, power, accuracy.
 
 Hypothesis: OPA on edge matches cloud for local tasks. Verify: Robot case—edge 200ms latency vs. cloud 1s.
----
 
-# Chapter 12: Ethical Considerations and Safeguards
+\newpage
+
+
+# Ethical Considerations and Safeguards
+
+![Ethics and Bias in AI](ethics.png)
 
 ## Introduction
 
@@ -1371,11 +1708,16 @@ Risk: In a hiring tool, if trained on biased resumes, it generates profiles favo
 
 Scenario: Sentiment analyzer on reviews. Corpus mostly positive for "Product A", negative for "B"—model biases against B unfairly.
 
-Math Verification: Bias score = (positive rate for group1 - group2) / avg. Balanced: ~0. Train on skewed (80% group1 positive): Score=0.4. Audit: Count group representations; if imbalance>20%, resample.
+Math Verification: Bias score = $\frac{\text{positive rate for group1} - \text{positive rate for group2}}{\text{average positive rate}}$. Balanced: ~0. Train on skewed (80% group1 positive): Score=0.4. Audit: Count group representations; if imbalance > 20%, resample.
 
-Mitigation: Curate corpora—balance manually or augment (e.g., swap demographics). Diversity metrics: Shannon index = -sum (p_i log p_i), where p_i=proportion of category. Aim high (>2 for 4 groups).
+Mitigation: Curate corpora—balance manually or augment (e.g., swap demographics). Diversity metrics: Shannon index = $-\sum (p_i \log p_i)$, where $p_i$=proportion of category. Aim high (>2 for 4 groups).
 
-Pipeline Safeguard: Judge checks for bias markers (e.g., keyword filters); replan if detected.
+**Actionable Checklist: Bias Mitigation in Corpora**
+
+- [ ] **Audit the Source:** Are you scraping data that heavily favors one outcome or demographic?
+- [ ] **Calculate Representation:** Ensure minority conditions or groups constitute at least 20% of the dataset.
+- [ ] **Implement Augmentation:** Use scripts to generate counter-factual examples (e.g., swapping "he" to "she", or "success" to "failure" in identical contexts) to neutralize spurious correlations.
+- [ ] **Pipeline Safeguard Check:** Design the Judge organelle to specifically scan for protected/biased keywords and force a replan if detected.
 
 Verification: Pre-curation bias=0.3; post=0.05. Outputs fairer—e.g., equal positives across groups.
 
@@ -1393,7 +1735,14 @@ Math Verification: Memorization rate = fraction of train data reproduced exactly
 
 Mitigation: Anonymize corpora (replace names with placeholders). On-device training: No data leaves device. Replay buffers (mix anonymized old data) prevent forgetting without raw storage.
 
-Verification Example: Train with/without noise. Without: 10% memorization (exact reproductions). With ε=0.5: <1%, utility loss<5% (accuracy drop).
+**Actionable Checklist: Privacy-Preserving Edge AI**
+
+- [ ] **Data Sanitization:** Run all training corpora through a PII (Personally Identifiable Information) scrubber before tokenization.
+- [ ] **Local-Only Processing:** Guarantee that `microgpt.c` training gradients never leave the device unless aggregated via a secure federated protocol.
+- [ ] **Differential Privacy Injection:** If gradients must be shared, add zero-mean Gaussian noise to the updates ($\epsilon \le 1.0$).
+- [ ] **Output Filtering:** Configure the Judge organelle with a regex filter to block outputs resembling SSNs, emails, or phone numbers.
+
+Verification Example: Train with/without noise. Without: 10% memorization (exact reproductions). With $\epsilon=0.5$: <1%, utility loss<5% (accuracy drop).
 
 Pipeline: Judge scans outputs for sensitive patterns (e.g., regex for emails)—block if found.
 
@@ -1411,7 +1760,7 @@ Math Verification: Drift measure: KL divergence = sum p_new log(p_new / p_train)
 
 Mitigation: Self-monitoring organelles—track conf distribution; if variance increases 30%, retrain incrementally. Validation loops (judge always checks outputs).
 
-Verification: Simulate shift (add offset to data). No mitigation: Accuracy 90%→60%. With monitor + retrain: Back to 85% after 100 new samples.
+Verification: Simulate shift (add offset to data). No mitigation: Accuracy 90%->60%. With monitor + retrain: Back to 85% after 100 new samples.
 
 ## Transparency and Explainability: Understanding AI Decisions
 
@@ -1436,9 +1785,11 @@ Consider downstream effects—e.g., biased models amplifying inequalities.
 Mitigation: Audit workflows (Chapter 9)—test on diverse subgroups. Accountability: Document decisions (e.g., corpus sources).
 
 Scenario Verification: Gender-neutral name generator. Audit: Equal male/female outputs? Adjust corpus if not.
----
 
-# Chapter 13: Future Research and Extensions
+\newpage
+
+
+# Future Research and Extensions
 
 ## Introduction
 
@@ -1460,11 +1811,13 @@ Math Verification: Use a simple statistic like z-score: z = (current_conf - mean
 
 Implementation Idea: Add a monitoring layer in code—after inference, log conf; periodically check.
 
-Verification Experiment: Simulate drift by shifting test data (add offset). Without monitoring: Accuracy 90% → 60% over 1,000 inferences. With: Detects at 200, retrains—back to 85%.
+Verification Experiment: Simulate drift by shifting test data (add offset). Without monitoring: Accuracy 90% -> 60% over 1,000 inferences. With: Detects at 200, retrains—back to 85%.
 
 Extension: Over-the-air updates—download refined organelles from a central hub, blending local adaptation with global improvements.
 
 ## Organelle Marketplace: Sharing and Versioning Specialists
+
+![Organelle Marketplace](markets.png)
 
 Imagine a repository where users share pre-trained organelles, indexed by task (e.g., "name-generator-v1").
 
@@ -1481,6 +1834,21 @@ Verification: Mock marketplace—share 5 organelles; test interoperability (same
 Implementation: Simple Git repo or web platform; metadata in JSON (e.g., {"task":"puzzle-solver", "params":460000}).
 
 Risk Mitigation: Scan for biases (Chapter 12) before sharing.
+
+## Low-Rank Adaptation (LoRA): Speculative Efficiency
+
+A major upcoming research area is bringing parameter-efficient fine-tuning (PEFT) to the edge. Rather than updating all parameters during on-device learning, LoRA freezes the main weights and trains small rank-decomposition matrices.
+
+**Mathematical Formulation:**
+For a pre-trained weight matrix $W_0 \in \mathbb{R}^{d \times k}$, a parameter update $\Delta W$ is constrained by representing it with a low-rank decomposition:
+\begin{equation}
+W = W_0 + \Delta W = W_0 + BA
+\end{equation}
+Where $B \in \mathbb{R}^{d \times r}$ and $A \in \mathbb{R}^{r \times k}$, with the rank $r \ll \min(d, k)$. 
+
+Scenario: Fine-tuning a 460K parameter organelle on a new user's speech patterns. Instead of gradients for 460K weights, we train $A$ and $B$ matrices with $r=2$. 
+
+Math Verification: If $W_0$ is $256 \times 256$ (65,536 params), then $B$ is $256 \times 2$ and $A$ is $2 \times 256$, totaling 1,024 params. This is a **98.4% reduction in trainable parameters**, slashing backpropagation memory footprints and making on-device learning trivial even for ESP32s.
 
 ## Hardware Targets: From RISC-V to FPGA Acceleration
 
@@ -1526,13 +1894,13 @@ Scenario: Fleet of drones. Each adapts to local terrain; federate for global mod
 
 Math: Convergence: Local steps=100; federated rounds=10—total compute / device halves vs. central.
 
-Verification: Sim 50 devices—accuracy 70% local → 85% federated.
+Verification: Sim 50 devices—accuracy 70% local -> 85% federated.
 
 ## Open Research Questions
 
 - **LR auto-tuning**: Can the training loop automatically detect divergence and reduce the learning rate? The c_compose experiment required manual tuning (Chapter 3). An auto-scheduler that detects loss spikes and backs off would remove this human-in-the-loop step.
 - **BPE tokenisation**: Character-level tokenisation limits vocabulary efficiency. Byte-pair encoding could improve throughput for structured outputs while keeping the vocabulary small enough for edge deployment.
-- **Expanded c_compose registry**: The current c_compose experiment uses ~2,000 functions. Scaling to 10,000+ would test whether the Planner→Judge pipeline maintains accuracy with larger registries.
+- **Expanded c_compose registry**: The current c_compose experiment uses ~2,000 functions. Scaling to 10,000+ would test whether the Planner->Judge pipeline maintains accuracy with larger registries.
 - Trap signals: When to deviate from greedy (e.g., flag=1 in prompts)?
 - Lookahead: Multi-step planning without explosion.
 - A* integration: Heuristics + search for optimality.
@@ -1543,13 +1911,19 @@ Math: A* nodes = O(b^{d/2}) vs. full b^d—exponential savings.
 
 Verification: Prototype extension—e.g., add LR auto-scheduler; test on c_compose v4 with expanded registry.
 
-## Contributing to the Future
+## Contributing to the Future: The MicroGPT-C Roadmap
 
-Join via code mods, new demos, or corpora. Priorities: INT8 full support, DAG pipelines (parallel workers), LR auto-tuning.
+The project evolves rapidly. Here is the speculative roadmap for the next major research and engineering milestones:
 
----
+![Project Speculative Roadmap](roadmap_gantt_bw.png)
 
-# Appendix A: Glossary and References
+Join via code mods, new demos, or corpora. Start by exploring the open research questions above and testing your hypotheses in the logic games laboratory.
+
+
+\newpage
+
+
+# Glossary and References {-}
 
 This appendix provides a comprehensive glossary of key terms used throughout the book, along with a curated list of references. The glossary defines concepts in simple, accessible language, drawing from the explanations in the chapters. Terms are listed alphabetically for easy reference. The references include foundational papers and resources that influenced the principles of MicroGPT-C, such as transformer architectures and optimization techniques. These are cited in a standard format (APA style) for further reading. Note that while the book focuses on practical implementation, these sources offer deeper theoretical insights.
 
@@ -1581,7 +1955,7 @@ This appendix provides a comprehensive glossary of key terms used throughout the
 
 - **Coordination Funnel**: The empirical pattern where pipeline coordination converts weak individual model outputs (~50% invalid) into high system-level success rates (85-90%). Validated across 14 experiments (see Chapters 5 and 6).
 
-- **c_compose**: The code composition experiment using a Planner→Judge pipeline (1.2M params each with LR scheduling) to generate function composition plans, achieving 83% exact match (see Chapter 10).
+- **c_compose**: The code composition experiment using a Planner->Judge pipeline (1.2M params each with LR scheduling) to generate function composition plans, achieving 83% exact match (see Chapter 10).
 
 - **Cross-Entropy Loss**: A measure of prediction error in generative models, penalizing low probabilities for correct targets (see Chapter 3).
 
@@ -1621,7 +1995,9 @@ This appendix provides a comprehensive glossary of key terms used throughout the
 
 - **Learning Rate Scheduling**: Gradually adjusting the step size in optimization, often with warmup and decay for stability (see Chapter 3).
 
-- **LR-Capacity Scaling**: The empirical rule that larger models require lower learning rates: lr ∝ 1/√params. At 460K params lr=0.001 works; at 1.2M params lr=0.0005 is needed to prevent divergence (see Chapters 3 and 4).
+- **Low-Rank Adaptation (LoRA)**: A parameter-efficient fine-tuning technique that freezes main weights and trains small rank-decomposition matrices, significantly reducing memory footprints (see Chapter 13).
+
+- **LR-Capacity Scaling**: The empirical rule that larger models require lower learning rates: lr ~ 1/√params. At 460K params lr=0.001 works; at 1.2M params lr=0.0005 is needed to prevent divergence (see Chapters 3 and 4).
 
 - **Multi-Head Attention (MHA)**: Parallel attention computations where each head learns different relationships (see Chapter 8).
 
@@ -1694,5 +2070,30 @@ Vaswani, A., et al. (2017). *Attention Is All You Need*. In Advances in Neural I
 Zaheer, M., et al. (2020). *Big Bird: Transformers for Longer Sequences*. In Advances in Neural Information Processing Systems (NeurIPS).
 
 These references represent seminal works on transformers and efficiency improvements. For implementation details, refer to the MicroGPT-C source code and documentation, which adapts these ideas for small-scale, C99-based systems. Further reading is encouraged for those interested in theoretical foundations.
----
+
+## Appendix B: Full Code Listings
+
+To maintain the flow of the text, many chapters only present truncated snippets. The complete, compilable source code for all examples is available in the repository:
+
+- **Core Engine:** `src/microgpt.c`
+- **Organelle API & Kanban:** `src/microgpt_organelle.c`
+- **CPU Parallelism (OpenMP):** `examples/names/main.c`
+- **Metal GPU Offloading:** `src/microgpt_metal.m`
+
+## Appendix C: Benchmarks and Experimental Data
+
+Performance claims and game win-rates are backed by reproducible benchmark scripts. 
+
+- **Game Organelle Experiments:** Explore the READMEs inside `experiments/organelles/` (e.g., `8puzzle`, `mastermind`, `pentago`).
+- **Autonomous Codegen (c_compose):** Test the 1.2M parameter planner/judge pipeline in `experiments/c_compose/`.
+
+## Appendix D: Datasets and Corpora
+
+The "stem cell" organelles were differentiated using specific generated datasets. For generation scripts:
+
+- **Name Generation Corpus:** `examples/names/names.txt`
+- **Shakespeare Character Corpus:** `examples/shakespeare/`
+
+\newpage
+
 

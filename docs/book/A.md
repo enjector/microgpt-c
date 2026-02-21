@@ -1,4 +1,4 @@
-# Appendix A: Glossary and References
+# Glossary and References {-}
 
 This appendix provides a comprehensive glossary of key terms used throughout the book, along with a curated list of references. The glossary defines concepts in simple, accessible language, drawing from the explanations in the chapters. Terms are listed alphabetically for easy reference. The references include foundational papers and resources that influenced the principles of MicroGPT-C, such as transformer architectures and optimization techniques. These are cited in a standard format (APA style) for further reading. Note that while the book focuses on practical implementation, these sources offer deeper theoretical insights.
 
@@ -69,6 +69,8 @@ This appendix provides a comprehensive glossary of key terms used throughout the
 - **KV Cache**: Stored keys and values from past attention computations, speeding up sequential inference (see Chapters 3 and 8).
 
 - **Learning Rate Scheduling**: Gradually adjusting the step size in optimization, often with warmup and decay for stability (see Chapter 3).
+
+- **Low-Rank Adaptation (LoRA)**: A parameter-efficient fine-tuning technique that freezes main weights and trains small rank-decomposition matrices, significantly reducing memory footprints (see Chapter 13).
 
 - **LR-Capacity Scaling**: The empirical rule that larger models require lower learning rates: lr ∝ 1/√params. At 460K params lr=0.001 works; at 1.2M params lr=0.0005 is needed to prevent divergence (see Chapters 3 and 4).
 
@@ -143,3 +145,26 @@ Vaswani, A., et al. (2017). *Attention Is All You Need*. In Advances in Neural I
 Zaheer, M., et al. (2020). *Big Bird: Transformers for Longer Sequences*. In Advances in Neural Information Processing Systems (NeurIPS).
 
 These references represent seminal works on transformers and efficiency improvements. For implementation details, refer to the MicroGPT-C source code and documentation, which adapts these ideas for small-scale, C99-based systems. Further reading is encouraged for those interested in theoretical foundations.
+
+## Appendix B: Full Code Listings
+
+To maintain the flow of the text, many chapters only present truncated snippets. The complete, compilable source code for all examples is available in the repository:
+
+- **Core Engine:** `src/microgpt.c`
+- **Organelle API & Kanban:** `src/microgpt_organelle.c`
+- **CPU Parallelism (OpenMP):** `examples/names/main.c`
+- **Metal GPU Offloading:** `src/microgpt_metal.m`
+
+## Appendix C: Benchmarks and Experimental Data
+
+Performance claims and game win-rates are backed by reproducible benchmark scripts. 
+
+- **Game Organelle Experiments:** Explore the READMEs inside `experiments/organelles/` (e.g., `8puzzle`, `mastermind`, `pentago`).
+- **Autonomous Codegen (c_compose):** Test the 1.2M parameter planner/judge pipeline in `experiments/c_compose/`.
+
+## Appendix D: Datasets and Corpora
+
+The "stem cell" organelles were differentiated using specific generated datasets. For generation scripts:
+
+- **Name Generation Corpus:** `examples/names/names.txt`
+- **Shakespeare Character Corpus:** `examples/shakespeare/`

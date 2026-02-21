@@ -6,8 +6,9 @@ OUTPUT_PDF="MicroGPT-C_Composable_Intelligence_at_the_Edge.pdf"
 
 echo "Initializing Book Builder..."
 
-# 1. Reset the output file
+# 1. Reset the output file and insert Cover Page LaTeX
 rm -f "$OUTPUT_MD"
+cat cover_page.tex > "$OUTPUT_MD"
 
 # 2. Loop through numeric chapters (0-99) and Appendices (A-Z)
 # This automatically finds 1.md, 2.md, A.md etc. and sorts them naturally.
@@ -18,8 +19,12 @@ for f in $(ls *.md | sort -V); do
   echo "Merging Chapter: $f"
   cat "$f" >> "$OUTPUT_MD"
   
-  # Add the separator you used in your original script
-  echo $'\n---\n' >> "$OUTPUT_MD" 
+  # Ensure there is a blank line, add a page break for the PDF, and another blank line
+  echo "" >> "$OUTPUT_MD"
+  echo "" >> "$OUTPUT_MD"
+  echo "\\newpage" >> "$OUTPUT_MD"
+  echo "" >> "$OUTPUT_MD"
+  echo "" >> "$OUTPUT_MD"
 done
 
 # 3. Cleanup Citations
@@ -38,13 +43,11 @@ sed -i '' \
     -e 's/┐/+/g' \
     -e 's/┘/+/g' \
     -e 's/─/-/g' \
+    -e 's/→/->/g' \
+    -e 's/∝/~/g' \
     "$OUTPUT_MD"
 
-# 4. Check dependencies
-if ! command -v pandoc &> /dev/null; then
-    echo "Error: pandoc not found. Please install it with: brew install pandoc"
-    exit 1
-fi
+
 
 # 5. Generate PDF with proper LaTeX math rendering
 # Try LaTeX first (best quality), fall back to HTML+MathJax if LaTeX not available
@@ -103,10 +106,10 @@ if [[ "$PDF_ENGINE" == "xelatex" || "$PDF_ENGINE" == "lualatex" ]]; then
         --from markdown \
         --to pdf \
         --pdf-engine="$PDF_ENGINE" \
-        -V geometry:margin=1in \
-        -V papersize=a4 \
-        -V mainfont="Times New Roman" \
-        -V monofont="Courier New" \
+        --template="template.tex" \
+        --highlight-style=pygments \
+        --top-level-division=chapter \
+        --number-sections \
         -o "$OUTPUT_PDF" \
         2>&1 | grep -v "Package hyperref Warning" || true
 else
@@ -115,8 +118,10 @@ else
         --from markdown \
         --to pdf \
         --pdf-engine="$PDF_ENGINE" \
-        -V geometry:margin=1in \
-        -V papersize=a4 \
+        --template="template.tex" \
+        --highlight-style=pygments \
+        --top-level-division=chapter \
+        --number-sections \
         -o "$OUTPUT_PDF" \
         2>&1 | grep -v "Package hyperref Warning" || true
 fi

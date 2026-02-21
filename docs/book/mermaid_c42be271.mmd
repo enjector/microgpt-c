@@ -1,0 +1,30 @@
+flowchart TD
+    subgraph MHA["Multi-Head (MHA)"]
+        Q1,Q2,Q3,Q4
+        K1,K2,K3,K4
+        V1,V2,V3,V4
+        Q1---K1---V1
+        Q2---K2---V2
+        Q3---K3---V3
+        Q4---K4---V4
+    end
+    
+    subgraph GQA["Grouped-Query (GQA)"]
+        GQ1[Q1],GQ2[Q2],GQ3[Q3],GQ4[Q4]
+        GK12[K1,2],GK34[K3,4]
+        GV12[V1,2],GV34[V3,4]
+        GQ1---GK12---GV12
+        GQ2---GK12---GV12
+        GQ3---GK34---GV34
+        GQ4---GK34---GV34
+    end
+    
+    subgraph MQA["Multi-Query (MQA)"]
+        MQ1[Q1],MQ2[Q2],MQ3[Q3],MQ4[Q4]
+        MK[K_shared]
+        MV[V_shared]
+        MQ1---MK---MV
+        MQ2---MK---MV
+        MQ3---MK---MV
+        MQ4---MK---MV
+    end
