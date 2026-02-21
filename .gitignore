@@ -2,6 +2,10 @@
 journals/
 REVIEW.md
 
+# Generated experiment artifacts (produced at runtime, not source)
+experiments/organelles/puzzle8_reasoning/puzzle8_mover_combined.txt
+experiments/organelles/puzzle8_reasoning/puzzle8_mover_enriched.txt
+
 # Python
 __pycache__/
 
