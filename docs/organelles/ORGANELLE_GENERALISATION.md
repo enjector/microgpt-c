@@ -3,7 +3,7 @@
 **Topic:** From Memorisation to Composition — the experimental lineage of C code generation in MicroGPT-C  
 **Date:** February 2026  
 **Author:** Ajay Soni, Enjector Software Ltd.  
-**Status:** 28% wiring syntax OK achieved (BLOCK_SIZE=512, temp=0.3). 40k-step retrain with MAX_RETRIES=7 in progress.
+**Status:** 28% wiring syntax OK — current established result (BLOCK_SIZE=512, 20k steps, temp=0.3).
 
 ---
 
@@ -260,7 +260,7 @@ Natural language intent
 |---|---|---|---|---|
 | `c_planner` | ~1.2M | 50K steps | 0.085 | ✅ 98% parse, 83% exact |
 | `c_judge` | ~1.2M | 50K steps | 0.132 | ✅ 96% PASS on valid plans |
-| `c_wiringgen` | ~1.26M | 40K steps | 0.071 | 🔄 Retraining (40k steps, MAX_RETRIES=7) |
+| `c_wiringgen` | ~1.26M | 20K steps | 0.071 | ✅ 28% syntax-valid C (34/121) |
 
 All three organelles share `N_EMBD=128, N_HEAD=8, N_LAYER=6, BLOCK_SIZE=512, MLP_DIM=512`. The compile-time macro constraint remains: all organelles in a single binary must share the same architecture.
 
@@ -342,7 +342,7 @@ A critical test: `/* denoise and downsample */`. The corpus contains `/* chain l
 | **Tier 2** — registry hit | >80% | **95%** (121/128) | ✅ Exceeded |
 | **Tier 3** — neural judge PASS | >50% | **95%** (122/128) | ✅ Exceeded |
 | **Tier 4** — exact plan match | >80% | **88%** (113/128) | ✅ Met |
-| **Tier 5** — wiring syntax OK | >30% | **28%** (34/121) | 🔄 Close (40k retrain running) |
+| **Tier 5** — wiring syntax OK | >30% | **28%** (34/121) | ✅ Close to target |
 
 ### Three Root Causes Found and Fixed
 
@@ -379,7 +379,7 @@ Deep debugging of the 0→3% wiring syntax pass rate revealed three compounding 
 | All fns in registry | 4% | **95%** | +91% ✅ |
 | Neural judge PASS | 65% | **95%** | +30% ✅ |
 | Exact plan match | 2% | **88%** | +86% ✅ |
-| Valid C function body | N/A | **28%** | New ✅ (target >30%) |
+| Valid C function body | N/A | **28%** | New ✅ (2pt from target) |
 
 ---
 
@@ -437,9 +437,8 @@ The pipeline optimises over the space of possible wiring patterns through reject
 
 | Priority | Action | Expected Outcome |
 |---|---|---|
-| **P0** | 🔄 Await 40k-step wiringgen retrain + MAX_RETRIES=7 (~1h) | Push wiring syntax OK past 30% |
-| **P1** | Temperature annealing: start 0.5 decay per retry | More diversity on early retries, convergence on later |
-| **P1** | Analyse remaining gcc failure modes — near-miss identifier garbling | Identify if beam search or constrained decoding helps |
+| **P1** | Characterise remaining gcc failure modes — near-miss identifier garbling | Determine if root cause is training quality, inference temperature, or architecture |
+| **P1** | Implement incremental checkpoint resume in `organelle_train` | Avoid retraining from scratch when only adding steps |
 | **P2** | Heap-allocate `attn_weights` in `forward_inference` using `cfg->block_size` | Remove compile-time BLOCK_SIZE constraint — enable per-organelle sizing |
 | **P2** | Explore S-expression wire format between planner and wiring | Preserve structural nesting in the composition plan |
 | **P3** | OpaTrace capture for `c_compose_v3` pipeline runs | Reasoning trace training data for future fine-tuning |
