@@ -205,6 +205,49 @@ Once a model has memorised its training patterns (loss ~0.08–0.11), further tr
 
 The loss floor is the mathematical signature of the retrieval–reasoning boundary: the model has extracted all learnable patterns from the corpus, and no amount of additional capacity will produce the internal state required for multi-step logical deduction.
 
+### 5.5 LLMs as "Monolithic Simulators" — The Neural Operator Waste Hypothesis
+
+> **The deeper question**: if organelles cannot do BFS, DFS, or Kanban internally, are LLMs actually doing these things — just wastefully, in fuzzy weights?
+
+The answer appears to be yes. Large LLMs do build internal "neural operators" for search and coordination but they are brittle approximations of algorithms that can be expressed in deterministic code:
+
+| What LLMs do internally | OPA equivalent | Cost in LLM params | Cost in OPA |
+|---|---|---|---|
+| Chain-of-thought as working memory | `OpaKanban` state struct | Millions of parameters | ~80 lines of C |
+| Self-consistency sampling to avoid wrong answers | `organelle_generate()` ensemble vote | Temperature tuning | 3 inference calls |
+| Retry on invalid output | `Judge` organelle + kanban replan | Implicit in RLHF | ~40 lines deterministic |
+| A↔B oscillation detection | `OpaCycleDetector` | Emergent (unreliable) | ~30 lines of C |
+| BFS-optimal path selection | `generate_corpus.py` + training | Memorised implicitly | 50-line Python BFS |
+
+The MicroGPT-C experiments provide direct evidence of this waste:
+
+- **The 340-line gap**: A ~340-line C coordination library (Kanban + cycle detector + judge) transformed 50%-accurate models into 90%-successful systems. An LLM achieving 90% accuracy without that library would need vastly more parameters — trained on vastly more data — to internalize the same logic fuzzily.
+- **Chain-of-thought is makeshift Kanban**: When an LLM reasons step-by-step, it uses its context window as a stateful scratch pad — exactly what `OpaKanban` provides deterministically. The difference is reliability: the Kanban never forgets a blocked move; the LLM eventually does.
+- **Wire format beats model size**: The project proved that the pipe-string wire format (`up|m=3,5,x,4|valid=up,right`) reduced syntactic load enough that a 460K-parameter model could match what a model ten times larger might achieve with free-form output.
+
+#### Why This Matters Architecturally
+
+LLMs are trained end-to-end to predict the next token. This means they must internally learn everything — syntax, semantics, search strategy, validity checking, backtracking — from the same gradient signal. There is no way for gradient descent to say "encode BFS here, encode validation there." The result is a single undifferentiated blob of fuzzy weights that approximately simulates all of these processes at once.
+
+The OPA insight is that **separation of concerns is not just a software engineering preference — it is a capacity efficiency argument**:
+
+```
+LLM approach:  1 model × N parameters learns (retrieval + search + validation + syntax)
+OPA approach:  K models × (N/K) parameters each learns 1 thing + deterministic code for the rest
+```
+
+At the same total parameter budget, OPA achieves higher reliability on each sub-task because each organelle spends its full capacity on a single well-defined output format, while the deterministic orchestrator provides what no amount of gradient descent can efficiently encode: guaranteed correctness, zero-cost cycle detection, and lossless state memory.
+
+#### The Emergent Reasoning Hypothesis
+
+This reframes how to think about LLM "reasoning":
+
+- LLMs do not reason — they compress the *output patterns of reasoning processes* into weights
+- Chain-of-thought prompting works because it forces the model to generate intermediate tokens that match the output patterns of reasoning (the "scratchpad" provides the structure that the model's weights approximate)
+- Scaling helps because with more capacity, the model can compress more reasoning trace patterns — but this is still retrieval of reasoning outputs, not execution of reasoning algorithms
+
+**The OPA verdict:** Rather than training a model to internalize BFS, train a small model to generate BFS-interpretable outputs, and wrap it in a BFS orchestrator. The model handles the fuzzy (what direction looks promising?) and the code handles the exact (is this move valid? have we visited this state?). This is not a workaround — it is the correct factoring of the problem.
+
 ---
 
 ## 6. Implications for the Project
