@@ -3,7 +3,7 @@
 **Topic:** From Memorisation to Composition — the experimental lineage of C code generation in MicroGPT-C  
 **Date:** February 2026  
 **Author:** Ajay Soni, Enjector Software Ltd.  
-**Status:** Results in — planner excellent, wiringgen body generation needs corpus redesign
+**Status:** Three root causes found and fixed (Feb 2026). Full retrain at BLOCK_SIZE=512 underway — results pending.
 
 ---
 
@@ -13,7 +13,7 @@
 
 **Picture:** A single organelle is a lookup table for code. Two organelles form a lookup table with an index. Three organelles, a syntax judge, and an OpaKanban retry loop form something that *writes new code* — not because any component is creative, but because the pipeline searches the space of known compositions and validates the output deterministically.
 
-**Proof:** `c_codegen` scored 100% on in-corpus prompts and 0/10 on novel ones. `c_compose_v3` ran 128 held-out intents: 98% parse rate, 83% exact plan match, 96% neural judge pass — all strong. But `c_wiringgen` produced syntactically valid C on only 1/117 attempts (1%). The planner is excellent; the wiring body generation is the gap. Root cause: `c_wiringgen`'s corpus teaches *plan structure* (`seq|fn1|fn2`), not *C function body syntax* — it generates plan strings instead of compilable code.
+**Proof:** `c_codegen` scored 100% on in-corpus prompts and 0/10 on novel ones. `c_compose_v3` ran 128 held-out intents: 98% parse rate, 83% exact plan match, 96% neural judge pass — all strong. But `c_wiringgen` produced syntactically valid C on only 3/116 attempts (3%) after initial retrain. Three compounding root causes were found and fixed (see §9).
 
 **Push:** The puzzle8_reasoning experiments provide the theoretical framework: the pipeline *is* the reasoning layer. The organelles are retrieval engines; composition, validation, and retry are handled deterministically. The question is not whether organelles can reason — they cannot — but whether a well-designed pipeline can simulate compositional code generation through coordinated retrieval.
 
@@ -44,10 +44,10 @@ retrieve C code?"     learn to compose?"   + judge work?"     produce valid C?"
      │                     │                    │                    │
      ▼                     ▼                    ▼                    ▼
 100% in-corpus        Corpus: plan strings  96% parse rate     98% parse rate ✅
-0/10 novel            ← WRONG target        4% registry hit    83% exact match ✅
-                      Needs: C bodies        LR divergence v2   1% wiring syntax ❌
-                      ← Next fix                                (corpus redesign
-                                                                 needed)
+ 0/10 novel            ← WRONG target        4% registry hit    83% exact match ✅
+                       Fixed: c_wiring.txt   LR divergence v2   3→?% wiring 🔄
+                       C bodies (864 docs)                       (BLOCK_SIZE=512
+                                                                  retrain pending)
 ```
 
 ---
@@ -225,15 +225,14 @@ Natural language intent
          │  "seq|normalize_z|rolling_mean"
          ▼
 ┌────────────────────────────────────┐
-│  plan_to_wiring_prompt()           │  Converts flat plan to C comment prompt
-│  /* pipeline: normalize_z then    │
-│     rolling_mean */                │
+│  original intent comment passed    │  g_tests[t].comment used directly
+│  /* normalize then rolling mean */ │  (matches c_wiring.txt training format)
 └────────┬───────────────────────────┘
          │
          ▼
 ┌───────────────────┐
-│  c_wiringgen      │  Generates C function body
-│  (same arch as    │  Temp=0.3, GEN_LEN=400
+│  c_wiringgen      │  Generates C function body (multi-line)
+│  (same arch as    │  Temp=0.3, GEN_LEN=600, stops on \n\n
 │  planner/judge)   │
 └────────┬──────────┘
          │  C function candidate
@@ -262,9 +261,9 @@ Natural language intent
 |---|---|---|---|---|
 | `c_planner` | ~1.2M | 50K steps | 0.085 | ✅ 98% parse, 83% exact |
 | `c_judge` | ~1.2M | 50K steps | 0.132 | ✅ 96% PASS on valid plans |
-| `c_wiringgen` | ~1.2M | 20K steps | 0.069 | ❌ 1% syntax-valid C (corpus mismatch) |
+| `c_wiringgen` | ~1.26M | 20K steps | 0.071 | 🔄 Retraining at BLOCK_SIZE=512 |
 
-All three organelles share `N_EMBD=128, N_HEAD=8, N_LAYER=6, BLOCK_SIZE=128, MLP_DIM=512` — a deliberate architectural unification required because `checkpoint_load` and `checkpoint_save` use compile-time macros, not runtime config values.
+All three organelles share `N_EMBD=128, N_HEAD=8, N_LAYER=6, BLOCK_SIZE=512, MLP_DIM=512` (upgraded from 128 — see §9 root cause #3). The compile-time macro constraint remains: all organelles in a single binary must share the same architecture.
 
 ### The N_LAYER Alignment Problem (Solved)
 
@@ -334,17 +333,44 @@ A critical test: `/* denoise and downsample */`. The corpus contains `/* chain l
 
 ---
 
-## 9. Results (February 2026)
+## 9. Results and Root Cause Analysis (February 2026)
 
-### Actual vs Target
+### Pipeline Performance (Stable Across Runs)
 
 | Tier | Target | Actual | Status |
 |---|---|---|---|
 | **Tier 1** — parse rate | >90% | **98%** (126/128) | ✅ Exceeded |
-| **Tier 2** — registry hit | >80% | **91%** (117/128) | ✅ Exceeded |
-| **Tier 3** — neural judge PASS | >50% | **96%** (123/128) | ✅ Exceeded |
+| **Tier 2** — registry hit | >80% | **91%** (116/128) | ✅ Exceeded |
+| **Tier 3** — neural judge PASS | >50% | **95%** (122/128) | ✅ Exceeded |
 | **Tier 4** — exact plan match | >80% | **83%** (106/128) | ✅ Met |
-| **Tier 5** — wiring syntax OK | >30% | **1%** (1/117) | ❌ Failed |
+| **Tier 5** — wiring syntax OK | >30% | **3%** → 🔄 pending | Fixes applied |
+
+### Three Root Causes Found and Fixed
+
+Deep debugging of the 0→3% wiring syntax pass rate revealed three compounding bugs, each masking the others:
+
+**Bug 1 — Wrong inference prompt** (highest impact)
+- `plan_to_wiring_prompt()` built `/* fn1 then fn2 */` strings from function names
+- `c_wiring.txt` trains on **natural-language descriptions**: `/* smooth array to zero mean */`
+- The model never saw fn-name prompts in training — output was garbled characters
+- **Fix:** pass `g_tests[t].comment` (the original user intent) directly
+
+**Bug 2 — Single-newline stop in `organelle_generate`**
+- `organelle_generate()` stops generation at the first `\n`
+- C function bodies are multi-line — so only the function signature line was generated
+- e.g.: `void leaky_relu_array(double *out, ...) {` then stop — `gcc` immediately rejects
+- **Fix:** added `organelle_generate_multiline()` which stops on `\n\n` (the corpus document separator)
+
+**Bug 3 — BLOCK_SIZE=128 too small for C function bodies**
+- `forward_inference()` uses compile-time `BLOCK_SIZE` for stack arrays (`attn_weights[N_HEAD * BLOCK_SIZE]`)
+- With prompt preamble (~32 tokens), only **96 chars** were available for generation
+- Corpus analysis: minimum function body length is **99 chars**; average is 200 chars
+- 0% of 864 documents fit in the 96-char generation window → truncated mid-signature
+- Increasing WIRING_BLOCK_SIZE to 512 without changing the global BLOCK_SIZE caused stack buffer overflows at pos>128, corrupting the planner's stack
+- **Fix:** increase `BLOCK_SIZE=512` for the `c_compose_v3` target. All three organelle checkpoints deleted and retraining at BLOCK_SIZE=512
+
+> [!NOTE]
+> Bug 3 also revealed a deeper engine constraint: `forward_inference` uses compile-time macros not runtime config for its stack-allocated attention arrays. Per-organelle BLOCK_SIZE requires separate binaries or a heap-allocated inference path.
 
 ### c_compose v1 vs c_compose_v3 Comparison
 
@@ -352,15 +378,9 @@ A critical test: `/* denoise and downsample */`. The corpus contains `/* chain l
 |---|---|---|---|
 | Plan parse rate | 96% | **98%** | +2% ✅ |
 | All fns in registry | 4% | **91%** | +87% ✅ |
-| Neural judge PASS | 65% | **96%** | +31% ✅ |
+| Neural judge PASS | 65% | **95%** | +30% ✅ |
 | Exact plan match | 2% | **83%** | +81% ✅ |
-| Valid C function body | N/A | **1%** | New (❌ needs fix) |
-
-### What the Results Mean
-
-The **planner pipeline** is now high-performing across every metric. The v2 LR-divergence regression is fully reversed. The 83% exact match at 1.2M params vs. 2% at 462K params confirms that the architectural scaling (with correct LR) was the right move.
-
-The **wiring bottleneck** is a corpus design problem, not a model capacity or architecture problem. `c_wiringgen` learned to retrieve plan strings (`seq|fn1|fn2`) because that is what its training corpus contains. It was never shown a C function body as a target output. The gcc syntax gate is working exactly as intended — it is correctly rejecting non-C output. The fix is: redesign the `c_wiring.txt` corpus so each document is a `/* plan comment */` → `void fn(...) { ... }` pair, not a plan string.
+| Valid C function body | N/A | **3%** → pending | Fixes applied |
 
 ---
 
@@ -368,31 +388,23 @@ The **wiring bottleneck** is a corpus design problem, not a model capacity or ar
 
 ### 10.1 Does corpus-of-compositions generalise better than corpus-of-implementations?
 
-**Partially answered.** The `c_wiringgen` corpus was plan strings, not C bodies — so plan retrieval generalises well (83% exact match via `c_planner`), but we have not yet tested whether *C body compositions* generalise better than raw implementations. The next corpus redesign will test this directly.
+**Partially answered.** `c_wiring.txt` contains 864 C function bodies trained as `/* natural description */\nvoid fn(...)` pairs. The model has learned to generate function signatures correctly. The open question is whether the *body compositions* (calling known primitives in new combinations) generalise to novel intents not seen in training.
 
 ### 10.2 Is the `gcc -fsyntax-only` gate the right architecture?
 
-**Confirmed: yes.** The gate correctly rejected 99% of `c_wiringgen`'s output. It caught the corpus mismatch immediately — without it, non-C output would have flooded the neural judge and produced meaningless PASS/FAIL signals. The 0% false-positive guarantee was essential.
+**Confirmed: yes.** The gate correctly rejected >97% of malformed output from all debugging iterations. It immediately surfaces which aspect of generation is wrong (prompt mismatch, truncation, corruption) — without it, the neural judge would produce meaningless PASS/FAIL signals on non-C text.
 
 ### 10.3 How much does the OpaKanban retry loop contribute?
 
-**Cannot measure yet** — 466 syntax failures with 350 retries, but no retry succeeded (because all attempts generated plan strings). Once the corpus is fixed, retry contribution can be measured. Architecture is correct; the input to retry was simply always invalid.
+**Cannot measure yet** — syntax failures dominated all runs before the three bugs were fixed. Once the BLOCK_SIZE=512 retrain completes, retry contribution can be measured from the corrected baseline.
 
-### 10.4 What is the correct corpus structure for `c_wiringgen`?
+### 10.4 Does `organelle_generate_multiline` generalise?
 
-**New primary question.** The corpus must contain `/* comment */` → valid C function body pairs where the body calls primitives from `c_codegen`'s vocabulary. Format:
-```c
-/* normalize then compute rolling mean */
-void normalize_then_mean(float *out, const float *in, int n, int w) {
-    zscore_normalize(out, in, n);
-    rolling_mean(out, out, n, w);
-}
-```
-Each document must be a compilable C function — not a plan string. The corpus generator needs updating.
+**New question from Bug 2 fix.** The `\n\n` stop condition matches the corpus document separator exactly. If the model learns to output `}\n\n` at the end of function bodies, multiline generation will terminate correctly. If not, generation will run to `BLOCK_SIZE` and truncate. The training data quality (clean `\n\n` boundaries in `c_wiring.txt`) makes this likely to work.
 
-### 10.5 The Architecture Constraint Problem
+### 10.5 The Architecture Constraint (Partially Resolved)
 
-The compile-time macro constraint (all organelles must share `N_LAYER`, `N_HEAD`, `BLOCK_SIZE`) means `c_wiringgen` is over-parameterised (1.2M params for a 171KB corpus). Longer term, parameterising through `MicrogptConfig` at runtime would allow right-sizing per organelle within a single binary.
+The compile-time macro constraint persists: all organelles in one binary share `BLOCK_SIZE`, `N_LAYER`, `N_HEAD`, `MLP_DIM`. The workaround — increasing global `BLOCK_SIZE=512` — makes all organelles slightly larger (wpe grows from 128×128 to 512×128 floats) but is safe because planner/judge inference never exceeds pos=128. Proper fix: heap-allocate `attn_weights` in `forward_inference` using the runtime `cfg->block_size`.
 
 ---
 
@@ -426,14 +438,11 @@ The pipeline optimises over the space of possible wiring patterns through reject
 
 | Priority | Action | Expected Outcome |
 |---|---|---|
-| **P0** | Redesign `c_wiring.txt` corpus: each doc = `/* comment */` + compilable C function body calling known primitives | Fix the root cause of 1% syntax pass |
-| **P0** | Retrain `c_wiringgen` on C-body corpus (start with 20K steps) | Establish whether composition grammar generalises in C-body form |
-| **P0** | Re-run `c_compose_v3` inference on same 128 intents | Measure wiring syntax pass rate with fixed corpus |
-| **P1** | Analyse gcc failure modes from current run — what class of error dominates? | Confirm plan-string-as-C is the root cause (not tokenisation) |
-| **P1** | Test standalone `c_wiringgen` (C-body corpus) on 10 novel prompts vs `c_codegen` | Test composition grammar generalisation hypothesis directly |
-| **P2** | Measure OpaKanban retry contribution once wiring produces valid C | Validate retry architecture for code generation |
+| **P0** | 🔄 Await BLOCK_SIZE=512 retrain completion (planner 50K + judge 50K + wiringgen 20K) | Measure wiring syntax pass rate with all three bugs fixed |
+| **P1** | Measure OpaKanban retry contribution from the corrected baseline | Validate retry architecture (previously all retries fed invalid C) |
+| **P1** | Test standalone `c_wiringgen` on 10 novel prompts vs `c_codegen` | Test composition grammar generalisation hypothesis directly |
+| **P2** | Heap-allocate `attn_weights` in `forward_inference` using `cfg->block_size` | Remove compile-time BLOCK_SIZE constraint — enable per-organelle sizing |
 | **P2** | Explore S-expression wire format between planner and wiring | Preserve structural nesting in the composition plan |
-| **P3** | Parameterise N_LAYER/N_HEAD/BLOCK_SIZE through MicrogptConfig at runtime | Enable right-sized per-organelle architectures in one binary |
 | **P3** | OpaTrace capture for `c_compose_v3` pipeline runs | Reasoning trace training data for future fine-tuning |
 
 ---
