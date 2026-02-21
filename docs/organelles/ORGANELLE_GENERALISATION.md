@@ -3,7 +3,7 @@
 **Topic:** From Memorisation to Composition — the experimental lineage of C code generation in MicroGPT-C  
 **Date:** February 2026  
 **Author:** Ajay Soni, Enjector Software Ltd.  
-**Status:** Three root causes found and fixed (Feb 2026). Full retrain at BLOCK_SIZE=512 underway — results pending.
+**Status:** 28% wiring syntax OK achieved (BLOCK_SIZE=512, temp=0.3). 40k-step retrain with MAX_RETRIES=7 in progress.
 
 ---
 
@@ -13,7 +13,7 @@
 
 **Picture:** A single organelle is a lookup table for code. Two organelles form a lookup table with an index. Three organelles, a syntax judge, and an OpaKanban retry loop form something that *writes new code* — not because any component is creative, but because the pipeline searches the space of known compositions and validates the output deterministically.
 
-**Proof:** `c_codegen` scored 100% on in-corpus prompts and 0/10 on novel ones. `c_compose_v3` ran 128 held-out intents: 98% parse rate, 83% exact plan match, 96% neural judge pass — all strong. But `c_wiringgen` produced syntactically valid C on only 3/116 attempts (3%) after initial retrain. Three compounding root causes were found and fixed (see §9).
+**Proof:** `c_codegen` scored 100% on in-corpus prompts and 0/10 on novel ones. `c_compose_v3` ran 128 held-out intents: 100% parse rate, 88% exact plan match, 95% neural judge pass — all strong. After fixing three compounding bugs (prompt mismatch, single-newline stop, BLOCK_SIZE=128), `c_wiringgen` now produces syntactically valid C on **28% of attempts** (34/121). Temperature sweep (0.1→0.2→0.3) confirmed 0.3 is optimal. A second retrain (40k steps, MAX_RETRIES=7) is running to push further.
 
 **Push:** The puzzle8_reasoning experiments provide the theoretical framework: the pipeline *is* the reasoning layer. The organelles are retrieval engines; composition, validation, and retry are handled deterministically. The question is not whether organelles can reason — they cannot — but whether a well-designed pipeline can simulate compositional code generation through coordinated retrieval.
 
@@ -43,11 +43,10 @@ c_codegen             c_wiringgen          c_compose          c_compose_v3
 retrieve C code?"     learn to compose?"   + judge work?"     produce valid C?"
      │                     │                    │                    │
      ▼                     ▼                    ▼                    ▼
-100% in-corpus        Corpus: plan strings  96% parse rate     98% parse rate ✅
- 0/10 novel            ← WRONG target        4% registry hit    83% exact match ✅
-                       Fixed: c_wiring.txt   LR divergence v2   3→?% wiring 🔄
-                       C bodies (864 docs)                       (BLOCK_SIZE=512
-                                                                  retrain pending)
+100% in-corpus        Corpus: plan strings  96% parse rate     100% parse rate ✅
+ 0/10 novel            Fixed: c_wiring.txt   4% registry hit    88% exact match ✅
+                       C bodies (864 docs)    LR divergence v2   28% wiring OK  ✅
+                                                                  (40k retrain 🔄)
 ```
 
 ---
@@ -261,9 +260,9 @@ Natural language intent
 |---|---|---|---|---|
 | `c_planner` | ~1.2M | 50K steps | 0.085 | ✅ 98% parse, 83% exact |
 | `c_judge` | ~1.2M | 50K steps | 0.132 | ✅ 96% PASS on valid plans |
-| `c_wiringgen` | ~1.26M | 20K steps | 0.071 | 🔄 Retraining at BLOCK_SIZE=512 |
+| `c_wiringgen` | ~1.26M | 40K steps | 0.071 | 🔄 Retraining (40k steps, MAX_RETRIES=7) |
 
-All three organelles share `N_EMBD=128, N_HEAD=8, N_LAYER=6, BLOCK_SIZE=512, MLP_DIM=512` (upgraded from 128 — see §9 root cause #3). The compile-time macro constraint remains: all organelles in a single binary must share the same architecture.
+All three organelles share `N_EMBD=128, N_HEAD=8, N_LAYER=6, BLOCK_SIZE=512, MLP_DIM=512`. The compile-time macro constraint remains: all organelles in a single binary must share the same architecture.
 
 ### The N_LAYER Alignment Problem (Solved)
 
@@ -339,11 +338,11 @@ A critical test: `/* denoise and downsample */`. The corpus contains `/* chain l
 
 | Tier | Target | Actual | Status |
 |---|---|---|---|
-| **Tier 1** — parse rate | >90% | **98%** (126/128) | ✅ Exceeded |
-| **Tier 2** — registry hit | >80% | **91%** (116/128) | ✅ Exceeded |
+| **Tier 1** — parse rate | >90% | **100%** (128/128) | ✅ Exceeded |
+| **Tier 2** — registry hit | >80% | **95%** (121/128) | ✅ Exceeded |
 | **Tier 3** — neural judge PASS | >50% | **95%** (122/128) | ✅ Exceeded |
-| **Tier 4** — exact plan match | >80% | **83%** (106/128) | ✅ Met |
-| **Tier 5** — wiring syntax OK | >30% | **3%** → 🔄 pending | Fixes applied |
+| **Tier 4** — exact plan match | >80% | **88%** (113/128) | ✅ Met |
+| **Tier 5** — wiring syntax OK | >30% | **28%** (34/121) | 🔄 Close (40k retrain running) |
 
 ### Three Root Causes Found and Fixed
 
@@ -376,11 +375,11 @@ Deep debugging of the 0→3% wiring syntax pass rate revealed three compounding 
 
 | Metric | c_compose v1 | c_compose_v3 | Change |
 |---|---|---|---|
-| Plan parse rate | 96% | **98%** | +2% ✅ |
-| All fns in registry | 4% | **91%** | +87% ✅ |
+| Plan parse rate | 96% | **100%** | +4% ✅ |
+| All fns in registry | 4% | **95%** | +91% ✅ |
 | Neural judge PASS | 65% | **95%** | +30% ✅ |
-| Exact plan match | 2% | **83%** | +81% ✅ |
-| Valid C function body | N/A | **3%** → pending | Fixes applied |
+| Exact plan match | 2% | **88%** | +86% ✅ |
+| Valid C function body | N/A | **28%** | New ✅ (target >30%) |
 
 ---
 
@@ -438,9 +437,9 @@ The pipeline optimises over the space of possible wiring patterns through reject
 
 | Priority | Action | Expected Outcome |
 |---|---|---|
-| **P0** | 🔄 Await BLOCK_SIZE=512 retrain completion (planner 50K + judge 50K + wiringgen 20K) | Measure wiring syntax pass rate with all three bugs fixed |
-| **P1** | Measure OpaKanban retry contribution from the corrected baseline | Validate retry architecture (previously all retries fed invalid C) |
-| **P1** | Test standalone `c_wiringgen` on 10 novel prompts vs `c_codegen` | Test composition grammar generalisation hypothesis directly |
+| **P0** | 🔄 Await 40k-step wiringgen retrain + MAX_RETRIES=7 (~1h) | Push wiring syntax OK past 30% |
+| **P1** | Temperature annealing: start 0.5 decay per retry | More diversity on early retries, convergence on later |
+| **P1** | Analyse remaining gcc failure modes — near-miss identifier garbling | Identify if beam search or constrained decoding helps |
 | **P2** | Heap-allocate `attn_weights` in `forward_inference` using `cfg->block_size` | Remove compile-time BLOCK_SIZE constraint — enable per-organelle sizing |
 | **P2** | Explore S-expression wire format between planner and wiring | Preserve structural nesting in the composition plan |
 | **P3** | OpaTrace capture for `c_compose_v3` pipeline runs | Reasoning trace training data for future fine-tuning |
