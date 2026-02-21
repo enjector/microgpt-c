@@ -291,6 +291,26 @@ add_demo(
           MAX_VOCAB=200 MAX_DOCS=5000 MAX_DOC_LEN=256
 )
 
+# ==================================================================
+#  Organelle: OPA Code Composition Pipeline v3 (with Syntax Judge)
+# ==================================================================
+
+add_demo(
+  NAME    c_compose_v3
+  SOURCE  experiments/organelles/c_compose_v3/main.c
+  THREADS METAL BLAS
+  COPY    experiments/organelles/c_compose/c_planner.txt
+          experiments/organelles/c_compose/c_judge.txt
+          experiments/organelles/c_compose/c_registry.txt
+          experiments/organelles/c_compose/test_intents.txt
+          experiments/organelles/c_wiringgen/c_wiring.txt
+  DEFINES N_EMBD=128 N_HEAD=8 N_LAYER=6 BLOCK_SIZE=128 MLP_DIM=512
+          NUM_STEPS=50000 LEARNING_RATE=0.0005 BATCH_SIZE=8 WARMUP_STEPS=2500
+          MAX_VOCAB=200 MAX_DOCS=5000 MAX_DOC_LEN=256
+          WIRING_N_EMBD=128 WIRING_N_HEAD=8 WIRING_N_LAYER=6
+          WIRING_BLOCK_SIZE=128 WIRING_MLP_DIM=512 WIRING_NUM_STEPS=20000
+)
+
 add_demo(
   NAME    puzzle8_demo
   SOURCE  experiments/organelles/puzzle8/main.c
