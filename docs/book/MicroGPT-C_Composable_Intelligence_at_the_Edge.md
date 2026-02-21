@@ -21,7 +21,7 @@
     
     {\large \today\par}
     \vspace{0.3cm}
-    {\normalsize\texttt{Version 1.0.2}\par}
+    {\normalsize\texttt{Version 1.0.3}\par}
 \end{titlepage}
 
 % --- Copyright Page ---
@@ -32,7 +32,7 @@
 \noindent
 \textbf{MicroGPT-C: Composable Intelligence at the Edge}\\
 From Stem Cell Models to Real-World AI Pipelines \textendash{} Architecture, Implementation, and Research\\
-\textit{Version 1.0.2}\\[2em]
+\textit{Version 1.0.3}\\[2em]
 
 \noindent
 \textbf{Research Team}\\
@@ -82,9 +82,10 @@ The guide is structured as a progressive reference, starting with foundational c
 ### Part I: Foundations – Understanding the Core Framework
 
 1. **[Chapter 1: The Case for Small AI](1.md)**  
-   *Teaser: Discover why massive LLMs are unsustainable for edge devices and calculate your own device's parameter limits.*  
+   *Teaser: Discover why massive LLMs are unsustainable for edge devices and calculate your own device's parameter limits. Then discover why inference is essentially free once a checkpoint exists.*  
    Why massive LLMs are unsustainable for edge devices and how MicroGPT-C provides a zero-dependency C99 alternative. Covers the "generalist monolith" problem — including the Neural Algorithmic Reasoning (NAR) insight that monolithic models waste parameter budget approximating deterministic algorithms (state tracking, search, validity checking) that can be expressed in 30–80 lines of C — the stem cell analogy, and the value of specialized, composable models.  
-   Key Topics: AI accessibility challenges; memory/compute math for edge devices; NAR capacity efficiency argument; end-to-end research preview.
+   **The economic inversion:** Training is a one-time cost — the `mastermind_player` organelle trained in **62 seconds** on a laptop CPU and produced a **1.1 MB checkpoint**. The `c_judge` (1.2M params) took **29 minutes**. After that, inference is CPU-resident at ~0.3s per query with no API, no per-token billing, and no network required. Cloud LLMs charge per inference; organelles charge once. This is the hard floor cloud providers cannot compete with for narrow, repeatable tasks.  
+   Key Topics: AI accessibility challenges; memory/compute math for edge devices; NAR capacity efficiency argument; training vs inference cost inversion; end-to-end research preview.
 
 2. **[Chapter 2: Core Architecture of MicroGPT-C](2.md)**  
    *Teaser: Dive into the forward pass with pseudocode for attention: `Attention(Q, K, V) = softmax(Q K^T / sqrt(d_k)) V`. Swap ReLU for GELU and measure the loss delta.*  
@@ -1588,6 +1589,10 @@ At 1.2M parameters, LR scheduling tuning was critical (see Chapter 3). The v2 at
 | Exact match | 83% (byte-perfect composition) |
 
 Research Insight: Flat protocols free capacity for semantics—params focus on meaning, not syntax. The same Planner->Judge pipeline pattern that filters invalid chess moves can filter invalid code composition plans.
+
+**Economics of Pipeline-Based Code Generation**
+
+Training the `c_judge` and `c_planner` organelles (1.2M params each) took **~29 minutes each** on a CPU and produced **14.5 MB checkpoints**. Total one-time training cost on a cloud CPU instance: under $1. Thereafter, each function composition query runs in under a second with zero API cost. A comparable query to GPT-4 costs ~$0.01–$0.06 per call. At 10,000 queries per month that is $100–$600/month cloud vs <$1/month self-hosted. The pipeline's retrieval-based architecture means the checkpoint is stable — it does not drift, does not require retraining unless the function registry changes, and runs identically on a Raspberry Pi as on a data centre CPU.
 
 \newpage
 
