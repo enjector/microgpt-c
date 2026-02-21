@@ -1129,3 +1129,225 @@ void organelle_generate_ensemble(const Organelle *org,
   if (confidence)
     *confidence = (scalar_t)vote_counts[best_idx] / (scalar_t)n_votes;
 }
+
+/* ======================== Reasoning Trace Recorder ======================== */
+
+/*
+ * The reasoning trace recorder captures the pipeline's decision-making process
+ * for a single run (one puzzle solve or game play).  Each step records:
+ *   - What action was proposed
+ *   - What happened (accepted/rejected/stall/replan/cycle-break)
+ *   - Progress metric before and after
+ *   - Kanban blocked state at the time of decision
+ *   - Whether the action came from the model or a fallback
+ *
+ * The serialised trace can be fed back as training data to teach organelles
+ * the pipeline's coordination logic: "process retrieval" rather than
+ * "answer retrieval."
+ */
+
+static const char *opa_outcome_str(OpaStepOutcome o) {
+  switch (o) {
+  case OPA_STEP_ACCEPTED:
+    return "accepted";
+  case OPA_STEP_REJECTED:
+    return "rejected";
+  case OPA_STEP_STALL:
+    return "stall";
+  case OPA_STEP_REPLAN:
+    return "replan";
+  case OPA_STEP_CYCLE_BREAK:
+    return "cycle_break";
+  default:
+    return "unknown";
+  }
+}
+
+/*
+ * opa_trace_init — Initialise a trace recorder to its empty state.
+ *
+ *   @param trace           Trace to initialise
+ *   @param initial_metric  Starting progress metric (e.g. manhattan distance)
+ */
+void opa_trace_init(OpaTrace *trace, int initial_metric) {
+  memset(trace, 0, sizeof(OpaTrace));
+  trace->initial_metric = initial_metric;
+  trace->final_metric = initial_metric; /* default until finalised */
+}
+
+/*
+ * opa_trace_record — Record one pipeline step in the trace.
+ *
+ *   Steps beyond OPA_TRACE_MAX_STEPS are silently dropped (no overflow).
+ *
+ *   @param trace          Trace recorder
+ *   @param action         Proposed action string (e.g. "up", "ABCD")
+ *   @param outcome        What happened to this action
+ *   @param metric_before  Progress metric before this step
+ *   @param metric_after   Progress metric after (-1 if rejected/N/A)
+ *   @param blocked        Current kanban blocked[] string (may be NULL)
+ *   @param from_model     1 = model-sourced, 0 = fallback
+ */
+void opa_trace_record(OpaTrace *trace, const char *action,
+                      OpaStepOutcome outcome, int metric_before,
+                      int metric_after, const char *blocked, int from_model) {
+  if (trace->num_steps >= OPA_TRACE_MAX_STEPS)
+    return; /* silently clamp */
+
+  OpaTraceStep *s = &trace->steps[trace->num_steps];
+  s->step = trace->num_steps + 1; /* 1-indexed */
+  s->outcome = outcome;
+  s->metric_before = metric_before;
+  s->metric_after = metric_after;
+  s->from_model = from_model;
+
+  /* Safe copy of action string */
+  if (action) {
+    strncpy(s->action, action, sizeof(s->action) - 1);
+    s->action[sizeof(s->action) - 1] = '\0';
+  } else {
+    s->action[0] = '\0';
+  }
+
+  /* Safe copy of blocked snapshot */
+  if (blocked) {
+    strncpy(s->blocked_snapshot, blocked, sizeof(s->blocked_snapshot) - 1);
+    s->blocked_snapshot[sizeof(s->blocked_snapshot) - 1] = '\0';
+  } else {
+    s->blocked_snapshot[0] = '\0';
+  }
+
+  trace->num_steps++;
+}
+
+/*
+ * opa_trace_finalise — Mark the trace as complete.
+ *
+ *   @param trace         Trace to finalise
+ *   @param final_metric  Ending progress metric
+ *   @param solved        1 if goal was reached, 0 if not
+ */
+void opa_trace_finalise(OpaTrace *trace, int final_metric, int solved) {
+  trace->final_metric = final_metric;
+  trace->solved = solved;
+}
+
+/*
+ * opa_trace_to_corpus — Serialise a trace to corpus-format text.
+ *
+ *   Format (one line per step):
+ *     "step|action|outcome|metric_before>metric_after|blocked|src\n"
+ *
+ *   A header line gives context:
+ *     "TRACE|initial=N|final=N|solved=0|steps=N\n"
+ *
+ *   @param trace   Trace to serialise
+ *   @param buf     Output buffer
+ *   @param buf_sz  Buffer size
+ *   @return        Bytes written (excluding NUL), or -1 if buffer too small
+ */
+int opa_trace_to_corpus(const OpaTrace *trace, char *buf, size_t buf_sz) {
+  if (!buf || buf_sz == 0)
+    return -1;
+
+  size_t pos = 0;
+
+  /* Header line */
+  int n = snprintf(buf + pos, buf_sz - pos,
+                   "TRACE|initial=%d|final=%d|solved=%d|steps=%d\n",
+                   trace->initial_metric, trace->final_metric, trace->solved,
+                   trace->num_steps);
+  if (n < 0 || (size_t)n >= buf_sz - pos)
+    return -1;
+  pos += (size_t)n;
+
+  /* One line per step */
+  for (int i = 0; i < trace->num_steps; i++) {
+    const OpaTraceStep *s = &trace->steps[i];
+    n = snprintf(buf + pos, buf_sz - pos, "%d|%s|%s|%d>%d|%s|%s\n", s->step,
+                 s->action, opa_outcome_str(s->outcome), s->metric_before,
+                 s->metric_after,
+                 s->blocked_snapshot[0] ? s->blocked_snapshot : "none",
+                 s->from_model ? "model" : "fallback");
+    if (n < 0 || (size_t)n >= buf_sz - pos)
+      return -1;
+    pos += (size_t)n;
+  }
+
+  return (int)pos;
+}
+
+/*
+ * opa_trace_write — Append a serialised trace to a file.
+ *
+ *   Each trace is separated by a blank line so the corpus loader
+ *   can treat each trace as a separate document.
+ *
+ *   @param trace  Trace to write
+ *   @param path   File path (created if absent, appended if exists)
+ *   @return       0 on success, -1 on error
+ */
+int opa_trace_write(const OpaTrace *trace, const char *path) {
+  char buf[4096];
+  int len = opa_trace_to_corpus(trace, buf, sizeof(buf));
+  if (len < 0)
+    return -1;
+
+  FILE *f = fopen(path, "a");
+  if (!f)
+    return -1;
+
+  fwrite(buf, 1, (size_t)len, f);
+  fprintf(f, "\n"); /* blank line separator between traces */
+  fclose(f);
+  return 0;
+}
+
+/*
+ * opa_trace_count — Count steps matching a specific outcome.
+ *
+ *   @param trace    Trace to examine
+ *   @param outcome  Outcome type to count
+ *   @return         Number of matching steps
+ */
+int opa_trace_count(const OpaTrace *trace, OpaStepOutcome outcome) {
+  int count = 0;
+  for (int i = 0; i < trace->num_steps; i++) {
+    if (trace->steps[i].outcome == outcome)
+      count++;
+  }
+  return count;
+}
+
+/*
+ * opa_trace_has_recovery — Detect non-monotonic recovery in the trace.
+ *
+ *   A "recovery" occurs when the progress metric increases (regression)
+ *   at some step, then later decreases (progress) at a subsequent step.
+ *   This pattern indicates a successful detour: the system accepted a
+ *   temporary penalty to reach a better overall position.
+ *
+ *   This is the hardest pattern for a retrieval system to learn, because
+ *   it violates the greedy assumption that every step should improve the
+ *   metric.
+ *
+ *   @param trace  Trace to examine
+ *   @return       1 if a recovery pattern exists, 0 otherwise
+ */
+int opa_trace_has_recovery(const OpaTrace *trace) {
+  int saw_regression = 0;
+  for (int i = 0; i < trace->num_steps; i++) {
+    const OpaTraceStep *s = &trace->steps[i];
+    if (s->metric_after < 0)
+      continue; /* skip rejected steps (no metric) */
+
+    if (s->metric_after > s->metric_before) {
+      /* Metric increased = regression */
+      saw_regression = 1;
+    } else if (s->metric_after < s->metric_before && saw_regression) {
+      /* Metric decreased after a previous regression = recovery */
+      return 1;
+    }
+  }
+  return 0;
+}

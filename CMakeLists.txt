@@ -124,9 +124,9 @@ function(_microgpt_lib_for_defines OUT_VAR)
   endif()
   # Build a unique suffix from the sorted defines
   list(SORT _defs)
-  string(REPLACE ";" "_" _suffix "${_defs}")
-  string(REPLACE "=" "" _suffix "${_suffix}")
-  set(_tgt "microgpt_lib_${_suffix}")
+  string(REPLACE ";" "_" _raw_suffix "${_defs}")
+  string(MD5 _hash "${_raw_suffix}")
+  set(_tgt "microgpt_lib_${_hash}")
 
   # Reuse existing target if already created
   if(TARGET ${_tgt})
@@ -303,6 +303,164 @@ add_demo(
   DEFINES N_EMBD=96 N_HEAD=8 N_LAYER=4 BLOCK_SIZE=128 MLP_DIM=384
           NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
           MAX_VOCAB=50 MAX_DOCS=60000 MAX_DOC_LEN=128
+)
+
+# ==================================================================
+#  Organelle: 8-Puzzle Verification Targets (Phase 5)
+# ==================================================================
+
+# 460K Bare Model (Verify scaling removed the need for scaffolding)
+add_demo(
+  NAME    puzzle8_bare
+  SOURCE  experiments/organelles/puzzle8/main.c
+  THREADS
+  COPY    experiments/organelles/puzzle8/puzzle8_strategist.txt
+          experiments/organelles/puzzle8/puzzle8_mover.txt
+          experiments/organelles/puzzle8/puzzle8_detour_detector.txt
+          experiments/organelles/puzzle8/puzzle8_detour_mover.txt
+          experiments/organelles/puzzle8/puzzle8_judge.txt
+  DEFINES N_EMBD=96 N_HEAD=8 N_LAYER=4 BLOCK_SIZE=128 MLP_DIM=384
+          NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
+          MAX_VOCAB=50 MAX_DOCS=60000 MAX_DOC_LEN=128
+          DISABLE_PIPELINE_ASSISTS=1
+)
+
+# 64K Assisted (Contrast: Scaffolding is a crutch for low capacity)
+add_demo(
+  NAME    puzzle8_64k_assisted
+  SOURCE  experiments/organelles/puzzle8/main.c
+  THREADS
+  COPY    experiments/organelles/puzzle8/puzzle8_strategist.txt
+          experiments/organelles/puzzle8/puzzle8_mover.txt
+          experiments/organelles/puzzle8/puzzle8_detour_detector.txt
+          experiments/organelles/puzzle8/puzzle8_detour_mover.txt
+          experiments/organelles/puzzle8/puzzle8_judge.txt
+  DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=2 BLOCK_SIZE=128 MLP_DIM=192
+          NUM_STEPS=10000 LEARNING_RATE=0.001 BATCH_SIZE=8
+          MAX_VOCAB=50 MAX_DOCS=60000 MAX_DOC_LEN=128
+          STRATEGIST_CKPT="puzzle8_strategist_64k.ckpt"
+          MOVER_CKPT="puzzle8_mover_64k.ckpt"
+          DETECTOR_CKPT="puzzle8_detector_64k.ckpt"
+          DETOUR_MOVER_CKPT="puzzle8_detour_mover_64k.ckpt"
+          JUDGE_CKPT="puzzle8_judge_64k.ckpt"
+)
+
+# 64K Bare (Contrast: 64K fails without crutch)
+add_demo(
+  NAME    puzzle8_64k_bare
+  SOURCE  experiments/organelles/puzzle8/main.c
+  THREADS
+  COPY    experiments/organelles/puzzle8/puzzle8_strategist.txt
+          experiments/organelles/puzzle8/puzzle8_mover.txt
+          experiments/organelles/puzzle8/puzzle8_detour_detector.txt
+          experiments/organelles/puzzle8/puzzle8_detour_mover.txt
+          experiments/organelles/puzzle8/puzzle8_judge.txt
+  DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=2 BLOCK_SIZE=128 MLP_DIM=192
+          NUM_STEPS=10000 LEARNING_RATE=0.001 BATCH_SIZE=8
+          MAX_VOCAB=50 MAX_DOCS=60000 MAX_DOC_LEN=128
+          DISABLE_PIPELINE_ASSISTS=1
+          STRATEGIST_CKPT="puzzle8_strategist_64k.ckpt"
+          MOVER_CKPT="puzzle8_mover_64k.ckpt"
+          DETECTOR_CKPT="puzzle8_detector_64k.ckpt"
+          DETOUR_MOVER_CKPT="puzzle8_detour_mover_64k.ckpt"
+          JUDGE_CKPT="puzzle8_judge_64k.ckpt"
+)
+
+# ==================================================================
+#  Organelle: 8-Puzzle with Reasoning Trace capture (comparison variant)
+# ==================================================================
+
+add_demo(
+  NAME    puzzle8_reasoning_demo
+  SOURCE  experiments/organelles/puzzle8_reasoning/main.c
+  THREADS
+  COPY    experiments/organelles/puzzle8_reasoning/puzzle8_strategist.txt
+          experiments/organelles/puzzle8_reasoning/puzzle8_mover.txt
+          experiments/organelles/puzzle8_reasoning/puzzle8_mover_enriched.txt
+          experiments/organelles/puzzle8_reasoning/puzzle8_detour_detector.txt
+          experiments/organelles/puzzle8_reasoning/puzzle8_detour_mover.txt
+          experiments/organelles/puzzle8_reasoning/puzzle8_judge.txt
+  DEFINES N_EMBD=96 N_HEAD=8 N_LAYER=4 BLOCK_SIZE=128 MLP_DIM=384
+          NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
+          MAX_VOCAB=50 MAX_DOCS=60000 MAX_DOC_LEN=128
+)
+
+# ==================================================================
+#  Organelle: 8-Puzzle with Enriched Corpus (Phase 4 A/B comparison)
+# ==================================================================
+
+add_demo(
+  NAME    puzzle8_reasoning_enriched_demo
+  SOURCE  experiments/organelles/puzzle8_reasoning/main.c
+  THREADS
+  COPY    experiments/organelles/puzzle8_reasoning/puzzle8_strategist.txt
+          experiments/organelles/puzzle8_reasoning/puzzle8_mover.txt
+          experiments/organelles/puzzle8_reasoning/puzzle8_mover_enriched.txt
+          experiments/organelles/puzzle8_reasoning/puzzle8_detour_detector.txt
+          experiments/organelles/puzzle8_reasoning/puzzle8_detour_mover.txt
+          experiments/organelles/puzzle8_reasoning/puzzle8_judge.txt
+  DEFINES N_EMBD=96 N_HEAD=8 N_LAYER=4 BLOCK_SIZE=128 MLP_DIM=384
+          NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
+          MAX_VOCAB=50 MAX_DOCS=60000 MAX_DOC_LEN=128
+          USE_ENRICHED_CORPUS=1
+)
+
+# ==================================================================
+#  Organelle: 8-Puzzle with Combined Corpus (Phase 4b A/B comparison)
+# ==================================================================
+
+add_demo(
+  NAME    puzzle8_reasoning_combined_demo
+  SOURCE  experiments/organelles/puzzle8_reasoning/main.c
+  THREADS
+  COPY    experiments/organelles/puzzle8_reasoning/puzzle8_strategist.txt
+          experiments/organelles/puzzle8_reasoning/puzzle8_mover.txt
+          experiments/organelles/puzzle8_reasoning/puzzle8_mover_enriched.txt
+          experiments/organelles/puzzle8_reasoning/puzzle8_mover_combined.txt
+          experiments/organelles/puzzle8_reasoning/puzzle8_detour_detector.txt
+          experiments/organelles/puzzle8_reasoning/puzzle8_detour_mover.txt
+          experiments/organelles/puzzle8_reasoning/puzzle8_judge.txt
+  DEFINES N_EMBD=96 N_HEAD=8 N_LAYER=4 BLOCK_SIZE=192 MLP_DIM=384
+          NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
+          MAX_VOCAB=50 MAX_DOCS=60000 MAX_DOC_LEN=192
+          USE_ENRICHED_CORPUS=2
+)
+
+# ==================================================================
+#  Organelle: 8-Puzzle bare-model tests (Phase 5 — scaffolding removal)
+# ==================================================================
+
+add_demo(
+  NAME    puzzle8_reasoning_standard_bare
+  SOURCE  experiments/organelles/puzzle8_reasoning/main.c
+  THREADS
+  COPY    experiments/organelles/puzzle8_reasoning/puzzle8_strategist.txt
+          experiments/organelles/puzzle8_reasoning/puzzle8_mover.txt
+          experiments/organelles/puzzle8_reasoning/puzzle8_mover_enriched.txt
+          experiments/organelles/puzzle8_reasoning/puzzle8_detour_detector.txt
+          experiments/organelles/puzzle8_reasoning/puzzle8_detour_mover.txt
+          experiments/organelles/puzzle8_reasoning/puzzle8_judge.txt
+  DEFINES N_EMBD=96 N_HEAD=8 N_LAYER=4 BLOCK_SIZE=128 MLP_DIM=384
+          NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
+          MAX_VOCAB=50 MAX_DOCS=60000 MAX_DOC_LEN=128
+          DISABLE_PIPELINE_ASSISTS=1
+)
+
+add_demo(
+  NAME    puzzle8_reasoning_combined_bare
+  SOURCE  experiments/organelles/puzzle8_reasoning/main.c
+  THREADS
+  COPY    experiments/organelles/puzzle8_reasoning/puzzle8_strategist.txt
+          experiments/organelles/puzzle8_reasoning/puzzle8_mover.txt
+          experiments/organelles/puzzle8_reasoning/puzzle8_mover_enriched.txt
+          experiments/organelles/puzzle8_reasoning/puzzle8_mover_combined.txt
+          experiments/organelles/puzzle8_reasoning/puzzle8_detour_detector.txt
+          experiments/organelles/puzzle8_reasoning/puzzle8_detour_mover.txt
+          experiments/organelles/puzzle8_reasoning/puzzle8_judge.txt
+  DEFINES N_EMBD=96 N_HEAD=8 N_LAYER=4 BLOCK_SIZE=192 MLP_DIM=384
+          NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
+          MAX_VOCAB=50 MAX_DOCS=60000 MAX_DOC_LEN=192
+          USE_ENRICHED_CORPUS=2 DISABLE_PIPELINE_ASSISTS=1
 )
 
 # ==================================================================

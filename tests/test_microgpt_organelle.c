@@ -414,6 +414,206 @@ TEST(ensemble_constants_valid) {
 }
 
 /* ==================================================================== */
+/*                     REASONING TRACE TESTS                              */
+/* ==================================================================== */
+
+TEST(trace_init_empty) {
+  OpaTrace tr;
+  opa_trace_init(&tr, 12);
+  ASSERT_EQ(tr.num_steps, 0);
+  ASSERT_EQ(tr.initial_metric, 12);
+  ASSERT_EQ(tr.final_metric, 12);
+  ASSERT_EQ(tr.solved, 0);
+}
+
+TEST(trace_record_single) {
+  OpaTrace tr;
+  opa_trace_init(&tr, 10);
+  opa_trace_record(&tr, "up", OPA_STEP_ACCEPTED, 10, 9, "", 1);
+  ASSERT_EQ(tr.num_steps, 1);
+  ASSERT_STREQ(tr.steps[0].action, "up");
+  ASSERT_EQ(tr.steps[0].outcome, OPA_STEP_ACCEPTED);
+  ASSERT_EQ(tr.steps[0].metric_before, 10);
+  ASSERT_EQ(tr.steps[0].metric_after, 9);
+  ASSERT_EQ(tr.steps[0].from_model, 1);
+  ASSERT_EQ(tr.steps[0].step, 1);
+}
+
+TEST(trace_record_sequence) {
+  OpaTrace tr;
+  opa_trace_init(&tr, 12);
+  opa_trace_record(&tr, "up", OPA_STEP_ACCEPTED, 12, 11, "", 1);
+  opa_trace_record(&tr, "right", OPA_STEP_ACCEPTED, 11, 10, "", 1);
+  opa_trace_record(&tr, "up", OPA_STEP_REJECTED, 10, -1, "up", 1);
+  opa_trace_record(&tr, "left", OPA_STEP_STALL, 10, 10, "", 0);
+  ASSERT_EQ(tr.num_steps, 4);
+  ASSERT_STREQ(tr.steps[0].action, "up");
+  ASSERT_STREQ(tr.steps[1].action, "right");
+  ASSERT_STREQ(tr.steps[2].action, "up");
+  ASSERT_STREQ(tr.steps[3].action, "left");
+  ASSERT_EQ(tr.steps[2].metric_after, -1);
+  ASSERT_STREQ(tr.steps[2].blocked_snapshot, "up");
+  ASSERT_EQ(tr.steps[3].from_model, 0);
+}
+
+TEST(trace_record_overflow) {
+  OpaTrace tr;
+  opa_trace_init(&tr, 20);
+  for (int i = 0; i < OPA_TRACE_MAX_STEPS + 10; i++) {
+    opa_trace_record(&tr, "up", OPA_STEP_ACCEPTED, 20 - i, 19 - i, "", 1);
+  }
+  /* Should clamp at max, not overflow */
+  ASSERT_EQ(tr.num_steps, OPA_TRACE_MAX_STEPS);
+}
+
+TEST(trace_finalise) {
+  OpaTrace tr;
+  opa_trace_init(&tr, 12);
+  opa_trace_record(&tr, "up", OPA_STEP_ACCEPTED, 12, 11, "", 1);
+  opa_trace_finalise(&tr, 0, 1);
+  ASSERT_EQ(tr.final_metric, 0);
+  ASSERT_EQ(tr.solved, 1);
+}
+
+TEST(trace_count_outcomes) {
+  OpaTrace tr;
+  opa_trace_init(&tr, 10);
+  opa_trace_record(&tr, "up", OPA_STEP_ACCEPTED, 10, 9, "", 1);
+  opa_trace_record(&tr, "right", OPA_STEP_REJECTED, 9, -1, "", 1);
+  opa_trace_record(&tr, "left", OPA_STEP_ACCEPTED, 9, 8, "", 1);
+  opa_trace_record(&tr, "down", OPA_STEP_STALL, 8, 8, "", 0);
+  opa_trace_record(&tr, "up", OPA_STEP_REPLAN, 8, 8, "", 0);
+  opa_trace_record(&tr, "right", OPA_STEP_CYCLE_BREAK, 8, 7, "", 1);
+  ASSERT_EQ(opa_trace_count(&tr, OPA_STEP_ACCEPTED), 2);
+  ASSERT_EQ(opa_trace_count(&tr, OPA_STEP_REJECTED), 1);
+  ASSERT_EQ(opa_trace_count(&tr, OPA_STEP_STALL), 1);
+  ASSERT_EQ(opa_trace_count(&tr, OPA_STEP_REPLAN), 1);
+  ASSERT_EQ(opa_trace_count(&tr, OPA_STEP_CYCLE_BREAK), 1);
+}
+
+TEST(trace_has_recovery) {
+  /* md increases (regression) then decreases (recovery) */
+  OpaTrace tr;
+  opa_trace_init(&tr, 10);
+  opa_trace_record(&tr, "up", OPA_STEP_ACCEPTED, 10, 9, "", 1);
+  opa_trace_record(&tr, "left", OPA_STEP_ACCEPTED, 9, 11, "",
+                   1); /* regression */
+  opa_trace_record(&tr, "down", OPA_STEP_ACCEPTED, 11, 8, "",
+                   1); /* recovery! */
+  ASSERT_EQ(opa_trace_has_recovery(&tr), 1);
+}
+
+TEST(trace_no_false_recovery) {
+  /* Monotonically decreasing trace — no recovery */
+  OpaTrace tr;
+  opa_trace_init(&tr, 10);
+  opa_trace_record(&tr, "up", OPA_STEP_ACCEPTED, 10, 9, "", 1);
+  opa_trace_record(&tr, "right", OPA_STEP_ACCEPTED, 9, 8, "", 1);
+  opa_trace_record(&tr, "down", OPA_STEP_ACCEPTED, 8, 7, "", 1);
+  ASSERT_EQ(opa_trace_has_recovery(&tr), 0);
+}
+
+TEST(trace_to_corpus_format) {
+  OpaTrace tr;
+  opa_trace_init(&tr, 10);
+  opa_trace_record(&tr, "up", OPA_STEP_ACCEPTED, 10, 9, "", 1);
+  opa_trace_record(&tr, "right", OPA_STEP_REJECTED, 9, -1, "up", 1);
+  opa_trace_finalise(&tr, 9, 0);
+
+  char buf[2048];
+  int len = opa_trace_to_corpus(&tr, buf, sizeof(buf));
+  ASSERT_GT(len, 0);
+  /* Header line should be present */
+  ASSERT(strstr(buf, "TRACE|") != NULL);
+  ASSERT(strstr(buf, "initial=10") != NULL);
+  ASSERT(strstr(buf, "solved=0") != NULL);
+  ASSERT(strstr(buf, "steps=2") != NULL);
+  /* Step lines should contain action and outcome */
+  ASSERT(strstr(buf, "up") != NULL);
+  ASSERT(strstr(buf, "accepted") != NULL);
+  ASSERT(strstr(buf, "rejected") != NULL);
+  ASSERT(strstr(buf, "model") != NULL);
+}
+
+TEST(trace_to_corpus_empty) {
+  OpaTrace tr;
+  opa_trace_init(&tr, 0);
+  opa_trace_finalise(&tr, 0, 1);
+  char buf[256];
+  int len = opa_trace_to_corpus(&tr, buf, sizeof(buf));
+  ASSERT_GT(len, 0);
+  ASSERT(strstr(buf, "TRACE|") != NULL);
+  ASSERT(strstr(buf, "steps=0") != NULL);
+}
+
+TEST(trace_write_file) {
+  OpaTrace tr;
+  opa_trace_init(&tr, 10);
+  opa_trace_record(&tr, "up", OPA_STEP_ACCEPTED, 10, 9, "", 1);
+  opa_trace_finalise(&tr, 9, 0);
+
+  const char *path = "_test_trace_output.txt";
+  remove(path); /* ensure clean start */
+  int rc = opa_trace_write(&tr, path);
+  ASSERT_EQ(rc, 0);
+
+  /* Verify file exists and has content */
+  FILE *f = fopen(path, "r");
+  ASSERT_NE(f, NULL);
+  char fbuf[2048];
+  size_t nread = fread(fbuf, 1, sizeof(fbuf) - 1, f);
+  fbuf[nread] = '\0';
+  fclose(f);
+  ASSERT_GT((int)nread, 0);
+  ASSERT(strstr(fbuf, "TRACE|") != NULL);
+  remove(path);
+}
+
+TEST(trace_pipeline_simulation) {
+  /* Simulate a full pipeline: accept, reject, stall, replan, cycle-break, solve
+   */
+  OpaTrace tr;
+  opa_trace_init(&tr, 12);
+
+  opa_trace_record(&tr, "up", OPA_STEP_ACCEPTED, 12, 11, "", 1);
+  opa_trace_record(&tr, "right", OPA_STEP_ACCEPTED, 11, 10, "", 1);
+  opa_trace_record(&tr, "up", OPA_STEP_REJECTED, 10, -1, "up", 1);
+  opa_trace_record(&tr, "left", OPA_STEP_STALL, 10, 10, "", 0);
+  opa_trace_record(&tr, "down", OPA_STEP_STALL, 10, 10, "", 0);
+  opa_trace_record(&tr, "up", OPA_STEP_REPLAN, 10, 10, "", 0);
+  opa_trace_record(&tr, "right", OPA_STEP_ACCEPTED, 10, 11, "",
+                   1); /* regression */
+  opa_trace_record(&tr, "down", OPA_STEP_CYCLE_BREAK, 11, 9, "up,left", 1);
+  opa_trace_record(&tr, "left", OPA_STEP_ACCEPTED, 9, 0, "", 1); /* solved! */
+  opa_trace_finalise(&tr, 0, 1);
+
+  /* Verify counts */
+  ASSERT_EQ(tr.num_steps, 9);
+  ASSERT_EQ(opa_trace_count(&tr, OPA_STEP_ACCEPTED), 4);
+  ASSERT_EQ(opa_trace_count(&tr, OPA_STEP_REJECTED), 1);
+  ASSERT_EQ(opa_trace_count(&tr, OPA_STEP_STALL), 2);
+  ASSERT_EQ(opa_trace_count(&tr, OPA_STEP_REPLAN), 1);
+  ASSERT_EQ(opa_trace_count(&tr, OPA_STEP_CYCLE_BREAK), 1);
+
+  /* Verify recovery (regression at step 7, then progress at step 8) */
+  ASSERT_EQ(opa_trace_has_recovery(&tr), 1);
+
+  /* Verify solved */
+  ASSERT_EQ(tr.solved, 1);
+  ASSERT_EQ(tr.final_metric, 0);
+  ASSERT_EQ(tr.initial_metric, 12);
+
+  /* Verify corpus serialisation */
+  char buf[4096];
+  int len = opa_trace_to_corpus(&tr, buf, sizeof(buf));
+  ASSERT_GT(len, 0);
+  ASSERT(strstr(buf, "TRACE|") != NULL);
+  ASSERT(strstr(buf, "solved=1") != NULL);
+  ASSERT(strstr(buf, "cycle_break") != NULL);
+  ASSERT(strstr(buf, "replan") != NULL);
+}
+
+/* ==================================================================== */
 /*                              MAIN                                     */
 /* ==================================================================== */
 
@@ -470,6 +670,20 @@ int main(void) {
 
   printf("\n[Ensemble Voting]\n");
   RUN(ensemble_constants_valid);
+
+  printf("\n[Reasoning Trace]\n");
+  RUN(trace_init_empty);
+  RUN(trace_record_single);
+  RUN(trace_record_sequence);
+  RUN(trace_record_overflow);
+  RUN(trace_finalise);
+  RUN(trace_count_outcomes);
+  RUN(trace_has_recovery);
+  RUN(trace_no_false_recovery);
+  RUN(trace_to_corpus_format);
+  RUN(trace_to_corpus_empty);
+  RUN(trace_write_file);
+  RUN(trace_pipeline_simulation);
 
   /* Summary */
   printf("\n=== Results: %d/%d passed", g_tests_passed, g_tests_run);

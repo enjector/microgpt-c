@@ -188,4 +188,96 @@ int opa_valid_filter(const char *action, const char *valid_csv);
 int opa_valid_fallback(const OpaKanban *kb, const char *valid_csv,
                        char *fallback, size_t fallback_sz);
 
+/* ======================== Reasoning Trace Recorder ======================== */
+/*
+ * Records the pipeline's decision-making process for a single run
+ * (one puzzle solve or game play).  Each step captures the proposed action,
+ * its outcome (accepted/rejected/stall/replan/cycle-break), progress metrics,
+ * and kanban state at the time of the decision.
+ *
+ * Usage:
+ *   1. opa_trace_init()     at start of each puzzle/game
+ *   2. opa_trace_record()   after each pipeline step
+ *   3. opa_trace_finalise() after the loop ends
+ *   4. opa_trace_to_corpus() or opa_trace_write() to export
+ *
+ * The serialised trace can be fed back as training data to teach organelles
+ * the pipeline's coordination logic ("process retrieval").
+ */
+
+#ifndef OPA_TRACE_MAX_STEPS
+#define OPA_TRACE_MAX_STEPS 64
+#endif
+
+/* Outcome of a single pipeline step */
+typedef enum {
+  OPA_STEP_ACCEPTED,   /* move was valid and made progress */
+  OPA_STEP_REJECTED,   /* move was invalid or out-of-bounds */
+  OPA_STEP_STALL,      /* move was valid but no progress (metric unchanged) */
+  OPA_STEP_REPLAN,     /* stall threshold reached, planner re-invoked */
+  OPA_STEP_CYCLE_BREAK /* oscillation detected and broken */
+} OpaStepOutcome;
+
+/* One step in a reasoning trace */
+typedef struct {
+  int step;                  /* 1-indexed step number */
+  char action[16];           /* the proposed action (e.g. "up", "ABCD") */
+  OpaStepOutcome outcome;    /* what happened */
+  int metric_before;         /* progress metric before (e.g. manhattan dist) */
+  int metric_after;          /* progress metric after (-1 if rejected) */
+  char blocked_snapshot[64]; /* kanban blocked[] state at time of decision */
+  int from_model;            /* 1 = model-sourced, 0 = fallback */
+} OpaTraceStep;
+
+/* Complete trace for one pipeline run (one puzzle/game) */
+typedef struct {
+  OpaTraceStep steps[OPA_TRACE_MAX_STEPS];
+  int num_steps;
+  int initial_metric; /* starting progress metric */
+  int final_metric;   /* ending progress metric */
+  int solved;         /* 1 if goal was reached */
+} OpaTrace;
+
+/* Initialise a trace recorder. */
+void opa_trace_init(OpaTrace *trace, int initial_metric);
+
+/*
+ * Record one pipeline step.
+ * action:         the proposed move string (e.g. "up", "ABCD")
+ * outcome:        what happened (accepted/rejected/stall/replan/cycle-break)
+ * metric_before:  progress metric before this step
+ * metric_after:   progress metric after (-1 if rejected/not applicable)
+ * blocked:        current kanban blocked[] string (may be "" or NULL)
+ * from_model:     1 if model-sourced, 0 if fallback
+ */
+void opa_trace_record(OpaTrace *trace, const char *action,
+                      OpaStepOutcome outcome, int metric_before,
+                      int metric_after, const char *blocked, int from_model);
+
+/* Finalise trace (set final_metric, solved flag). */
+void opa_trace_finalise(OpaTrace *trace, int final_metric, int solved);
+
+/*
+ * Serialise trace to a corpus-format string.
+ * Each step becomes a line: "step|action|outcome|mb→ma|blocked|src\n"
+ * Returns number of bytes written (excluding NUL), or -1 if buf too small.
+ */
+int opa_trace_to_corpus(const OpaTrace *trace, char *buf, size_t buf_sz);
+
+/*
+ * Write trace to a file in corpus format (append mode).
+ * Returns 0 on success, -1 on error.
+ */
+int opa_trace_write(const OpaTrace *trace, const char *path);
+
+/* Return count of steps with a given outcome. */
+int opa_trace_count(const OpaTrace *trace, OpaStepOutcome outcome);
+
+/*
+ * Return 1 if trace contains a non-monotonic recovery:
+ * metric increased (regression) then later decreased (progress).
+ * This indicates a successful detour — the hardest pattern to learn.
+ */
+int opa_trace_has_recovery(const OpaTrace *trace);
+
 #endif /* MICROGPT_ORGANELLE_H */

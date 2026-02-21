@@ -1,9 +1,10 @@
 /*
- * MicroGPT-C — 8-Puzzle Multi-Organelle Demo (v3b — Greedy/Detour Split)
+ * MicroGPT-C — 8-Puzzle with Reasoning Trace Capture
  * Copyright (c) 2026 Ajay Soni, Enjector Software Ltd. MIT License.
  *
- * Demonstrates the Organelle Pipeline Architecture (OPA) with
- * MD-delta encoding for genuine generalisation:
+ * Reasoning trace variant of the 8-puzzle OPA demo. Identical pipeline
+ * to puzzle8_demo, but captures every decision via OpaTrace for later
+ * use as training data (process retrieval vs answer retrieval).
  *
  *   5 neural organelles (Strategist, Greedy-Mover, Detour-Detector,
  *   Detour-Mover, Judge) collaborate via pipe-separated flat strings.
@@ -14,11 +15,12 @@
  *   3. Greedy-Mover: m=U,D,L,R|b=N[|x=DIR] → direction
  *   4. Judge: deterministic apply_move() boundary check
  *   5. Oscillation breaker: detect A↔B cycles, force unexplored dir
- *   6. Repeat until solved or max iterations reached
+ *   6. OpaTrace records outcome at each step
+ *   7. Repeat until solved or max iterations reached
  *
  * Build:
- *   cmake --build build --target puzzle8_demo
- *   ./build/puzzle8_demo
+ *   cmake --build build --target puzzle8_reasoning_demo
+ *   ./build/puzzle8_reasoning_demo
  */
 
 #define _CRT_SECURE_NO_WARNINGS 1
@@ -34,26 +36,28 @@
 
 /* ---- Configuration ---- */
 #define STRATEGIST_CORPUS "puzzle8_strategist.txt"
-#define MOVER_CORPUS "puzzle8_mover.txt"
+#define MOVER_CORPUS_STD "puzzle8_mover.txt"
+#define MOVER_CORPUS_ENRICHED "puzzle8_mover_enriched.txt"
+#define MOVER_CORPUS_COMBINED "puzzle8_mover_combined.txt"
 #define DETECTOR_CORPUS "puzzle8_detour_detector.txt"
 #define DETOUR_MOVER_CORPUS "puzzle8_detour_mover.txt"
 #define JUDGE_CORPUS "puzzle8_judge.txt"
 
-#ifndef STRATEGIST_CKPT
+/* Set USE_ENRICHED_CORPUS: 0=standard, 1=enriched-only, 2=combined */
+#ifndef USE_ENRICHED_CORPUS
+#define USE_ENRICHED_CORPUS 0
+#endif
+
+/* Set DISABLE_PIPELINE_ASSISTS=1 to remove scaffolding (Phase 5 test) */
+#ifndef DISABLE_PIPELINE_ASSISTS
+#define DISABLE_PIPELINE_ASSISTS 0
+#endif
+
 #define STRATEGIST_CKPT "puzzle8_strategist_v3b.ckpt"
-#endif
-#ifndef MOVER_CKPT
 #define MOVER_CKPT "puzzle8_mover_v3b.ckpt"
-#endif
-#ifndef DETECTOR_CKPT
 #define DETECTOR_CKPT "puzzle8_detector_v3b.ckpt"
-#endif
-#ifndef DETOUR_MOVER_CKPT
 #define DETOUR_MOVER_CKPT "puzzle8_detour_mover_v3b.ckpt"
-#endif
-#ifndef JUDGE_CKPT
 #define JUDGE_CKPT "puzzle8_judge_v3b.ckpt"
-#endif
 
 #define ORGANELLE_TEMP 0.2 /* low temperature for reliable retrieval */
 #define INF_GEN_LEN 80     /* max chars per organelle generation */
@@ -66,9 +70,10 @@
   (NUM_EASY_PUZZLES + NUM_MEDIUM_PUZZLES + NUM_HARD_PUZZLES)
 #define REPLAN_THRESHOLD 6 /* stalls before clearing blocked */
 #define ENSEMBLE_VOTES 3   /* worker votes per move (odd for tiebreak) */
-#ifndef DISABLE_PIPELINE_ASSISTS
-#define DISABLE_PIPELINE_ASSISTS 0
-#endif
+
+/* Reasoning trace and enriched corpus output */
+#define TRACE_OUTPUT_FILE "puzzle8_reasoning_traces.txt"
+#define ENRICHED_CORPUS_FILE "puzzle8_mover_enriched.txt"
 
 /* ---- File-scoped runtime config ---- */
 static MicrogptConfig g_cfg;
@@ -264,10 +269,17 @@ int main(void) {
   g_cfg.max_vocab = 50;
   g_cfg.max_docs = 60000;
   g_cfg.max_doc_len = 128;
-  microgpt_print_config("MicroGPT-C - 8-Puzzle OPA Generalisation Demo (v3b)",
-                        &g_cfg);
+  const char *mover_corpus = (USE_ENRICHED_CORPUS == 2) ? MOVER_CORPUS_COMBINED
+                             : (USE_ENRICHED_CORPUS == 1)
+                                 ? MOVER_CORPUS_ENRICHED
+                                 : MOVER_CORPUS_STD;
+  const char *mode_name = (USE_ENRICHED_CORPUS == 2)   ? "COMBINED"
+                          : (USE_ENRICHED_CORPUS == 1) ? "ENRICHED"
+                                                       : "STANDARD";
+  printf("Mover corpus: %s (%s mode)\n", mover_corpus, mode_name);
   printf("Pipeline assists: %s\n",
          DISABLE_PIPELINE_ASSISTS ? "DISABLED (bare model)" : "ENABLED");
+  microgpt_print_config("MicroGPT-C - 8-Puzzle Reasoning Trace Demo", &g_cfg);
 
   /* ================================================================
    * PHASE 1: Train organelles
@@ -283,7 +295,11 @@ int main(void) {
     return 1;
   }
 
-  Organelle *mover = organelle_train("Greedy-Mover", MOVER_CORPUS, MOVER_CKPT,
+  const char *mover_ckpt =
+      (USE_ENRICHED_CORPUS == 2)   ? "puzzle8_mover_combined_v3b.ckpt"
+      : (USE_ENRICHED_CORPUS == 1) ? "puzzle8_mover_enriched_v3b.ckpt"
+                                   : MOVER_CKPT;
+  Organelle *mover = organelle_train("Greedy-Mover", mover_corpus, mover_ckpt,
                                      &g_cfg, g_cfg.num_steps);
   if (!mover) {
     fprintf(stderr, "FATAL: Greedy-Mover training failed\n");
@@ -334,6 +350,20 @@ int main(void) {
   int total_detour_uses = 0;
   int total_greedy_uses = 0;
   int total_cycle_breaks = 0;
+  int total_traces_written = 0;
+  int total_recovery_traces = 0;
+  int corpus_lines_written = 0;
+
+  /* Open enriched corpus file for writing (Phase 2 generation) */
+  FILE *corpus_fp = NULL;
+  if (!USE_ENRICHED_CORPUS) {
+    corpus_fp = fopen(ENRICHED_CORPUS_FILE, "w");
+    if (!corpus_fp)
+      fprintf(stderr, "WARNING: Could not open %s for writing\n",
+              ENRICHED_CORPUS_FILE);
+    else
+      printf("Enriched corpus: writing to %s\n", ENRICHED_CORPUS_FILE);
+  }
 
   struct timespec pipeline_start, pipeline_end;
   clock_gettime(CLOCK_MONOTONIC, &pipeline_start);
@@ -373,21 +403,29 @@ int main(void) {
 
       /* Step 2: Pipeline loop — Mover + Judge + Oscillation Breaker */
       OpaKanban kb;
-      opa_kanban_init(&kb, 0); /* no history tracking needed */
+      opa_kanban_init(&kb, 4); /* track last 4 moves for trace context */
       OpaCycleDetector cd;
       opa_cycle_init(&cd);
+
+      /* Reasoning trace: capture every pipeline decision */
+      OpaTrace trace;
+      opa_trace_init(&trace, initial_md);
 
       int moves_made = 0;
       int solved = 0;
       int last_best_md = initial_md;
+      int from_model = 1; /* tracks whether current move is model-sourced */
 
       for (int iter = 0; iter < MAX_PIPELINE_ITERS && !solved; iter++) {
         md_delta_str(board, dstr, sizeof(dstr));
         int blank = find_blank(board);
         int md_before = manhattan_distance(board);
 
-        /* Clear blocked if stalled too long */
+        /* Clear blocked if stalled too long (replan) */
         if (!DISABLE_PIPELINE_ASSISTS && kb.stalls >= REPLAN_THRESHOLD) {
+          int md_now = manhattan_distance(board);
+          opa_trace_record(&trace, "replan", OPA_STEP_REPLAN, md_now, md_now,
+                           kb.blocked, 0);
           opa_kanban_clear_blocked(&kb);
           kb.stalls = 0;
         }
@@ -443,10 +481,10 @@ int main(void) {
           printf("   [%d] Mover -> \"%s\" (PARSE ERROR)\n", iter + 1,
                  move_output);
           total_parse_errors++;
+          from_model = 0; /* switching to fallback */
           /* Use opa_valid_fallback for first valid non-blocked direction */
           char fb[16];
-          if (!DISABLE_PIPELINE_ASSISTS &&
-              opa_valid_fallback(&kb, valid_dirs, fb, sizeof(fb))) {
+          if (opa_valid_fallback(&kb, valid_dirs, fb, sizeof(fb))) {
             if (strcmp(fb, "up") == 0)
               dir = "up";
             else if (strcmp(fb, "down") == 0)
@@ -457,12 +495,16 @@ int main(void) {
               dir = "right";
           }
           if (!dir) {
+            opa_trace_record(&trace, move_output, OPA_STEP_REJECTED, md_before,
+                             -1, kb.blocked, 0);
             kb.stalls++;
             continue;
           }
+        } else {
+          from_model = 1; /* model produced a valid parse */
         }
 
-        /* ---- Oscillation Breaker ---- */
+        /* ---- Oscillation Breaker (disabled in bare mode) ---- */
         int dir_id = dir_to_id(dir);
         if (!DISABLE_PIPELINE_ASSISTS && opa_cycle_detected(&cd, dir_id)) {
           int cycle_a = dir_id;
@@ -487,9 +529,12 @@ int main(void) {
           if (best_alt) {
             printf("   [%d] CYCLE DETECTED (%s<->%s) -> forcing %s\n", iter + 1,
                    dir_names[cycle_a], dir_names[cycle_b], best_alt);
+            opa_trace_record(&trace, dir, OPA_STEP_CYCLE_BREAK, md_before,
+                             best_alt_md, kb.blocked, from_model);
             dir = best_alt;
             dir_id = dir_to_id(dir);
             total_cycle_breaks++;
+            from_model = 0; /* cycle breaker overrode the model */
           }
         }
 
@@ -518,10 +563,35 @@ int main(void) {
           if (dir_id >= 0)
             opa_cycle_record(&cd, dir_id);
 
+          /* Reasoning trace: ACCEPTED if progress, STALL if no progress */
+          OpaStepOutcome step_outcome =
+              (md_after < md_before) ? OPA_STEP_ACCEPTED : OPA_STEP_STALL;
+          opa_trace_record(&trace, dir, step_outcome, md_before, md_after,
+                           kb.blocked, from_model);
+
+          /* Write enriched corpus entry (Phase 2 generation) */
+          if (corpus_fp && from_model) {
+            if (kb.last[0] != '\0') {
+              fprintf(corpus_fp, "%s|stalls=%d|last=%s\n%s\n\n", mover_prompt,
+                      kb.stalls, kb.last, dir);
+            } else {
+              fprintf(corpus_fp, "%s|stalls=%d\n%s\n\n", mover_prompt,
+                      kb.stalls, dir);
+            }
+            corpus_lines_written++;
+          }
+
+          /* Record move in Kanban history (for next iteration's context) */
+          opa_kanban_add_last(&kb, dir);
+
           printf("   [%d] %s move=%s %c (md: %d->%d)\n", iter + 1,
                  is_detour ? "[D]" : "[G]", dir, arrow, md_before, md_after);
         } else {
-          opa_kanban_add_blocked(&kb, dir);
+          /* Reasoning trace: REJECTED (out of bounds) */
+          opa_trace_record(&trace, dir, OPA_STEP_REJECTED, md_before, -1,
+                           kb.blocked, from_model);
+          if (!DISABLE_PIPELINE_ASSISTS)
+            opa_kanban_add_blocked(&kb, dir);
           kb.stalls++;
           total_rejects++;
           printf("   [%d] move=%s -> OUT OF BOUNDS [blocked:%s]\n", iter + 1,
@@ -537,14 +607,24 @@ int main(void) {
       int final_md = manhattan_distance(board);
       total_moves += moves_made;
 
+      /* Finalise and write reasoning trace */
+      opa_trace_finalise(&trace, final_md, solved);
+      opa_trace_write(&trace, TRACE_OUTPUT_FILE);
+      total_traces_written++;
+      if (opa_trace_has_recovery(&trace))
+        total_recovery_traces++;
+
       if (solved) {
         total_solved++;
         band_solved[band]++;
         band_moves[band] += moves_made;
-        printf("   SOLVED in %d moves!\n\n", moves_made);
+        printf("   SOLVED in %d moves! (trace: %d steps, recovery=%s)\n\n",
+               moves_made, trace.num_steps,
+               opa_trace_has_recovery(&trace) ? "yes" : "no");
       } else {
-        printf("   NOT SOLVED: board=%s md=%d (was %d) moves=%d\n\n", board_str,
-               final_md, initial_md, moves_made);
+        printf("   NOT SOLVED: board=%s md=%d (was %d) moves=%d "
+               "(trace: %d steps)\n\n",
+               board_str, final_md, initial_md, moves_made, trace.num_steps);
       }
     }
   }
@@ -585,6 +665,21 @@ int main(void) {
   printf("Greedy dispatches:%d\n", total_greedy_uses);
   printf("Detour dispatches:%d\n", total_detour_uses);
   printf("Cycle breaks:     %d\n", total_cycle_breaks);
+  printf("\nReasoning Traces:\n");
+  printf("Traces written:   %d\n", total_traces_written);
+  printf("Recovery traces:  %d (%.0f%%)\n", total_recovery_traces,
+         total_traces_written > 0
+             ? 100.0 * total_recovery_traces / total_traces_written
+             : 0.0);
+  printf("Trace file:       %s\n", TRACE_OUTPUT_FILE);
+  if (corpus_fp) {
+    fclose(corpus_fp);
+    printf("Enriched corpus:  %d entries written to %s\n", corpus_lines_written,
+           ENRICHED_CORPUS_FILE);
+  }
+  printf("Mode:             %s\n", mode_name);
+  printf("Assists:          %s\n",
+         DISABLE_PIPELINE_ASSISTS ? "DISABLED" : "ENABLED");
   printf("Pipeline time:    %.2fs\n", pipeline_time);
   printf("================================================================\n");
 
