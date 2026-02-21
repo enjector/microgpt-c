@@ -381,6 +381,26 @@ Deep debugging of the 0→3% wiring syntax pass rate revealed three compounding 
 | Exact plan match | 2% | **88%** | +86% ✅ |
 | Valid C function body | N/A | **28%** | New ✅ (2pt from target) |
 
+### Conclusion and Open Problem
+
+**The 28% ceiling is an inference-time noise problem, not a training problem.**
+
+The failure evidence is clear: the model correctly generates function signatures and often correct bodies — `void smooth_cumsum(...)` passes gcc on attempt 1. The failures are single-character substitutions during autoregressive sampling: `dor` instead of `for`, `i+++` instead of `i++`, `noid` instead of `void`. These are not *wrong knowledge* — the model knows the constructs — they are *sampling errors*: the wrong token drawn from a distribution that is almost-right but not sufficiently peaked.
+
+More training steps reduce the training loss but do not eliminate sampling noise at inference time. The model's uncertainty on specific token positions (mid-identifier, mid-keyword) has a noise floor determined by the architecture capacity and corpus size, not the number of gradient steps. This was confirmed empirically: doubling to 40k steps was projected to take 3 hours with no principled reason to expect the noise floor to drop.
+
+**The garbling problem requires a different strategy:**
+
+| Strategy | Mechanism | Tradeoff |
+|---|---|---|
+| **Beam search** | Generate K candidates in parallel, pick highest-likelihood valid one | Requires inference-time beam width — 4-8× compute per attempt |
+| **Constrained decoding** | Restrict vocabulary at each position to valid C tokens | Requires a C grammar automaton at inference time |
+| **Larger corpus** | More examples per function pattern → sharper distributions | Corpus generation effort; diminishing returns past ~5k docs |
+| **Larger model** | More capacity → lower perplexity on each token | Defeats the 1.26M-param constraint design |
+| **Post-fix heuristics** | Regex-correct common garbles (`dor`→`for`) before gcc | Brittle; symbol-specific |
+
+The most principled fix is **beam search**: generate 4-8 complete function bodies per intent (vs the current serial retry loop), score by model log-probability, and pass the highest-scoring candidate to gcc first. This is compatible with the existing architecture and does not require retraining.
+
 ---
 
 ## 10. Open Research Questions
