@@ -80,8 +80,8 @@ The guide is structured as a progressive reference, starting with foundational c
 
 1. **[Chapter 1: The Case for Small AI](1.md)**  
    *Teaser: Discover why massive LLMs are unsustainable for edge devices and calculate your own device's parameter limits.*  
-   Why massive LLMs are unsustainable for edge devices and how MicroGPT-C provides a zero-dependency C99 alternative. Covers the "generalist monolith" problem, the stem cell analogy, and the value of specialized, composable models.  
-   Key Topics: AI accessibility challenges; memory/compute math for edge devices; end-to-end research preview.
+   Why massive LLMs are unsustainable for edge devices and how MicroGPT-C provides a zero-dependency C99 alternative. Covers the "generalist monolith" problem — including the Neural Algorithmic Reasoning (NAR) insight that monolithic models waste parameter budget approximating deterministic algorithms (state tracking, search, validity checking) that can be expressed in 30–80 lines of C — the stem cell analogy, and the value of specialized, composable models.  
+   Key Topics: AI accessibility challenges; memory/compute math for edge devices; NAR capacity efficiency argument; end-to-end research preview.
 
 2. **[Chapter 2: Core Architecture of MicroGPT-C](2.md)**  
    *Teaser: Dive into the forward pass with pseudocode for attention: `Attention(Q, K, V) = softmax(Q K^T / sqrt(d_k)) V`. Swap ReLU for GELU and measure the loss delta.*  
@@ -102,8 +102,8 @@ The guide is structured as a progressive reference, starting with foundational c
 
 5. **[Chapter 5: Pipeline Coordination – The Kanban Architecture](5.md)**  
    *Teaser: Build an Observe-Plan-Act (OPA) pipeline and see how Kanban state machines (`OpaKanban`) prevent models from making invalid moves.*  
-   The Organelle Pipeline Architecture (OPA), including Kanban state management (`OpaKanban`), cycle detection (`OpaCycleDetector`), and the Planner-Worker-Judge decomposition. Uses game demos as case studies.  
-   Key Topics: "Coordination rescues weakness"; invalid move filtering; oscillation breaking and replanning.
+   The Organelle Pipeline Architecture (OPA), including Kanban state management (`OpaKanban`), cycle detection (`OpaCycleDetector`), and the Planner-Worker-Judge decomposition. Uses game demos as case studies. `OpaKanban` and `OpaCycleDetector` explicitly externalise the state-tracking and cycle-detection operators that Neural Algorithmic Reasoning (NAR) research shows LLMs learn poorly and use significant capacity to approximate — giving the OPA architecture academic grounding beyond engineering pragmatics.  
+   Key Topics: "Coordination rescues weakness"; invalid move filtering; oscillation breaking and replanning; NAR motivation for deterministic pipeline components.
 
 6. **[Chapter 6: Logic Games as Research Laboratories](6.md)**  
    *Teaser: Climb the game progression ladder from Tic-Tac-Toe to Red Donkey. See how a 30K parameter model can outsmart a 160K parameter one.*  
@@ -1911,7 +1911,13 @@ Extension: STM32 demo—basic name generator on thumb-sized chip.
 
 Blend MicroGPT-C with non-AI techniques, like geometric reasoning (manifolds for shape analysis) or tree search (MCTS for planning).
 
-Background: Transformers handle sequences well; hybrids add strengths (e.g., deterministic search for optimality).
+Background: Transformers handle sequences well; hybrids add strengths (e.g., deterministic search for optimality). This direction is grounded in the **Neural Algorithmic Reasoning (NAR)** research field — specifically the CLRS-30 benchmark (DeepMind, 2022), which tests 30 classical algorithms (BFS, DFS, sorting, graph traversal) against neural models and consistently finds that transformers fail to generalise these algorithms to larger inputs, even after scaling. NAR concludes that neural networks should handle pattern matching while deterministic systems handle structured reasoning — exactly the OPA design.
+
+The four classes of algorithms LLMs build internally as fuzzy "neural operators" — and which OPA already externalises — are:
+1. **Logic operators** (AND/OR/NOT) — approximated by attention patterns; expressed deterministically as branch instructions
+2. **Status/comparison operators** (`>`, `==`, `in-bounds`) — approximated as implicit circuits; expressed as C conditionals
+3. **Search operators** (BFS, DFS, A\*) — approximated by layer-by-layer expansion; expressed as 30-line C with a queue
+4. **State-tracking operators** (Kanban, visited-set, cycle detection) — approximated via context window tokens; expressed as `OpaKanban` + `OpaCycleDetector`
 
 Future Direction: MD-delta encoding (precompute evaluations, like Manhattan distance in puzzles) as input hints. Hybrid: Organelle proposes moves; minimax (exhaustive search) validates.
 
