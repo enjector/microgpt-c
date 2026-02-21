@@ -36,6 +36,8 @@ In biology, a stem cell is a blank slate with the potential to become any specia
 * **Differentiation:** Given a small, specific corpus (e.g., 500 examples of valid shipping addresses), the block "specializes" through on-device training.
 * **Maturity:** The result is a high-confidence, low-power micro-model that performs one task—and only one task—with focused precision.
 
+**Why not make one big model instead?** Research in [Neural Algorithmic Reasoning (NAR)](docs/organelles/ORGANELLE_REASONING.md) shows that large monolithic models spend enormous parameter budgets approximating algorithms that can be expressed in 30–80 lines of deterministic code: state tracking, cycle detection, validity checking, and search. The OPA architecture externalises these as deterministic C (`OpaKanban`, `OpaCycleDetector`, `apply_move()`), freeing every model parameter to focus on the fuzzy pattern-matching task it was actually trained for. Same total computational budget — dramatically better allocation.
+
 ![The Biological Blueprint for Tiny AI — stem cell differentiation, the Planner-Worker-Judge triad, and the coordination funnel](docs/organelles/OPA_Biology_Analogy.jpg)
 
 ---

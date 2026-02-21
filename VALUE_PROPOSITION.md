@@ -93,6 +93,8 @@ MicroGPT-C's **organelle architecture** takes this further. Instead of one large
 
 **Total: 60K–480K parameters per pipeline. Right-sized by corpus complexity. Zero invalid moves.**
 
+**Why this outperforms a monolith of the same total budget:** Research in [Neural Algorithmic Reasoning](docs/organelles/ORGANELLE_REASONING.md) shows that LLMs spend significant capacity approximating deterministic algorithms — state tracking, cycle detection, validity checking — as fuzzy weight patterns. OPA externalises these to deterministic C (`OpaKanban`, `OpaCycleDetector`, `Judge`), freeing every model parameter to focus on pattern matching. The ~340-line coordination library handles what gradient descent handles poorly; each organelle handles what gradient descent handles well.
+
 This is proven in sixteen experiments:
 - **C Code Composition** — **83% exact match** on function plans, 98% parse rate (1.2M params with LR scheduling)
 - **8-Puzzle solver** — **90% solve rate** with 5 organelles (100% easy, 100% medium, 70% hard) and zero parse errors
