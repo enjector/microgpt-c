@@ -88,6 +88,9 @@
 #ifndef WIRING_NUM_STEPS
 #define WIRING_NUM_STEPS 20000
 #endif
+#ifndef WIRING_MAX_DOC_LEN
+#define WIRING_MAX_DOC_LEN 2048
+#endif
 
 /* ── Registry ─────────────────────────────────────────────────────────── */
 
@@ -265,7 +268,7 @@ static const char *K_FORWARD_DECLS =
     "void moving_avg(double *y, const double *x, int n, int w);\n"
     "double ema(double prev, double cur, double alpha);\n"
     "void ema_series(double *out, const double *x, int n, double alpha);\n"
-    "void diff_central(double *dy, const double *y, double h, int n);\n"
+    "void diff_central(double *out, const double *x, int n);\n"
     "void first_diff(double *dy, const double *x, int n);\n"
     "void softmax(double *p, const double *x, int n);\n"
     "double sigmoid(double x);\n"
@@ -378,7 +381,7 @@ static void plan_to_wiring_prompt(const char *plan, char fns[MAX_PLAN_FNS][64],
     }
   }
   size_t rem = sizeof(buf) - strlen(buf) - 1;
-  strncat(buf, " */", rem);
+  strncat(buf, " */\n", rem); /* \n mirrors the corpus doc separator */
   strncpy(prompt_out, buf, (size_t)(prompt_sz - 1));
   prompt_out[prompt_sz - 1] = '\0';
 }
@@ -463,7 +466,7 @@ int main(void) {
   cfg_wg.batch_size = 16;
   cfg_wg.max_vocab = 200;
   cfg_wg.max_docs = 5000;
-  cfg_wg.max_doc_len = 1024;
+  cfg_wg.max_doc_len = WIRING_MAX_DOC_LEN;
 
   /* ── Train / load organelles ── */
   printf("[1/3] Training c_planner organelle...\n");
