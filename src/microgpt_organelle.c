@@ -322,6 +322,92 @@ void organelle_generate(const Organelle *org, const MicrogptConfig *cfg,
   free(logits_buf);
 }
 
+/* ── organelle_generate_multiline ───────────────────────────────────────────
+ */
+
+/*
+ * Like organelle_generate but stops on a blank line (double newline "\n\n")
+ * instead of the first newline.  Required for multi-line corpus targets
+ * such as C function bodies:  "void fn(...) {\n  ...\n}\n\n"
+ *
+ * The output includes newlines within the body but stops before the blank
+ * line that separates documents.  Null-terminated.
+ */
+void organelle_generate_multiline(const Organelle *org,
+                                  const MicrogptConfig *cfg, const char *prompt,
+                                  char *output, int max_len,
+                                  scalar_t temperature) {
+  const int nl = cfg->n_layer;
+
+  scalar_t **inf_keys = (scalar_t **)malloc((size_t)nl * sizeof(scalar_t *));
+  scalar_t **inf_values = (scalar_t **)malloc((size_t)nl * sizeof(scalar_t *));
+  size_t *inf_cache_len = (size_t *)calloc((size_t)nl, sizeof(size_t));
+  for (int l = 0; l < nl; l++) {
+    inf_keys[l] = kv_cache_alloc(cfg);
+    inf_values[l] = kv_cache_alloc(cfg);
+  }
+
+  scalar_t *logits_buf =
+      (scalar_t *)malloc((size_t)cfg->max_vocab * sizeof(scalar_t));
+  int pos = 0;
+  int out_pos = 0;
+
+  const Vocab *vocab = &org->vocab;
+
+  /* Feed BOS token */
+  size_t token = vocab->bos_id;
+  forward_inference(org->model, token, pos, inf_keys, inf_values, inf_cache_len,
+                    logits_buf);
+  pos++;
+
+  /* Feed prompt characters */
+  for (int i = 0; prompt[i] && pos < cfg->block_size - 1; i++) {
+    token = 0;
+    for (size_t v = 0; v < vocab->vocab_size; v++) {
+      if (vocab->chars[v] == (unsigned char)prompt[i]) {
+        token = v;
+        break;
+      }
+    }
+    forward_inference(org->model, token, pos, inf_keys, inf_values,
+                      inf_cache_len, logits_buf);
+    pos++;
+  }
+
+  /* Auto-regressive decoding — stop on double-newline or BOS or max_len */
+  int prev_was_newline = 0;
+  for (int g = 0; g < max_len && pos < cfg->block_size; g++) {
+    token = sample_token(logits_buf, vocab->vocab_size, temperature);
+
+    if (token == vocab->bos_id)
+      break;
+
+    char ch = (char)vocab->chars[token];
+
+    /* Stop on double-newline: previous char was \n and this one is too */
+    if (ch == '\n' && prev_was_newline)
+      break;
+
+    output[out_pos++] = ch;
+    prev_was_newline = (ch == '\n');
+
+    forward_inference(org->model, token, pos, inf_keys, inf_values,
+                      inf_cache_len, logits_buf);
+    pos++;
+  }
+
+  output[out_pos] = '\0';
+
+  for (int l = 0; l < nl; l++) {
+    kv_cache_free(inf_keys[l]);
+    kv_cache_free(inf_values[l]);
+  }
+  free(inf_keys);
+  free(inf_values);
+  free(inf_cache_len);
+  free(logits_buf);
+}
+
 /* ======================== Organelle Training ===============================
  */
 

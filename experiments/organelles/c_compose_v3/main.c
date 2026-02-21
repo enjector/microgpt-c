@@ -570,10 +570,9 @@ int main(void) {
       int syntax_passed = 0;
 
       for (int attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-        /* Build prompt from plan functions, excluding blocked patterns */
-        plan_to_wiring_prompt(plan, fns, nfns, wiring_prompt,
-                              sizeof(wiring_prompt));
-
+        // Use original intent comment as wiring prompt (matches training).
+        snprintf(wiring_prompt, sizeof(wiring_prompt), "%s\n",
+                 g_tests[t].comment);
         /* Append blocked hint if Kanban has failures */
         if (kb.stalls > 0 && strlen(kb.blocked) > 0) {
           size_t wp_len = strlen(wiring_prompt);
@@ -589,9 +588,18 @@ int main(void) {
           }
         }
 
-        /* Generate C body from wiring organelle */
-        organelle_generate(wiring, &cfg_wg, wiring_prompt, c_body,
-                           sizeof(c_body), (scalar_t)WIRING_TEMP);
+        /* Generate C body from wiring organelle (multi-line: stop on \n\n) */
+        organelle_generate_multiline(wiring, &cfg_wg, wiring_prompt, c_body,
+                                     sizeof(c_body), (scalar_t)WIRING_TEMP);
+
+        /* DEBUG: print raw generated body (first 300 chars) on attempt 0 */
+        if (attempt == 0) {
+          int dbg_show = (int)strlen(c_body);
+          if (dbg_show > 300)
+            dbg_show = 300;
+          printf("  [DBG] generated(%d chars): %.*s%s\n", (int)strlen(c_body),
+                 dbg_show, c_body, (int)strlen(c_body) > 300 ? "..." : "");
+        }
 
         /* Deterministic syntax gate */
         if (c_syntax_judge(c_body)) {
@@ -644,6 +652,13 @@ int main(void) {
       } else {
         printf("  [WIRE] result:  SYNTAX FAIL after %d retries\n",
                MAX_RETRIES + 1);
+        /* DEBUG: print first 300 chars of last generated body */
+        int show = (int)strlen(c_body);
+        if (show > 300)
+          show = 300;
+        if (show > 0)
+          printf("  [WIRE] body(fail): %.*s%s\n", show, c_body,
+                 (int)strlen(c_body) > 300 ? "..." : "");
       }
     }
 

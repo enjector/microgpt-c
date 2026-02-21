@@ -54,6 +54,17 @@ void organelle_generate(const Organelle *org, const MicrogptConfig *cfg,
                         scalar_t temperature);
 
 /*
+ * organelle_generate_multiline — Like organelle_generate but stops on a blank
+ * line (double newline: "}\n\n") instead of the first newline.
+ * Use for corpora where responses span multiple lines, e.g. C function bodies.
+ * Output is null-terminated and stops at "\n\n", "\n\0" (EOS) or max_len.
+ */
+void organelle_generate_multiline(const Organelle *org,
+                                  const MicrogptConfig *cfg, const char *prompt,
+                                  char *output, int max_len,
+                                  scalar_t temperature);
+
+/*
  * Free all resources owned by an organelle (model, docs).
  * The Organelle pointer itself is also freed.
  */
