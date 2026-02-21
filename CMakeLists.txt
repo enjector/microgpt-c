@@ -304,12 +304,12 @@ add_demo(
           experiments/organelles/c_compose/c_registry.txt
           experiments/organelles/c_compose/test_intents.txt
           experiments/organelles/c_wiringgen/c_wiring.txt
-  DEFINES N_EMBD=128 N_HEAD=8 N_LAYER=6 BLOCK_SIZE=128 MLP_DIM=512
+  DEFINES N_EMBD=128 N_HEAD=8 N_LAYER=6 BLOCK_SIZE=512 MLP_DIM=512
           NUM_STEPS=50000 LEARNING_RATE=0.0005 BATCH_SIZE=8 WARMUP_STEPS=2500
           MAX_VOCAB=200 MAX_DOCS=5000 MAX_DOC_LEN=256
           WIRING_N_EMBD=128 WIRING_N_HEAD=8 WIRING_N_LAYER=6
-          WIRING_BLOCK_SIZE=128 WIRING_MLP_DIM=512 WIRING_NUM_STEPS=20000
-          WIRING_MAX_DOC_LEN=512 GEN_LEN=600
+          WIRING_BLOCK_SIZE=512 WIRING_MLP_DIM=512 WIRING_NUM_STEPS=20000
+          WIRING_MAX_DOC_LEN=1024 GEN_LEN=600
 )
 
 add_demo(
