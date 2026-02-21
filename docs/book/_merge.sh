@@ -3,12 +3,35 @@
 # Configuration
 OUTPUT_MD="MicroGPT-C_Composable_Intelligence_at_the_Edge.md"
 OUTPUT_PDF="MicroGPT-C_Composable_Intelligence_at_the_Edge.pdf"
+VERSION_FILE="VERSION"
 
 echo "Initializing Book Builder..."
 
-# 1. Reset the output file and insert Cover Page LaTeX
+# ── Version Management ──────────────────────────────────────────────────────
+# Read current version from VERSION file (format: MAJOR.MINOR.PATCH)
+if [[ ! -f "$VERSION_FILE" ]]; then
+    echo "1.0.0" > "$VERSION_FILE"
+fi
+
+FULL_VERSION=$(cat "$VERSION_FILE" | tr -d '[:space:]')
+IFS='.' read -r MAJOR MINOR PATCH <<< "$FULL_VERSION"
+
+# Auto-increment patch on every build
+PATCH=$((PATCH + 1))
+NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+echo "$NEW_VERSION" > "$VERSION_FILE"
+
+echo "Building version: $NEW_VERSION (was: $FULL_VERSION)"
+
+# ── Generate cover page with version substituted ─────────────────────────────
+# Substitute BOOKVERSION placeholder in cover_page.tex → a temp file used for this build
+COVER_TMP=$(mktemp /tmp/cover_page_XXXXXX.tex)
+sed "s/BOOKVERSION/${NEW_VERSION}/g" cover_page.tex > "$COVER_TMP"
+
+# 1. Reset the output file and insert Cover Page LaTeX (with version)
 rm -f "$OUTPUT_MD"
-cat cover_page.tex > "$OUTPUT_MD"
+cat "$COVER_TMP" > "$OUTPUT_MD"
+rm -f "$COVER_TMP"
 
 # 2. Loop through numeric chapters (0-99) and Appendices (A-Z)
 # This automatically finds 1.md, 2.md, A.md etc. and sorts them naturally.
@@ -79,13 +102,13 @@ else
         echo "Converting HTML to PDF using wkhtmltopdf..."
         wkhtmltopdf --page-size A4 "$HTML_FILE" "$OUTPUT_PDF"
         rm -f "$HTML_FILE"
-        echo "Success! Created $OUTPUT_PDF"
+        echo "Success! Created $OUTPUT_PDF (v${NEW_VERSION})"
         exit 0
     elif command -v weasyprint &> /dev/null; then
         echo "Converting HTML to PDF using weasyprint..."
         weasyprint "$HTML_FILE" "$OUTPUT_PDF"
         rm -f "$HTML_FILE"
-        echo "Success! Created $OUTPUT_PDF"
+        echo "Success! Created $OUTPUT_PDF (v${NEW_VERSION})"
         exit 0
     else
         echo "Error: No PDF converter found. Please install one of:"
@@ -126,4 +149,4 @@ else
         2>&1 | grep -v "Package hyperref Warning" || true
 fi
 
-echo "Success! Created $OUTPUT_PDF"
+echo "Success! Created $OUTPUT_PDF (v${NEW_VERSION})"
