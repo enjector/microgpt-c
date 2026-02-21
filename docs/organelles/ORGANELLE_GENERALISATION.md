@@ -453,15 +453,78 @@ The pipeline optimises over the space of possible wiring patterns through reject
 
 ---
 
+## 11. c_compose v4 Design: Grammar-Guided Sampling
+
+### 11.1 The Core Idea
+
+The 28% wiring syntax ceiling is caused by token-level sampling noise — the neural organelle is *almost right* at each position but draws the wrong character from a near-peaked distribution. The fix is to eliminate the wrong choices at sampling time rather than rejecting after generation.
+
+A **grammar organelle** is a deterministic finite-state machine that runs in parallel with the neural organelle at every token position. At each step it returns the set of valid next characters given the current parse state. The neural organelle's softmax distribution is masked to zero on invalid characters before sampling:
+
+```
+characters in vocab: 63
+neural organelle   → P[63]              (probability over all chars)
+grammar organelle  → valid_mask[63]     (1=allowed, 0=forbidden by grammar)
+sample from        → P[i] * valid_mask[i]
+```
+
+This guarantees syntactically valid token sequences by construction — the gcc gate becomes a final sanity check rather than the primary rejection mechanism.
+
+### 11.2 Two-Layer Architecture
+
+A full C grammar is context-sensitive (typedef names require symbol lookup). For the specific patterns `c_wiringgen` generates, a two-layer approach is sufficient:
+
+**Layer 1 — Lexer DFA (character level)**
+Tracks the current lexical state: inside an identifier, keyword, numeric literal, string literal, comment, or operator. Determines valid continuation characters character by character. For example, after `f-o-r` the only valid continuations are `(` (the keyword is complete) or more alphanumeric characters (still building an identifier).
+
+**Layer 2 — Parser PDA (over lexer tokens)**
+Maintains a parse stack tracking syntactic position. After the lexer emits `KW_FOR`, the parser state enforces `(` must follow. After `{`, only statement-starting tokens are valid. The stack tracks nesting depth for `{}` and `()` pairs.
+
+For the ~6 statement forms `c_wiringgen` generates (`for`, `if`, `while`, `return`, assignment, function call), approximately 25-30 parser states are sufficient. This is a hand-coded state machine rather than a full Bison-generated LALR(1) parser.
+
+### 11.3 Symbol Table Organelle — Semantic Correctness
+
+Grammar-guided sampling ensures syntactic validity but not semantic correctness: wrong argument types, mismatched return types, undeclared variables. `gcc -fsyntax-only` already catches these — it performs full type checking. However, catching errors *during generation* rather than after would eliminate semantically invalid samples entirely.
+
+A **symbol table organelle** is a natural extension of the grammar organelle:
+
+- **Input**: the function registry (`c_registry.txt`) — all known function signatures with parameter types and return types
+- **State**: tracks declared local variables (name, type), the current function's return type, and the current argument position within a call
+- **At each token position**: narrows valid tokens to those consistent with the declared types. At an argument position of `rolling_mean(out, x, ...)`, only `double *` identifiers are valid for `out`.
+
+The two deterministic organelles together form a **computation graph**: they track data flow from declaration → loop variable → function argument → return value, enforcing correctness at each edge.
+
+**Combined v4 pipeline:**
+
+```
+planner → [grammar_pda ⊗ symbol_table ⊗ wiringgen] → gcc (final gate) → judge
+```
+
+The `⊗` denotes constrained sampling: the neural organelle provides the proposal distribution, the deterministic organelles provide the validity mask. As the deterministic organelles take on more of the correctness burden, the gcc gate becomes increasingly redundant — retained only as a defence-in-depth check.
+
+### 11.4 Feasibility
+
+| Component | Implementation | Lines of C | Retraining? |
+|---|---|---|---|
+| Grammar organelle (lexer DFA) | Hand-coded state machine | ~150 | No |
+| Grammar organelle (parser PDA) | Hand-coded state machine | ~200 | No |
+| Symbol table organelle | Registry-seeded type tracker | ~200 | No |
+| `organelle_generate_guided()` | New variant with mask parameter | ~80 | No |
+
+Total: ~630 lines, no retraining of any model. The existing `c_wiringgen` checkpoint is reused as-is.
+
+---
+
 ## 12. Next Steps
 
 | Priority | Action | Expected Outcome |
 |---|---|---|
-| **P1** | Characterise remaining gcc failure modes — near-miss identifier garbling | Determine if root cause is training quality, inference temperature, or architecture |
-| **P1** | Implement incremental checkpoint resume in `organelle_train` | Avoid retraining from scratch when only adding steps |
+| **P1** | Implement grammar organelle (lexer DFA + parser PDA) for c_compose_v4 | Eliminate token-level garbling — syntax pass rate approaches 100% |
+| **P1** | Implement symbol table organelle seeded from `c_registry.txt` | Eliminate semantic errors (wrong arg types, bad returns) during generation |
+| **P1** | Add `organelle_generate_guided()` with validity mask parameter | Wire grammar + symbol organelles into the sampling loop |
+| **P2** | Implement incremental checkpoint resume in `organelle_train` | Avoid retraining from scratch when only adding steps |
 | **P2** | Heap-allocate `attn_weights` in `forward_inference` using `cfg->block_size` | Remove compile-time BLOCK_SIZE constraint — enable per-organelle sizing |
-| **P2** | Explore S-expression wire format between planner and wiring | Preserve structural nesting in the composition plan |
-| **P3** | OpaTrace capture for `c_compose_v3` pipeline runs | Reasoning trace training data for future fine-tuning |
+| **P3** | OpaTrace capture for `c_compose_v3` and `c_compose_v4` pipeline runs | Reasoning trace training data for future fine-tuning |
 
 ---
 
