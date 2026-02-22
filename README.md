@@ -44,8 +44,11 @@ cmake --build . --config Release
 # Train a name generator in < 1 second (4K params)
 ./names_demo
 
-# Train Shakespeare text generation (840K params, multi-threaded)
+# Train Shakespeare text generation (840K params, character-level)
 ./shakespeare_demo
+
+# Train Shakespeare word-level generation (510K params, ~40K tok/s inference, 2 min training)
+./shakespeare_word_demo
 
 # Run a multi-organelle game pipeline (90% win rate)
 ./connect4_demo

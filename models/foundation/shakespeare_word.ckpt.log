@@ -1,0 +1,507 @@
+
+========================================
+Run: 2026-02-22 17:37:30
+========================================
+Tokenisation: WORD-LEVEL
+Corpus: 114634 lines | 899588 word tokens
+Vocab: 8000 tokens (7997 words + 3 special)
+UNK rate: 14.24%
+Architecture: N_EMBD=64 N_LAYER=2 N_HEAD=4 BLOCK_SIZE=128
+Params: 1130496
+Training: batch=16 steps=15000 lr=0.0010
+
+--- Training ---
+step     1 / 15000 | loss 9.4853
+
+========================================
+Run: 2026-02-22 17:37:40
+========================================
+Tokenisation: WORD-LEVEL
+Corpus: 114634 lines | 899588 word tokens
+Vocab: 8000 tokens (7997 words + 3 special)
+UNK rate: 14.24%
+Architecture: N_EMBD=64 N_LAYER=2 N_HEAD=4 BLOCK_SIZE=128
+Params: 1130496
+Training: batch=16 steps=15000 lr=0.0010
+
+--- Training ---
+step     1 / 15000 | loss 9.4853
+step   500 / 15000 | loss 6.1498
+step  1000 / 15000 | loss 5.8250
+step  1500 / 15000 | loss 5.7447
+step  2000 / 15000 | loss 5.3654
+step  2500 / 15000 | loss 5.3751
+step  3000 / 15000 | loss 5.5632
+step  3500 / 15000 | loss 5.7134
+step  4000 / 15000 | loss 5.1736
+step  4500 / 15000 | loss 5.4430
+step  5000 / 15000 | loss 5.2313
+
+========================================
+Run: 2026-02-22 17:40:27
+========================================
+Tokenisation: WORD-LEVEL
+Corpus: 114634 lines | 899588 word tokens
+Vocab: 8000 tokens (7997 words + 3 special)
+UNK rate: 16.82%
+Architecture: N_EMBD=64 N_LAYER=2 N_HEAD=4 BLOCK_SIZE=128
+Params: 1130496
+Training: batch=16 steps=15000 lr=0.0010
+
+--- Training ---
+step     1 / 15000 | loss 9.4958
+
+========================================
+Run: 2026-02-22 17:40:37
+========================================
+Tokenisation: WORD-LEVEL
+Corpus: 114634 lines | 899588 word tokens
+Vocab: 8000 tokens (7997 words + 3 special)
+UNK rate: 16.82%
+Architecture: N_EMBD=64 N_LAYER=2 N_HEAD=4 BLOCK_SIZE=128
+Params: 1130496
+Training: batch=16 steps=15000 lr=0.0010
+
+--- Training ---
+step     1 / 15000 | loss 9.4958
+step   500 / 15000 | loss 5.6444
+step  1000 / 15000 | loss 6.0118
+
+========================================
+Run: 2026-02-22 17:45:02
+========================================
+Tokenisation: WORD-LEVEL
+Corpus: 114634 lines | 899588 word tokens
+Vocab: 8000 tokens (7997 words + 3 special)
+UNK rate: 16.82%
+Architecture: N_EMBD=64 N_LAYER=2 N_HEAD=4 BLOCK_SIZE=128
+Params: 1130496
+Training: batch=16 steps=15000 lr=0.0010
+
+--- Training ---
+step     1 / 15000 | loss 9.4958
+step   500 / 15000 | loss 5.6444
+step  1000 / 15000 | loss 6.0118
+step  1500 / 15000 | loss 5.5779
+step  2000 / 15000 | loss 5.8519
+step  2500 / 15000 | loss 5.2140
+step  3000 / 15000 | loss 5.2955
+step  3500 / 15000 | loss 5.4061
+step  4000 / 15000 | loss 4.9569
+step  4500 / 15000 | loss 4.9782
+step  5000 / 15000 | loss 5.2193
+step  5500 / 15000 | loss 5.0324
+
+========================================
+Run: 2026-02-22 17:47:00
+========================================
+Tokenisation: WORD-LEVEL
+Corpus: 114634 lines | 899588 word tokens
+Vocab: 3000 tokens (2997 words + 3 special)
+UNK rate: 24.59%
+Architecture: N_EMBD=48 N_LAYER=1 N_HEAD=4 BLOCK_SIZE=64
+Params: 318720
+Training: batch=16 steps=10000 lr=0.0010
+
+--- Training ---
+step     1 / 10000 | loss 8.3569
+step   500 / 10000 | loss 4.9008
+step  6000 / 15000 | loss 4.7837
+step  1000 / 10000 | loss 4.3910
+step  1500 / 10000 | loss 4.8532
+step  2000 / 10000 | loss 4.5597
+step  6500 / 15000 | loss 4.8914
+step  2500 / 10000 | loss 4.7029
+step  3000 / 10000 | loss 4.6961
+step  3500 / 10000 | loss 4.6446
+step  7000 / 15000 | loss 5.1925
+step  4000 / 10000 | loss 4.0162
+step  4500 / 10000 | loss 4.2760
+step  5000 / 10000 | loss 4.3900
+step  7500 / 15000 | loss 5.3569
+step  5500 / 10000 | loss 4.6605
+step  6000 / 10000 | loss 4.2711
+step  6500 / 10000 | loss 4.4716
+step  7000 / 10000 | loss 4.5633
+step  8000 / 15000 | loss 5.0827
+step  7500 / 10000 | loss 4.4759
+step  8000 / 10000 | loss 4.5749
+step  8500 / 10000 | loss 4.0478
+step  8500 / 15000 | loss 4.5639
+step  9000 / 10000 | loss 4.5340
+step  9500 / 10000 | loss 4.5471
+step 10000 / 10000 | loss 4.1244
+
+Training complete: 63.0s | 159 steps/s | 19.9k tok/s
+Final checkpoint: shakespeare_word.ckpt
+  sample 1: seed="The" | 62 words | 57296 tok/s
+  sample 2: seed="O" | 62 words | 58076 tok/s
+  sample 3: seed="What" | 62 words | 59646 tok/s
+  sample 4: seed="My" | 62 words | 57866 tok/s
+  sample 5: seed="How" | 62 words | 58608 tok/s
+
+--- Inference Summary ---
+samples: 5 | total_tokens: 320 | time: 0.005s | avg: 58288 tok/s
+========================================
+
+step  9000 / 15000 | loss 5.2342
+step  9500 / 15000 | loss 5.2846
+step 10000 / 15000 | loss 4.7009
+step 10500 / 15000 | loss 5.1824
+step 11000 / 15000 | loss 5.3488
+step 11500 / 15000 | loss 5.3666
+step 12000 / 15000 | loss 4.5674
+step 12500 / 15000 | loss 5.0624
+step 13000 / 15000 | loss 5.0512
+step 13500 / 15000 | loss 4.9232
+
+========================================
+Run: 2026-02-22 17:49:53
+========================================
+Tokenisation: WORD-LEVEL
+Corpus: 114634 lines | 899588 word tokens
+Vocab: 3000 tokens (2997 words + 3 special)
+UNK rate: 24.59%
+Architecture: N_EMBD=48 N_LAYER=1 N_HEAD=4 BLOCK_SIZE=64
+Params: 318720
+Training: batch=16 steps=10000 lr=0.0010
+Loaded checkpoint: shakespeare_word.ckpt (trained 10000 steps)
+  sample 1: seed="The" | 62 words | 54468 tok/s
+  sample 2: seed="O" | 62 words | 56889 tok/s
+  sample 3: seed="What" | 62 words | 57710 tok/s
+  sample 4: seed="My" | 62 words | 56587 tok/s
+  sample 5: seed="How" | 62 words | 58662 tok/s
+
+--- Inference Summary ---
+samples: 5 | total_tokens: 320 | time: 0.006s | avg: 56828 tok/s
+========================================
+
+
+========================================
+Run: 2026-02-22 17:51:09
+========================================
+Tokenisation: WORD-LEVEL
+Corpus: 114634 lines | 899588 word tokens
+Vocab: 3000 tokens (2997 words + 3 special)
+UNK rate: 24.59%
+Architecture: N_EMBD=48 N_LAYER=1 N_HEAD=4 BLOCK_SIZE=64
+Params: 318720
+Training: batch=16 steps=10000 lr=0.0010
+
+--- Training ---
+step     1 / 10000 | loss 8.3569
+step   500 / 10000 | loss 4.9008
+step  1000 / 10000 | loss 4.3910
+step  1500 / 10000 | loss 4.8532
+step  2000 / 10000 | loss 4.5597
+step  2500 / 10000 | loss 4.7029
+step  3000 / 10000 | loss 4.6961
+step  3500 / 10000 | loss 4.6446
+step  4000 / 10000 | loss 4.0162
+step  4500 / 10000 | loss 4.2760
+step  5000 / 10000 | loss 4.3900
+step  5500 / 10000 | loss 4.6605
+step  6000 / 10000 | loss 4.2711
+step  6500 / 10000 | loss 4.4716
+step  7000 / 10000 | loss 4.5633
+step  7500 / 10000 | loss 4.4759
+step  8000 / 10000 | loss 4.5749
+step  8500 / 10000 | loss 4.0478
+step  9000 / 10000 | loss 4.5340
+step  9500 / 10000 | loss 4.5471
+step 10000 / 10000 | loss 4.1244
+
+Training complete: 62.0s | 161 steps/s | 20.2k tok/s
+Final checkpoint: shakespeare_word.ckpt
+  sample 1: seed="The" | 62 words | 58235 tok/s
+  sample 2: seed="O" | 62 words | 58662 tok/s
+  sample 3: seed="What" | 62 words | 60038 tok/s
+  sample 4: seed="My" | 62 words | 58394 tok/s
+  sample 5: seed="How" | 62 words | 58878 tok/s
+
+--- Inference Summary ---
+samples: 5 | total_tokens: 320 | time: 0.005s | avg: 58834 tok/s
+========================================
+
+
+========================================
+Run: 2026-02-22 17:53:54
+========================================
+Tokenisation: WORD-LEVEL
+Corpus: 114634 lines | 899588 word tokens
+Vocab: 5000 tokens (4997 words + 3 special)
+UNK rate: 19.46%
+Architecture: N_EMBD=48 N_LAYER=1 N_HEAD=4 BLOCK_SIZE=64
+Params: 510720
+Training: batch=16 steps=10000 lr=0.0010
+
+--- Training ---
+step     1 / 10000 | loss 8.6605
+step   500 / 10000 | loss 5.3803
+
+========================================
+Run: 2026-02-22 17:54:09
+========================================
+Tokenisation: WORD-LEVEL
+Corpus: 114634 lines | 899588 word tokens
+Vocab: 5000 tokens (4997 words + 3 special)
+UNK rate: 19.46%
+Architecture: N_EMBD=48 N_LAYER=1 N_HEAD=4 BLOCK_SIZE=64
+Params: 510720
+Training: batch=16 steps=10000 lr=0.0010
+
+--- Training ---
+step     1 / 10000 | loss 8.6605
+step   500 / 10000 | loss 5.3803
+step  1000 / 10000 | loss 5.3282
+step  1500 / 10000 | loss 5.2831
+step  2000 / 10000 | loss 5.0298
+step  2500 / 10000 | loss 4.6480
+step  3000 / 10000 | loss 5.2747
+step  3500 / 10000 | loss 5.1225
+step  4000 / 10000 | loss 4.8644
+step  4500 / 10000 | loss 4.7470
+step  5000 / 10000 | loss 4.9016
+step  5500 / 10000 | loss 5.0690
+step  6000 / 10000 | loss 4.4997
+step  6500 / 10000 | loss 4.8380
+step  7000 / 10000 | loss 4.9794
+step  7500 / 10000 | loss 5.2970
+step  8000 / 10000 | loss 5.1260
+step  8500 / 10000 | loss 4.2405
+step  9000 / 10000 | loss 5.0721
+step  9500 / 10000 | loss 4.9076
+step 10000 / 10000 | loss 4.4191
+
+Training complete: 100.0s | 100 steps/s | 12.5k tok/s
+Final checkpoint: shakespeare_word.ckpt
+  sample 1: seed="The" | 62 words | 37016 tok/s
+  sample 2: seed="O" | 62 words | 34501 tok/s
+  sample 3: seed="What" | 62 words | 41184 tok/s
+  sample 4: seed="My" | 62 words | 37870 tok/s
+  sample 5: seed="How" | 62 words | 39360 tok/s
+
+--- Inference Summary ---
+samples: 5 | total_tokens: 320 | time: 0.008s | avg: 37852 tok/s
+========================================
+
+
+========================================
+Run: 2026-02-22 17:56:23
+========================================
+Tokenisation: WORD-LEVEL
+Corpus: 114634 lines | 899588 word tokens
+Vocab: 5000 tokens (4997 words + 3 special)
+UNK rate: 19.46%
+Architecture: N_EMBD=48 N_LAYER=1 N_HEAD=4 BLOCK_SIZE=64
+Params: 510720
+Training: batch=16 steps=10000 lr=0.0010
+
+--- Training ---
+step     1 / 10000 | loss 8.6605
+step   500 / 10000 | loss 5.3803
+step  1000 / 10000 | loss 5.3282
+step  1500 / 10000 | loss 5.2831
+step  2000 / 10000 | loss 5.0298
+step  2500 / 10000 | loss 4.6480
+step  3000 / 10000 | loss 5.2747
+step  3500 / 10000 | loss 5.1225
+step  4000 / 10000 | loss 4.8644
+step  4500 / 10000 | loss 4.7470
+step  5000 / 10000 | loss 4.9016
+step  5500 / 10000 | loss 5.0690
+step  6000 / 10000 | loss 4.4997
+step  6500 / 10000 | loss 4.8380
+step  7000 / 10000 | loss 4.9794
+step  7500 / 10000 | loss 5.2970
+step  8000 / 10000 | loss 5.1260
+step  8500 / 10000 | loss 4.2405
+step  9000 / 10000 | loss 5.0721
+step  9500 / 10000 | loss 4.9076
+step 10000 / 10000 | loss 4.4191
+
+Training complete: 101.0s | 99 steps/s | 12.4k tok/s
+Final checkpoint: shakespeare_word.ckpt
+  sample 1: seed="The" | 62 words | 35496 tok/s
+  sample 2: seed="O" | 62 words | 36446 tok/s
+  sample 3: seed="What" | 62 words | 35754 tok/s
+  sample 4: seed="My" | 62 words | 37780 tok/s
+  sample 5: seed="How" | 62 words | 37253 tok/s
+
+--- Inference Summary ---
+samples: 5 | total_tokens: 320 | time: 0.009s | avg: 36526 tok/s
+========================================
+
+
+========================================
+Run: 2026-02-22 18:02:36
+========================================
+Tokenisation: WORD-LEVEL
+Corpus: 114634 lines | 1105657 word tokens
+Vocab: 5000 tokens (4997 words + 3 special)
+UNK rate: 7.37%
+Architecture: N_EMBD=48 N_LAYER=1 N_HEAD=4 BLOCK_SIZE=64
+Params: 510720
+Training: batch=16 steps=10000 lr=0.0010
+
+--- Training ---
+step     1 / 10000 | loss 8.6192
+step   500 / 10000 | loss 5.3728
+step  1000 / 10000 | loss 5.0188
+
+========================================
+Run: 2026-02-22 18:02:52
+========================================
+Tokenisation: WORD-LEVEL
+Corpus: 114634 lines | 1105657 word tokens
+Vocab: 5000 tokens (4997 words + 3 special)
+UNK rate: 7.37%
+Architecture: N_EMBD=48 N_LAYER=1 N_HEAD=4 BLOCK_SIZE=64
+Params: 510720
+Training: batch=16 steps=10000 lr=0.0010
+
+--- Training ---
+step     1 / 10000 | loss 8.6192
+step   500 / 10000 | loss 5.3728
+step  1000 / 10000 | loss 5.0188
+
+========================================
+Run: 2026-02-22 18:03:06
+========================================
+Tokenisation: WORD-LEVEL
+Corpus: 114634 lines | 1105657 word tokens
+Vocab: 5000 tokens (4997 words + 3 special)
+UNK rate: 7.37%
+Architecture: N_EMBD=48 N_LAYER=1 N_HEAD=4 BLOCK_SIZE=64
+Params: 510720
+Training: batch=16 steps=10000 lr=0.0010
+
+--- Training ---
+step     1 / 10000 | loss 8.6192
+step   500 / 10000 | loss 5.3728
+step  1000 / 10000 | loss 5.0188
+step  1500 / 10000 | loss 4.7368
+step  2000 / 10000 | loss 5.2392
+step  2500 / 10000 | loss 4.4540
+step  3000 / 10000 | loss 5.0931
+
+========================================
+Run: 2026-02-22 18:03:43
+========================================
+Tokenisation: WORD-LEVEL
+Corpus: 114634 lines | 1105657 word tokens
+Vocab: 5000 tokens (4997 words + 3 special)
+UNK rate: 7.37%
+Architecture: N_EMBD=48 N_LAYER=1 N_HEAD=4 BLOCK_SIZE=64
+Params: 510720
+Training: batch=16 steps=10000 lr=0.0010
+
+--- Training ---
+step     1 / 10000 | loss 8.6192
+step  3500 / 10000 | loss 5.4292
+step   500 / 10000 | loss 5.3728
+step  4000 / 10000 | loss 4.7259
+step  1000 / 10000 | loss 5.0188
+step  4500 / 10000 | loss 4.7850
+step  1500 / 10000 | loss 4.7368
+step  5000 / 10000 | loss 4.7302
+step  2000 / 10000 | loss 5.2392
+step  5500 / 10000 | loss 4.5655
+step  2500 / 10000 | loss 4.4540
+step  6000 / 10000 | loss 4.7713
+step  3000 / 10000 | loss 5.0931
+step  6500 / 10000 | loss 4.7623
+step  3500 / 10000 | loss 5.4292
+step  7000 / 10000 | loss 4.6574
+step  4000 / 10000 | loss 4.7259
+step  7500 / 10000 | loss 4.7583
+step  4500 / 10000 | loss 4.7850
+step  8000 / 10000 | loss 4.5399
+step  5000 / 10000 | loss 4.7302
+step  8500 / 10000 | loss 4.4893
+step  5500 / 10000 | loss 4.5655
+step  9000 / 10000 | loss 4.6638
+step  6000 / 10000 | loss 4.7713
+step  9500 / 10000 | loss 4.9751
+step  6500 / 10000 | loss 4.7623
+step 10000 / 10000 | loss 4.3481
+
+Training complete: 123.0s | 81 steps/s | 12.5k tok/s
+Final checkpoint: shakespeare_word.ckpt
+  sample 1: seed="the" | 62 words | 39096 tok/s
+  sample 2: seed="o" | 62 words | 40025 tok/s
+  sample 3: seed="what" | 62 words | 37581 tok/s
+  sample 4: seed="my" | 62 words | 39875 tok/s
+  sample 5: seed="how" | 62 words | 40226 tok/s
+
+--- Inference Summary ---
+samples: 5 | total_tokens: 320 | time: 0.008s | avg: 39336 tok/s
+========================================
+
+step  7000 / 10000 | loss 4.6574
+step  7500 / 10000 | loss 4.7583
+step  8000 / 10000 | loss 4.5399
+step  8500 / 10000 | loss 4.4893
+step  9000 / 10000 | loss 4.6638
+step  9500 / 10000 | loss 4.9751
+step 10000 / 10000 | loss 4.3481
+
+Training complete: 123.0s | 81 steps/s | 12.5k tok/s
+Final checkpoint: shakespeare_word.ckpt
+  sample 1: seed="the" | 62 words | 39360 tok/s
+  sample 2: seed="o" | 62 words | 37736 tok/s
+  sample 3: seed="what" | 62 words | 41237 tok/s
+  sample 4: seed="my" | 62 words | 40738 tok/s
+  sample 5: seed="how" | 62 words | 40455 tok/s
+
+--- Inference Summary ---
+samples: 5 | total_tokens: 320 | time: 0.008s | avg: 39865 tok/s
+========================================
+
+
+========================================
+Run: 2026-02-22 18:07:47
+========================================
+Tokenisation: WORD-LEVEL
+Corpus: 114634 lines | 1105657 word tokens
+Vocab: 5000 tokens (4997 words + 3 special)
+UNK rate: 7.37%
+Architecture: N_EMBD=48 N_LAYER=1 N_HEAD=4 BLOCK_SIZE=64
+Params: 510720
+Training: batch=16 steps=10000 lr=0.0010
+
+--- Training ---
+step     1 / 10000 | loss 8.6192
+step   500 / 10000 | loss 5.3728
+step  1000 / 10000 | loss 5.0188
+step  1500 / 10000 | loss 4.7368
+step  2000 / 10000 | loss 5.2392
+step  2500 / 10000 | loss 4.4540
+step  3000 / 10000 | loss 5.0931
+step  3500 / 10000 | loss 5.4292
+step  4000 / 10000 | loss 4.7259
+step  4500 / 10000 | loss 4.7850
+step  5000 / 10000 | loss 4.7302
+step  5500 / 10000 | loss 4.5655
+step  6000 / 10000 | loss 4.7713
+step  6500 / 10000 | loss 4.7623
+step  7000 / 10000 | loss 4.6574
+step  7500 / 10000 | loss 4.7583
+step  8000 / 10000 | loss 4.5399
+step  8500 / 10000 | loss 4.4893
+step  9000 / 10000 | loss 4.6638
+step  9500 / 10000 | loss 4.9751
+step 10000 / 10000 | loss 4.3481
+
+Training complete: 123.0s | 81 steps/s | 12.5k tok/s
+Final checkpoint: shakespeare_word.ckpt
+  sample 1: seed="the" | 62 words | 40000 tok/s
+  sample 2: seed="o" | 62 words | 40790 tok/s
+  sample 3: seed="what" | 62 words | 40328 tok/s
+  sample 4: seed="my" | 62 words | 39240 tok/s
+  sample 5: seed="how" | 62 words | 39001 tok/s
+
+--- Inference Summary ---
+samples: 5 | total_tokens: 320 | time: 0.008s | avg: 39860 tok/s
+========================================
+

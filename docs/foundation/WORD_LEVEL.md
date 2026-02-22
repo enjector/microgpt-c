@@ -6,24 +6,26 @@
 
 **Point:** Word-level tokenisation trades vocabulary size for semantic density — each token carries a whole word's meaning instead of a single letter.
 
-**Picture:** It's like reading a book word-by-word instead of letter-by-letter. You understand faster but you'll skip any word you've never seen before — and at this model scale that happens a lot.
+**Picture:** It's like reading a book word-by-word instead of letter-by-letter. You understand faster but you'll skip any word you've never seen before — and for open vocabulary at this model scale that happens a lot.
 
-**Proof:** The Shakespeare corpus has ~8,000 unique words. At the model sizes MicroGPT-C uses (~875K params) the `<unk>` rate becomes problematic. The Shakespeare demo was rewritten from word-level to character-level precisely because of this.
+**Proof:** The Shakespeare corpus has ~8,000 unique word forms, but text normalisation (lowercase + punctuation splitting) reduces effective vocabulary to ~4,000. With 5,000 word slots, the UNK rate drops to ~7%. For **constrained vocabularies** (like the VM codegen DSL with ~500 words) UNK drops to <0.1%, making word-level the superior choice.
 
-**Push:** Only use word-level tokenisation when you have a controlled vocabulary (forms, templates, structured data). For open-ended text at sub-1M param scale, character-level is strictly better.
+**Push:** Word-level tokenisation is ideal for **controlled vocabularies** (DSLs, forms, structured data). For open-ended prose, compare with the character-level demo to see the tradeoff.
 
 ---
 
-Word-level tokenisation splits text on whitespace, maps each word to a token ID, and preserves newlines as distinct tokens. It works best for **prose, dialogue, and longer text** where whole-word semantics matter more than individual characters.
+Word-level tokenisation splits text on whitespace, maps each word to a token ID, and preserves newlines as distinct tokens. It works best when **the vocabulary is bounded or repeating** — fewer tokens per document, but a much larger embedding table.
 
 ## When to Use
 
 | ✅ Good fits | ❌ Poor fits |
 |-------------|------------|
-| Prose / literary text | Very short text (< 5 words) |
-| Dialogue generation | Character-level patterns (names) |
-| Poetry (verse structure) | Highly varied vocabulary |
-| Text with natural word boundaries | Subword morphology needed |
+| Constrained DSLs (VM code, SQL) | Highly varied open vocabulary |
+| Prose with frequent word reuse | Very short text (< 5 words) |
+| Dialogue with stock phrases | Character-level patterns (names) |
+| Forms and templates | Subword morphology needed |
+
+> **Key insight from vm_codegen:** Word-level tokenisation pushed syntax pass rate from 0% → 80% on a constrained VM DSL, while character-level achieved 0% on the same model. Representation beats capacity.
 
 ## API
 
@@ -62,34 +64,69 @@ free_word_vocab(&wv);
 free(text);
 ```
 
-## Example
+## Demos
 
-The word-level API is available in `microgpt.h` for use in your own programs. See the API section above for a complete usage pattern.
+| Demo | Vocab | UNK Rate | Notes |
+|------|-------|----------|-------|
+| [`demos/word-level/shakespeare/`](file:///Users/user/dev/projects/microgpt-c/demos/word-level/shakespeare) | 5,000 words | ~7% | Normalised open vocab (lowercase + punct split) |
+| [`demos/character-level/shakespeare/`](file:///Users/user/dev/projects/microgpt-c/demos/character-level/shakespeare) | ~80 chars | 0% | No UNK but must learn spelling |
+| [`experiments/organelles/vm_codegen/`](file:///Users/user/dev/projects/microgpt-c/experiments/organelles/vm_codegen) | 500 words | <0.1% | Constrained DSL — **80% syntax pass** |
 
-> **Note:** The bundled Shakespeare demo (`examples/shakespeare/main.c`) uses **character-level** tokenisation for better quality at this model scale. Word-level tokenisation is most effective with larger models and vocabularies.
+> **Character vs Word — when to use which:**
+> - **Character-level** — zero unknowns, learns spelling, needs deeper models (4 layers). Best for open vocabulary at sub-1M scale.
+> - **Word-level** — coherent phrases, needs normalisation to control vocab, shallower models (1 layer). Best for constrained vocabularies or when phrase structure matters more than spelling.
+
+## Text Normalisation
+
+Raw word-level tokenisation wastes vocab slots on punctuation variants: `"the"`, `"the,"`, `"the."`, `"The"` all consume separate entries. Pre-processing fixes this:
+
+1. **Lowercase**: `"The"` → `"the"` — merges case variants
+2. **Punctuation splitting**: `"art,"` → `"art" ","` — separates words from punctuation
+
+This reduces effective unique words from ~8,000 to ~4,000, so 5,000 vocab slots cover 93% of Shakespeare:
+
+```
+Before: [John.] [I] [wonder] [thou] [UNK] [art,] [born]     (20% UNK)
+After:  [john] [.] [i] [wonder] [thou] [being] [,] [art]    (7% UNK)
+```
+
+See the Shakespeare word-level demo for the full implementation.
 
 ## Vocabulary Sizing
 
 The `max_words` parameter to `build_word_vocab` controls how many unique words to keep. Words outside the top-N become `<unk>`.
 
-| Corpus | Unique words | Recommended top-N | Model params |
-|--------|-------------|-------------------|-------------|
-| Small (< 1MB) | ~2,000 | 1,000–2,000 | ~100k |
-| Medium (1–10MB) | ~8,000 | 3,000–5,000 | ~300k |
-| Large (> 10MB) | ~20,000+ | 5,000–10,000 | ~500k+ |
+| Corpus type | Unique words | Recommended top-N | `<unk>` rate |
+|-------------|-------------|-------------------|-------------|
+| Constrained DSL | ~200–500 | All (500) | <0.1% |
+| Small prose (< 1MB) | ~2,000 | 1,000–2,000 | ~5% |
+| Medium prose (1–10MB) | ~8,000 | 5,000–8,000 | ~15% |
+| Large prose (> 10MB) | ~20,000+ | 8,000–10,000 | ~20% |
 
-**Key tradeoff**: more words = fewer `<unk>` in output, but each rare word gets less training signal, and the output layer grows quadratically with N_EMBD.
+**Key tradeoff**: more words = fewer `<unk>` in output, but each rare word gets less training signal, and the output layer grows linearly with vocab size.
+
+## Performance Note
+
+`build_word_vocab` uses O(n²) deduplication. For large corpora (>1MB), sample a subset for vocabulary discovery:
+
+```c
+/* Use first 500KB for vocab discovery (fast) */
+size_t sample_len = text_len > 500000 ? 500000 : text_len;
+build_word_vocab(text, sample_len, max_words, &wv);
+/* Then tokenize full corpus with discovered vocab */
+tokenize_words(text, text_len, &wv, ids, max_ids);
+```
 
 ## Model Sizing
 
 Word-level models need more capacity than character-level since the vocabulary is much larger:
 
-| Parameter | Recommended |
-|-----------|-------------|
-| N_EMBD | 32–64 |
-| BLOCK_SIZE | 32–64 |
-| N_LAYER | 1–2 |
-| MAX_VOCAB | top_words + 3 (round up) |
-| Training steps | 3,000–10,000 |
+| Parameter | Open Vocabulary | Constrained DSL |
+|-----------|----------------|----------------|
+| N_EMBD | 48 | 48–64 |
+| BLOCK_SIZE | 64 | 256 |
+| N_LAYER | 1 | 1 |
+| MAX_VOCAB | 5,000 | 500 |
+| Training steps | 10,000 | 15,000 |
 
-These are set via CMake compile definitions (see `CMakeLists.txt` for the shakespeare target).
+These are set via CMake compile definitions (see `CMakeLists.txt` for the `shakespeare_word_demo` and `vm_codegen` targets).
