@@ -713,7 +713,9 @@ find_package(FLEX)
 find_package(BISON)
 
 set(VM_PARSER_SOURCES)
-if(FLEX_FOUND AND BISON_FOUND)
+# Grammar uses %define api.prefix which requires Bison >= 3.0
+# macOS ships Bison 2.3 which cannot parse this syntax
+if(FLEX_FOUND AND BISON_FOUND AND BISON_VERSION VERSION_GREATER_EQUAL "3.0")
     flex_target(vm_scanner
         ${CMAKE_CURRENT_SOURCE_DIR}/src/microgpt_vm.l
         ${CMAKE_CURRENT_BINARY_DIR}/microgpt_vm_parser.l.c)
@@ -725,7 +727,11 @@ if(FLEX_FOUND AND BISON_FOUND)
         ${FLEX_vm_scanner_OUTPUTS}
         ${BISON_vm_parser_OUTPUTS})
 else()
-    message(STATUS "Flex/Bison not found — using pre-generated parser sources")
+    if(BISON_FOUND AND BISON_VERSION VERSION_LESS "3.0")
+        message(STATUS "Bison ${BISON_VERSION} found but >= 3.0 required — using pre-generated parser sources")
+    else()
+        message(STATUS "Flex/Bison not found — using pre-generated parser sources")
+    endif()
     list(APPEND VM_PARSER_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/src/microgpt_vm_parser.l.c
         ${CMAKE_CURRENT_SOURCE_DIR}/src/microgpt_vm_parser.tab.c)
