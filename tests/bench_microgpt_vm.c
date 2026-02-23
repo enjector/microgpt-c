@@ -43,10 +43,10 @@ static int benchmark_simple1() {
   assert(source != NULL);
 
   vm_module *module = NULL;
-  result r = vm_module_compile(NULL, source, &module);
-  assert(RESULT_OK == r);
+  vm_result r = vm_module_compile(NULL, source, &module);
+  assert(VM_OK == r);
   assert(module != NULL);
-  assert(0 == sequence_count(module->errors));
+  assert(0 == vm_list_count(module->errors));
 
   vm_module_runtime *runtime = vm_module_runtime_create(module);
   assert(runtime != NULL);
@@ -56,9 +56,9 @@ static int benchmark_simple1() {
 
   while (n-- > 0) {
     r = vm_module_runtime_run(runtime, function);
-    assert(RESULT_OK == r);
+    assert(VM_OK == r);
     vm_variable *var =
-        (vm_variable *)cmap_get_value(function->variables, "total");
+        (vm_variable *)vm_map_get_value(function->variables, "total");
     assert(var != NULL);
 
     if (var->type_class != ptcNUMBER) {
@@ -81,7 +81,7 @@ static int benchmark_simple1() {
 
     vm_variable *return_var = NULL;
     r = vm_module_runtime_stack_pop(runtime, &return_var);
-    assert(RESULT_OK == r);
+    assert(VM_OK == r);
     assert(return_var != NULL);
     assert(ptcNUMBER == return_var->type_class);
     assert(362 == return_var->value.number);
@@ -95,7 +95,7 @@ static int benchmark_simple1() {
   free(source);
 
 #ifdef _DEBUG
-  xmemory_report_exit_on_leaks();
+  vm_memory_report_exit_on_leaks();
 #endif
 
   return count;
@@ -117,12 +117,12 @@ static int benchmark_conditions1() {
       load_file_content("resources/vm/runtime/runtime_conditions1.ts");
   assert(source != NULL);
 
-  result r = vm_module_compile(NULL, source, &module);
+  vm_result r = vm_module_compile(NULL, source, &module);
   puts("Compile finished!");
   fflush(stdout);
-  assert(RESULT_OK == r);
+  assert(VM_OK == r);
   assert(module != NULL);
-  assert(0 == sequence_count(module->errors));
+  assert(0 == vm_list_count(module->errors));
 
   vm_module_runtime *runtime = vm_module_runtime_create(module);
   assert(runtime != NULL);
@@ -132,11 +132,11 @@ static int benchmark_conditions1() {
 
   while (n-- > 0) {
     r = vm_module_runtime_run(runtime, function);
-    assert(RESULT_OK == r);
+    assert(VM_OK == r);
 
     /* Verify amount stays at 100 (never modified by the script) */
     vm_variable *var_amount =
-        (vm_variable *)cmap_get_value(function->variables, "amount");
+        (vm_variable *)vm_map_get_value(function->variables, "amount");
     assert(var_amount != NULL);
 
     if (var_amount->type_class != ptcNUMBER) {
@@ -156,23 +156,23 @@ static int benchmark_conditions1() {
        a=1 (amount > 10), b=1 (amount >= 100), c=1 (amount-1 == 99),
        d=1 (amount < 200 && amount <= 100), f=2 (amount < 1000, f=1+1) */
     vm_variable *var_a =
-        (vm_variable *)cmap_get_value(function->variables, "a");
+        (vm_variable *)vm_map_get_value(function->variables, "a");
     assert(var_a != NULL && var_a->value.number == 1);
 
     vm_variable *var_b =
-        (vm_variable *)cmap_get_value(function->variables, "b");
+        (vm_variable *)vm_map_get_value(function->variables, "b");
     assert(var_b != NULL && var_b->value.number == 1);
 
     vm_variable *var_c =
-        (vm_variable *)cmap_get_value(function->variables, "c");
+        (vm_variable *)vm_map_get_value(function->variables, "c");
     assert(var_c != NULL && var_c->value.number == 1);
 
     vm_variable *var_d =
-        (vm_variable *)cmap_get_value(function->variables, "d");
+        (vm_variable *)vm_map_get_value(function->variables, "d");
     assert(var_d != NULL && var_d->value.number == 1);
 
     vm_variable *var_f =
-        (vm_variable *)cmap_get_value(function->variables, "f");
+        (vm_variable *)vm_map_get_value(function->variables, "f");
     assert(var_f != NULL && var_f->value.number == 2);
 
     vm_module_runtime_clear(runtime);
@@ -182,7 +182,7 @@ static int benchmark_conditions1() {
   vm_module_dispose(module);
 
 #ifdef _DEBUG
-  xmemory_report_exit_on_leaks();
+  vm_memory_report_exit_on_leaks();
 #endif
 
   return count;
@@ -207,17 +207,17 @@ static int benchmark_simple_verb_call_single_param() {
 
   verb_context *context = verb_context_create();
 
-  int result = verb_register(context, "echo", "message", bench_echo, NULL);
+  int vm_result = verb_register(context, "echo", "message", bench_echo, NULL);
 
-  if (result != RESULT_OK) {
+  if (vm_result != VM_OK) {
     verb_context_dispose(context);
     return BENCHMARK_RESULT_CORE_FAILED;
   }
 
   while (n-- > 0) {
-    result = verb_exec(context, "echo hello", &response);
+    vm_result = verb_exec(context, "echo hello", &response);
 
-    if (result != RESULT_OK) {
+    if (vm_result != VM_OK) {
       verb_context_dispose(context);
       return BENCHMARK_RESULT_CORE_FAILED;
     }
@@ -263,7 +263,7 @@ static verb(bench_create_signal) {
   _bench_handles[id] = s;
   char buf[32];
   snprintf(buf, sizeof(buf), "%zu", id);
-  return string_clone(buf);
+  return vm_string_clone(buf);
 }
 
 static verb(bench_rolling_mean) {
@@ -284,7 +284,7 @@ static verb(bench_rolling_mean) {
   _bench_handles[id] = dst;
   char buf[32];
   snprintf(buf, sizeof(buf), "%zu", id);
-  return string_clone(buf);
+  return vm_string_clone(buf);
 }
 
 static verb(bench_signal_value_at) {
@@ -292,7 +292,7 @@ static verb(bench_signal_value_at) {
   size_t idx = (size_t)atoi(verb_arg("index"));
   char buf[64];
   snprintf(buf, sizeof(buf), "%.6f", _bench_handles[id]->data[idx]);
-  return string_clone(buf);
+  return vm_string_clone(buf);
 }
 
 static int benchmark_opaque_handle_rolling_mean() {
@@ -392,7 +392,7 @@ int main(int argc, const char *argv[]) {
 
 #endif
   //   abc:
-  bool result = benchmark_suite_run(benchmarks, optional_output_path);
+  bool vm_result = benchmark_suite_run(benchmarks, optional_output_path);
 
 #ifdef _WIN32
 
@@ -408,5 +408,5 @@ int main(int argc, const char *argv[]) {
 #endif
 
   // Return 0 for success and 1 fo failure
-  return result ? 0 : 1;
+  return vm_result ? 0 : 1;
 }

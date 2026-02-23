@@ -4,7 +4,7 @@
  *
  * Trains a word-level GPT on VM DSL functions.  Each token is a whole keyword,
  * identifier, number, or operator — not a single character.  This eliminates
- * spelling errors (can't produce "fun tion") and dramatically reduces sequence
+ * spelling errors (can't produce "fun tion") and dramatically reduces vm_list
  * lengths (~40 tokens per function vs ~175 characters).
  *
  * Uses vm_module_compile() as a deterministic syntax validation gate.
@@ -394,8 +394,8 @@ static void vm_detokenize(const size_t *tokens, size_t count,
 
 static int validate_vm_code(const char *code) {
   vm_module *module = NULL;
-  result r = vm_module_compile(NULL, code, &module);
-  int valid = (r == RESULT_OK && module && sequence_count(module->errors) == 0);
+  vm_result r = vm_module_compile(NULL, code, &module);
+  int valid = (r == VM_OK && module && vm_list_count(module->errors) == 0);
   if (module)
     vm_module_dispose(module);
   return valid;

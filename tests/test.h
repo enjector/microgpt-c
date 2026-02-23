@@ -119,11 +119,11 @@ static inline bool test_suite_run(test_suite *suites) {
   return failed == 0;
 }
 
-// Stubs for functions removed from enjector/core during C99 rewrite
+// Stubs for debug/diagnostics functions (no-ops in test builds)
 #define core_result_to_string_register() (void)0
 #define result_to_string_register_clear() (void)0
-#define xmemory_report_clear() (void)0
-#define xmemory_report_exit_on_leaks() (void)0
+#define vm_memory_report_clear() (void)0
+#define vm_memory_report_exit_on_leaks() (void)0
 #define log_set_enable_debug(x) (void)(x)
 #define log_set_enable_info(x) (void)(x)
 #define log_set_enable_warn(x) (void)(x)

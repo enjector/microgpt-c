@@ -1,19 +1,22 @@
 /*
- * MicroGPT-C VM Engine — Flex Lexer
+ * microgpt_vm.l  —  Flex lexer for the MicroGPT-C Virtual Machine.
  *
- * Copyright (c) 2026 Ajay Soni (ajay.soni@enjector.com), Enjector Software Ltd.
+ * Copyright (c) 2026 Ajay Soni.  MIT License.
  *
- * SPDX-License-Identifier: MIT
- */
-
-/*
- * microgpt_vm.l  —  Flex lexer for the Virtual Machine parser.
+ * Tokenises a TypeScript-like language with LaTeX mathematical extensions.
+ * All generated symbols use the "vm_module_parser_" prefix (%option prefix)
+ * to avoid clashing with application-level lex/yacc.
  *
- * Tokenises a TypeScript-like language plus LaTeX mathematical notation.
- * Uses custom YY_INPUT to read from an in-memory string buffer (no files).
- * All tokens use the "vm_module_parser_" prefix (%option prefix).
+ * Input method:  Custom YY_INPUT macro reads one character at a time from
+ *                an in-memory source string (vm_module_parser), not FILE*.
  *
- * Copyright 2024 Enjector Software, Ltd.  MIT License.
+ * Token categories:
+ *   - Keywords:        function, declare, return, if, else, while, for, ...
+ *   - Literals:        NAME, NUMBER, STRING, BOOLEAN
+ *   - Operators:       comparison (>=, <=, !=, ==), logical (&&, ||),
+ *                      increment/decrement (++, --, +=, -=)
+ *   - LaTeX math:      \sum_, \frac, \pow, Greek letters (α / \alpha)
+ *   - Comments:        line (//) and block comments
  */
 
 %option prefix="vm_module_parser_"
@@ -57,7 +60,7 @@
 	#define YY_DECL int yylex(vm_module_parser* parser)
 %}
 
-/* ── Pattern definitions ──────────────────────────────────────────────── */
+/* -- Pattern definitions ------------------------------------------------ */
 
 nl				(\r\n|\r|\n)
 ws				[ \t]+
@@ -93,6 +96,7 @@ operator_pow		"\\pow"
 
 %%
 
+ /* Reserved keywords */
 
 function			{ return FUNCTION; }
 declare				{ return DECLARE; }
@@ -105,8 +109,10 @@ while				{ return WHILE; }
 for					{ return FOR; }
 
 
-true				{ vm_module_parser_lval.string = string_clone("true"); return BOOLEAN; }
-false				{ vm_module_parser_lval.string = string_clone("false"); return BOOLEAN; }
+ /* Boolean literals */
+
+true				{ vm_module_parser_lval.string = vm_string_clone("true"); return BOOLEAN; }
+false				{ vm_module_parser_lval.string = vm_string_clone("false"); return BOOLEAN; }
 
 {string}			{	size_t yystring_len = strlen(yytext);
 						/* Allocate space for content (minus quotes) + null terminator */
@@ -116,8 +122,10 @@ false				{ vm_module_parser_lval.string = string_clone("false"); return BOOLEAN;
 						return STRING; 
 					}
 
-{name}				{ vm_module_parser_lval.string = string_clone(yytext); return NAME; }
-{number}			{ vm_module_parser_lval.string = string_clone(yytext); return NUMBER; }
+ /* Identifiers and numeric literals */
+
+{name}				{ vm_module_parser_lval.string = vm_string_clone(yytext); return NAME; }
+{number}			{ vm_module_parser_lval.string = vm_string_clone(yytext); return NUMBER; }
 
 
 {condition_gte}		{ return CONDITION_GTE; }
@@ -136,7 +144,7 @@ false				{ vm_module_parser_lval.string = string_clone("false"); return BOOLEAN;
 {decrement_by}		{ return DECREMENT_BY; }
 
 
-{symbol_alpha}      { vm_module_parser_lval.string = string_clone("alpha"); return NAME; }
+{symbol_alpha}      { vm_module_parser_lval.string = vm_string_clone("alpha"); return NAME; }
 
 
 {operator_sum}		{ return OPERATOR_SUM; }
@@ -144,11 +152,16 @@ false				{ vm_module_parser_lval.string = string_clone("false"); return BOOLEAN;
 {operator_pow}		{ return OPERATOR_POW; }
 
 
+ /* Comments */
+
 {comment}			{ vm_module_parser_lval.string = yytext; return COMMENT; }
 {block_comment}		{ vm_module_parser_lval.string = yytext; return COMMENT; }
+
+ /* Whitespace and newlines (track line/column for error reporting) */
 
 {ws}				{/* skip whitespace */}
 {nl}				{ parser->vm_module_parser_state_input_line_number++; parser->vm_module_parser_state_input_line_column = 1; }
 
+ /* Fallback: return single characters as their ASCII value */
 
 .					{ return yytext[0]; }

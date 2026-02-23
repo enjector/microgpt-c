@@ -759,11 +759,11 @@ extern int vm_module_parser_char_fetch_next(vm_module_parser *parser);
 extern vm_module_parser *_vm_ctx_current_parser;
 
 #undef YY_INPUT
-#define YY_INPUT(buf, result, max_size)                                        \
+#define YY_INPUT(buf, vm_result, max_size)                                        \
   {                                                                            \
     int c = vm_module_parser_char_fetch_next(_vm_ctx_current_parser);          \
-    result = (c == 0) ? YY_NULL : (buf[0] = c, 1);                             \
-    if (result != YY_NULL) {                                                   \
+    vm_result = (c == 0) ? YY_NULL : (buf[0] = c, 1);                             \
+    if (vm_result != YY_NULL) {                                                   \
       ++_vm_ctx_current_parser->vm_module_parser_state_input_line_column;      \
     }                                                                          \
   }
@@ -878,10 +878,10 @@ static int input(void);
 #endif
 
 /* Gets input and stuffs it into "buf".  number of characters read, or YY_NULL,
- * is returned in "result".
+ * is returned in "vm_result".
  */
 #ifndef YY_INPUT
-#define YY_INPUT(buf, result, max_size)                                        \
+#define YY_INPUT(buf, vm_result, max_size)                                        \
   if (YY_CURRENT_BUFFER_LVALUE->yy_is_interactive) {                           \
     int c = '*';                                                               \
     int n;                                                                     \
@@ -891,10 +891,10 @@ static int input(void);
       buf[n++] = (char)c;                                                      \
     if (c == EOF && ferror(yyin))                                              \
       YY_FATAL_ERROR("input in flex scanner failed");                          \
-    result = n;                                                                \
+    vm_result = n;                                                                \
   } else {                                                                     \
     errno = 0;                                                                 \
-    while ((result = (int)fread(buf, 1, (yy_size_t)max_size, yyin)) == 0 &&    \
+    while ((vm_result = (int)fread(buf, 1, (yy_size_t)max_size, yyin)) == 0 &&    \
            ferror(yyin)) {                                                     \
       if (errno != EINTR) {                                                    \
         YY_FATAL_ERROR("input in flex scanner failed");                        \
@@ -1104,7 +1104,7 @@ YY_DECL {
         YY_RULE_SETUP
 #line 84 "D:/dev/projects/enjector/microgpt-vm/main/core/src/vm_module_parser.l"
         {
-          vm_module_parser_lval.string = string_clone("true");
+          vm_module_parser_lval.string = vm_string_clone("true");
           return BOOLEAN;
         }
         YY_BREAK
@@ -1112,7 +1112,7 @@ YY_DECL {
         YY_RULE_SETUP
 #line 85 "D:/dev/projects/enjector/microgpt-vm/main/core/src/vm_module_parser.l"
         {
-          vm_module_parser_lval.string = string_clone("false");
+          vm_module_parser_lval.string = vm_string_clone("false");
           return BOOLEAN;
         }
         YY_BREAK
@@ -1131,7 +1131,7 @@ YY_DECL {
         YY_RULE_SETUP
 #line 93 "D:/dev/projects/enjector/microgpt-vm/main/core/src/vm_module_parser.l"
         {
-          vm_module_parser_lval.string = string_clone(yytext);
+          vm_module_parser_lval.string = vm_string_clone(yytext);
           return NAME;
         }
         YY_BREAK
@@ -1139,7 +1139,7 @@ YY_DECL {
         YY_RULE_SETUP
 #line 94 "D:/dev/projects/enjector/microgpt-vm/main/core/src/vm_module_parser.l"
         {
-          vm_module_parser_lval.string = string_clone(yytext);
+          vm_module_parser_lval.string = vm_string_clone(yytext);
           return NUMBER;
         }
         YY_BREAK
@@ -1231,7 +1231,7 @@ YY_DECL {
         YY_RULE_SETUP
 #line 110 "D:/dev/projects/enjector/microgpt-vm/main/core/src/vm_module_parser.l"
         {
-          vm_module_parser_lval.string = string_clone("alpha");
+          vm_module_parser_lval.string = vm_string_clone("alpha");
           return NAME;
         }
         YY_BREAK

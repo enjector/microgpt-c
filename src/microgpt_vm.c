@@ -1,9 +1,18 @@
 /*
- * MicroGPT-C VM Engine
+ * microgpt_vm.c  —  MicroGPT-C Virtual Machine Engine (implementation)
  *
- * Copyright (c) 2026 Ajay Soni (ajay.soni@enjector.com), Enjector Software Ltd.
+ * Copyright (c) 2026 Ajay Soni.  MIT License.
  *
- * SPDX-License-Identifier: MIT
+ * Implements all non-inline functions declared in microgpt_vm.h:
+ *   - Engine API (vm_engine_*)
+ *   - Verb dispatch layer (verb_register, verb_compile, verb_exec)
+ *   - Module / function lifecycle
+ *   - Code generator and deferred code fragments
+ *   - Post-processing passes (jump tables, type decoration, variable interning)
+ *   - Parser interface (Flex/Bison integration)
+ *   - Runtime execution (opcode interpreter loop)
+ *   - Expression evaluator (vm_eval)
+ *   - Legacy vm_queue-based runtime
  */
 
 #include "microgpt_vm.h"
@@ -66,7 +75,7 @@ static void _ext_method_dispatch(vm_module_runtime *runtime,
   vm_variable *var = NULL;
 
   /* Pop arguments until stack empty or buffer full */
-  while (vm_module_runtime_stack_pop(runtime, &var) == RESULT_OK && var &&
+  while (vm_module_runtime_stack_pop(runtime, &var) == VM_OK && var &&
          argc < 32) {
     args[argc++] = var->value.number;
   }
@@ -132,7 +141,7 @@ void vm_engine_register_fn(vm_engine *e, const char *name, vm_native_fn fn) {
         e->native_fns, e->native_fns_cap * sizeof(native_fn_entry));
   }
 
-  e->native_fns[e->native_fns_count].name = string_clone(name);
+  e->native_fns[e->native_fns_count].name = vm_string_clone(name);
   e->native_fns[e->native_fns_count].fn = fn;
   e->native_fns_count++;
 }
@@ -157,18 +166,18 @@ int vm_engine_load(vm_engine *e, const char *source) {
   /* Parse into module, passing the engine as verb_context for native dispatch
    */
   vm_module *mod = NULL;
-  if (vm_module_parser_generate((verb_context *)e, source, &mod) != RESULT_OK ||
+  if (vm_module_parser_generate((verb_context *)e, source, &mod) != VM_OK ||
       !mod) {
     snprintf(e->last_error, sizeof(e->last_error),
              "Parse failed — empty module");
     return -1;
   }
 
-  if (sequence_count(mod->errors) > 0) {
+  if (vm_list_count(mod->errors) > 0) {
     /* Collect errors into last_error */
     char buf[64];
     snprintf(e->last_error, sizeof(e->last_error), "Parse errors:");
-    sequence_foreach_of(mod->errors, vm_module_error *, err) {
+    vm_list_foreach_of(mod->errors, vm_module_error *, err) {
       snprintf(buf, sizeof(buf), " [L%zu:%zu]", err->source_line_number,
                err->source_line_column);
       strncat(e->last_error, buf,
@@ -223,7 +232,7 @@ int vm_engine_run(vm_engine *e, const char *fn_name) {
 
   /* Retrieve return value */
   vm_variable *ret = NULL;
-  if (vm_module_runtime_stack_pop(e->runtime, &ret) == RESULT_OK && ret) {
+  if (vm_module_runtime_stack_pop(e->runtime, &ret) == VM_OK && ret) {
     e->result_number = ret->value.number;
     e->result_bool = ret->value.boolean ? 1 : 0;
     if (ret->value.string) {
@@ -258,16 +267,22 @@ void vm_engine_dump_il(const vm_engine *e) {
   char *il = vm_module_to_string(e->module);
   if (il) {
     puts(il);
-    string_free(il);
+    vm_string_free(il);
   }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
- *  Verb System  —  full DSL command dispatch layer
+ *  Verb System  —  DSL command dispatch layer
  *
- *  Ported from experiments/engines/microgpt-verb/main/src/verb.cpp.
- *  Provides verb_register / verb_compile / verb_exec / verb_unregister /
- *  verb_enum / verb_definition_dispose / verb_compile_dispose / verb_result.
+ *  A simple command-dispatch framework: callers register "verbs" (named
+ *  commands with typed parameters), then parse + execute natural-language
+ *  sentences against the registry.
+ *
+ *  verb_register     — binds a name + parameter spec to a C callback.
+ *  verb_compile      — parses a sentence, matches the longest verb, and
+ *                      extracts arguments into a vm_map.
+ *  verb_exec         — compile + dispatch in one step.
+ *  verb_unregister   — removes a verb registration.
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
@@ -277,8 +292,8 @@ void verb_definition_dispose(verb_definition *def) {
   free((void *)def->name);
   free((void *)def->definition_params);
   if (def->param_list) {
-    sequence_dispose_items(def->param_list);
-    sequence_free(def->param_list);
+    vm_list_dispose_items(def->param_list);
+    vm_list_free(def->param_list);
   }
   free(def);
 }
@@ -287,13 +302,13 @@ void verb_context_dispose(verb_context *ctx) {
   if (!ctx)
     return;
   if (ctx->verb_definition_map) {
-    cmap_foreach_of(ctx->verb_definition_map, _vname, verb_definition *,
-                    _vdef) {
+    vm_map_foreach_of(ctx->verb_definition_map, _vname, verb_definition *,
+                      _vdef) {
       verb_definition_dispose(_vdef);
     }
-    cmap_free(ctx->verb_definition_map);
+    vm_map_free(ctx->verb_definition_map);
   }
-  xmemory_free(ctx);
+  VM_FREE(ctx);
 }
 
 int verb_register(verb_context *ctx, const char *name, const char *params,
@@ -306,8 +321,8 @@ int verb_register(verb_context *ctx, const char *name, const char *params,
     return RESULT_CORE_VERB_ERROR_ALREADY_REGISTERED;
 
   /* Parse parameter names from the space-separated string */
-  sequence *verb_param_list = sequence_create();
-  string_buffer *usage_buf = string_buffer_create_empty();
+  vm_list *verb_param_list = vm_list_create();
+  vm_string_buffer *usage_buf = vm_string_buffer_create_empty();
 
   if (params && strcmp(params, "") != 0) {
     const size_t plen = strlen(params);
@@ -327,33 +342,33 @@ int verb_register(verb_context *ctx, const char *name, const char *params,
       if (is_delim || is_end) {
         *buf_idx = '\0';
         buf_idx = buf;
-        sequence_add(verb_param_list, string_clone(buf));
+        vm_list_add(verb_param_list, vm_string_clone(buf));
 
         /* Build usage string: <param1> <param2> ... */
-        if (sequence_count(verb_param_list) > 1)
-          string_buffer_append(usage_buf, " ");
-        string_buffer_append_format(usage_buf, "<%s>", buf);
+        if (vm_list_count(verb_param_list) > 1)
+          vm_string_buffer_append(usage_buf, " ");
+        vm_string_buffer_append_format(usage_buf, "<%s>", buf);
       } else {
         *buf_idx++ = c;
       }
     } while (!is_end);
 
-    xmemory_free(buf);
+    VM_FREE(buf);
   }
 
   /* Create the verb definition */
-  verb_definition *def = xmemory_new(verb_definition);
-  def->name = string_clone(name);
-  def->definition_params = string_buffer_free_not_data(usage_buf);
+  verb_definition *def = VM_NEW(verb_definition);
+  def->name = vm_string_clone(name);
+  def->definition_params = vm_string_buffer_free_not_data(usage_buf);
   def->name_length = strlen(name);
   def->param_list = verb_param_list;
-  def->params_count = sequence_count(verb_param_list);
+  def->params_count = vm_list_count(verb_param_list);
   def->function = fn;
   def->fcontext = fctx;
   def->next_verb_definition = NULL;
 
-  cmap_set(ctx->verb_definition_map, name, def);
-  return RESULT_OK;
+  vm_map_set(ctx->verb_definition_map, name, def);
+  return VM_OK;
 }
 
 int verb_unregister(verb_context *ctx, const char *name) {
@@ -365,27 +380,32 @@ int verb_unregister(verb_context *ctx, const char *name) {
     return RESULT_CORE_VERB_ERROR_NO_MATCH;
 
   verb_definition_dispose(def);
-  cmap_remove(ctx->verb_definition_map, name);
-  return RESULT_OK;
+  vm_map_remove(ctx->verb_definition_map, name);
+  return VM_OK;
 }
 
-/* ── verb_compile: sentence parser (ported from verb.cpp lines 247–663) ── */
+/* ── verb_compile: natural-language sentence parser ────────────────────────
+ *
+ * Longest-match verb lookup, followed by structured argument extraction.
+ * Handles: bare words, single/double quoted strings, JSON arrays/objects,
+ * and XML fragments with proper nesting.
+ */
 
 #define VERB_MAX_EXIT_TOKENS 100
 
 verb_compiled *verb_compile(verb_context *ctx, const char *sentence,
                             void *context) {
-  verb_compiled *compiled = xmemory_new(verb_compiled);
+  verb_compiled *compiled = VM_NEW(verb_compiled);
   memset(compiled, 0, sizeof(verb_compiled));
   compiled->context = context;
 
   if (!ctx) {
-    compiled->result = RESULT_CORE_VERB_ERROR_ARGUMENT_NULL;
+    compiled->vm_result = RESULT_CORE_VERB_ERROR_ARGUMENT_NULL;
     return compiled;
   }
 
   if (!sentence || strlen(sentence) == 0) {
-    compiled->result = RESULT_CORE_VERB_ERROR_ARGUMENT_NULL;
+    compiled->vm_result = RESULT_CORE_VERB_ERROR_ARGUMENT_NULL;
     return compiled;
   }
 
@@ -395,7 +415,7 @@ verb_compiled *verb_compile(verb_context *ctx, const char *sentence,
   verb_definition *best = NULL;
   size_t best_len = 0;
 
-  cmap_foreach_of(ctx->verb_definition_map, _vk, verb_definition *, vd) {
+  vm_map_foreach_of(ctx->verb_definition_map, _vk, verb_definition *, vd) {
     if (vd->name_length <= sentence_length) {
       if (strncmp(vd->name, sentence, vd->name_length) == 0) {
         if (vd->name_length > best_len) {
@@ -410,25 +430,25 @@ verb_compiled *verb_compile(verb_context *ctx, const char *sentence,
   }
 
   if (!best) {
-    compiled->result = RESULT_CORE_VERB_ERROR_NO_MATCH;
+    compiled->vm_result = RESULT_CORE_VERB_ERROR_NO_MATCH;
     return compiled;
   }
 
   /* Check: verb matched but params expected and none provided */
   bool missing_vals = (sentence_length == best_len && best->params_count > 0);
   if (missing_vals) {
-    compiled->result = RESULT_CORE_VERB_ERROR_INCORRECT_USAGE;
+    compiled->vm_result = RESULT_CORE_VERB_ERROR_INCORRECT_USAGE;
     compiled->verb_definition_ = best;
     return compiled;
   }
 
   /* ── Parse arguments ── */
   bool parse_error = false;
-  char *sent_clone = string_clone(sentence);
+  char *sent_clone = vm_string_clone(sentence);
   char *sent_idx = sent_clone + best_len + 1; /* skip verb + space */
 
-  cmap *arg_list = cmap_create();
-  cmap_set(arg_list, "verb_context", ctx);
+  vm_map *arg_list = vm_map_create();
+  vm_map_set(arg_list, "verb_context", ctx);
 
   char *param_start = sent_idx;
 
@@ -443,7 +463,7 @@ verb_compiled *verb_compile(verb_context *ctx, const char *sentence,
   } vp_type;
 
   /* Iterate over expected parameter names */
-  sequence_foreach_of(best->param_list, char *, pname) {
+  vm_list_foreach_of(best->param_list, char *, pname) {
     size_t exit_depth = 0;
     char exit_tok = 0;
 
@@ -632,7 +652,7 @@ verb_compiled *verb_compile(verb_context *ctx, const char *sentence,
           *param_end = '\0';
         }
 
-        cmap_set(arg_list, pname, param_start);
+        vm_map_set(arg_list, pname, param_start);
 
         if (is_eol)
           break;
@@ -653,9 +673,9 @@ verb_compiled *verb_compile(verb_context *ctx, const char *sentence,
 
   /* Handle parse errors */
   if (parse_error) {
-    cmap_free(arg_list);
-    string_free(sent_clone);
-    compiled->result = RESULT_CORE_VERB_ERROR_ARGUMENT_PARSING;
+    vm_map_free(arg_list);
+    vm_string_free(sent_clone);
+    compiled->vm_result = RESULT_CORE_VERB_ERROR_ARGUMENT_PARSING;
     compiled->verb_definition_ = best;
     return compiled;
   }
@@ -666,14 +686,14 @@ verb_compiled *verb_compile(verb_context *ctx, const char *sentence,
   missing_vals = (expected != actual);
 
   if (missing_vals) {
-    cmap_free(arg_list);
-    string_free(sent_clone);
-    compiled->result = RESULT_CORE_VERB_ERROR_INCORRECT_USAGE;
+    vm_map_free(arg_list);
+    vm_string_free(sent_clone);
+    compiled->vm_result = RESULT_CORE_VERB_ERROR_INCORRECT_USAGE;
     compiled->verb_definition_ = best;
     return compiled;
   }
 
-  compiled->result = RESULT_OK;
+  compiled->vm_result = VM_OK;
   compiled->verb_definition_ = best;
   compiled->verb_arg_list = arg_list;
   compiled->sentence_values = sent_clone;
@@ -684,10 +704,10 @@ void verb_compile_dispose(verb_compiled *compiled) {
   if (!compiled)
     return;
   if (compiled->sentence_values)
-    string_free(compiled->sentence_values);
+    vm_string_free(compiled->sentence_values);
   if (compiled->verb_arg_list)
-    cmap_free(compiled->verb_arg_list);
-  xmemory_free(compiled);
+    vm_map_free(compiled->verb_arg_list);
+  VM_FREE(compiled);
 }
 
 int verb_exec(verb_context *ctx, const char *sentence, char **response) {
@@ -697,18 +717,18 @@ int verb_exec(verb_context *ctx, const char *sentence, char **response) {
   char *result_response = NULL;
 
   verb_compiled *compiled = verb_compile(ctx, sentence, NULL);
-  int r = compiled->result;
+  int r = compiled->vm_result;
 
   if (r == RESULT_CORE_VERB_ERROR_INCORRECT_USAGE &&
       compiled->verb_definition_) {
     /* Build usage message: "Usage: verb_name <p1> <p2>" */
-    char buf[SENTENCE_MESSAGE_MAX_SIZE];
+    char buf[VM_SENTENCE_MESSAGE_MAX_SIZE];
     snprintf(buf, sizeof(buf), "Usage: %s %s", compiled->verb_definition_->name,
              compiled->verb_definition_->definition_params
                  ? compiled->verb_definition_->definition_params
                  : "");
-    result_response = string_clone(buf);
-  } else if (r == RESULT_OK && compiled->verb_definition_) {
+    result_response = vm_string_clone(buf);
+  } else if (r == VM_OK && compiled->verb_definition_) {
     result_response = compiled->verb_definition_->function(
         ctx, compiled->verb_arg_list, compiled->verb_definition_->fcontext);
 
@@ -724,8 +744,8 @@ int verb_exec(verb_context *ctx, const char *sentence, char **response) {
 
 const char *verb_result(int code) {
   switch (code) {
-  case RESULT_OK:
-    return "RESULT_OK";
+  case VM_OK:
+    return "VM_OK";
   case RESULT_CORE_VERB_ERROR:
     return "RESULT_CORE_VERB_ERROR";
   case RESULT_CORE_VERB_ERROR_ALREADY_REGISTERED:
@@ -756,30 +776,30 @@ const char *verb_result(int code) {
  * @return Heap-allocated module.  Caller must call vm_module_dispose().
  */
 vm_module *vm_module_create(verb_context *verb_context) {
-  vm_module *module = xmemory_new(vm_module);
+  vm_module *module = VM_NEW(vm_module);
   module->verb_context_ = verb_context;
-  module->functions = cmap_create();
-  module->errors = sequence_create();
-  module->functions_list = sequence_create();
+  module->functions = vm_map_create();
+  module->errors = vm_list_create();
+  module->functions_list = vm_list_create();
   return module;
 }
 
 /** Free a module and all resources it owns (functions, errors, etc). */
 void vm_module_dispose(vm_module *module) {
-  verify_not_null(module);
+  VM_ASSERT_NOT_NULL(module);
 
-  cmap_foreach_of(module->functions, name, vm_function *, function) {
+  vm_map_foreach_of(module->functions, name, vm_function *, function) {
     vm_function_dispose(function);
   }
-  cmap_free(module->functions);
+  vm_map_free(module->functions);
 
-  sequence_foreach_of(module->errors, vm_module_error *, error) {
+  vm_list_foreach_of(module->errors, vm_module_error *, error) {
     vm_module_error_dispose(error);
   }
-  sequence_free(module->errors);
-  sequence_free(module->functions_list);
+  vm_list_free(module->errors);
+  vm_list_free(module->functions_list);
 
-  xmemory_free(module);
+  VM_FREE(module);
 }
 
 /**
@@ -788,11 +808,11 @@ void vm_module_dispose(vm_module *module) {
  * @return Pointer to the function, or NULL if not found.
  */
 vm_function *vm_module_fetch_function(vm_module *module, const char *name) {
-  verify_not_null(module);
-  verify_not_null(name);
+  VM_ASSERT_NOT_NULL(module);
+  VM_ASSERT_NOT_NULL(name);
 
   vm_function *function = NULL;
-  cmap_item *item = cmap_get_item(module->functions, name);
+  vm_map_item *item = vm_map_get_item(module->functions, name);
 
   if (item) {
     function = (vm_function *)item->value;
@@ -804,83 +824,83 @@ vm_function *vm_module_fetch_function(vm_module *module, const char *name) {
 /**
  * Render the entire module's IL as a heap-allocated string.
  * Includes instruction dumps for every function plus any error messages.
- * Caller owns the returned string — free with string_free().
+ * Caller owns the returned string — free with vm_string_free().
  */
 char *vm_module_to_string(vm_module *module) {
-  verify_not_null(module);
+  VM_ASSERT_NOT_NULL(module);
 
-  string_buffer *buffer = string_buffer_create_empty();
+  vm_string_buffer *buffer = vm_string_buffer_create_empty();
 
-  sequence_foreach_of(module->functions_list, vm_function *, function) {
-    string_buffer_append(
+  vm_list_foreach_of(module->functions_list, vm_function *, function) {
+    vm_string_buffer_append(
         buffer,
         "\n// "
         "------------------------------------------------------------\n");
-    string_buffer_append_format(buffer, "// %s(", function->name);
+    vm_string_buffer_append_format(buffer, "// %s(", function->name);
     bool more_params = false;
-    sequence_foreach_of(function->parameters, char *, parameter) {
+    vm_list_foreach_of(function->parameters, char *, parameter) {
       if (more_params) {
-        string_buffer_append(buffer, ", ");
+        vm_string_buffer_append(buffer, ", ");
       }
 
-      string_buffer_append_format(buffer, "%s", parameter);
+      vm_string_buffer_append_format(buffer, "%s", parameter);
       more_params = true;
     }
-    string_buffer_append(
+    vm_string_buffer_append(
         buffer,
         ")\n// "
         "------------------------------------------------------------\n");
 
     size_t pos = 0;
 
-    sequence_foreach_of(function->instructions, vm_instruction *, instruction) {
+    vm_list_foreach_of(function->instructions, vm_instruction *, instruction) {
       if (instruction->opcode == opCOMMENT) {
-        string_buffer_append(buffer, "\n");
+        vm_string_buffer_append(buffer, "\n");
       }
 
       char *instruction_dump = vm_instruction_to_string(instruction);
-      string_buffer_append_format(buffer, "%3zu)\t%s\n", pos++,
-                                  instruction_dump);
-      string_free(instruction_dump);
+      vm_string_buffer_append_format(buffer, "%3zu)\t%s\n", pos++,
+                                     instruction_dump);
+      vm_string_free(instruction_dump);
     }
   }
 
-  if (sequence_count(module->errors)) {
-    string_buffer_append(buffer,
-                         "\n// ** ERRORS "
-                         "************************************************"
-                         "******************\n");
-    sequence_foreach_of(module->errors, vm_module_error *, error) {
-      string_buffer_append_format(buffer, "- Line %d: %s\n",
-                                  error->source_line_number, error->message);
+  if (vm_list_count(module->errors)) {
+    vm_string_buffer_append(buffer,
+                            "\n// ** ERRORS "
+                            "************************************************"
+                            "******************\n");
+    vm_list_foreach_of(module->errors, vm_module_error *, error) {
+      vm_string_buffer_append_format(buffer, "- Line %d: %s\n",
+                                     error->source_line_number, error->message);
     }
   }
 
-  return string_buffer_free_not_data(buffer);
+  return vm_string_buffer_free_not_data(buffer);
 }
 
 /** Record a parse/compile error with source location for later reporting. */
 void vm_module_error_add(vm_module *module, size_t source_line_number,
                          size_t source_line_column, char *message) {
-  verify_not_null(module);
-  verify_not_null(module->errors);
+  VM_ASSERT_NOT_NULL(module);
+  VM_ASSERT_NOT_NULL(module->errors);
 
-  vm_module_error *verify_result_error = xmemory_new(vm_module_error);
+  vm_module_error *verify_result_error = VM_NEW(vm_module_error);
   verify_result_error->source_line_number = source_line_number;
   verify_result_error->source_line_column = source_line_column;
-  verify_result_error->message = string_clone(message);
-  sequence_add(module->errors, verify_result_error);
+  verify_result_error->message = vm_string_clone(message);
+  vm_list_add(module->errors, verify_result_error);
 }
 
 /** Free a single module error record and its message string. */
 void vm_module_error_dispose(vm_module_error *error) {
-  verify_not_null(error);
+  VM_ASSERT_NOT_NULL(error);
 
   if (error->message) {
-    string_free(error->message);
+    vm_string_free(error->message);
   }
 
-  xmemory_free(error);
+  VM_FREE(error);
 }
 
 #include "microgpt_vm_parser.tab.h"
@@ -891,12 +911,12 @@ void vm_module_error_dispose(vm_module_error *error) {
  * @param verb_context_  Optional verb dispatch table for native calls.
  * @param source         Null-terminated source string.
  * @param out_module     On success, receives a heap-allocated vm_module.
- * @return RESULT_OK on success.
+ * @return VM_OK on success.
  */
-result vm_module_compile(verb_context *verb_context_, const char *source,
-                         vm_module **out_module) {
-  verify_not_null(source);
-  verify_not_null(out_module);
+vm_result vm_module_compile(verb_context *verb_context_, const char *source,
+                            vm_module **out_module) {
+  VM_ASSERT_NOT_NULL(source);
+  VM_ASSERT_NOT_NULL(out_module);
 
   return vm_module_parser_generate(verb_context_, source, out_module);
 }
@@ -912,29 +932,29 @@ void _vm_module_generator_function_emit(vm_module_generator *generator,
  * deferred code fragment queues for nested constructs (if/else, loops).
  */
 vm_module_generator *vm_module_generator_create(vm_module *module) {
-  vm_module_generator *generator = xmemory_new(vm_module_generator);
+  vm_module_generator *generator = VM_NEW(vm_module_generator);
   generator->vm_module_parser_state_current_module = module;
   generator->vm_module_parser_state_current_function = NULL;
-  generator->code_fragments = queue_create();
-  generator->completed_code_fragments = queue_create();
+  generator->code_fragments = vm_queue_create();
+  generator->completed_code_fragments = vm_queue_create();
   return generator;
 }
 
 /** Free the generator and its code fragment queues. */
 void vm_module_generator_dispose(vm_module_generator *generator) {
-  verify_not_null(generator);
+  VM_ASSERT_NOT_NULL(generator);
 
   if (generator->code_fragments) {
-    queue_clear(generator->code_fragments);
-    queue_free(generator->code_fragments);
+    vm_queue_clear(generator->code_fragments);
+    vm_queue_free(generator->code_fragments);
   }
 
   if (generator->completed_code_fragments) {
-    queue_clear(generator->completed_code_fragments);
-    queue_free(generator->completed_code_fragments);
+    vm_queue_clear(generator->completed_code_fragments);
+    vm_queue_free(generator->completed_code_fragments);
   }
 
-  xmemory_free(generator);
+  VM_FREE(generator);
 }
 
 /**
@@ -946,24 +966,24 @@ void vm_module_generator_dispose(vm_module_generator *generator) {
  */
 vm_function *vm_module_generator_function_begin(vm_module_generator *generator,
                                                 char *name) {
-  verify_not_null(generator);
-  verify_not_null(name);
+  VM_ASSERT_NOT_NULL(generator);
+  VM_ASSERT_NOT_NULL(name);
 
   vm_module *module = generator->vm_module_parser_state_current_module;
-  verify_not_null(module);
-  verify_not_null(module->functions);
+  VM_ASSERT_NOT_NULL(module);
+  VM_ASSERT_NOT_NULL(module->functions);
 
-  if (cmap_contains(module->functions, name)) {
-    log_error("Function with the name %s already defined", name);
+  if (vm_map_contains(module->functions, name)) {
+    vm_log_error("Function with the name %s already defined", name);
     return NULL;
   }
 
   /* Create function and add to module's lookup map + ordered list */
   vm_function *function = vm_function_create(name);
-  cmap_set(generator->vm_module_parser_state_current_module->functions, name,
-           function);
-  sequence_add(generator->vm_module_parser_state_current_module->functions_list,
-               function);
+  vm_map_set(generator->vm_module_parser_state_current_module->functions, name,
+             function);
+  vm_list_add(generator->vm_module_parser_state_current_module->functions_list,
+              function);
 
   /* Set as current context and emit the entry label */
   generator->vm_module_parser_state_current_function = function;
@@ -978,15 +998,15 @@ vm_function *vm_module_generator_function_begin(vm_module_generator *generator,
  * then switches the codegen context back to "main".
  */
 void vm_module_generator_function_end(vm_module_generator *generator) {
-  verify_not_null(generator);
-  verify_not_null(generator->vm_module_parser_state_current_function);
+  VM_ASSERT_NOT_NULL(generator);
+  VM_ASSERT_NOT_NULL(generator->vm_module_parser_state_current_function);
 
   vm_function *function = generator->vm_module_parser_state_current_function;
-  verify_not_null(function);
+  VM_ASSERT_NOT_NULL(function);
 
   /* Append implicit RETURN if missing */
   vm_instruction *last_instruction =
-      sequence_last_of(function->instructions, vm_instruction);
+      vm_list_last_of(function->instructions, vm_instruction);
 
   if (last_instruction && last_instruction->opcode != opRETURN) {
     _vm_module_generator_function_emit(generator, opRETURN, NULL, NULL, NULL);
@@ -994,19 +1014,19 @@ void vm_module_generator_function_end(vm_module_generator *generator) {
 
   /* Switch codegen context back to main */
   generator->vm_module_parser_state_current_function =
-      (vm_function *)cmap_get_value(
+      (vm_function *)vm_map_get_value(
           generator->vm_module_parser_state_current_module->functions, "main");
 }
 
 /** Register a typed parameter for the current function being compiled. */
 void vm_module_generator_function_parameter(vm_module_generator *generator,
                                             char *name, char *type) {
-  verify_not_null(generator);
-  verify_not_null(name);
-  verify_not_null(type);
+  VM_ASSERT_NOT_NULL(generator);
+  VM_ASSERT_NOT_NULL(name);
+  VM_ASSERT_NOT_NULL(type);
 
   vm_function *function = generator->vm_module_parser_state_current_function;
-  verify_not_null(function);
+  VM_ASSERT_NOT_NULL(function);
 
   vm_function_parameter_add(function, name, type);
 }
@@ -1017,25 +1037,25 @@ void vm_module_generator_function_parameter(vm_module_generator *generator,
  */
 void vm_module_generator_function_return_type_set(
     vm_module_generator *generator, char *name, char *type) {
-  verify_not_null(generator);
-  verify_not_null(type);
+  VM_ASSERT_NOT_NULL(generator);
+  VM_ASSERT_NOT_NULL(type);
 
   vm_module *module = generator->vm_module_parser_state_current_module;
-  verify_not_null(module);
-  verify_not_null(module->functions);
+  VM_ASSERT_NOT_NULL(module);
+  VM_ASSERT_NOT_NULL(module->functions);
 
-  cmap_item *function_item = cmap_get_item(module->functions, name);
+  vm_map_item *function_item = vm_map_get_item(module->functions, name);
   if (function_item == NULL) {
-    log_error("Function with the name %s doesn't exist", name);
+    vm_log_error("Function with the name %s doesn't exist", name);
     return;
   }
 
   vm_function *function = generator->vm_module_parser_state_current_function;
-  verify_not_null(function);
+  VM_ASSERT_NOT_NULL(function);
 
   function->return_type_class =
       vm_variable_param_type_name_to_param_type_class(type);
-  function->return_type = string_clone(type);
+  function->return_type = vm_string_clone(type);
 }
 
 /**
@@ -1047,16 +1067,16 @@ void vm_module_generator_function_return_type_set(
 char *
 vm_module_generator_function_return_type_get(vm_module_generator *generator,
                                              char *name) {
-  verify_not_null(generator);
-  verify_not_null(name);
+  VM_ASSERT_NOT_NULL(generator);
+  VM_ASSERT_NOT_NULL(name);
 
   vm_module *module = generator->vm_module_parser_state_current_module;
-  verify_not_null(module);
-  verify_not_null(module->functions);
+  VM_ASSERT_NOT_NULL(module);
+  VM_ASSERT_NOT_NULL(module->functions);
 
-  cmap_item *function_item = cmap_get_item(module->functions, name);
+  vm_map_item *function_item = vm_map_get_item(module->functions, name);
   if (function_item == NULL && !module->verb_context_) {
-    log_error("Function with the name %s doesn't exist", name);
+    vm_log_error("Function with the name %s doesn't exist", name);
     return NULL;
   } else if (module->verb_context_) {
     if (verb_exists(module->verb_context_, name)) {
@@ -1064,20 +1084,20 @@ vm_module_generator_function_return_type_get(vm_module_generator *generator,
     }
 
     /* Try matching verb name with spaces (underscores → spaces) */
-    char *name_with_spaces = string_replace(name, "_", " ");
+    char *name_with_spaces = vm_string_replace(name, "_", " ");
     bool exists = verb_exists(module->verb_context_, name_with_spaces);
-    string_free(name_with_spaces);
+    vm_string_free(name_with_spaces);
     if (exists) {
-      string_replace_inplace(name, '_', ' ');
+      vm_string_replace_inplace(name, '_', ' ');
       return "string";
     } else {
-      log_error("Verb with the name %s doesn't exist", name);
+      vm_log_error("Verb with the name %s doesn't exist", name);
       return NULL;
     }
   }
 
   vm_function *function = (vm_function *)function_item->value;
-  verify_not_null(function);
+  VM_ASSERT_NOT_NULL(function);
 
   return function->return_type;
 }
@@ -1090,15 +1110,15 @@ void _vm_module_generator_function_emit(vm_module_generator *generator,
                                         vm_instruction_opcode opcode,
                                         char *param1, char *param2,
                                         char *param3) {
-  verify_not_null(generator);
+  VM_ASSERT_NOT_NULL(generator);
 
   vm_function *function = generator->vm_module_parser_state_current_function;
-  verify_not_null(function);
+  VM_ASSERT_NOT_NULL(function);
 
   vm_instruction *instruction = vm_instruction_create_with_meta(
       opcode, param1, param2, param3,
       generator->meta_state_input_line_number_previous);
-  sequence_add(function->instructions, instruction);
+  vm_list_add(function->instructions, instruction);
 }
 
 /**
@@ -1110,10 +1130,10 @@ void vm_module_generator_function_emit_with_meta(
     vm_module_generator *generator, vm_instruction_opcode opcode, char *param1,
     char *param2, char *param3, char *meta_source, size_t meta_line_number,
     size_t meta_source_index) {
-  verify_not_null(generator);
+  VM_ASSERT_NOT_NULL(generator);
 
   vm_function *function = generator->vm_module_parser_state_current_function;
-  verify_not_null(function);
+  VM_ASSERT_NOT_NULL(function);
 
   /* Extract the source fragment that corresponds to this instruction */
   if (meta_source) {
@@ -1125,7 +1145,7 @@ void vm_module_generator_function_emit_with_meta(
         (char *)&meta_source[generator->meta_state_input_index_previous];
     int len = meta_source_index - generator->meta_state_input_index_previous;
     char *end = start + len;
-    size_t meta_source_len = string_length(meta_source);
+    size_t meta_source_len = vm_string_length(meta_source);
     char *meta_source_end = meta_source + meta_source_len;
 
     generator->meta_state_input_line_number_previous = meta_line_number;
@@ -1170,7 +1190,7 @@ void vm_module_generator_function_emit_with_meta(
         continue;
       }
 
-      string_copy_length(buffer, start, len);
+      vm_string_copy_length(buffer, start, len);
 
       // Replace all /n inside with spaces
       int i = len;
@@ -1188,9 +1208,9 @@ void vm_module_generator_function_emit_with_meta(
       _vm_module_generator_function_emit(
           generator, opCOMMENT,
           (char *)vm_module_generator_symbol_track(
-              generator, convert_int_to_string(meta_line_number)),
+              generator, vm_int_to_string(meta_line_number)),
           (char *)vm_module_generator_symbol_track(generator,
-                                                   string_clone(buffer)),
+                                                   vm_string_clone(buffer)),
           NULL);
       generator->meta_state_input_line_number_previous = meta_line_number;
 
@@ -1226,9 +1246,9 @@ void vm_module_generator_function_emit_comment_with_meta(
   _vm_module_generator_function_emit(
       generator, opCOMMENT,
       (char *)vm_module_generator_symbol_track(
-          generator, convert_int_to_string(meta_line_number)),
+          generator, vm_int_to_string(meta_line_number)),
       (char *)vm_module_generator_symbol_track(generator,
-                                               string_clone(message)),
+                                               vm_string_clone(message)),
       NULL);
 
   generator->meta_state_input_line_number_previous = meta_line_number;
@@ -1248,24 +1268,24 @@ void vm_module_generator_function_emit_comment(vm_module_generator *generator,
  * @return Heap-allocated register name string.
  */
 char *vm_module_generator_tmp_register_create(vm_module_generator *generator) {
-  verify_not_null(generator);
+  VM_ASSERT_NOT_NULL(generator);
 
   vm_function *function = generator->vm_module_parser_state_current_function;
-  verify_not_null(function);
+  VM_ASSERT_NOT_NULL(function);
 
-  const size_t count = sequence_count(function->register_names);
+  const size_t count = vm_list_count(function->register_names);
   char tmp[10];
   snprintf(tmp, sizeof(tmp), "r$%zu", count);
 
-  char *var = string_clone(tmp);
-  sequence_add(function->register_names, var);
+  char *var = vm_string_clone(tmp);
+  vm_list_add(function->register_names, var);
 
   return var;
 }
 
 /** Reset register allocation counter for the current function (no-op stub). */
 void vm_module_generator_tmp_registers_reset(vm_module_generator *generator) {
-  verify_not_null(generator);
+  VM_ASSERT_NOT_NULL(generator);
 }
 
 /**
@@ -1274,17 +1294,17 @@ void vm_module_generator_tmp_registers_reset(vm_module_generator *generator) {
  * @return Heap-allocated label name string.
  */
 char *vm_module_generator_tmp_label_create(vm_module_generator *generator) {
-  verify_not_null(generator);
+  VM_ASSERT_NOT_NULL(generator);
 
   vm_function *function = generator->vm_module_parser_state_current_function;
-  verify_not_null(function);
+  VM_ASSERT_NOT_NULL(function);
 
-  const size_t count = sequence_count(function->label_names);
+  const size_t count = vm_list_count(function->label_names);
   char tmp[10];
-  sprintf_s(tmp, sizeof(tmp), "L%zu", count);
+  VM_SPRINTF_S(tmp, sizeof(tmp), "L%zu", count);
 
-  char *label = string_clone(tmp);
-  sequence_add(function->label_names, label);
+  char *label = vm_string_clone(tmp);
+  vm_list_add(function->label_names, label);
 
   return label;
 }
@@ -1292,35 +1312,35 @@ char *vm_module_generator_tmp_label_create(vm_module_generator *generator) {
 /** Push a label name onto the tracking stack (used for nested if/while/for). */
 void vm_module_generator_tracking_labels_push(vm_module_generator *generator,
                                               char *label) {
-  verify_not_null(generator);
+  VM_ASSERT_NOT_NULL(generator);
 
   vm_function *function = generator->vm_module_parser_state_current_function;
-  verify_not_null(function);
+  VM_ASSERT_NOT_NULL(function);
 
-  queue_push(function->tracking_labels, label);
+  vm_queue_push(function->tracking_labels, label);
 }
 
 /** Pop and return the innermost label from the tracking stack. */
 char *vm_module_generator_tracking_labels_pop(vm_module_generator *generator) {
-  verify_not_null(generator);
+  VM_ASSERT_NOT_NULL(generator);
 
   vm_function *function = generator->vm_module_parser_state_current_function;
-  verify_not_null(function);
-  verify(!queue_is_empty(function->tracking_labels));
+  VM_ASSERT_NOT_NULL(function);
+  VM_ASSERT(!vm_queue_is_empty(function->tracking_labels));
 
-  return (char *)queue_pop(function->tracking_labels);
+  return (char *)vm_queue_pop(function->tracking_labels);
 }
 
 /** Clear all labels from the tracking stack (used during generator teardown).
  */
 void vm_module_generator_tracking_labels_clear(vm_module_generator *generator) {
-  verify_not_null(generator);
+  VM_ASSERT_NOT_NULL(generator);
 
   vm_function *function = generator->vm_module_parser_state_current_function;
-  verify_not_null(function);
+  VM_ASSERT_NOT_NULL(function);
 
-  sequence_dispose_items(function->label_names);
-  queue_dispose_items(function->tracking_labels);
+  vm_list_dispose_items(function->label_names);
+  vm_queue_dispose_items(function->tracking_labels);
 }
 
 /**
@@ -1330,47 +1350,47 @@ void vm_module_generator_tracking_labels_clear(vm_module_generator *generator) {
  * context onto a stack and creates a temporary capture function.
  */
 void vm_module_generator_defer_push_begin(vm_module_generator *generator) {
-  verify_not_null(generator);
+  VM_ASSERT_NOT_NULL(generator);
 
   vm_function *current_code_fragment =
       generator->vm_module_parser_state_current_function;
-  verify_not_null(current_code_fragment);
+  VM_ASSERT_NOT_NULL(current_code_fragment);
 
   /* Save the current context */
-  queue_push(generator->code_fragments, current_code_fragment);
+  vm_queue_push(generator->code_fragments, current_code_fragment);
 
   /* Create a temporary function to capture deferred instructions */
   char fragment_id[128];
-  sprintf_s(fragment_id, sizeof(fragment_id), "_deferred_code_fragment_L%zu",
-            generator->meta_state_input_index_previous);
+  VM_SPRINTF_S(fragment_id, sizeof(fragment_id), "_deferred_code_fragment_L%zu",
+               generator->meta_state_input_index_previous);
   vm_function *new_code_fragment =
-      vm_function_create(string_clone(fragment_id));
+      vm_function_create(vm_string_clone(fragment_id));
   generator->vm_module_parser_state_current_function = new_code_fragment;
 }
 
 /**
  * Stop capturing deferred instructions and stash the fragment.
- * Moves the completed fragment to the completed queue and resumes
+ * Moves the completed fragment to the completed vm_queue and resumes
  * the previous codegen context.
  */
 void vm_module_generator_defer_push_end(vm_module_generator *generator) {
-  verify_not_null(generator);
+  VM_ASSERT_NOT_NULL(generator);
 
   vm_function *current_code_fragment =
       generator->vm_module_parser_state_current_function;
-  verify_not_null(current_code_fragment);
+  VM_ASSERT_NOT_NULL(current_code_fragment);
 
-  if (queue_is_empty(generator->code_fragments)) {
-    verify(false);
+  if (vm_queue_is_empty(generator->code_fragments)) {
+    VM_ASSERT(false);
     return;
   }
 
   /* Stash completed fragment */
-  queue_push(generator->completed_code_fragments, current_code_fragment);
+  vm_queue_push(generator->completed_code_fragments, current_code_fragment);
 
   /* Resume previous context */
   vm_function *previous_code_fragment =
-      (vm_function *)queue_pop(generator->code_fragments);
+      (vm_function *)vm_queue_pop(generator->code_fragments);
   generator->vm_module_parser_state_current_function = previous_code_fragment;
 }
 
@@ -1380,57 +1400,56 @@ void vm_module_generator_defer_push_end(vm_module_generator *generator) {
  * registers, symbols, labels, and type traits, then disposes the fragment.
  */
 void vm_module_generator_defer_pop(vm_module_generator *generator) {
-  verify_not_null(generator);
+  VM_ASSERT_NOT_NULL(generator);
 
-  if (queue_is_empty(generator->completed_code_fragments)) {
-    verify(false);
+  if (vm_queue_is_empty(generator->completed_code_fragments)) {
+    VM_ASSERT(false);
     return;
   }
 
   /* Merge all collections from the fragment into the current function */
   vm_function *last_completed_code_fragment =
-      (vm_function *)queue_pop(generator->completed_code_fragments);
-  sequence_merge(
+      (vm_function *)vm_queue_pop(generator->completed_code_fragments);
+  vm_list_merge(
       generator->vm_module_parser_state_current_function->instructions,
       last_completed_code_fragment->instructions);
-  sequence_merge(generator->vm_module_parser_state_current_function->registers,
-                 last_completed_code_fragment->registers);
-  cmap_merge(generator->vm_module_parser_state_current_function->variables,
-             last_completed_code_fragment->variables);
-  cmap_merge(generator->vm_module_parser_state_current_function->constants,
-             last_completed_code_fragment->constants);
-  cmap_merge(generator->vm_module_parser_state_current_function->trait_types,
-             last_completed_code_fragment->trait_types);
-  sequence_merge(generator->vm_module_parser_state_current_function->symbols,
-                 last_completed_code_fragment->symbols);
-  queue_merge(
+  vm_list_merge(generator->vm_module_parser_state_current_function->registers,
+                last_completed_code_fragment->registers);
+  vm_map_merge(generator->vm_module_parser_state_current_function->variables,
+               last_completed_code_fragment->variables);
+  vm_map_merge(generator->vm_module_parser_state_current_function->constants,
+               last_completed_code_fragment->constants);
+  vm_map_merge(generator->vm_module_parser_state_current_function->trait_types,
+               last_completed_code_fragment->trait_types);
+  vm_list_merge(generator->vm_module_parser_state_current_function->symbols,
+                last_completed_code_fragment->symbols);
+  vm_queue_merge(
       generator->vm_module_parser_state_current_function->tracking_labels,
       last_completed_code_fragment->tracking_labels);
-  sequence_merge(
-      generator->vm_module_parser_state_current_function->label_names,
-      last_completed_code_fragment->label_names);
-  sequence_merge(
+  vm_list_merge(generator->vm_module_parser_state_current_function->label_names,
+                last_completed_code_fragment->label_names);
+  vm_list_merge(
       generator->vm_module_parser_state_current_function->register_names,
       last_completed_code_fragment->register_names);
-  cmap_merge(generator->vm_module_parser_state_current_function->trait_types,
-             last_completed_code_fragment->trait_types);
-  sequence_merge(generator->vm_module_parser_state_current_function->registers,
-                 last_completed_code_fragment->registers);
-  cmap_merge(generator->vm_module_parser_state_current_function->constants,
-             last_completed_code_fragment->constants);
-  cmap_merge(generator->vm_module_parser_state_current_function->variables,
-             last_completed_code_fragment->variables);
+  vm_map_merge(generator->vm_module_parser_state_current_function->trait_types,
+               last_completed_code_fragment->trait_types);
+  vm_list_merge(generator->vm_module_parser_state_current_function->registers,
+                last_completed_code_fragment->registers);
+  vm_map_merge(generator->vm_module_parser_state_current_function->constants,
+               last_completed_code_fragment->constants);
+  vm_map_merge(generator->vm_module_parser_state_current_function->variables,
+               last_completed_code_fragment->variables);
 
   /* Clean up the disposable fragment */
-  sequence_clear(last_completed_code_fragment->instructions);
-  sequence_clear(last_completed_code_fragment->symbols);
-  queue_clear(last_completed_code_fragment->tracking_labels);
-  sequence_clear(last_completed_code_fragment->label_names);
-  sequence_clear(last_completed_code_fragment->register_names);
-  cmap_clear(last_completed_code_fragment->trait_types);
-  sequence_clear(last_completed_code_fragment->registers);
-  cmap_clear(last_completed_code_fragment->constants);
-  cmap_clear(last_completed_code_fragment->variables);
+  vm_list_clear(last_completed_code_fragment->instructions);
+  vm_list_clear(last_completed_code_fragment->symbols);
+  vm_queue_clear(last_completed_code_fragment->tracking_labels);
+  vm_list_clear(last_completed_code_fragment->label_names);
+  vm_list_clear(last_completed_code_fragment->register_names);
+  vm_map_clear(last_completed_code_fragment->trait_types);
+  vm_list_clear(last_completed_code_fragment->registers);
+  vm_map_clear(last_completed_code_fragment->constants);
+  vm_map_clear(last_completed_code_fragment->variables);
 
   vm_function_dispose(last_completed_code_fragment);
 }
@@ -1442,10 +1461,10 @@ void vm_module_generator_defer_pop(vm_module_generator *generator) {
 const char *vm_module_generator_symbol_track(vm_module_generator *generator,
                                              const char *symbol) {
   vm_function *function = generator->vm_module_parser_state_current_function;
-  verify_not_null(function);
+  VM_ASSERT_NOT_NULL(function);
 
-  if (!sequence_contains(function->symbols, (void *)symbol)) {
-    sequence_add(function->symbols, (void *)symbol);
+  if (!vm_list_contains(function->symbols, (void *)symbol)) {
+    vm_list_add(function->symbols, (void *)symbol);
   }
 
   return symbol;
@@ -1458,39 +1477,39 @@ const char *vm_module_generator_symbol_track(vm_module_generator *generator,
 void vm_module_generator_trait_type_set(vm_module_generator *generator,
                                         char *symbol, char *type,
                                         bool is_constant) {
-  verify_not_null(generator);
-  verify_not_null(symbol);
+  VM_ASSERT_NOT_NULL(generator);
+  VM_ASSERT_NOT_NULL(symbol);
 
   if (!type) {
-    log_warn("Attempt to set symbol %s type to NULL", symbol);
+    vm_log_warn("Attempt to set symbol %s type to NULL", symbol);
     return;
   }
 
   vm_module *module = generator->vm_module_parser_state_current_module;
-  verify_not_null(module);
+  VM_ASSERT_NOT_NULL(module);
 
   vm_function *function = generator->vm_module_parser_state_current_function;
-  verify_not_null(function);
+  VM_ASSERT_NOT_NULL(function);
 
-  /* Check for existing trait and verify type consistency */
-  if (cmap_contains(function->trait_types, symbol)) {
+  /* Check for existing trait and VM_ASSERT type consistency */
+  if (vm_map_contains(function->trait_types, symbol)) {
     vm_type_trait *type_trait =
-        (vm_type_trait *)cmap_get_value(function->trait_types, symbol);
+        (vm_type_trait *)vm_map_get_value(function->trait_types, symbol);
 
-    if (!string_equals(type_trait->type, type)) {
+    if (!vm_string_equals(type_trait->type, type)) {
       char error[1024];
       snprintf(error, sizeof(error),
                "Cannot assign value of type %s to %s which is already "
                "of type %s",
                type, symbol, type_trait->type);
-      log_warn(error, NULL);
+      vm_log_warn(error, NULL);
     }
 
     return;
   }
 
   vm_type_trait *type_trait = vm_type_trait_create(type, is_constant);
-  cmap_set(function->trait_types, symbol, type_trait);
+  vm_map_set(function->trait_types, symbol, type_trait);
 }
 
 /**
@@ -1501,24 +1520,24 @@ void vm_module_generator_trait_type_set(vm_module_generator *generator,
  */
 char *vm_module_generator_trait_type_get(vm_module_generator *generator,
                                          char *symbol) {
-  verify_not_null(generator);
-  verify_not_null(symbol);
+  VM_ASSERT_NOT_NULL(generator);
+  VM_ASSERT_NOT_NULL(symbol);
 
   vm_module *module = generator->vm_module_parser_state_current_module;
-  verify_not_null(module);
+  VM_ASSERT_NOT_NULL(module);
 
   vm_function *function = generator->vm_module_parser_state_current_function;
-  verify_not_null(function);
+  VM_ASSERT_NOT_NULL(function);
 
-  if (!cmap_contains(function->trait_types, symbol)) {
+  if (!vm_map_contains(function->trait_types, symbol)) {
     char error[1024];
     snprintf(error, sizeof(error), "Type trait for %s not found", symbol);
-    log_warn(error, NULL);
+    vm_log_warn(error, NULL);
     return NULL;
   }
 
   vm_type_trait *type_trait =
-      (vm_type_trait *)cmap_get_value(function->trait_types, symbol);
+      (vm_type_trait *)vm_map_get_value(function->trait_types, symbol);
   return type_trait->type;
 }
 
@@ -1532,36 +1551,36 @@ char *vm_module_generator_trait_type_get(vm_module_generator *generator,
  */
 void _vm_module_generator_post_processing_calculate_jump_table(
     vm_module *module) {
-  verify_not_null(module);
-  verify_not_null(module->functions);
+  VM_ASSERT_NOT_NULL(module);
+  VM_ASSERT_NOT_NULL(module->functions);
 
-  cmap_foreach_of(module->functions, name, vm_function *, function) {
+  vm_map_foreach_of(module->functions, name, vm_function *, function) {
     // We now need to create a jump table from any labels
-    cmap *jump_table = cmap_create();
+    vm_map *jump_table = vm_map_create();
     size_t pos = 0;
-    sequence_foreach_of(function->instructions, vm_instruction *,
-                        instruction_label_search) {
+    vm_list_foreach_of(function->instructions, vm_instruction *,
+                       instruction_label_search) {
       if (instruction_label_search->opcode == opLABEL) {
-        cmap_set(jump_table, instruction_label_search->param1,
-                 (void *)pos); // TODO: hold scalar?
+        vm_map_set(jump_table, instruction_label_search->param1,
+                   (void *)pos); // TODO: hold scalar?
       }
 
       pos++;
     }
 
     // Annotate any jumps with label with jump table positions
-    sequence_foreach_of(function->instructions, vm_instruction *, instruction) {
+    vm_list_foreach_of(function->instructions, vm_instruction *, instruction) {
       if (instruction->opcode == opJUMP ||
           instruction->opcode == opJUMP_IF_FALSE ||
           instruction->opcode == opJUMP_IF_TRUE) {
         // Find label in jump table
-        if (!cmap_contains(jump_table, instruction->param3)) {
+        if (!vm_map_contains(jump_table, instruction->param3)) {
           // TODO: this is fatal and we need to bomb out
-          log_error("Jump label doesn't exist: %s", instruction->param3);
+          vm_log_error("Jump label doesn't exist: %s", instruction->param3);
         } else {
           // Get the jump table location
           const size_t address =
-              (size_t)cmap_get_value(jump_table, instruction->param3);
+              (size_t)vm_map_get_value(jump_table, instruction->param3);
           instruction->opJUMP_jump_to_instruction_pos =
               address == 0 ? -1 : address;
         }
@@ -1570,7 +1589,7 @@ void _vm_module_generator_post_processing_calculate_jump_table(
       pos++;
     }
 
-    cmap_free(jump_table);
+    vm_map_free(jump_table);
   }
 }
 
@@ -1582,15 +1601,15 @@ void _vm_module_generator_post_processing_calculate_jump_table(
  */
 void _vm_post_processing_instruction_param_decorate_type_traits(
     vm_module *module) {
-  verify_not_null(module);
-  verify_not_null(module->functions);
+  VM_ASSERT_NOT_NULL(module);
+  VM_ASSERT_NOT_NULL(module->functions);
 
-  cmap_foreach_of(module->functions, name, vm_function *, function) {
+  vm_map_foreach_of(module->functions, name, vm_function *, function) {
     // Add type traits to params
-    sequence_foreach_of(function->instructions, vm_instruction *, instruction) {
+    vm_list_foreach_of(function->instructions, vm_instruction *, instruction) {
       if (instruction->param1 &&
-          cmap_contains(function->trait_types, instruction->param1)) {
-        vm_type_trait *type_trait = (vm_type_trait *)cmap_get_value(
+          vm_map_contains(function->trait_types, instruction->param1)) {
+        vm_type_trait *type_trait = (vm_type_trait *)vm_map_get_value(
             function->trait_types, instruction->param1);
         instruction->param_type_1 = type_trait->type;
         instruction->param_is_constant_1 = type_trait->is_constant;
@@ -1600,12 +1619,12 @@ void _vm_post_processing_instruction_param_decorate_type_traits(
         instruction->param_register_id_1 =
             !instruction->param_is_register_1
                 ? 0
-                : convert_string_to_int(&instruction->param1[2]);
+                : vm_string_to_int(&instruction->param1[2]);
       }
 
       if (instruction->param2 &&
-          cmap_contains(function->trait_types, instruction->param2)) {
-        vm_type_trait *type_trait = (vm_type_trait *)cmap_get_value(
+          vm_map_contains(function->trait_types, instruction->param2)) {
+        vm_type_trait *type_trait = (vm_type_trait *)vm_map_get_value(
             function->trait_types, instruction->param2);
         instruction->param_type_2 = type_trait->type;
         instruction->param_is_constant_2 = type_trait->is_constant;
@@ -1615,12 +1634,12 @@ void _vm_post_processing_instruction_param_decorate_type_traits(
         instruction->param_register_id_2 =
             !instruction->param_is_register_2
                 ? 0
-                : convert_string_to_int(&instruction->param2[2]);
+                : vm_string_to_int(&instruction->param2[2]);
       }
 
       if (instruction->param3 &&
-          cmap_contains(function->trait_types, instruction->param3)) {
-        vm_type_trait *type_trait = (vm_type_trait *)cmap_get_value(
+          vm_map_contains(function->trait_types, instruction->param3)) {
+        vm_type_trait *type_trait = (vm_type_trait *)vm_map_get_value(
             function->trait_types, instruction->param3);
         instruction->param_type_3 = type_trait->type;
         instruction->param_is_constant_3 = type_trait->is_constant;
@@ -1630,7 +1649,7 @@ void _vm_post_processing_instruction_param_decorate_type_traits(
         instruction->param_register_id_3 =
             !instruction->param_is_register_3
                 ? 0
-                : convert_string_to_int(&instruction->param3[2]);
+                : vm_string_to_int(&instruction->param3[2]);
       }
     }
   }
@@ -1644,28 +1663,31 @@ void _vm_post_processing_instruction_param_decorate_type_traits(
  */
 void _vm_post_processing_function_return_decorate_type_traits(
     vm_module *module) {
-  verify_not_null(module);
-  verify_not_null(module->functions);
+  VM_ASSERT_NOT_NULL(module);
+  VM_ASSERT_NOT_NULL(module->functions);
 
-  cmap_foreach_of(module->functions, name, vm_function *, function) {
-    cmap_foreach_of(module->functions, scanned_name, vm_function *,
-                    scanned_function) {
-      sequence_foreach_of(scanned_function->instructions, vm_instruction *,
-                          scanned_instruction) {
+  vm_map_foreach_of(module->functions, name, vm_function *, function) {
+    vm_map_foreach_of(module->functions, scanned_name, vm_function *,
+                      scanned_function) {
+      vm_list_foreach_of(scanned_function->instructions, vm_instruction *,
+                         scanned_instruction) {
         // Look for types which are this function's name, replace with
         // this functions type name
         if (scanned_instruction->param_type_1 &&
-            string_equals(scanned_instruction->param_type_1, function->name)) {
+            vm_string_equals(scanned_instruction->param_type_1,
+                             function->name)) {
           scanned_instruction->param_type_1 = function->return_type;
         }
 
         if (scanned_instruction->param_type_2 &&
-            string_equals(scanned_instruction->param_type_2, function->name)) {
+            vm_string_equals(scanned_instruction->param_type_2,
+                             function->name)) {
           scanned_instruction->param_type_2 = function->return_type;
         }
 
         if (scanned_instruction->param_type_3 &&
-            string_equals(scanned_instruction->param_type_3, function->name)) {
+            vm_string_equals(scanned_instruction->param_type_3,
+                             function->name)) {
           scanned_instruction->param_type_3 = function->return_type;
         }
 
@@ -1673,7 +1695,7 @@ void _vm_post_processing_function_return_decorate_type_traits(
         // return type
         if (scanned_instruction->opcode == opCALL_METHOD &&
             !scanned_instruction->param_type_1 &&
-            string_equals(scanned_instruction->param1, function->name)) {
+            vm_string_equals(scanned_instruction->param1, function->name)) {
           scanned_instruction->param_type_1 = function->return_type;
         }
 
@@ -1712,22 +1734,22 @@ bool vm_variable_fetch_by_instruction_param(
     char *param_type, vm_param_type_class param_type_class,
     bool param_is_constant, bool param_is_register, size_t param_register_id,
     vm_variable **out_var) {
-  verify_not_null(function);
-  verify_not_null(out_var);
+  VM_ASSERT_NOT_NULL(function);
+  VM_ASSERT_NOT_NULL(out_var);
 
   if (opcode != opLABEL && opcode != opCOMMENT && opcode != opCALL_METHOD &&
       opcode != opCALL_OBJ_METHOD && opcode != opJUMP) {
     if (param && param_type) {
       if (param_is_register) {
         // Fetch register value
-        verify_not_null(function->registers);
-        vm_variable *reg = (vm_variable *)sequence_get_value(
-            function->registers, param_register_id);
+        VM_ASSERT_NOT_NULL(function->registers);
+        vm_variable *reg = (vm_variable *)vm_list_get_value(function->registers,
+                                                            param_register_id);
 
         if (reg->type_class == ptcNONE) {
           if (!vm_variable_value_assign_constant(param_type_class, param,
                                                  &reg->value)) {
-            log_error("Failed to assign constant", NULL);
+            vm_log_error("Failed to assign constant", NULL);
             return false;
           }
 
@@ -1737,11 +1759,11 @@ bool vm_variable_fetch_by_instruction_param(
 
         *out_var = reg;
       } else if (param_is_constant) {
-        verify_not_null(function->constants);
+        VM_ASSERT_NOT_NULL(function->constants);
         vm_variable *var;
 
-        if (cmap_contains(function->constants, param)) {
-          var = (vm_variable *)cmap_get_value(function->constants, param);
+        if (vm_map_contains(function->constants, param)) {
+          var = (vm_variable *)vm_map_get_value(function->constants, param);
         } else {
 #ifdef VM_ENABLE_VAR_NAME
           var = vm_variable_create(param);
@@ -1753,22 +1775,22 @@ bool vm_variable_fetch_by_instruction_param(
 
           if (!vm_variable_value_assign_constant(var->type_class, param,
                                                  &var->value)) {
-            log_error("Failed to assign variable", NULL);
+            vm_log_error("Failed to assign variable", NULL);
             return false;
           }
 
-          cmap_set(function->constants, param, var);
+          vm_map_set(function->constants, param, var);
         }
 
         *out_var = var;
 
       } else {
         // Fetch from variable
-        verify_not_null(function->variables);
+        VM_ASSERT_NOT_NULL(function->variables);
         vm_variable *var;
 
-        if (cmap_contains(function->variables, param)) {
-          var = (vm_variable *)cmap_get_value(function->variables, param);
+        if (vm_map_contains(function->variables, param)) {
+          var = (vm_variable *)vm_map_get_value(function->variables, param);
         } else {
 #ifdef VM_ENABLE_VAR_NAME
           var = vm_variable_create(param);
@@ -1780,16 +1802,16 @@ bool vm_variable_fetch_by_instruction_param(
           var->is_constant = false;
           var->is_register = false;
 
-          cmap_set(function->variables, param, var);
-          sequence_add(function->variables_list, string_clone(param));
+          vm_map_set(function->variables, param, var);
+          vm_list_add(function->variables_list, vm_string_clone(param));
         }
 
         *out_var = var;
         /* #ifdef _DEBUG_TRACE
-                        string_buffer* sb =
-        string_buffer_create_empty(); vm_variable_to_string_buffer(sb,
-        param, var); printf("Recall %s\n", string_buffer_get(sb));
-                        string_buffer_free(sb);
+                        vm_string_buffer* sb =
+        vm_string_buffer_create_empty(); vm_variable_to_vm_string_buffer(sb,
+        param, var); printf("Recall %s\n", vm_string_buffer_get(sb));
+                        vm_string_buffer_free(sb);
         #endif*/
       }
     }
@@ -1807,19 +1829,19 @@ bool vm_variable_fetch_by_instruction_param(
 bool _vm_post_processing_precalculate_reg_var_const_fn(vm_function *function) {
   // TODO: set on instructions the var/reg/const references
   // Pre gen registers
-  size_t register_count = sequence_count(function->register_names);
+  size_t register_count = vm_list_count(function->register_names);
 
   while (register_count-- > 0) {
 #ifdef VM_ENABLE_VAR_NAME
     char name[100]; // TODO: check
-    snprintf(name, sizeof(name), "r%zu", sequence_count(function->registers));
-    sequence_add(function->registers, vm_variable_create(name));
+    snprintf(name, sizeof(name), "r%zu", vm_list_count(function->registers));
+    vm_list_add(function->registers, vm_variable_create(name));
 #else
-    sequence_add(function->registers, vm_variable_create());
+    vm_list_add(function->registers, vm_variable_create());
 #endif
   }
 
-  sequence_foreach_of(function->instructions, vm_instruction *, instruction) {
+  vm_list_foreach_of(function->instructions, vm_instruction *, instruction) {
     vm_param_type_class var_type_class_1 = ptcNONE;
     vm_variable_value *var_value_1 = NULL;
 
@@ -1835,7 +1857,7 @@ bool _vm_post_processing_precalculate_reg_var_const_fn(vm_function *function) {
             instruction->param_type_1, instruction->param_type_class_1,
             instruction->param_is_constant_1, instruction->param_is_register_1,
             instruction->param_register_id_1, &instruction->var1)) {
-      log_error("Unable to fetch var for param 1", NULL);
+      vm_log_error("Unable to fetch var for param 1", NULL);
       return false;
     }
 
@@ -1844,7 +1866,7 @@ bool _vm_post_processing_precalculate_reg_var_const_fn(vm_function *function) {
             instruction->param_type_2, instruction->param_type_class_2,
             instruction->param_is_constant_2, instruction->param_is_register_2,
             instruction->param_register_id_2, &instruction->var2)) {
-      log_error("Unable to fetch var for param 2", NULL);
+      vm_log_error("Unable to fetch var for param 2", NULL);
       return false;
     }
 
@@ -1853,7 +1875,7 @@ bool _vm_post_processing_precalculate_reg_var_const_fn(vm_function *function) {
             instruction->param_type_3, instruction->param_type_class_3,
             instruction->param_is_constant_3, instruction->param_is_register_3,
             instruction->param_register_id_3, &instruction->var3)) {
-      log_error("Unable to fetch var for param 3", NULL);
+      vm_log_error("Unable to fetch var for param 3", NULL);
       return false;
     }
   }
@@ -1864,10 +1886,10 @@ bool _vm_post_processing_precalculate_reg_var_const_fn(vm_function *function) {
 /** Post-processing pass 4: apply register/variable pre-calculation to all
  * functions. */
 void _vm_post_processing_precalculate_reg_var_const(vm_module *module) {
-  verify_not_null(module);
-  verify_not_null(module->functions);
+  VM_ASSERT_NOT_NULL(module);
+  VM_ASSERT_NOT_NULL(module->functions);
 
-  cmap_foreach_of(module->functions, name, vm_function *, function) {
+  vm_map_foreach_of(module->functions, name, vm_function *, function) {
     _vm_post_processing_precalculate_reg_var_const_fn(function);
   }
 }
@@ -1878,26 +1900,26 @@ void _vm_post_processing_precalculate_reg_var_const(vm_module *module) {
  * on each CALL_METHOD instruction for O(1) dispatch at runtime.
  */
 void _vm_post_processing_call_method_pre_calc(vm_module *module) {
-  verify_not_null(module);
-  verify_not_null(module->functions);
+  VM_ASSERT_NOT_NULL(module);
+  VM_ASSERT_NOT_NULL(module->functions);
 
-  cmap_foreach_of(module->functions, name, vm_function *, function) {
-    sequence_foreach_of(function->instructions, vm_instruction *, instruction) {
+  vm_map_foreach_of(module->functions, name, vm_function *, function) {
+    vm_list_foreach_of(function->instructions, vm_instruction *, instruction) {
       if (instruction->opcode == opCALL_METHOD) {
         char *function_name = instruction->param1;
         if (function_name == NULL) {
-          log_error("Function cannot be null", NULL);
+          vm_log_error("Function cannot be null", NULL);
           return;
         }
 
         // Find the function
         bool found_function = false;
-        if (cmap_contains(module->functions, function_name)) {
+        if (vm_map_contains(module->functions, function_name)) {
           instruction->call_method_function =
-              (vm_function *)cmap_get_value(module->functions, function_name);
+              (vm_function *)vm_map_get_value(module->functions, function_name);
           found_function = true;
         } else if (!module->verb_context_) {
-          log_error("Unable to find the function %s(...)", function_name);
+          vm_log_error("Unable to find the function %s(...)", function_name);
           return;
         }
 
@@ -1907,7 +1929,7 @@ void _vm_post_processing_call_method_pre_calc(vm_module *module) {
           if (verb_definition_) {
             instruction->call_method_verb = verb_definition_;
           } else {
-            log_error("Unable to find the verb %s(...)", function_name);
+            vm_log_error("Unable to find the verb %s(...)", function_name);
             return;
           }
         }
@@ -1925,7 +1947,7 @@ void _vm_post_processing_call_method_pre_calc(vm_module *module) {
  *   5. CALL_METHOD target pre-resolution
  */
 void vm_module_generator_post_processing_process(vm_module *module) {
-  verify_not_null(module);
+  VM_ASSERT_NOT_NULL(module);
 
   _vm_module_generator_post_processing_calculate_jump_table(module);
   _vm_post_processing_instruction_param_decorate_type_traits(module);
@@ -1938,13 +1960,13 @@ void vm_module_generator_post_processing_process(vm_module *module) {
  * constant and register (mutually exclusive flags).
  */
 void _vm_module_generator_verifier_check_instruction_params(vm_module *module) {
-  verify_not_null(module);
-  verify_not_null(module->functions);
+  VM_ASSERT_NOT_NULL(module);
+  VM_ASSERT_NOT_NULL(module->functions);
 
   char error[1024];
 
-  sequence_foreach_of(module->functions_list, vm_function *, function) {
-    sequence_foreach_of(function->instructions, vm_instruction *, instruction) {
+  vm_list_foreach_of(module->functions_list, vm_function *, function) {
+    vm_list_foreach_of(function->instructions, vm_instruction *, instruction) {
       if (instruction->param1 && instruction->param_is_constant_1 &&
           instruction->param_is_register_1) {
         snprintf(error, sizeof(error),
@@ -1977,24 +1999,24 @@ void _vm_module_generator_verifier_check_instruction_params(vm_module *module) {
  */
 void _vm_module_generator_verifier_check_function_call_params(
     vm_module *module) {
-  verify_not_null(module);
-  verify_not_null(module->functions);
+  VM_ASSERT_NOT_NULL(module);
+  VM_ASSERT_NOT_NULL(module->functions);
 
-  sequence_foreach_of(module->functions_list, vm_function *, function) {
-    sequence_foreach_of(module->functions_list, vm_function *,
-                        scanned_function) {
+  vm_list_foreach_of(module->functions_list, vm_function *, function) {
+    vm_list_foreach_of(module->functions_list, vm_function *,
+                       scanned_function) {
       // How many parameters are there into this function?
-      const size_t expected_param_count = sequence_count(function->parameters);
+      const size_t expected_param_count = vm_list_count(function->parameters);
 
       // No need to look at the args for 0 param functions
       if (expected_param_count == 0) {
         continue;
       }
 
-      sequence_item *scanned_instructions =
-          sequence_enumerable(scanned_function->instructions);
+      vm_list_item *scanned_instructions =
+          vm_list_enumerable(scanned_function->instructions);
       const size_t scanned_instructions_count =
-          sequence_count(scanned_function->instructions);
+          vm_list_count(scanned_function->instructions);
 
       int scanned_instructions_index = scanned_instructions_count;
 
@@ -2007,9 +2029,9 @@ void _vm_module_generator_verifier_check_function_call_params(
           continue;
 
         if (scanned_instruction->opcode == opCALL_METHOD &&
-            string_equals(scanned_instruction->param1, function->name)) {
+            vm_string_equals(scanned_instruction->param1, function->name)) {
           // Now fetch the type traits for the arguments being pushed in
-          sequence *scanned_type_args = sequence_create();
+          vm_list *scanned_type_args = vm_list_create();
 
           while (scanned_instructions_index-- > 0) {
             scanned_instruction =
@@ -2022,8 +2044,7 @@ void _vm_module_generator_verifier_check_function_call_params(
 
             // Is the type on the param set already?
             if (scanned_instruction->opcode == opSTACK_PUSH) {
-              sequence_add(scanned_type_args,
-                           scanned_instruction->param_type_1);
+              vm_list_add(scanned_type_args, scanned_instruction->param_type_1);
             } else {
               break;
             }
@@ -2034,24 +2055,24 @@ void _vm_module_generator_verifier_check_function_call_params(
           ///////////////////////////////////////////////////////////////////
 
           // Enough parameters being passed in?
-          if (sequence_count(scanned_type_args) != expected_param_count) {
+          if (vm_list_count(scanned_type_args) != expected_param_count) {
             char error[1024];
             snprintf(error, sizeof(error),
                      "Incorrect number of arguments to fn %s: expected %zd, "
                      "but got %zd",
                      function->name, expected_param_count,
-                     sequence_count(scanned_type_args));
+                     vm_list_count(scanned_type_args));
             vm_module_error_add(module, scanned_instruction->source_line, 0,
                                 error);
           } else {
             // Check params against declared function params
             for (size_t i = 0; i < expected_param_count; i++) {
-              sequence_item *expected =
-                  sequence_get_item(function->parameters, i);
+              vm_list_item *expected =
+                  vm_list_get_item(function->parameters, i);
               char *expected_type = expected->type;
               char *expected_name = (char *)expected->value;
               char *actual_type =
-                  (char *)sequence_get_value(scanned_type_args, i);
+                  (char *)vm_list_get_value(scanned_type_args, i);
 
               if (!actual_type) {
                 char error[1024];
@@ -2064,7 +2085,8 @@ void _vm_module_generator_verifier_check_function_call_params(
                 break;
               }
 
-              if (expected_type && !string_equals(expected_type, actual_type)) {
+              if (expected_type &&
+                  !vm_string_equals(expected_type, actual_type)) {
                 char error[1024];
                 snprintf(error, sizeof(error),
                          "Incorrect parameter arg %zd (%s) to fn %s in %s: "
@@ -2078,7 +2100,7 @@ void _vm_module_generator_verifier_check_function_call_params(
             }
           }
 
-          sequence_free(scanned_type_args);
+          vm_list_free(scanned_type_args);
         }
       }
     }
@@ -2092,11 +2114,11 @@ void _vm_module_generator_verifier_check_function_call_params(
  */
 void _vm_module_generator_verifier_check_call_function_declared(
     vm_module *module) {
-  verify_not_null(module);
-  verify_not_null(module->functions);
+  VM_ASSERT_NOT_NULL(module);
+  VM_ASSERT_NOT_NULL(module->functions);
 
-  sequence_foreach_of(module->functions_list, vm_function *, function) {
-    sequence_foreach_of(function->instructions, vm_instruction *, instruction) {
+  vm_list_foreach_of(module->functions_list, vm_function *, function) {
+    vm_list_foreach_of(function->instructions, vm_instruction *, instruction) {
       if ((instruction->opcode == opCALL_METHOD ||
            instruction->opcode == opCALL_OBJ_METHOD) &&
           instruction->param_type_1 == NULL) {
@@ -2118,13 +2140,13 @@ void _vm_module_generator_verifier_check_call_function_declared(
  * has a declared type trait.  Undeclared variables generate an error.
  */
 void _vm_module_generator_verifier_check_call_var_declared(vm_module *module) {
-  verify_not_null(module);
-  verify_not_null(module->functions);
+  VM_ASSERT_NOT_NULL(module);
+  VM_ASSERT_NOT_NULL(module->functions);
 
   char error[1024];
 
-  sequence_foreach_of(module->functions_list, vm_function *, function) {
-    sequence_foreach_of(function->instructions, vm_instruction *, instruction) {
+  vm_list_foreach_of(module->functions_list, vm_function *, function) {
+    vm_list_foreach_of(function->instructions, vm_instruction *, instruction) {
       if (instruction->opcode != opLABEL && instruction->opcode != opCOMMENT &&
           instruction->opcode != opCALL_METHOD &&
           instruction->opcode != opCALL_OBJ_METHOD &&
@@ -2163,12 +2185,12 @@ void _vm_module_generator_verifier_check_call_var_declared(vm_module *module) {
  */
 void _vm_module_generator_verifier_check_function_return_value_type(
     vm_module *module) {
-  verify_not_null(module);
-  verify_not_null(module->functions);
+  VM_ASSERT_NOT_NULL(module);
+  VM_ASSERT_NOT_NULL(module->functions);
 
-  sequence_foreach_of(module->functions_list, vm_function *, function) {
-    sequence_item *instructions = sequence_enumerable(function->instructions);
-    const size_t instructions_count = sequence_count(function->instructions);
+  vm_list_foreach_of(module->functions_list, vm_function *, function) {
+    vm_list_item *instructions = vm_list_enumerable(function->instructions);
+    const size_t instructions_count = vm_list_count(function->instructions);
 
     if (instructions_count < 2) {
       continue;
@@ -2180,7 +2202,7 @@ void _vm_module_generator_verifier_check_function_return_value_type(
         (vm_instruction *)instructions[return_instruction_index].value;
 
     if (return_instruction->opcode != opRETURN) {
-      log_error("Expected RETURN opcode", NULL);
+      vm_log_error("Expected RETURN opcode", NULL);
       continue;
     }
 
@@ -2194,10 +2216,10 @@ void _vm_module_generator_verifier_check_function_return_value_type(
       // Check the return types
       if (function->return_type == NULL &&
           stack_push_instruction->param_type_1 &&
-          !string_equals(stack_push_instruction->param_type_1, "void")) {
+          !vm_string_equals(stack_push_instruction->param_type_1, "void")) {
         expected_type = "void";
-      } else if (!string_equals(function->return_type,
-                                stack_push_instruction->param_type_1)) {
+      } else if (!vm_string_equals(function->return_type,
+                                   stack_push_instruction->param_type_1)) {
         expected_type = function->return_type;
       }
 
@@ -2217,17 +2239,17 @@ void _vm_module_generator_verifier_check_function_return_value_type(
 
 /**
  * Verifier check 6: After a CALL_METHOD, if the return value is popped
- * and assigned to a variable, verify the return type matches the
+ * and assigned to a variable, VM_ASSERT the return type matches the
  * variable's declared type.
  */
 void _vm_module_generator_verifier_check_function_return_type_value_assignment_after_call(
     vm_module *module) {
-  verify_not_null(module);
-  verify_not_null(module->functions);
+  VM_ASSERT_NOT_NULL(module);
+  VM_ASSERT_NOT_NULL(module->functions);
 
-  sequence_foreach_of(module->functions_list, vm_function *, function) {
-    sequence_item *instructions = sequence_enumerable(function->instructions);
-    const size_t instructions_count = sequence_count(function->instructions);
+  vm_list_foreach_of(module->functions_list, vm_function *, function) {
+    vm_list_item *instructions = vm_list_enumerable(function->instructions);
+    const size_t instructions_count = vm_list_count(function->instructions);
 
     for (size_t instructions_index = 0; instructions_index < instructions_count;
          instructions_index++) {
@@ -2258,8 +2280,8 @@ void _vm_module_generator_verifier_check_function_return_type_value_assignment_a
         }
 
         // Check assignment
-        if (!string_equals(call_method_instruction->param_type_1,
-                           set_var_instruction->param_type_3)) {
+        if (!vm_string_equals(call_method_instruction->param_type_1,
+                              set_var_instruction->param_type_3)) {
           char error[1024];
           snprintf(error, sizeof(error),
                    "Return of function %s(...):%s cannot be assigned to "
@@ -2280,7 +2302,7 @@ void _vm_module_generator_verifier_check_function_return_type_value_assignment_a
  * Run all six verifier checks (static analysis) on the compiled module.
  * Errors are accumulated into module->errors.
  */
-void vm_module_generator_verifier_verify_not_null(vm_module *module) {
+void vm_module_generator_verifier_VM_ASSERT_NOT_NULL(vm_module *module) {
   _vm_module_generator_verifier_check_instruction_params(module);
   _vm_module_generator_verifier_check_function_call_params(module);
   _vm_module_generator_verifier_check_call_function_declared(module);
@@ -2296,8 +2318,8 @@ extern VM_MODULE_PARSER_STYPE vm_module_parser_lval;
 
 #define ERROR_BUFFER_SIZE 1024
 
-#define RESULT_OK 0
-#define RESULT_UNKNOWN -1
+#define VM_OK 0
+#define VM_UNKNOWN -1
 #define RESULT_CORE_VM_SYNTAX_ERROR -2
 #define RESULT_CORE_VM_OUT_OF_MEMORY -3
 
@@ -2317,25 +2339,26 @@ extern void vm_module_parser_set_in(FILE *in_str);
 /**
  * Top-level entry point: parse source text into a compiled vm_module.
  *
- * Pipeline: parse → post-process (5 passes) → verify (6 checks).
+ * Pipeline: parse → post-process (5 passes) → VM_ASSERT (6 checks).
  * On success, *out_module receives a fully resolved module ready for
  * vm_module_runtime_run().  On failure, module->errors is populated.
  *
  * @param verb_context_  Optional native function dispatch table.
  * @param source         Null-terminated source string.
  * @param out_module     Receives the compiled module on success.
- * @return RESULT_OK (0) on success, negative error code on failure.
+ * @return VM_OK (0) on success, negative error code on failure.
  */
-result vm_module_parser_generate(verb_context *verb_context_,
-                                 const char *source, vm_module **out_module) {
-  verify_not_null(source);
-  verify_not_null(out_module);
+vm_result vm_module_parser_generate(verb_context *verb_context_,
+                                    const char *source,
+                                    vm_module **out_module) {
+  VM_ASSERT_NOT_NULL(source);
+  VM_ASSERT_NOT_NULL(out_module);
 
   // Init
-  vm_module_parser *parser = xmemory_new(vm_module_parser);
+  vm_module_parser *parser = VM_NEW(vm_module_parser);
   parser->vm_module_parser_state_input = source;
   parser->vm_module_parser_state_input_index = 0;
-  parser->vm_module_parser_state_input_len = string_length(source);
+  parser->vm_module_parser_state_input_len = vm_string_length(source);
   parser->vm_module_parser_state_input_line_number = 1;
 
   vm_module *module = vm_module_create(verb_context_);
@@ -2346,22 +2369,22 @@ result vm_module_parser_generate(verb_context *verb_context_,
   // Used by Flex
   _vm_ctx_current_parser = parser;
 
-  int result = vm_module_parser_parse(parser);
+  int vm_result = vm_module_parser_parse(parser);
 
-  if (sequence_count(module->errors) == 0) {
+  if (vm_list_count(module->errors) == 0) {
     vm_module_generator_post_processing_process(module);
-    vm_module_generator_verifier_verify_not_null(module);
+    vm_module_generator_verifier_VM_ASSERT_NOT_NULL(module);
   }
 
   vm_module_generator_dispose(parser->generator);
-  xmemory_free(parser);
+  VM_FREE(parser);
 
-  switch (result) {
+  switch (vm_result) {
   case 0:
     // The value returned by yyparse is 0 if parsing was successful
     // (return is due to end-of-input).
     *out_module = module;
-    return RESULT_OK;
+    return VM_OK;
 
   case 1:
 
@@ -2379,7 +2402,7 @@ result vm_module_parser_generate(verb_context *verb_context_,
     return RESULT_CORE_VM_SYNTAX_ERROR;
 
   default:
-    return RESULT_UNKNOWN;
+    return VM_UNKNOWN;
   }
 }
 
@@ -2392,7 +2415,7 @@ int vm_module_parser_wrap() { return 1; }
  * Returns 0 (EOF) when the entire source has been consumed.
  */
 int vm_module_parser_char_fetch_next(vm_module_parser *parser) {
-  verify_not_null(parser);
+  VM_ASSERT_NOT_NULL(parser);
 
   int c = 0;
 
@@ -2410,11 +2433,11 @@ int vm_module_parser_char_fetch_next(vm_module_parser *parser) {
  * snippet for later reporting through module->errors.
  */
 void vm_module_parser_error(vm_module_parser *parser, char *error) {
-  verify_not_null(parser);
-  verify_not_null(error);
+  VM_ASSERT_NOT_NULL(parser);
+  VM_ASSERT_NOT_NULL(error);
 
   vm_module *module = parser->generator->vm_module_parser_state_current_module;
-  verify_not_null(module);
+  VM_ASSERT_NOT_NULL(module);
 
   // Show the offending line
   const char *input = parser->vm_module_parser_state_input;
@@ -2425,7 +2448,7 @@ void vm_module_parser_error(vm_module_parser *parser, char *error) {
 
   // Limit the error line to the following
   char buffer[ERROR_BUFFER_SIZE + 1];
-  verify_not_null(error_end > error_start);
+  VM_ASSERT_NOT_NULL(error_end > error_start);
   size_t error_len = error_end - error_start;
 
   if (error_len > ERROR_BUFFER_SIZE) {
@@ -2437,7 +2460,7 @@ void vm_module_parser_error(vm_module_parser *parser, char *error) {
     error_len = ERROR_BUFFER_SIZE;
   }
 
-  string_copy_length(buffer, &input[error_start], error_len);
+  vm_string_copy_length(buffer, &input[error_start], error_len);
   buffer[error_len] = 0;
 
   char error2[1024];
@@ -2446,22 +2469,22 @@ void vm_module_parser_error(vm_module_parser *parser, char *error) {
            parser->vm_module_parser_state_input_line_column, buffer);
   vm_module_error_add(module, parser->vm_module_parser_state_input_line_number,
                       0, error2);
-  log_error(error2, NULL);
+  vm_log_error(error2, NULL);
 
   char error3[1024];
   snprintf(error3, sizeof(error3), "   %s\n", buffer);
   vm_module_error_add(module, parser->vm_module_parser_state_input_line_number,
                       0, error);
 
-  log_error(error3, NULL);
+  vm_log_error(error3, NULL);
 }
 
 // #define _DEBUG_TRACE
 
 /* convert.h removed */
 
-#define RESULT_OK 0
-#define RESULT_UNKNOWN -1
+#define VM_OK 0
+#define VM_UNKNOWN -1
 // Macros moved to vm_module_runtime.h
 
 /**
@@ -2469,11 +2492,11 @@ void vm_module_parser_error(vm_module_parser *parser, char *error) {
  * The runtime manages the evaluation stack and execution state.
  */
 vm_module_runtime *vm_module_runtime_create(vm_module *module) {
-  verify_not_null(module);
+  VM_ASSERT_NOT_NULL(module);
 
-  vm_module_runtime *runtime = xmemory_new(vm_module_runtime);
+  vm_module_runtime *runtime = VM_NEW(vm_module_runtime);
   runtime->module = module;
-  //    runtime->stack = queue_create();
+  //    runtime->stack = vm_queue_create();
 
   return runtime;
 }
@@ -2481,20 +2504,20 @@ vm_module_runtime *vm_module_runtime_create(vm_module *module) {
 /** Dispose a runtime and all its resources (stack, errors, function state).
  */
 void vm_module_runtime_dispose(vm_module_runtime *runtime) {
-  verify_not_null(runtime);
+  VM_ASSERT_NOT_NULL(runtime);
 
   vm_module_runtime_clear(runtime);
 
   // Reset errors
-  sequence_foreach_of(runtime->module->errors, vm_module_error *, error) {
+  vm_list_foreach_of(runtime->module->errors, vm_module_error *, error) {
     vm_module_error_dispose(error);
   }
 
   // Reset functions
-  cmap_foreach_of(runtime->module->functions, name, vm_function *, function) {
+  vm_map_foreach_of(runtime->module->functions, name, vm_function *, function) {
     vm_function_clear(function);
   }
-  xmemory_free(runtime);
+  VM_FREE(runtime);
 }
 
 /**
@@ -2503,31 +2526,31 @@ void vm_module_runtime_dispose(vm_module_runtime *runtime) {
  * Allows re-execution of the same compiled module.
  */
 void vm_module_runtime_clear(vm_module_runtime *runtime) {
-  verify_not_null(runtime);
+  VM_ASSERT_NOT_NULL(runtime);
 
   // Clear stack
   size_t i = runtime->stack_size;
 
   while (i-- > 0) {
     vm_variable *variable = runtime->stack[i];
-    verify_not_null(variable);
+    VM_ASSERT_NOT_NULL(variable);
     vm_variable_dispose(variable);
   }
 
   runtime->stack_size = 0;
 
   // Reset errors
-  sequence_foreach_of(runtime->module->errors, vm_module_error *, error) {
+  vm_list_foreach_of(runtime->module->errors, vm_module_error *, error) {
     if (error->message) {
-      string_free(error->message);
+      vm_string_free(error->message);
     }
 
-    xmemory_free(error);
+    VM_FREE(error);
   }
-  sequence_clear(runtime->module->errors);
+  vm_list_clear(runtime->module->errors);
 
   // Reset functions
-  cmap_foreach_of(runtime->module->functions, name, vm_function *, function) {
+  vm_map_foreach_of(runtime->module->functions, name, vm_function *, function) {
     vm_function_clear(function);
   }
 }
@@ -2535,8 +2558,8 @@ void vm_module_runtime_clear(vm_module_runtime *runtime) {
 /** Push a boolean value onto the runtime evaluation stack. */
 void vm_module_runtime_stack_push_boolean(vm_module_runtime *runtime,
                                           bool value) {
-  verify_not_null(runtime);
-  verify(runtime->stack_size != VM_MAX_STACK);
+  VM_ASSERT_NOT_NULL(runtime);
+  VM_ASSERT(runtime->stack_size != VM_MAX_STACK);
 
 #ifdef VM_ENABLE_VAR_NAME
   char name[100]; // TODO: check
@@ -2555,8 +2578,8 @@ void vm_module_runtime_stack_push_boolean(vm_module_runtime *runtime,
 /** Push a number (double) value onto the runtime evaluation stack. */
 void vm_module_runtime_stack_push_number(vm_module_runtime *runtime,
                                          double value) {
-  verify_not_null(runtime);
-  verify(runtime->stack_size != VM_MAX_STACK);
+  VM_ASSERT_NOT_NULL(runtime);
+  VM_ASSERT(runtime->stack_size != VM_MAX_STACK);
 
 #ifdef VM_ENABLE_VAR_NAME
   char name[100]; // TODO: check
@@ -2575,8 +2598,8 @@ void vm_module_runtime_stack_push_number(vm_module_runtime *runtime,
 /** Push a string value onto the runtime evaluation stack (cloned). */
 void vm_module_runtime_stack_push_string(vm_module_runtime *runtime,
                                          const char *value) {
-  verify_not_null(runtime);
-  verify(runtime->stack_size != VM_MAX_STACK);
+  VM_ASSERT_NOT_NULL(runtime);
+  VM_ASSERT(runtime->stack_size != VM_MAX_STACK);
 
 #ifdef VM_ENABLE_VAR_NAME
   char name[100]; // TODO: check
@@ -2587,7 +2610,7 @@ void vm_module_runtime_stack_push_string(vm_module_runtime *runtime,
 #endif
 
   stack_push_var->type_class = ptcSTRING;
-  stack_push_var->value.string = value ? string_clone(value) : NULL;
+  stack_push_var->value.string = value ? vm_string_clone(value) : NULL;
 
   runtime->stack[runtime->stack_size++] = stack_push_var;
 }
@@ -2595,8 +2618,8 @@ void vm_module_runtime_stack_push_string(vm_module_runtime *runtime,
 /** Push an opaque pointer onto the runtime evaluation stack. */
 void vm_module_runtime_stack_push_other(vm_module_runtime *runtime,
                                         void *other) {
-  verify_not_null(runtime);
-  verify(runtime->stack_size != VM_MAX_STACK);
+  VM_ASSERT_NOT_NULL(runtime);
+  VM_ASSERT(runtime->stack_size != VM_MAX_STACK);
 
 #ifdef VM_ENABLE_VAR_NAME
   char name[100]; // TODO: check
@@ -2615,12 +2638,12 @@ void vm_module_runtime_stack_push_other(vm_module_runtime *runtime,
 /**
  * Pop the top value from the runtime evaluation stack.
  * @param out_variable  Receives the popped variable.  Caller owns it.
- * @return RESULT_OK or RESULT_CORE_VM_EMPTY_STACK if stack is empty.
+ * @return VM_OK or RESULT_CORE_VM_EMPTY_STACK if stack is empty.
  */
-result vm_module_runtime_stack_pop(vm_module_runtime *runtime,
-                                   vm_variable **out_variable) {
-  verify_not_null(runtime);
-  verify_not_null(out_variable);
+vm_result vm_module_runtime_stack_pop(vm_module_runtime *runtime,
+                                      vm_variable **out_variable) {
+  VM_ASSERT_NOT_NULL(runtime);
+  VM_ASSERT_NOT_NULL(out_variable);
 
   *out_variable = NULL;
 
@@ -2630,7 +2653,7 @@ result vm_module_runtime_stack_pop(vm_module_runtime *runtime,
 
   *out_variable = runtime->stack[--runtime->stack_size];
 
-  return RESULT_OK;
+  return VM_OK;
 }
 
 #define op(expected_var_type_class_1, expected_var_type_class_2,               \
@@ -2646,7 +2669,7 @@ result vm_module_runtime_stack_pop(vm_module_runtime *runtime,
 #define op_completed() did_process_opcode = true;
 
 #define op_set_error(message)                                                  \
-  error = string_clone(message);                                               \
+  error = vm_string_clone(message);                                            \
   did_error = true;
 
 /**
@@ -2658,43 +2681,44 @@ void vm_instruction_with_var_to_string(vm_function *function,
                                        vm_param_type_class var_type_class_1,
                                        vm_param_type_class var_type_class_2,
                                        vm_param_type_class var_type_class_3) {
-  string_buffer *buffer = string_buffer_create_empty();
+  vm_string_buffer *buffer = vm_string_buffer_create_empty();
   char *instruction_dump = vm_instruction_to_string(instruction);
-  string_buffer_append_format(buffer, "%3d)\t", function->instruction_pointer);
-  string_buffer_append(buffer, instruction_dump);
-  string_buffer_append(buffer, "|");
+  vm_string_buffer_append_format(buffer, "%3d)\t",
+                                 function->instruction_pointer);
+  vm_string_buffer_append(buffer, instruction_dump);
+  vm_string_buffer_append(buffer, "|");
 
   if (var_type_class_1 != ptcNONE) {
-    vm_variable_to_string_buffer(buffer, instruction->param1,
-                                 instruction->var1);
+    vm_variable_to_vm_string_buffer(buffer, instruction->param1,
+                                    instruction->var1);
   }
 
-  string_buffer_append(buffer, "\t|");
+  vm_string_buffer_append(buffer, "\t|");
 
   if (var_type_class_2 != ptcNONE) {
-    vm_variable_to_string_buffer(buffer, instruction->param2,
-                                 instruction->var2);
+    vm_variable_to_vm_string_buffer(buffer, instruction->param2,
+                                    instruction->var2);
   }
 
-  string_buffer_append(buffer, "\t|");
+  vm_string_buffer_append(buffer, "\t|");
 
   if (var_type_class_3 != ptcNONE) {
-    vm_variable_to_string_buffer(buffer, instruction->param3,
-                                 instruction->var3);
+    vm_variable_to_vm_string_buffer(buffer, instruction->param3,
+                                    instruction->var3);
   }
 
   puts(buffer->data);
 
-  string_buffer_free(buffer);
-  string_free(instruction_dump);
+  vm_string_buffer_free(buffer);
+  vm_string_free(instruction_dump);
 }
 
 /** Register a callback for CALL_EXT_METHOD opcodes (native function calls).
  */
 void vm_module_runtime_set_call_ext_method_callback(
     vm_module_runtime *runtime, vm_call_ext_method_callback callback) {
-  verify_not_null(runtime);
-  verify_not_null(callback);
+  VM_ASSERT_NOT_NULL(runtime);
+  VM_ASSERT_NOT_NULL(callback);
 
   runtime->call_ext_method_callback = callback;
 }
@@ -2708,23 +2732,23 @@ void vm_module_runtime_set_call_ext_method_callback(
  *
  * @param runtime   Execution context (stack, ext callbacks).
  * @param function  The function to execute (instruction_pointer is reset).
- * @return RESULT_OK on success, negative error code on failure.
+ * @return VM_OK on success, negative error code on failure.
  */
-result vm_module_runtime_run(vm_module_runtime *runtime,
-                             vm_function *function) {
-  verify_not_null(runtime);
-  verify_not_null(function);
+vm_result vm_module_runtime_run(vm_module_runtime *runtime,
+                                vm_function *function) {
+  VM_ASSERT_NOT_NULL(runtime);
+  VM_ASSERT_NOT_NULL(function);
 
   char *error = NULL;
 
 #ifdef _DEBUG_TRACE
   printf("\n--> %s <----------------------------\n", function->name);
 #endif
-  sequence_item *instructions = sequence_enumerable(function->instructions);
-  const size_t instructions_count = sequence_count(function->instructions);
+  vm_list_item *instructions = vm_list_enumerable(function->instructions);
+  const size_t instructions_count = vm_list_count(function->instructions);
 
   while (function->instruction_pointer < instructions_count) {
-    result r = RESULT_CORE_VM_RUNTIME_ERROR;
+    vm_result r = RESULT_CORE_VM_RUNTIME_ERROR;
 
     vm_instruction *instruction =
         (vm_instruction *)instructions[function->instruction_pointer].value;
@@ -2747,7 +2771,7 @@ result vm_module_runtime_run(vm_module_runtime *runtime,
 #ifdef _DEBUG_TRACE
     char *instruction_dump = vm_instruction_to_string(instruction);
     puts(instruction_dump);
-    string_free(instruction_dump);
+    vm_string_free(instruction_dump);
 
     if (instruction->opcode == opCALL_METHOD ||
         instruction->opcode == opRETURN) {
@@ -2804,15 +2828,15 @@ result vm_module_runtime_run(vm_module_runtime *runtime,
      * opADD: add two numbers, decimals, strings and other strings with these
      * param1: input A
      * param2: input B
-     * param3: result
+     * param3: vm_result
      */
     case opADD:
       op(ptcNUMBER, ptcNUMBER, ptcNUMBER,
          { var_value_3->number = var_value_1->number + var_value_2->number; });
 
       op(ptcSTRING, ptcSTRING, ptcSTRING, {
-        len = string_length(var_value_1->string) +
-              string_length(var_value_2->string);
+        len = vm_string_length(var_value_1->string) +
+              vm_string_length(var_value_2->string);
         buffer_string = (char *)malloc(len + 1);
         buffer_string[0] = '\0';
         strcat(buffer_string, var_value_1->string);
@@ -2821,14 +2845,15 @@ result vm_module_runtime_run(vm_module_runtime *runtime,
       });
 
       op(ptcSTRING, ptcNUMBER, ptcSTRING, {
-        buffer_number = convert_int_to_string(var_value_2->number);
-        len = string_length(var_value_1->string) + string_length(buffer_number);
+        buffer_number = vm_int_to_string(var_value_2->number);
+        len = vm_string_length(var_value_1->string) +
+              vm_string_length(buffer_number);
         buffer_string = (char *)malloc(len + 1);
         buffer_string[0] = '\0';
         strcat(buffer_string, var_value_1->string);
         strcat(buffer_string, buffer_number);
         var_value_3->string = buffer_string;
-        string_free(buffer_number);
+        vm_string_free(buffer_number);
       });
 
       break;
@@ -2837,7 +2862,7 @@ result vm_module_runtime_run(vm_module_runtime *runtime,
      * opMUL: multiply two number or decimals
      * param1: input A
      * param2: input B
-     * param3: result
+     * param3: vm_result
      */
     case opMUL:
       op(ptcNUMBER, ptcNUMBER, ptcNUMBER, {
@@ -2848,7 +2873,7 @@ result vm_module_runtime_run(vm_module_runtime *runtime,
      * opDIV: divide two number or decimals
      * param1: input A
      * param2: input B
-     * param3: result
+     * param3: vm_result
      */
     case opDIV:
       op(ptcNUMBER, ptcNUMBER, ptcNUMBER, {
@@ -2861,7 +2886,7 @@ result vm_module_runtime_run(vm_module_runtime *runtime,
      * opEXP: exponent
      * param1: input A
      * param2: input B
-     * param3: result
+     * param3: vm_result
      */
     case opEXP:
       op(ptcNUMBER, ptcNONE, ptcNUMBER,
@@ -2872,7 +2897,7 @@ result vm_module_runtime_run(vm_module_runtime *runtime,
      * opEXP: power to
      * param1: input A
      * param2: input B
-     * param3: result
+     * param3: vm_result
      */
     case opPOW:
       op(ptcNUMBER, ptcNUMBER, ptcNUMBER, {
@@ -2884,7 +2909,7 @@ result vm_module_runtime_run(vm_module_runtime *runtime,
      * opSUB: subtract two number or decimals
      * param1: input A
      * param2: input B
-     * param3: result
+     * param3: vm_result
      */
     case opSUB:
       op(ptcNUMBER, ptcNUMBER, ptcNUMBER,
@@ -2895,7 +2920,7 @@ result vm_module_runtime_run(vm_module_runtime *runtime,
      * opNEG: exit function
      * param1: input
      * param2:
-     * param3: result
+     * param3: vm_result
      */
     case opNEG:
       op(ptcNUMBER, ptcNONE, ptcNUMBER,
@@ -2906,7 +2931,7 @@ result vm_module_runtime_run(vm_module_runtime *runtime,
      * opNOT: reverse a boolean
      * param1: value
      * param2:
-     * param3: result
+     * param3: vm_result
      */
     case opNOT:
       op(ptcBOOLEAN, ptcNONE, ptcBOOLEAN,
@@ -2938,8 +2963,8 @@ result vm_module_runtime_run(vm_module_runtime *runtime,
          { var_value_3->boolean = var_value_1->boolean; });
       op(ptcSTRING, ptcNONE, ptcSTRING, {
         if (var_value_3->string)
-          string_free(var_value_3->string);
-        var_value_3->string = string_clone(var_value_1->string);
+          vm_string_free(var_value_3->string);
+        var_value_3->string = vm_string_clone(var_value_1->string);
       });
 
       break;
@@ -2973,7 +2998,7 @@ result vm_module_runtime_run(vm_module_runtime *runtime,
         op_set_error("Tried to STACK_POP on empty stack");
       } else {
         stack_pop_var = runtime->stack[--runtime->stack_size];
-        verify_not_null(stack_pop_var);
+        VM_ASSERT_NOT_NULL(stack_pop_var);
 
         // Assign to target var
         if (!vm_variable_value_assign(stack_pop_var, var_type_class_3,
@@ -2988,7 +3013,7 @@ result vm_module_runtime_run(vm_module_runtime *runtime,
         }
 
         vm_variable_dispose(stack_pop_var);
-        //                    xmemory_free(stack_pop_var);
+        //                    VM_FREE(stack_pop_var);
       }
 
       break;
@@ -3009,12 +3034,12 @@ result vm_module_runtime_run(vm_module_runtime *runtime,
       stack_push_var->type_class = var_type_class_1;
 
       if (var_type_class_1 == ptcSTRING) {
-        stack_push_var->value.string = string_clone(var_value_1->string);
+        stack_push_var->value.string = vm_string_clone(var_value_1->string);
       } else {
         stack_push_var->value = *var_value_1;
       }
 
-      verify(runtime->stack_size != VM_MAX_STACK);
+      VM_ASSERT(runtime->stack_size != VM_MAX_STACK);
       runtime->stack[runtime->stack_size++] = stack_push_var;
 
       did_process_opcode = true;
@@ -3029,11 +3054,11 @@ result vm_module_runtime_run(vm_module_runtime *runtime,
     case opCALL_METHOD:
       if (!instruction->call_method_function &&
           !instruction->call_method_verb) {
-        log_error("Function/Verb doesn't exist %s", instruction->param1);
+        vm_log_error("Function/Verb doesn't exist %s", instruction->param1);
         r = RESULT_CORE_VM_RUNTIME_METHOD_DOESNT_EXIST;
       } else if (instruction->call_method_function) {
         if (instruction->call_method_function->is_executing) {
-          log_error(
+          vm_log_error(
               "Cannot call method (function) %s recursively (not supported)",
               instruction->param1);
           r = RESULT_CORE_VM_RUNTIME_RECURSION_NOT_SUPPORTED;
@@ -3043,7 +3068,7 @@ result vm_module_runtime_run(vm_module_runtime *runtime,
 
           r = vm_module_runtime_run(runtime, instruction->call_method_function);
 
-          if (r == RESULT_OK) {
+          if (r == VM_OK) {
             instruction->call_method_function->is_executing = false;
             op_completed();
           }
@@ -3058,30 +3083,30 @@ result vm_module_runtime_run(vm_module_runtime *runtime,
                    "Cannot call method (verb) %s not enough params (%zu/%zu)",
                    instruction->param1, runtime->stack_size,
                    verb_definition_->params_count);
-          log_error(err_msg, NULL);
+          vm_log_error(err_msg, NULL);
           r = RESULT_CORE_VM_RUNTIME_INCORRECT_PARAMS;
         } else {
-          cmap *verb_arg_list = cmap_create();
-          //                        cmap_set( verb_arg_list, "verb_context",
+          vm_map *verb_arg_list = vm_map_create();
+          //                        vm_map_set( verb_arg_list, "verb_context",
           //                        runtime->module->verb_context_ );
 
-          r = RESULT_OK;
-          sequence_foreach_of(verb_definition_->param_list, char *,
-                              verb_param_name) {
+          r = VM_OK;
+          vm_list_foreach_of(verb_definition_->param_list, char *,
+                             verb_param_name) {
             // size_t verb_params_count = verb_definition_->params_count;
-            // while ( verb_params_count-- > 0 && r == RESULT_OK ) {
+            // while ( verb_params_count-- > 0 && r == VM_OK ) {
             vm_variable *out_variable;
             r = vm_module_runtime_stack_pop(runtime, &out_variable);
-            if (r != RESULT_OK) {
+            if (r != VM_OK) {
               break;
             }
 
-            cmap_set(verb_arg_list, verb_param_name,
-                     string_clone(out_variable->value.string));
+            vm_map_set(verb_arg_list, verb_param_name,
+                       vm_string_clone(out_variable->value.string));
             vm_variable_dispose(out_variable);
           }
 
-          if (r == RESULT_OK) {
+          if (r == VM_OK) {
             char *result_response = verb_definition_->function(
                 runtime->module->verb_context_, verb_arg_list,
                 verb_definition_->fcontext);
@@ -3092,13 +3117,13 @@ result vm_module_runtime_run(vm_module_runtime *runtime,
                 vm_module_runtime_stack_push_string(runtime, result_response);
               }
 
-              string_free(result_response);
+              vm_string_free(result_response);
             }
-            r = RESULT_OK;
+            r = VM_OK;
             op_completed();
           }
 
-          cmap_free(verb_arg_list);
+          vm_map_free(verb_arg_list);
         }
       }
 
@@ -3121,7 +3146,7 @@ result vm_module_runtime_run(vm_module_runtime *runtime,
      */
     case opCALL_EXT_METHOD:
       if (!runtime->call_ext_method_callback) {
-        log_error("call ext method callback not set", NULL);
+        vm_log_error("call ext method callback not set", NULL);
         r = RESULT_CORE_VM_RUNTIME_CALL_EXT_METHOD_CALLBACK_NOT_SET;
       } else {
         runtime->call_ext_method_callback(runtime, function);
@@ -3144,7 +3169,7 @@ result vm_module_runtime_run(vm_module_runtime *runtime,
      * opCONDITION_GTE: if A >= B
      * param1: input A
      * param2: input B
-     * param3: result
+     * param3: vm_result
      */
     case opCONDITION_GTE:
       op(ptcNUMBER, ptcNUMBER, ptcBOOLEAN, {
@@ -3157,7 +3182,7 @@ result vm_module_runtime_run(vm_module_runtime *runtime,
      * opCONDITION_LTE: if A <= B
      * param1: input A
      * param2: input B
-     * param3: result
+     * param3: vm_result
      */
     case opCONDITION_LTE:
       op(ptcNUMBER, ptcNUMBER, ptcBOOLEAN, {
@@ -3169,7 +3194,7 @@ result vm_module_runtime_run(vm_module_runtime *runtime,
      * opCONDITION_GT: if A > B
      * param1: input A
      * param2: input B
-     * param3: result
+     * param3: vm_result
      */
     case opCONDITION_GT:
       op(ptcNUMBER, ptcNUMBER, ptcBOOLEAN,
@@ -3180,7 +3205,7 @@ result vm_module_runtime_run(vm_module_runtime *runtime,
      * opCONDITION_LT: if A < B
      * param1: input A
      * param2: input B
-     * param3: result
+     * param3: vm_result
      */
     case opCONDITION_LT:
       op(ptcNUMBER, ptcNUMBER, ptcBOOLEAN,
@@ -3191,12 +3216,12 @@ result vm_module_runtime_run(vm_module_runtime *runtime,
      * opCONDITION_NE: if A != B
      * param1: input A
      * param2: input B
-     * param3: result
+     * param3: vm_result
      */
     case opCONDITION_NE:
       op(ptcSTRING, ptcSTRING, ptcBOOLEAN, {
         var_value_3->boolean =
-            !string_equals(var_value_1->string, var_value_2->string);
+            !vm_string_equals(var_value_1->string, var_value_2->string);
       });
       op(ptcNUMBER, ptcNUMBER, ptcBOOLEAN, {
         var_value_3->boolean = var_value_1->number != var_value_2->number;
@@ -3211,12 +3236,12 @@ result vm_module_runtime_run(vm_module_runtime *runtime,
      * opCONDITION_EQ: if A == B
      * param1: input A
      * param2: input B
-     * param3: result
+     * param3: vm_result
      */
     case opCONDITION_EQ:
       op(ptcSTRING, ptcSTRING, ptcBOOLEAN, {
         var_value_3->boolean =
-            string_equals(var_value_1->string, var_value_2->string);
+            vm_string_equals(var_value_1->string, var_value_2->string);
       });
       op(ptcNUMBER, ptcNUMBER, ptcBOOLEAN, {
         var_value_3->boolean = var_value_1->number == var_value_2->number;
@@ -3231,7 +3256,7 @@ result vm_module_runtime_run(vm_module_runtime *runtime,
      * opCONDITION_TRUE: if A is true
      * param1: input A
      * param2:
-     * param3: result
+     * param3: vm_result
      */
     case opCONDITION_TRUE:
       op(ptcBOOLEAN, ptcNONE, ptcBOOLEAN,
@@ -3243,7 +3268,7 @@ result vm_module_runtime_run(vm_module_runtime *runtime,
      * opCONDITIONAL_AND: if (A && B)
      * param1: input A
      * param2: input B
-     * param3: result
+     * param3: vm_result
      */
     case opCONDITIONAL_AND:
       op(ptcBOOLEAN, ptcBOOLEAN, ptcBOOLEAN, {
@@ -3255,7 +3280,7 @@ result vm_module_runtime_run(vm_module_runtime *runtime,
      * opCONDITIONAL_OR: if (A || B)
      * param1: input A
      * param2: input B
-     * param3: result
+     * param3: vm_result
      */
     case opCONDITIONAL_OR:
       op(ptcBOOLEAN, ptcBOOLEAN, ptcBOOLEAN, {
@@ -3282,7 +3307,7 @@ result vm_module_runtime_run(vm_module_runtime *runtime,
       op(ptcBOOLEAN, ptcNONE, ptcNONE, {
         if (!var_value_1->boolean) {
           if (instruction->opJUMP_jump_to_instruction_pos == 0) {
-            log_error("Jump index cannot be 0", NULL);
+            vm_log_error("Jump index cannot be 0", NULL);
             r = RESULT_CORE_VM_RUNTIME_JUMP_INDEX_INVALID;
           } else {
             function->instruction_pointer =
@@ -3303,7 +3328,7 @@ result vm_module_runtime_run(vm_module_runtime *runtime,
     case opJUMP:
       op(ptcNONE, ptcNONE, ptcNONE, {
         if (instruction->opJUMP_jump_to_instruction_pos == 0) {
-          log_error("Jump index cannot be 0", NULL);
+          vm_log_error("Jump index cannot be 0", NULL);
           r = RESULT_CORE_VM_RUNTIME_JUMP_INDEX_INVALID;
         } else {
           function->instruction_pointer =
@@ -3382,7 +3407,7 @@ result vm_module_runtime_run(vm_module_runtime *runtime,
         char err_msg[1024];
         snprintf(err_msg, sizeof(err_msg), "%s:\n%3zu) %s", error,
                  function->instruction_pointer, instruction_dump);
-        log_error(err_msg, NULL);
+        vm_log_error(err_msg, NULL);
 
       } else if (!did_process_opcode) {
 #ifdef _DEBUG_TRACE
@@ -3393,12 +3418,12 @@ result vm_module_runtime_run(vm_module_runtime *runtime,
         snprintf(err_msg, sizeof(err_msg),
                  "No handler to process instruction:\n%3zu) %s",
                  function->instruction_pointer, instruction_dump);
-        log_error(err_msg, NULL);
+        vm_log_error(err_msg, NULL);
         r = r != RESULT_CORE_VM_RUNTIME_ERROR ? r
                                               : RESULT_CORE_VM_RUNTIME_ERROR;
       }
 
-      string_free(instruction_dump);
+      vm_string_free(instruction_dump);
       return r;
     }
 
@@ -3415,7 +3440,7 @@ result vm_module_runtime_run(vm_module_runtime *runtime,
     function->instruction_pointer++;
   }
 
-  return RESULT_OK;
+  return VM_OK;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -3425,10 +3450,10 @@ result vm_module_runtime_run(vm_module_runtime *runtime,
 
 /** Create a new type trait with the given type string and constant flag. */
 vm_type_trait *vm_type_trait_create(char *type, bool is_constant) {
-  verify_not_null(type);
+  VM_ASSERT_NOT_NULL(type);
 
-  vm_type_trait *type_trait = xmemory_new(vm_type_trait);
-  type_trait->type = string_clone(type);
+  vm_type_trait *type_trait = VM_NEW(vm_type_trait);
+  type_trait->type = vm_string_clone(type);
   type_trait->is_constant = is_constant;
 
   return type_trait;
@@ -3436,13 +3461,13 @@ vm_type_trait *vm_type_trait_create(char *type, bool is_constant) {
 
 /** Free a type trait and its cloned type string. */
 void vm_type_trait_dispose(vm_type_trait *type_trait) {
-  verify_not_null(type_trait);
+  VM_ASSERT_NOT_NULL(type_trait);
 
   if (type_trait->type) {
-    string_free(type_trait->type);
+    vm_string_free(type_trait->type);
   }
 
-  xmemory_free(type_trait);
+  VM_FREE(type_trait);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -3457,24 +3482,24 @@ void vm_type_trait_dispose(vm_type_trait *type_trait) {
  * @param name  Already heap-allocated name string — ownership is transferred.
  */
 vm_function *vm_function_create(char *name) {
-  verify_not_null(name);
+  VM_ASSERT_NOT_NULL(name);
 
-  vm_function *function = xmemory_new(vm_function);
+  vm_function *function = VM_NEW(vm_function);
   function->name = name; // name is already text cloned
-  function->parameters = sequence_create();
-  function->instructions = sequence_create();
-  function->tracking_labels = queue_create();
-  function->register_names = sequence_create();
-  function->label_names = sequence_create();
-  function->symbols = sequence_create();
-  function->trait_types = cmap_create();
+  function->parameters = vm_list_create();
+  function->instructions = vm_list_create();
+  function->tracking_labels = vm_queue_create();
+  function->register_names = vm_list_create();
+  function->label_names = vm_list_create();
+  function->symbols = vm_list_create();
+  function->trait_types = vm_map_create();
   function->return_type_class = ptcNONE;
   function->return_type = NULL;
 
-  function->variables = cmap_create();
-  function->constants = cmap_create();
-  function->variables_list = sequence_create();
-  function->registers = sequence_create();
+  function->variables = vm_map_create();
+  function->constants = vm_map_create();
+  function->variables_list = vm_list_create();
+  function->registers = vm_list_create();
 
   function->is_executing = false;
   function->instruction_pointer = 0;
@@ -3486,36 +3511,37 @@ vm_function *vm_function_create(char *name) {
  * Free a function and all its sub-resources.
  */
 void vm_function_dispose(vm_function *function) {
-  verify_not_null(function);
-  verify_not_null(function->name);
-  verify_not_null(function->instructions);
+  VM_ASSERT_NOT_NULL(function);
+  VM_ASSERT_NOT_NULL(function->name);
+  VM_ASSERT_NOT_NULL(function->instructions);
 
   if (function->return_type) {
-    string_free(function->return_type);
+    vm_string_free(function->return_type);
   }
 
-  string_free(function->name);
+  vm_string_free(function->name);
 
-  sequence_foreach_of(function->instructions, vm_instruction *, instruction) {
+  vm_list_foreach_of(function->instructions, vm_instruction *, instruction) {
     vm_instruction_free(instruction);
   }
-  sequence_free(function->instructions);
+  vm_list_free(function->instructions);
 
-  cmap_foreach_of(function->trait_types, trait_type_name, vm_type_trait *,
-                  type_trait) {
+  vm_map_foreach_of(function->trait_types, trait_type_name, vm_type_trait *,
+                    type_trait) {
     vm_type_trait_dispose(type_trait);
   }
-  cmap_free(function->trait_types);
+  vm_map_free(function->trait_types);
 
-  sequence_foreach_of(function->registers, vm_variable *, reg) {
+  vm_list_foreach_of(function->registers, vm_variable *, reg) {
     vm_variable_dispose(reg);
   }
-  sequence_free(function->registers);
+  vm_list_free(function->registers);
 
-  sequence_dispose_items(function->register_names);
-  sequence_free(function->register_names);
+  vm_list_dispose_items(function->register_names);
+  vm_list_free(function->register_names);
 
-  cmap_foreach_of(function->constants, constant_name, vm_variable *, constant) {
+  vm_map_foreach_of(function->constants, constant_name, vm_variable *,
+                    constant) {
     // We don't free constant values — this comes from symbols, we only have a
     // reference here
     if (constant->type_class == ptcSTRING) {
@@ -3524,27 +3550,27 @@ void vm_function_dispose(vm_function *function) {
 
     vm_variable_dispose(constant);
   }
-  cmap_free(function->constants);
+  vm_map_free(function->constants);
 
-  cmap_foreach_of(function->variables, variable_name, vm_variable *, var) {
+  vm_map_foreach_of(function->variables, variable_name, vm_variable *, var) {
     vm_variable_dispose(var);
   }
-  cmap_free(function->variables);
+  vm_map_free(function->variables);
 
-  sequence_dispose_items(function->variables_list);
-  sequence_free(function->variables_list);
+  vm_list_dispose_items(function->variables_list);
+  vm_list_free(function->variables_list);
 
-  sequence_dispose_items(function->parameters);
-  sequence_free(function->parameters);
+  vm_list_dispose_items(function->parameters);
+  vm_list_free(function->parameters);
 
-  sequence_dispose_items(function->label_names);
-  sequence_free(function->label_names);
-  queue_free(function->tracking_labels);
+  vm_list_dispose_items(function->label_names);
+  vm_list_free(function->label_names);
+  vm_queue_free(function->tracking_labels);
 
-  sequence_dispose_items(function->symbols);
-  sequence_free(function->symbols);
+  vm_list_dispose_items(function->symbols);
+  vm_list_free(function->symbols);
 
-  xmemory_free(function);
+  VM_FREE(function);
 }
 
 /**
@@ -3552,57 +3578,58 @@ void vm_function_dispose(vm_function *function) {
  * Clears registers and non-constant variables for re-execution.
  */
 void vm_function_clear(vm_function *function) {
-  verify_not_null(function);
-  verify_not_null(function->name);
-  verify_not_null(function->instructions);
+  VM_ASSERT_NOT_NULL(function);
+  VM_ASSERT_NOT_NULL(function->name);
+  VM_ASSERT_NOT_NULL(function->instructions);
 
   function->is_executing = false;
   function->instruction_pointer = 0;
 
-  sequence_foreach_of(function->registers, vm_variable *, reg) {
+  vm_list_foreach_of(function->registers, vm_variable *, reg) {
     //        vm_variable_dispose(reg);
 
     vm_variable_clear(reg);
   }
-  //    sequence_clear(function->registers);
+  //    vm_list_clear(function->registers);
 
-  cmap_foreach_of(function->variables, name, vm_variable *, var) {
+  vm_map_foreach_of(function->variables, name, vm_variable *, var) {
     //      vm_variable_dispose(var);
     if (!var->is_constant && !var->is_register) {
       vm_variable_clear(var);
     }
   }
-  //    cmap_clear(function->variables);
+  //    vm_map_clear(function->variables);
 }
 
 /** Add a typed parameter to a function's parameter list. */
 void vm_function_parameter_add(vm_function *function, char *name, char *type) {
-  verify_not_null(function);
-  verify_not_null(name);
-  verify_not_null(type);
+  VM_ASSERT_NOT_NULL(function);
+  VM_ASSERT_NOT_NULL(name);
+  VM_ASSERT_NOT_NULL(type);
 
-  sequence_add(function->parameters, string_clone(name));
-  sequence_item *item = (sequence_item *)sequence_get_item(
-      function->parameters, sequence_count(function->parameters) - 1);
+  vm_list_add(function->parameters, vm_string_clone(name));
+  vm_list_item *item = (vm_list_item *)vm_list_get_item(
+      function->parameters, vm_list_count(function->parameters) - 1);
   if (item) {
-    item->type = string_clone(type);
+    item->type = vm_string_clone(type);
   }
 }
 
 /** Render all function-scoped variables as a heap-allocated string. */
 char *vm_function_variables_to_string(vm_function *function) {
-  verify_not_null(function);
+  VM_ASSERT_NOT_NULL(function);
 
-  string_buffer *buffer = string_buffer_create_empty();
+  vm_string_buffer *buffer = vm_string_buffer_create_empty();
 
-  sequence_foreach_of(function->variables_list, char *, name) {
-    vm_variable *var = (vm_variable *)cmap_get_value(function->variables, name);
+  vm_list_foreach_of(function->variables_list, char *, name) {
+    vm_variable *var =
+        (vm_variable *)vm_map_get_value(function->variables, name);
     if (!var)
       continue;
-    vm_variable_to_string_buffer(buffer, name, var);
-    string_buffer_append(buffer, "\n");
+    vm_variable_to_vm_string_buffer(buffer, name, var);
+    vm_string_buffer_append(buffer, "\n");
   }
-  return string_buffer_free_not_data(buffer);
+  return vm_string_buffer_free_not_data(buffer);
 }
 /* ═══════════════════════════════════════════════════════════════════════════
  *  Instructions  —  single bytecode entries
@@ -3666,7 +3693,7 @@ vm_instruction *vm_instruction_create_with_meta(vm_instruction_opcode opcode,
                                                 char *param1, char *param2,
                                                 char *param3,
                                                 size_t meta_source_line) {
-  vm_instruction *instruction = xmemory_new(vm_instruction);
+  vm_instruction *instruction = VM_NEW(vm_instruction);
   instruction->opcode = opcode;
   instruction->param1 = param1;
   instruction->param2 = param2;
@@ -3701,54 +3728,54 @@ vm_instruction *vm_instruction_create(vm_instruction_opcode opcode,
 /** Free an instruction struct (params are symbol-tracked, so not freed here).
  */
 void vm_instruction_free(vm_instruction *instruction) {
-  verify_not_null(instruction);
+  VM_ASSERT_NOT_NULL(instruction);
   //
   //    if (instruction->opcode == opCOMMENT && instruction->param1 &&
   //    instruction->param2) {
-  ////        string_free(instruction->param1);
-  //        string_free(instruction->param2);
+  ////        vm_string_free(instruction->param1);
+  //        vm_string_free(instruction->param2);
   //    }
 
-  xmemory_free(instruction);
+  VM_FREE(instruction);
 }
 
 /** Append opcode string (right-aligned 20 chars) to a string buffer. */
-void vm_instruction_opcode_to_string_buffer(string_buffer *buffer,
-                                            vm_instruction_opcode opcode) {
-  string_buffer_append_format(buffer, "%20s",
-                              vm_instruction_opcode_to_string(opcode));
+void vm_instruction_opcode_to_vm_string_buffer(vm_string_buffer *buffer,
+                                               vm_instruction_opcode opcode) {
+  vm_string_buffer_append_format(buffer, "%20s",
+                                 vm_instruction_opcode_to_string(opcode));
 }
 
 /** Append one instruction parameter's details to a string buffer (for IL
  * dump).
  */
-void vm_instruction_params_to_string_buffer(
-    string_buffer *buffer, bool param_is_constant, bool param_is_register,
+void vm_instruction_params_to_vm_string_buffer(
+    vm_string_buffer *buffer, bool param_is_constant, bool param_is_register,
     size_t param_register_id, char *param, char *param_type,
     vm_param_type_class param_type_class) {
   if (param_is_constant || param_is_register) {
     if (param_is_register) {
-      string_buffer_append_format(
+      vm_string_buffer_append_format(
           buffer, "\t{%sr[%zu]}%10s:%-10s", !param_is_constant ? " " : "c",
           param_register_id, !param ? "" : param,
           !param_type ? (param ? "?" : "") : param_type);
     } else {
-      string_buffer_append_format(
+      vm_string_buffer_append_format(
           buffer, "\t{%s    }%10s:%-10s", !param_is_constant ? " " : "c",
           !param ? "" : param, !param_type ? (param ? "?" : "") : param_type);
     }
   } else {
-    string_buffer_append_format(buffer, "\t       %10s:%-10s",
-                                !param ? "" : param,
-                                !param_type ? (param ? "?" : "") : param_type);
+    vm_string_buffer_append_format(
+        buffer, "\t       %10s:%-10s", !param ? "" : param,
+        !param_type ? (param ? "?" : "") : param_type);
   }
 
   if (param && param_type) {
-    string_buffer_append_format(
+    vm_string_buffer_append_format(
         buffer, " {%s}",
         vm_variable_param_type_class_to_string_abbreviated(param_type_class));
   } else {
-    string_buffer_append_format(
+    vm_string_buffer_append_format(
         buffer, "    ",
         vm_variable_param_type_class_to_string_abbreviated(param_type_class));
   }
@@ -3757,50 +3784,50 @@ void vm_instruction_params_to_string_buffer(
 /** Render a full instruction as a heap-allocated string (for IL dump output).
  */
 char *vm_instruction_to_string(vm_instruction *instruction) {
-  string_buffer *buffer = string_buffer_create_empty();
+  vm_string_buffer *buffer = vm_string_buffer_create_empty();
 
   switch (instruction->opcode) {
   case opLABEL:
-    string_buffer_append_format(buffer, "%s:", instruction->param1);
+    vm_string_buffer_append_format(buffer, "%s:", instruction->param1);
     break;
 
   case opCOMMENT:
-    string_buffer_append_format(buffer, "// *** Line %s: %s",
-                                instruction->param1, instruction->param2);
+    vm_string_buffer_append_format(buffer, "// *** Line %s: %s",
+                                   instruction->param1, instruction->param2);
     break;
 
   case opJUMP:
   case opJUMP_IF_FALSE:
   case opJUMP_IF_TRUE:
-    vm_instruction_opcode_to_string_buffer(buffer, instruction->opcode);
-    vm_instruction_params_to_string_buffer(
+    vm_instruction_opcode_to_vm_string_buffer(buffer, instruction->opcode);
+    vm_instruction_params_to_vm_string_buffer(
         buffer, instruction->param_is_constant_1,
         instruction->param_is_register_1, instruction->param_register_id_1,
         instruction->param1, instruction->param_type_1,
         instruction->param_type_class_1);
-    vm_instruction_params_to_string_buffer(
+    vm_instruction_params_to_vm_string_buffer(
         buffer, instruction->param_is_constant_2,
         instruction->param_is_register_2, instruction->param_register_id_2,
         instruction->param2, instruction->param_type_2,
         instruction->param_type_class_2);
-    string_buffer_append_format(buffer, "\t%25s [%d]",
-                                !instruction->param3 ? "" : instruction->param3,
-                                instruction->opJUMP_jump_to_instruction_pos);
+    vm_string_buffer_append_format(
+        buffer, "\t%25s [%d]", !instruction->param3 ? "" : instruction->param3,
+        instruction->opJUMP_jump_to_instruction_pos);
     break;
 
   default:
-    vm_instruction_opcode_to_string_buffer(buffer, instruction->opcode);
-    vm_instruction_params_to_string_buffer(
+    vm_instruction_opcode_to_vm_string_buffer(buffer, instruction->opcode);
+    vm_instruction_params_to_vm_string_buffer(
         buffer, instruction->param_is_constant_1,
         instruction->param_is_register_1, instruction->param_register_id_1,
         instruction->param1, instruction->param_type_1,
         instruction->param_type_class_1);
-    vm_instruction_params_to_string_buffer(
+    vm_instruction_params_to_vm_string_buffer(
         buffer, instruction->param_is_constant_2,
         instruction->param_is_register_2, instruction->param_register_id_2,
         instruction->param2, instruction->param_type_2,
         instruction->param_type_class_2);
-    vm_instruction_params_to_string_buffer(
+    vm_instruction_params_to_vm_string_buffer(
         buffer, instruction->param_is_constant_3,
         instruction->param_is_register_3, instruction->param_register_id_3,
         instruction->param3, instruction->param_type_3,
@@ -3808,7 +3835,7 @@ char *vm_instruction_to_string(vm_instruction *instruction) {
     break;
   }
 
-  return string_buffer_free_not_data(buffer);
+  return vm_string_buffer_free_not_data(buffer);
 }
 
 /* convert.h removed */
@@ -3839,7 +3866,7 @@ vm_variable *_vm_variable_create(const char *filename, size_t line) {
     exit(1);
   }
 
-  //        vm_variable* variable = _xmemory_malloc(sizeof(vm_variable),
+  //        vm_variable* variable = _vm_memory_malloc(sizeof(vm_variable),
   //        filename, line);
   vm_variable *variable = NULL;
 
@@ -3860,8 +3887,8 @@ vm_variable *_vm_variable_create(const char *filename, size_t line) {
 #ifdef VM_ENABLE_VAR_NAME
 
   // TODO: max length check
-  if (string_length(name) >= sizeof(variable->name)) {
-    log_error("vm_variable", "Variable name too long name=%s", name);
+  if (vm_string_length(name) >= sizeof(variable->name)) {
+    vm_log_error("vm_variable", "Variable name too long name=%s", name);
     return NULL;
   }
 
@@ -3877,26 +3904,26 @@ vm_variable *_vm_variable_create(const char *filename, size_t line) {
 }
 
 void vm_variable_dispose(vm_variable *variable) {
-  verify_not_null(variable);
+  VM_ASSERT_NOT_NULL(variable);
 
   vm_variable_clear(variable);
 
-  //  string_free(variable->name);
+  //  vm_string_free(variable->name);
   variable->type_class = ptcNONE;
   variable->is_constant = false;
   variable->is_register = false;
   variable->is_used = false;
 
   if (!variable->is_preallocated) {
-    xmemory_free(variable);
+    VM_FREE(variable);
   }
 }
 
 void vm_variable_clear(vm_variable *variable) {
-  verify_not_null(variable);
+  VM_ASSERT_NOT_NULL(variable);
 
   if (variable->type_class == ptcSTRING && variable->value.string) {
-    string_free(variable->value.string);
+    vm_string_free(variable->value.string);
     variable->value.string = NULL;
   }
 }
@@ -3913,24 +3940,24 @@ vm_variable *_vm_variable_create(const char *filename, size_t line) {
 }
 
 void vm_variable_dispose(vm_variable *variable) {
-  verify_not_null(variable);
+  VM_ASSERT_NOT_NULL(variable);
 
   vm_variable_clear(variable);
 
-  //  string_free(variable->name);
+  //  vm_string_free(variable->name);
   variable->type_class = ptcNONE;
   variable->is_constant = false;
   variable->is_register = false;
   variable->is_used = false;
 
-  xmemory_free(variable);
+  VM_FREE(variable);
 }
 
 void vm_variable_clear(vm_variable *variable) {
-  verify_not_null(variable);
+  VM_ASSERT_NOT_NULL(variable);
 
   if (variable->type_class == ptcSTRING && variable->value.string) {
-    string_free(variable->value.string);
+    vm_string_free(variable->value.string);
     variable->value.string = NULL;
   }
 }
@@ -3946,12 +3973,12 @@ void vm_variable_clear(vm_variable *variable) {
 bool vm_variable_value_assign_constant(vm_param_type_class param_type,
                                        char *param_value,
                                        vm_variable_value *value) {
-  verify_not_null(param_value);
-  verify_not_null(value);
+  VM_ASSERT_NOT_NULL(param_value);
+  VM_ASSERT_NOT_NULL(value);
 
   switch (param_type) {
   case ptcBOOLEAN:
-    value->boolean = string_equals("true", param_value);
+    value->boolean = vm_string_equals("true", param_value);
     break;
 
   case ptcNUMBER:
@@ -3969,7 +3996,7 @@ bool vm_variable_value_assign_constant(vm_param_type_class param_type,
              "ptcOTHER as a constant is not supported for param_value %s and "
              "param_type %s",
              param_value, vm_variable_param_type_class_to_string(param_type));
-    log_error(err_msg, NULL);
+    vm_log_error(err_msg, NULL);
     return false;
   }
 
@@ -3979,7 +4006,7 @@ bool vm_variable_value_assign_constant(vm_param_type_class param_type,
     snprintf(err_msg, sizeof(err_msg),
              "ptcNONE detected for param_value %s and param_type %s",
              param_value, vm_variable_param_type_class_to_string(param_type));
-    log_error(err_msg, NULL);
+    vm_log_error(err_msg, NULL);
     return false;
   }
   }
@@ -3996,8 +4023,8 @@ bool vm_variable_value_assign_constant(vm_param_type_class param_type,
 bool vm_variable_value_assign(vm_variable *source,
                               vm_param_type_class target_type_class,
                               vm_variable_value *target_value) {
-  verify_not_null(source);
-  verify_not_null(target_value);
+  VM_ASSERT_NOT_NULL(source);
+  VM_ASSERT_NOT_NULL(target_value);
 
   if (source->type_class != target_type_class) {
     // This shouldn't ever happen, if it does the compiler verifier should
@@ -4008,7 +4035,7 @@ bool vm_variable_value_assign(vm_variable *source,
              "type %s cannot be set to the stack return value type of type %s",
              vm_variable_param_type_class_to_string(target_type_class),
              vm_variable_param_type_class_to_string(source->type_class));
-    log_error(err_msg, NULL);
+    vm_log_error(err_msg, NULL);
     return false;
   }
 
@@ -4022,16 +4049,16 @@ bool vm_variable_value_assign(vm_variable *source,
     break;
 
   case ptcSTRING:
-    target_value->string = string_clone(source->value.string);
+    target_value->string = vm_string_clone(source->value.string);
     break;
 
   case ptcOTHER:
-    log_error("ptcOTHER assignment is not supported", NULL);
+    vm_log_error("ptcOTHER assignment is not supported", NULL);
     return false;
 
   case ptcNONE:
   default:
-    log_error("ptcNONE assignment is not supported", NULL);
+    vm_log_error("ptcNONE assignment is not supported", NULL);
     return false;
   }
 
@@ -4089,17 +4116,17 @@ const char *vm_variable_param_type_class_to_string_abbreviated(
 /** Parse a type name string ("boolean", "number", "string") into its enum. */
 vm_param_type_class
 vm_variable_param_type_name_to_param_type_class(char *type) {
-  verify_not_null(type);
+  VM_ASSERT_NOT_NULL(type);
 
-  if (string_equals(type, "boolean")) {
+  if (vm_string_equals(type, "boolean")) {
     return ptcBOOLEAN;
   }
 
-  if (string_equals(type, "number")) {
+  if (vm_string_equals(type, "number")) {
     return ptcNUMBER;
   }
 
-  if (string_equals(type, "string")) {
+  if (vm_string_equals(type, "string")) {
     return ptcSTRING;
   }
 
@@ -4111,7 +4138,7 @@ vm_variable_param_type_name_to_param_type_class(char *type) {
  * WARNING: uses a static buffer for numbers — not thread-safe.
  */
 char *vm_variable_to_string(vm_variable *variable) {
-  verify_not_null(variable);
+  VM_ASSERT_NOT_NULL(variable);
 
   static char buffer[64];
 
@@ -4130,34 +4157,34 @@ char *vm_variable_to_string(vm_variable *variable) {
   case ptcNONE:
   case ptcOTHER:
   default:
-    verify_not_null(variable->value.other);
+    VM_ASSERT_NOT_NULL(variable->value.other);
     return (char *)variable->value.other;
   }
 }
 
 /** Append a variable's value to a string buffer in "name=value" format. */
-void vm_variable_to_string_buffer(string_buffer *buffer, const char *name,
-                                  vm_variable *var) {
+void vm_variable_to_vm_string_buffer(vm_string_buffer *buffer, const char *name,
+                                     vm_variable *var) {
   switch (var->type_class) {
   case ptcNONE:
-    string_buffer_append_format(buffer, "%s=<none>", name);
+    vm_string_buffer_append_format(buffer, "%s=<none>", name);
     break;
 
   case ptcBOOLEAN:
-    string_buffer_append_format(buffer, "%s=%s", name,
-                                var->value.boolean ? "true" : "false");
+    vm_string_buffer_append_format(buffer, "%s=%s", name,
+                                   var->value.boolean ? "true" : "false");
     break;
 
   case ptcNUMBER:
-    string_buffer_append_format(buffer, "%s=%g", name, var->value.number);
+    vm_string_buffer_append_format(buffer, "%s=%g", name, var->value.number);
     break;
 
   case ptcSTRING:
-    string_buffer_append_format(buffer, "%s=%s", name, var->value.string);
+    vm_string_buffer_append_format(buffer, "%s=%s", name, var->value.string);
     break;
 
   case ptcOTHER:
-    string_buffer_append_format(buffer, "%s=<other>", name);
+    vm_string_buffer_append_format(buffer, "%s=<other>", name);
     break;
   }
 }

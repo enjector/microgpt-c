@@ -449,7 +449,7 @@ TEST(forward_backward_returns_positive_loss) {
 }
 
 TEST(training_reduces_loss) {
-  /* Run 50 training steps on a tiny sequence and check loss decreases */
+  /* Run 50 training steps on a tiny vm_list and check loss decreases */
   seed_rng(42);
   Model *m = model_create(10, &g_cfg);
   size_t np = model_num_params(m);
@@ -862,8 +862,8 @@ TEST(kv_cache_grows_with_positions) {
 }
 
 TEST(inference_kv_cache_autoregressive) {
-  /* Run an auto-regressive inference sequence of several tokens
-   * and verify each step produces valid, finite logits */
+  /* Run an auto-regressive inference vm_list of several tokens
+   * and VM_ASSERT each step produces valid, finite logits */
   seed_rng(42);
   Model *m = model_create(10, &g_cfg);
   scalar_t logits[MAX_VOCAB_VAL];
@@ -1031,7 +1031,7 @@ TEST(forward_inference_matches_fwd_bwd_logits) {
   seed_rng(42);
   size_t tok1 = sample_token(logits_inf, 10, 0.01); /* near-greedy */
 
-  /* Run inference again from scratch — should get same result */
+  /* Run inference again from scratch — should get same vm_result */
   for (int L = 0; L < g_cfg.n_layer; L++)
     cl1[L] = 0;
   forward_inference(m, 3, 0, keys1, vals1, cl1, logits_bwd);
@@ -1197,7 +1197,7 @@ TEST(loss_different_targets_give_different_losses) {
 /* ==================================================================== */
 
 /*
- * These tests verify the tiled loop nest algorithm used in lin_fwd and
+ * These tests VM_ASSERT the tiled loop nest algorithm used in lin_fwd and
  * lin_bwd.  Since those functions are static in microgpt.c, we reproduce
  * the tiled algorithm here and compare against naive reference.  This
  * validates:
@@ -1457,7 +1457,7 @@ TEST(paged_kv_append_and_get) {
   }
   ASSERT_EQ(c->len, (size_t)3);
 
-  /* Read back and verify */
+  /* Read back and VM_ASSERT */
   for (size_t i = 0; i < 3; i++) {
     const scalar_t *slot = paged_kv_get(c, i);
     ASSERT_NE(slot, NULL);
@@ -1468,7 +1468,7 @@ TEST(paged_kv_append_and_get) {
 }
 
 TEST(paged_kv_grows_across_page_boundary) {
-  /* Fill beyond one page to verify demand allocation */
+  /* Fill beyond one page to VM_ASSERT demand allocation */
   size_t n = KV_PAGE_SIZE + 5;
   PagedKVCache *c = paged_kv_create(n + KV_PAGE_SIZE);
   ASSERT_NE(c, NULL);
@@ -1601,7 +1601,7 @@ TEST(sample_token_single_vocab) {
 /* ==================================================================== */
 
 TEST(multi_position_loss_accumulation) {
-  /* Training on a sequence of length > 1 should produce a loss
+  /* Training on a vm_list of length > 1 should produce a loss
      that scales roughly linearly with the number of positions. */
   seed_rng(42);
   Model *m = model_create(10, &g_cfg);
@@ -1735,7 +1735,7 @@ TEST(same_seed_produces_identical_models) {
 /* ==================================================================== */
 
 TEST(overfit_single_sequence_near_zero_loss) {
-  /* Train for many steps on a single short sequence.
+  /* Train for many steps on a single short vm_list.
      Loss should approach near-zero for a small model. */
   seed_rng(123);
   Model *m = model_create(10, &g_cfg);
@@ -1750,7 +1750,7 @@ TEST(overfit_single_sequence_near_zero_loss) {
     TEST_KV_ALLOC(vals, L);
   }
 
-  /* Train on fixed sequence: 0→1→2→3 */
+  /* Train on fixed vm_list: 0→1→2→3 */
   size_t seq[] = {0, 1, 2, 3};
   int seq_len = 4;
   scalar_t last_loss = 0;
@@ -1772,7 +1772,7 @@ TEST(overfit_single_sequence_near_zero_loss) {
     last_loss = step_loss;
   }
 
-  /* After 500 steps on a 4-token sequence, loss should be very small */
+  /* After 500 steps on a 4-token vm_list, loss should be very small */
   ASSERT_LT(last_loss, 0.01);
 
   for (int L = 0; L < g_cfg.n_layer; L++) {

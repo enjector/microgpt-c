@@ -101,7 +101,7 @@ void opa_kanban_add_last(OpaKanban *kb, const char *action);
 
 /* ======================== Cycle Detector ================================= */
 /*
- * Detects A↔B oscillation patterns in a sequence of integer-encoded actions.
+ * Detects A↔B oscillation patterns in a vm_list of integer-encoded actions.
  * Usage:
  *   1. opa_cycle_init() at start of each puzzle/game
  *   2. opa_cycle_detected(cd, proposed_action) before executing a move
@@ -158,7 +158,7 @@ int opa_load_docs_multiline(const char *path, Docs *docs, int max_docs);
 /* ======================== Ensemble Voting ================================ */
 /*
  * Generate a response by running N inferences with temperature jitter and
- * majority-voting the result.  This is domain-agnostic: workers remain
+ * majority-voting the vm_result.  This is domain-agnostic: workers remain
  * generalists, but ensemble agreement filters out low-confidence outliers.
  *
  * n_votes:     number of inference runs (odd recommended, e.g. 3 or 5)
@@ -193,7 +193,7 @@ int opa_valid_filter(const char *action, const char *valid_csv);
 
 /*
  * Pick the first valid action from valid_csv that is NOT blocked in kb.
- * Writes the result to fallback (must be at least 16 bytes).
+ * Writes the vm_result to fallback (must be at least 16 bytes).
  * Returns 1 if a fallback was found, 0 if all valid actions are blocked.
  */
 int opa_valid_fallback(const OpaKanban *kb, const char *valid_csv,

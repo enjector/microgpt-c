@@ -93,7 +93,7 @@ char *vm_tmp_var = 0;
 char *vm_tmp_label = 0;
 char *vm_tmp_type = 0;
 
-queue *tracking_labels;
+vm_queue *tracking_labels;
 
 #define function_begin(name)                                                   \
   vm_module_generator_function_begin(parser->generator, name)
@@ -1126,7 +1126,7 @@ const char *yysrc;
    heuristic is that double-quoting is unnecessary unless the string
    contains an apostrophe, a comma, or backslash (other than
    backslash-backslash).  YYSTR is taken from yytname.  If YYRES is
-   null, do not copy; instead, return the length of what the result
+   null, do not copy; instead, return the length of what the vm_result
    would have been.  */
 static YYSIZE_T yytnamerr(char *yyres, const char *yystr) {
   if (*yystr == '"') {
@@ -1659,7 +1659,7 @@ yyreduce:
 /* Line 1792 of yacc.c  */
 #line 135 "D:/dev/projects/enjector/microgpt-vm/main/core/src/vm_module_parser.y"
   {
-    vm_tmp_type = string_clone("void");
+    vm_tmp_type = vm_string_clone("void");
     function_return_type_set((yyvsp[(1) - (4)].string), vm_tmp_type);
     trait_type_set((yyvsp[(1) - (4)].string), vm_tmp_type, false);
     track(vm_tmp_type);
@@ -1682,8 +1682,8 @@ yyreduce:
 #line 140 "D:/dev/projects/enjector/microgpt-vm/main/core/src/vm_module_parser.y"
   {
     function_return_type_set((yyvsp[(2) - (5)].string),
-                             track(string_clone("void")));
-    trait_type_set((yyvsp[(2) - (5)].string), string_clone("void"), false);
+                             track(vm_string_clone("void")));
+    trait_type_set((yyvsp[(2) - (5)].string), vm_string_clone("void"), false);
     (yyval.string) = (yyvsp[(2) - (5)].string);
   } break;
 
@@ -2380,7 +2380,7 @@ yyreduce:
 #line 342 "D:/dev/projects/enjector/microgpt-vm/main/core/src/vm_module_parser.y"
   {
     function_return_type_set((yyvsp[(1) - (4)].string),
-                             track(string_clone("number")));
+                             track(vm_string_clone("number")));
     (yyval.string) = (yyvsp[(1) - (4)].string);
   } break;
 
@@ -2517,7 +2517,7 @@ yyreduce:
 
   *++yyvsp = yyval;
 
-  /* Now `shift' the result of the reduction.  Determine what state
+  /* Now `shift' the vm_result of the reduction.  Determine what state
      that goes to, based on the state we popped back to and the rule
      number reduced by.  */
 

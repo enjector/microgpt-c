@@ -1,18 +1,12 @@
 /*
- * MicroGPT-C VM Engine
+ * microgpt_vm.h  —  MicroGPT-C Virtual Machine Engine (public header)
  *
- * Copyright (c) 2026 Ajay Soni (ajay.soni@enjector.com), Enjector Software Ltd.
- *
- * SPDX-License-Identifier: MIT
- */
-
-/*
- * microgpt_vm.h  —  Virtual Machine Engine public header.
+ * Copyright (c) 2026 Ajay Soni.  MIT License.
  *
  * Self-contained header declaring every type, enum, and function used by
  * the TypeScript-ish virtual machine.  Organised into logical sections:
  *
- *   0. Support Layer    — C99 shim (memory, strings, containers)
+ *   0. Support Layer    — C99 utilities (memory, strings, containers)
  *   1. Variables        — typed value containers (vm_variable)
  *   2. Engine API       — high-level C API (vm_engine)
  *   3. Instructions     — bytecode opcodes and instruction structs
@@ -24,9 +18,7 @@
  *   9. Post-Processing  — optimisation / verification passes
  *  10. Parser           — lexer/parser interface
  *  11. Eval             — one-shot expression evaluator (vm_eval)
- *  12. Legacy Runtime   — older queue-based runtime (vm_runtime)
- *
- * Copyright 2024 Enjector Software Ltd. MIT License.
+ *  12. Legacy Runtime   — older vm_queue-based runtime (vm_runtime)
  */
 
 #pragma once
@@ -40,26 +32,26 @@
 #include <string.h>
 
 /* ═══════════════════════════════════════════════════════════════════════════
- *  0. Support Layer  —  Pure-C99 shim (replaces enjector-core)
+ *  0. Support Layer  —  Pure-C99 VM utilities
  *
- *  Lightweight implementations of: xmemory, string utilities,
- *  string_buffer, sequence, cmap, queue, verify/log, verb_context.
+ *  Lightweight implementations of: vm_memory, string utilities,
+ *  vm_string_buffer, vm_list, vm_map, vm_queue, VM_ASSERT/log, verb_context.
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
 /* ── core_result ── */
 
-typedef enum { RESULT_OK = 0, RESULT_UNKNOWN = 1, RESULT_FAIL = 2 } result;
+typedef enum { VM_OK = 0, VM_UNKNOWN = 1, VM_FAIL = 2 } vm_result;
 
 /* ── verb_context (forward decl — full definition at end of section 0) ── */
 
 typedef struct verb_context_t verb_context;
 
-/* ── xmemory ── */
+/* ── vm_memory ── */
 
-#define xmemory_new(T) ((T *)calloc(1, sizeof(T)))
-#define xmemory_create(T) ((T *)calloc(1, sizeof(T)))
-#define xmemory_free(p)                                                        \
+#define VM_NEW(T) ((T *)calloc(1, sizeof(T)))
+#define VM_CREATE(T) ((T *)calloc(1, sizeof(T)))
+#define VM_FREE(p)                                                             \
   do {                                                                         \
     free(p);                                                                   \
     (p) = NULL;                                                                \
@@ -68,7 +60,7 @@ typedef struct verb_context_t verb_context;
 /* ── string utilities ── */
 
 /** Duplicate a C string onto the heap.  Returns NULL if `s` is NULL. */
-static inline char *string_clone(const char *s) {
+static inline char *vm_string_clone(const char *s) {
   if (!s)
     return NULL;
   size_t n = strlen(s) + 1;
@@ -79,20 +71,23 @@ static inline char *string_clone(const char *s) {
 }
 
 /** Free a heap-allocated string (NULL-safe). */
-static inline void string_free(char *s) { free(s); }
+static inline void vm_string_free(char *s) { free(s); }
 
 /** Return the length of `s`, or 0 if NULL. */
-static inline size_t string_length(const char *s) { return s ? strlen(s) : 0; }
+static inline size_t vm_string_length(const char *s) {
+  return s ? strlen(s) : 0;
+}
 
 /** Compare two C strings for equality.  Returns false if either is NULL. */
-static inline bool string_equals(const char *a, const char *b) {
+static inline bool vm_string_equals(const char *a, const char *b) {
   if (!a || !b)
     return false;
   return strcmp(a, b) == 0;
 }
 
 /** Copy up to `len` characters from `src` into `dst` and null-terminate. */
-static inline void string_copy_length(char *dst, const char *src, size_t len) {
+static inline void vm_string_copy_length(char *dst, const char *src,
+                                         size_t len) {
   if (dst && src) {
     strncpy(dst, src, len);
     dst[len] = '\0';
@@ -100,11 +95,11 @@ static inline void string_copy_length(char *dst, const char *src, size_t len) {
 }
 
 /** Single-character replacement in a heap-allocated copy.  Caller frees. */
-static inline char *string_replace(const char *s, const char *old_sub,
-                                   const char *new_sub) {
+static inline char *vm_string_replace(const char *s, const char *old_sub,
+                                      const char *new_sub) {
   if (!s || !old_sub || !new_sub)
     return NULL;
-  char *m = string_clone(s);
+  char *m = vm_string_clone(s);
   char *p = m;
   while (*p) {
     if (*p == old_sub[0])
@@ -115,7 +110,7 @@ static inline char *string_replace(const char *s, const char *old_sub,
 }
 
 /** In-place single-character replacement across the entire string. */
-static inline void string_replace_inplace(char *s, char old_c, char new_c) {
+static inline void vm_string_replace_inplace(char *s, char old_c, char new_c) {
   if (!s)
     return;
   while (*s) {
@@ -126,30 +121,30 @@ static inline void string_replace_inplace(char *s, char old_c, char new_c) {
 }
 
 /** Convert a decimal string to int (returns 0 on NULL). */
-static inline int convert_string_to_int(const char *s) {
+static inline int vm_string_to_int(const char *s) {
   if (!s)
     return 0;
   return atoi(s);
 }
 
 /** Convert an int to a heap-allocated decimal string.  Caller frees. */
-static inline char *convert_int_to_string(int val) {
+static inline char *vm_int_to_string(int val) {
   char buf[32];
   snprintf(buf, sizeof(buf), "%d", val);
-  return string_clone(buf);
+  return vm_string_clone(buf);
 }
 
-/* ── string_buffer (growable C-string builder) ── */
+/* ── vm_string_buffer (growable C-string builder) ── */
 
 typedef struct {
   char *data;
   size_t len;
   size_t cap;
-} string_buffer;
+} vm_string_buffer;
 
 /** Create a new empty string buffer (initial capacity 256). */
-static inline string_buffer *string_buffer_create_empty(void) {
-  string_buffer *b = (string_buffer *)calloc(1, sizeof(string_buffer));
+static inline vm_string_buffer *vm_string_buffer_create_empty(void) {
+  vm_string_buffer *b = (vm_string_buffer *)calloc(1, sizeof(vm_string_buffer));
   if (!b)
     return NULL;
   b->cap = 256;
@@ -160,7 +155,7 @@ static inline string_buffer *string_buffer_create_empty(void) {
 }
 
 /** Append a null-terminated string, growing as needed. */
-static inline void string_buffer_append(string_buffer *b, const char *s) {
+static inline void vm_string_buffer_append(vm_string_buffer *b, const char *s) {
   if (!b || !s)
     return;
   size_t slen = strlen(s);
@@ -175,8 +170,8 @@ static inline void string_buffer_append(string_buffer *b, const char *s) {
 }
 
 /** Append a printf-style formatted string. */
-static inline void string_buffer_append_format(string_buffer *b,
-                                               const char *fmt, ...) {
+static inline void vm_string_buffer_append_format(vm_string_buffer *b,
+                                                  const char *fmt, ...) {
   if (!b)
     return;
   char tmp[4096];
@@ -184,11 +179,11 @@ static inline void string_buffer_append_format(string_buffer *b,
   va_start(args, fmt);
   vsnprintf(tmp, sizeof(tmp), fmt, args);
   va_end(args);
-  string_buffer_append(b, tmp);
+  vm_string_buffer_append(b, tmp);
 }
 
-/** Extract the internal buffer and free the struct.  Caller owns result. */
-static inline char *string_buffer_free_not_data(string_buffer *b) {
+/** Extract the internal buffer and free the struct.  Caller owns vm_result. */
+static inline char *vm_string_buffer_free_not_data(vm_string_buffer *b) {
   if (!b)
     return NULL;
   char *r = b->data;
@@ -197,64 +192,63 @@ static inline char *string_buffer_free_not_data(string_buffer *b) {
 }
 
 /** Free both the buffer data and the struct. */
-static inline void string_buffer_free(string_buffer *b) {
+static inline void vm_string_buffer_free(vm_string_buffer *b) {
   if (!b)
     return;
   free(b->data);
   free(b);
 }
 
-/* ── verify / log ── */
+/* ── VM_ASSERT / log ── */
 
-#define verify_not_null(x) assert((x) != NULL)
+#define VM_ASSERT_NOT_NULL(x) assert((x) != NULL)
 
-#ifndef verify
-#define verify(x) assert((x))
+#ifndef VM_ASSERT
+#define VM_ASSERT(x) assert((x))
 #endif
 
-#define sprintf_s snprintf
+#define VM_SPRINTF_S snprintf
 
 /** Log an error to stderr with an optional detail string. */
-static inline void log_error(const char *msg, const char *detail) {
+static inline void vm_log_error(const char *msg, const char *detail) {
   if (detail)
     fprintf(stderr, "[vm] ERROR: %s — %s\n", msg, detail);
   else
     fprintf(stderr, "[vm] ERROR: %s\n", msg);
 }
 
-#define log_warn(fmt, ...) fprintf(stderr, fmt, ##__VA_ARGS__)
+#define vm_log_warn(fmt, ...) fprintf(stderr, fmt, ##__VA_ARGS__)
 
-/* ── sequence (growable void* array with per-item type metadata) ── */
+/* ── vm_list (growable void* array with per-item type metadata) ── */
 
 typedef struct {
   void *value;
   char *type;
-} sequence_item;
+} vm_list_item;
 
 typedef struct {
-  sequence_item *items;
+  vm_list_item *items;
   size_t count;
   size_t cap;
-} sequence;
+} vm_list;
 
-/** Create a new empty sequence (initial capacity 8). */
-static inline sequence *sequence_create(void) {
-  sequence *s = (sequence *)calloc(1, sizeof(sequence));
+/** Create a new empty vm_list (initial capacity 8). */
+static inline vm_list *vm_list_create(void) {
+  vm_list *s = (vm_list *)calloc(1, sizeof(vm_list));
   if (!s)
     return NULL;
   s->cap = 8;
-  s->items = (sequence_item *)calloc(s->cap, sizeof(sequence_item));
+  s->items = (vm_list_item *)calloc(s->cap, sizeof(vm_list_item));
   return s;
 }
 
 /** Append an item, doubling capacity when full. */
-static inline void sequence_add(sequence *s, void *item) {
+static inline void vm_list_add(vm_list *s, void *item) {
   if (!s)
     return;
   if (s->count == s->cap) {
     s->cap *= 2;
-    s->items =
-        (sequence_item *)realloc(s->items, s->cap * sizeof(sequence_item));
+    s->items = (vm_list_item *)realloc(s->items, s->cap * sizeof(vm_list_item));
   }
   s->items[s->count].value = item;
   s->items[s->count].type = NULL;
@@ -262,12 +256,12 @@ static inline void sequence_add(sequence *s, void *item) {
 }
 
 /** Return the item count, or 0 if NULL. */
-static inline size_t sequence_count(const sequence *s) {
+static inline size_t vm_list_count(const vm_list *s) {
   return s ? s->count : 0;
 }
 
 /** Free backing array and struct (does NOT free stored items). */
-static inline void sequence_free(sequence *s) {
+static inline void vm_list_free(vm_list *s) {
   if (!s)
     return;
   free(s->items);
@@ -275,13 +269,13 @@ static inline void sequence_free(sequence *s) {
 }
 
 /** Reset count to zero without freeing backing array. */
-static inline void sequence_clear(sequence *s) {
+static inline void vm_list_clear(vm_list *s) {
   if (s)
     s->count = 0;
 }
 
 /** Free every item's value and type, then reset count to zero. */
-static inline void sequence_dispose_items(sequence *s) {
+static inline void vm_list_dispose_items(vm_list *s) {
   if (s) {
     for (size_t i = 0; i < s->count; i++) {
       free(s->items[i].value);
@@ -292,18 +286,18 @@ static inline void sequence_dispose_items(sequence *s) {
 }
 
 /** Append all items from src into dst (deep-copies type strings). */
-static inline void sequence_merge(sequence *dst, sequence *src) {
+static inline void vm_list_merge(vm_list *dst, vm_list *src) {
   if (!dst || !src)
     return;
   for (size_t i = 0; i < src->count; i++) {
-    sequence_add(dst, src->items[i].value);
+    vm_list_add(dst, src->items[i].value);
     dst->items[dst->count - 1].type =
-        src->items[i].type ? string_clone(src->items[i].type) : NULL;
+        src->items[i].type ? vm_string_clone(src->items[i].type) : NULL;
   }
 }
 
-/** Check if the sequence contains a specific pointer value. */
-static inline bool sequence_contains(const sequence *s, void *item) {
+/** Check if the vm_list contains a specific pointer value. */
+static inline bool vm_list_contains(const vm_list *s, void *item) {
   if (!s)
     return false;
   for (size_t i = 0; i < s->count; i++) {
@@ -314,56 +308,55 @@ static inline bool sequence_contains(const sequence *s, void *item) {
 }
 
 /** Get value at index, or NULL if out of bounds. */
-static inline void *sequence_get_value(const sequence *s, size_t index) {
+static inline void *vm_list_get_value(const vm_list *s, size_t index) {
   if (!s || index >= s->count)
     return NULL;
   return s->items[index].value;
 }
 
 /** Get pointer to item at index, or NULL if out of bounds. */
-static inline sequence_item *sequence_get_item(const sequence *s,
-                                               size_t index) {
+static inline vm_list_item *vm_list_get_item(const vm_list *s, size_t index) {
   if (!s || index >= s->count)
     return NULL;
   return &s->items[index];
 }
 
 /** Return the raw item array. */
-static inline sequence_item *sequence_enumerable(const sequence *s) {
+static inline vm_list_item *vm_list_enumerable(const vm_list *s) {
   return s ? s->items : NULL;
 }
 
 /** Get last item's value cast to Type, or NULL if empty. */
-#define sequence_last_of(seq_ptr, Type)                                        \
+#define vm_list_last_of(seq_ptr, Type)                                         \
   ((Type *)((seq_ptr) && (seq_ptr)->count > 0                                  \
                 ? (seq_ptr)->items[(seq_ptr)->count - 1].value                 \
                 : NULL))
 
 /**
- * Iterate over sequence items with a typed loop variable.
- * Usage:  sequence_foreach_of(errors, vm_module_error*, err) { ... }
+ * Iterate over vm_list items with a typed loop variable.
+ * Usage:  vm_list_foreach_of(errors, vm_module_error*, err) { ... }
  */
-#define sequence_foreach_of(seq_ptr, Type, var)                                \
+#define vm_list_foreach_of(seq_ptr, Type, var)                                 \
   for (size_t _sf_i = 0; (seq_ptr) && _sf_i < (seq_ptr)->count; _sf_i++)       \
     for (int _sf_once_##var = 1; _sf_once_##var; _sf_once_##var = 0)           \
       for (Type var = (Type)(seq_ptr)->items[_sf_i].value; _sf_once_##var;     \
            _sf_once_##var = 0)
 
-/* ── cmap (open-addressing string-keyed hash map) ── */
+/* ── vm_map (open-addressing string-keyed hash map) ── */
 
 typedef struct {
   char *key;
   void *value;
-} cmap_item;
+} vm_map_item;
 
 typedef struct {
-  cmap_item *buckets;
+  vm_map_item *buckets;
   size_t cap;
   size_t count;
-} cmap;
+} vm_map;
 
 /** DJB2 hash masked to fit within cap (must be power of 2). */
-static inline size_t _cmap_hash(const char *key, size_t cap) {
+static inline size_t _vm_map_hash(const char *key, size_t cap) {
   size_t h = 5381;
   while (*key)
     h = ((h << 5) + h) ^ (unsigned char)*key++;
@@ -371,28 +364,28 @@ static inline size_t _cmap_hash(const char *key, size_t cap) {
 }
 
 /** Create a new empty map (initial capacity 16). */
-static inline cmap *cmap_create(void) {
-  cmap *m = (cmap *)calloc(1, sizeof(cmap));
+static inline vm_map *vm_map_create(void) {
+  vm_map *m = (vm_map *)calloc(1, sizeof(vm_map));
   if (!m)
     return NULL;
   m->cap = 16;
-  m->buckets = (cmap_item *)calloc(m->cap, sizeof(cmap_item));
+  m->buckets = (vm_map_item *)calloc(m->cap, sizeof(vm_map_item));
   return m;
 }
 
 /** Insert or update.  Keys are cloned on insert.  Grows at 75% load. */
-static inline void cmap_set(cmap *m, const char *key, void *value) {
+static inline void vm_map_set(vm_map *m, const char *key, void *value) {
   if (!m || !key)
     return;
   if (m->count * 4 >= m->cap * 3) {
     size_t new_cap = m->cap * 2;
-    cmap_item *nb = (cmap_item *)calloc(new_cap, sizeof(cmap_item));
+    vm_map_item *nb = (vm_map_item *)calloc(new_cap, sizeof(vm_map_item));
     if (!nb)
       return;
     for (size_t i = 0; i < m->cap; i++) {
       if (!m->buckets[i].key)
         continue;
-      size_t j = _cmap_hash(m->buckets[i].key, new_cap);
+      size_t j = _vm_map_hash(m->buckets[i].key, new_cap);
       while (nb[j].key)
         j = (j + 1) & (new_cap - 1);
       nb[j] = m->buckets[i];
@@ -401,7 +394,7 @@ static inline void cmap_set(cmap *m, const char *key, void *value) {
     m->buckets = nb;
     m->cap = new_cap;
   }
-  size_t i = _cmap_hash(key, m->cap);
+  size_t i = _vm_map_hash(key, m->cap);
   while (m->buckets[i].key) {
     if (strcmp(m->buckets[i].key, key) == 0) {
       m->buckets[i].value = value;
@@ -409,16 +402,16 @@ static inline void cmap_set(cmap *m, const char *key, void *value) {
     }
     i = (i + 1) & (m->cap - 1);
   }
-  m->buckets[i].key = string_clone(key);
+  m->buckets[i].key = vm_string_clone(key);
   m->buckets[i].value = value;
   m->count++;
 }
 
 /** Look up a bucket by key.  Returns NULL if not found. */
-static inline cmap_item *cmap_get_item(const cmap *m, const char *key) {
+static inline vm_map_item *vm_map_get_item(const vm_map *m, const char *key) {
   if (!m || !key)
     return NULL;
-  size_t i = _cmap_hash(key, m->cap);
+  size_t i = _vm_map_hash(key, m->cap);
   size_t probed = 0;
   while (m->buckets[i].key && probed < m->cap) {
     if (strcmp(m->buckets[i].key, key) == 0)
@@ -430,18 +423,18 @@ static inline cmap_item *cmap_get_item(const cmap *m, const char *key) {
 }
 
 /** Get value for a key, or NULL. */
-static inline void *cmap_get_value(const cmap *m, const char *key) {
-  cmap_item *it = cmap_get_item(m, key);
+static inline void *vm_map_get_value(const vm_map *m, const char *key) {
+  vm_map_item *it = vm_map_get_item(m, key);
   return it ? it->value : NULL;
 }
 
 /** Check whether a key exists. */
-static inline bool cmap_contains(const cmap *m, const char *key) {
-  return cmap_get_item(m, key) != NULL;
+static inline bool vm_map_contains(const vm_map *m, const char *key) {
+  return vm_map_get_item(m, key) != NULL;
 }
 
 /** Free keys, buckets, and map struct (does NOT free values). */
-static inline void cmap_free(cmap *m) {
+static inline void vm_map_free(vm_map *m) {
   if (!m)
     return;
   for (size_t i = 0; i < m->cap; i++)
@@ -451,7 +444,7 @@ static inline void cmap_free(cmap *m) {
 }
 
 /** Remove all entries (frees keys only). */
-static inline void cmap_clear(cmap *m) {
+static inline void vm_map_clear(vm_map *m) {
   if (!m)
     return;
   for (size_t i = 0; i < m->cap; i++) {
@@ -465,10 +458,10 @@ static inline void cmap_clear(cmap *m) {
 }
 
 /** Remove a single entry by key (frees key only, NOT value). */
-static inline bool cmap_remove(cmap *m, const char *key) {
+static inline bool vm_map_remove(vm_map *m, const char *key) {
   if (!m || !key)
     return false;
-  size_t idx = _cmap_hash(key, m->cap);
+  size_t idx = _vm_map_hash(key, m->cap);
   for (size_t i = 0; i < m->cap; i++) {
     size_t pos = (idx + i) & (m->cap - 1);
     if (!m->buckets[pos].key)
@@ -485,20 +478,20 @@ static inline bool cmap_remove(cmap *m, const char *key) {
 }
 
 /** Copy all entries from src into dst. */
-static inline void cmap_merge(cmap *dst, cmap *src) {
+static inline void vm_map_merge(vm_map *dst, vm_map *src) {
   if (!dst || !src)
     return;
   for (size_t i = 0; i < src->cap; i++) {
     if (src->buckets[i].key)
-      cmap_set(dst, src->buckets[i].key, src->buckets[i].value);
+      vm_map_set(dst, src->buckets[i].key, src->buckets[i].value);
   }
 }
 
 /**
- * Iterate over occupied cmap buckets.
- * Usage:  cmap_foreach_of(map, key, vm_function*, fn) { ... }
+ * Iterate over occupied vm_map buckets.
+ * Usage:  vm_map_foreach_of(map, key, vm_function*, fn) { ... }
  */
-#define cmap_foreach_of(cmap_ptr, key_var, Type, val_var)                      \
+#define vm_map_foreach_of(cmap_ptr, key_var, Type, val_var)                    \
   for (size_t _cm_i = 0; (cmap_ptr) && _cm_i < (cmap_ptr)->cap; _cm_i++)       \
     for (const char *key_var = (cmap_ptr)->buckets[_cm_i].key; key_var;        \
          key_var = NULL)                                                       \
@@ -507,29 +500,29 @@ static inline void cmap_merge(cmap *dst, cmap *src) {
         for (Type val_var = (Type)(cmap_ptr)->buckets[_cm_i].value;            \
              _cm_once_##val_var; _cm_once_##val_var = 0)
 
-/* ── queue (singly-linked FIFO) ── */
+/* ── vm_queue (singly-linked FIFO) ── */
 
-typedef struct _queue_node {
+typedef struct _vm_queue_node {
   void *data;
-  struct _queue_node *next;
-} _queue_node;
+  struct _vm_queue_node *next;
+} _vm_queue_node;
 
 typedef struct {
-  _queue_node *head;
-  _queue_node *tail;
+  _vm_queue_node *head;
+  _vm_queue_node *tail;
   size_t count;
-} queue;
+} vm_queue;
 
-/** Create a new empty queue. */
-static inline queue *queue_create(void) {
-  return (queue *)calloc(1, sizeof(queue));
+/** Create a new empty vm_queue. */
+static inline vm_queue *vm_queue_create(void) {
+  return (vm_queue *)calloc(1, sizeof(vm_queue));
 }
 
 /** Push an item onto the front. */
-static inline void queue_push(queue *q, void *item) {
+static inline void vm_queue_push(vm_queue *q, void *item) {
   if (!q)
     return;
-  _queue_node *n = (_queue_node *)malloc(sizeof(_queue_node));
+  _vm_queue_node *n = (_vm_queue_node *)malloc(sizeof(_vm_queue_node));
   if (!n)
     return;
   n->data = item;
@@ -541,10 +534,10 @@ static inline void queue_push(queue *q, void *item) {
 }
 
 /** Pop and return the front item, or NULL if empty. */
-static inline void *queue_pop(queue *q) {
+static inline void *vm_queue_pop(vm_queue *q) {
   if (!q || !q->head)
     return NULL;
-  _queue_node *n = q->head;
+  _vm_queue_node *n = q->head;
   void *v = n->data;
   q->head = n->next;
   if (!q->head)
@@ -555,19 +548,21 @@ static inline void *queue_pop(queue *q) {
 }
 
 /** Return item count, or 0 if NULL. */
-static inline size_t queue_count(const queue *q) { return q ? q->count : 0; }
+static inline size_t vm_queue_count(const vm_queue *q) {
+  return q ? q->count : 0;
+}
 
-/** Check whether the queue is empty (or NULL). */
-static inline bool queue_is_empty(const queue *q) {
+/** Check whether the vm_queue is empty (or NULL). */
+static inline bool vm_queue_is_empty(const vm_queue *q) {
   return !q || q->count == 0;
 }
 
-/** Free all nodes and the queue struct (does NOT free data). */
-static inline void queue_free(queue *q) {
+/** Free all nodes and the vm_queue struct (does NOT free data). */
+static inline void vm_queue_free(vm_queue *q) {
   if (!q)
     return;
   while (q->head) {
-    _queue_node *n = q->head;
+    _vm_queue_node *n = q->head;
     q->head = n->next;
     free(n);
   }
@@ -575,11 +570,11 @@ static inline void queue_free(queue *q) {
 }
 
 /** Remove all nodes without freeing data. */
-static inline void queue_clear(queue *q) {
+static inline void vm_queue_clear(vm_queue *q) {
   if (!q)
     return;
   while (q->head) {
-    _queue_node *n = q->head;
+    _vm_queue_node *n = q->head;
     q->head = n->next;
     free(n);
   }
@@ -588,11 +583,11 @@ static inline void queue_clear(queue *q) {
 }
 
 /** Remove all nodes AND free each node's data pointer. */
-static inline void queue_dispose_items(queue *q) {
+static inline void vm_queue_dispose_items(vm_queue *q) {
   if (!q)
     return;
   while (q->head) {
-    _queue_node *n = q->head;
+    _vm_queue_node *n = q->head;
     q->head = n->next;
     free(n->data);
     free(n);
@@ -602,12 +597,12 @@ static inline void queue_dispose_items(queue *q) {
 }
 
 /** Transfer all items from src into dst.  src is emptied. */
-static inline void queue_merge(queue *dst, queue *src) {
+static inline void vm_queue_merge(vm_queue *dst, vm_queue *src) {
   if (!dst || !src)
     return;
   while (src->head) {
-    queue_push(dst, src->head->data);
-    _queue_node *o = src->head;
+    vm_queue_push(dst, src->head->data);
+    _vm_queue_node *o = src->head;
     src->head = o->next;
     free(o);
   }
@@ -616,11 +611,11 @@ static inline void queue_merge(queue *dst, queue *src) {
 }
 
 /**
- * Iterate over queue items.
- * Usage:  queue_foreach_of(labels, char*, lbl) { ... }
+ * Iterate over vm_queue items.
+ * Usage:  vm_queue_foreach_of(labels, char*, lbl) { ... }
  */
-#define queue_foreach_of(q_ptr, Type, var)                                     \
-  for (_queue_node *_qn_##var = (q_ptr) ? (q_ptr)->head : NULL; _qn_##var;     \
+#define vm_queue_foreach_of(q_ptr, Type, var)                                  \
+  for (_vm_queue_node *_qn_##var = (q_ptr) ? (q_ptr)->head : NULL; _qn_##var;  \
        _qn_##var = _qn_##var->next)                                            \
     for (int _qn_once_##var = 1; _qn_once_##var; _qn_once_##var = 0)           \
       for (Type var = (Type)_qn_##var->data; _qn_once_##var; _qn_once_##var = 0)
@@ -649,13 +644,13 @@ static inline void queue_merge(queue *dst, queue *src) {
 #define RESULT_CORE_VERB_ERROR_EXEC_NOT_ENOUGH_PARAMS 2306
 
 /* Sentence parse ←→ dispatch limit */
-#define SENTENCE_MESSAGE_MAX_SIZE 4096
+#define VM_SENTENCE_MESSAGE_MAX_SIZE 4096
 
 struct verb_context_t {
-  cmap *verb_definition_map;
+  vm_map *verb_definition_map;
 };
 
-typedef char *(*verb_function)(verb_context *vcontext, const cmap *args,
+typedef char *(*verb_function)(verb_context *vcontext, const vm_map *args,
                                void *fcontext);
 typedef verb_function verb_exec_function; /* alias used by some call sites */
 
@@ -663,18 +658,18 @@ typedef struct verb_definition_t {
   const char *name;              /**< Verb name (heap-allocated). */
   const char *definition_params; /**< Usage string, e.g. "<name> <message>". */
   size_t name_length;            /**< Cached strlen(name) for prefix match. */
-  sequence *param_list;          /**< Sequence of parameter-name strings. */
+  vm_list *param_list;           /**< Sequence of parameter-name strings. */
   size_t params_count;           /**< Number of parameters. */
   verb_function function;        /**< User callback. */
   void *fcontext;                /**< Opaque user context passed to callback. */
   struct verb_definition_t *next_verb_definition; /**< Legacy linked list. */
 } verb_definition;
 
-/** Holds the result of verb_compile (parsed sentence + matched verb). */
+/** Holds the vm_result of verb_compile (parsed sentence + matched verb). */
 typedef struct verb_compiled_t {
-  int result; /**< RESULT_OK on success, verb error code otherwise. */
+  int vm_result; /**< VM_OK on success, verb error code otherwise. */
   verb_definition *verb_definition_; /**< Matched verb (may be NULL). */
-  cmap *verb_arg_list;   /**< Parsed argument map (param name → value). */
+  vm_map *verb_arg_list; /**< Parsed argument map (param name → value). */
   char *sentence_values; /**< Cloned sentence (owns memory for value ptrs). */
   void *context;         /**< Caller context passed through compile. */
 } verb_compiled;
@@ -682,13 +677,14 @@ typedef struct verb_compiled_t {
 /* ── lightweight inlines ── */
 
 static inline verb_context *verb_context_create(void) {
-  verb_context *ctx = (verb_context *)xmemory_new(struct verb_context_t);
-  ctx->verb_definition_map = cmap_create();
+  verb_context *ctx = (verb_context *)VM_NEW(struct verb_context_t);
+  ctx->verb_definition_map = vm_map_create();
   return ctx;
 }
 
 static inline verb_definition *verb_find(verb_context *ctx, const char *name) {
-  return ctx ? (verb_definition *)cmap_get_value(ctx->verb_definition_map, name)
+  return ctx ? (verb_definition *)vm_map_get_value(ctx->verb_definition_map,
+                                                   name)
              : NULL;
 }
 
@@ -696,15 +692,15 @@ static inline bool verb_exists(verb_context *ctx, const char *name) {
   return verb_find(ctx, name) != NULL;
 }
 
-static inline cmap *verb_enum(verb_context *ctx) {
+static inline vm_map *verb_enum(verb_context *ctx) {
   return ctx ? ctx->verb_definition_map : NULL;
 }
 
 /* ── macros ── */
 
 #define verb(function)                                                         \
-  char *function(verb_context *vcontext, const cmap *args, void *context)
-#define verb_arg(_name) (const char *)cmap_get_value(args, _name)
+  char *function(verb_context *vcontext, const vm_map *args, void *context)
+#define verb_arg(_name) (const char *)vm_map_get_value(args, _name)
 
 /* ── prototypes (implemented in microgpt_vm.c) ── */
 
@@ -801,12 +797,13 @@ bool vm_variable_value_assign(vm_variable *source,
                               vm_param_type_class target_type_class,
                               vm_variable_value *target_value);
 
-/** Render a variable's value as a heap-allocated string. Caller owns result. */
+/** Render a variable's value as a heap-allocated string. Caller owns vm_result.
+ */
 char *vm_variable_to_string(vm_variable *variable);
 
-/** Append "name=value\n" to a string_buffer for diagnostics. */
-void vm_variable_to_string_buffer(string_buffer *buffer, const char *name,
-                                  vm_variable *var);
+/** Append "name=value\n" to a vm_string_buffer for diagnostics. */
+void vm_variable_to_vm_string_buffer(vm_string_buffer *buffer, const char *name,
+                                     vm_variable *var);
 
 /* ═══════════════════════════════════════════════════════════════════════════
  *  2. Engine API  —  high-level C interface for embedding the VM
@@ -815,7 +812,7 @@ void vm_variable_to_string_buffer(string_buffer *buffer, const char *name,
  *    vm_engine *e = vm_engine_create();
  *    if (vm_engine_load(e, source_code) == 0) {
  *        vm_engine_run(e, "main");
- *        printf("result = %f\n", vm_engine_result_number(e));
+ *        printf("vm_result = %f\n", vm_engine_result_number(e));
  *    }
  *    vm_engine_dispose(e);
  * ═══════════════════════════════════════════════════════════════════════════
@@ -827,7 +824,7 @@ typedef struct vm_engine_t vm_engine;
 /**
  * Native function callback — invoked when VM script calls a registered
  * C function.  The return value (double) is placed into the engine's
- * result slot.
+ * vm_result slot.
  */
 typedef double (*vm_native_fn)(int argc, const double *argv);
 
@@ -1044,25 +1041,25 @@ void vm_type_trait_dispose(vm_type_trait *type_trait);
  * parameters, variables, constants, registers, type traits, and labels.
  */
 struct vm_function_t {
-  char *name;             /**< Function name (heap-allocated). */
-  sequence *parameters;   /**< Parameter list (vm_variable*). */
-  sequence *instructions; /**< Bytecode (vm_instruction*). */
+  char *name;            /**< Function name (heap-allocated). */
+  vm_list *parameters;   /**< Parameter list (vm_variable*). */
+  vm_list *instructions; /**< Bytecode (vm_instruction*). */
 
   vm_param_type_class return_type_class; /**< Return type classification. */
   char *return_type;                     /**< Return type name string. */
 
-  sequence *symbols;        /**< Source-level symbol records. */
-  queue *tracking_labels;   /**< Label stack for loop/branch generation. */
-  sequence *label_names;    /**< All label name strings. */
-  sequence *register_names; /**< Temporary register name strings. */
-  cmap *trait_types;        /**< Maps symbol name → vm_type_trait*. */
+  vm_list *symbols;          /**< Source-level symbol records. */
+  vm_queue *tracking_labels; /**< Label stack for loop/branch generation. */
+  vm_list *label_names;      /**< All label name strings. */
+  vm_list *register_names;   /**< Temporary register name strings. */
+  vm_map *trait_types;       /**< Maps symbol name → vm_type_trait*. */
 
   bool is_executing; /**< True while running (for recursion guard). */
 
-  sequence *registers;      /**< Temporary register pool (vm_variable*). */
-  cmap *constants;          /**< Named constants (vm_variable*). */
-  cmap *variables;          /**< Named variables (vm_variable*). */
-  sequence *variables_list; /**< Variable list preserving declaration order. */
+  vm_list *registers;      /**< Temporary register pool (vm_variable*). */
+  vm_map *constants;       /**< Named constants (vm_variable*). */
+  vm_map *variables;       /**< Named variables (vm_variable*). */
+  vm_list *variables_list; /**< Variable list preserving declaration order. */
 
   size_t instruction_pointer; /**< Current IP during execution. */
 };
@@ -1079,7 +1076,7 @@ void vm_function_clear(vm_function *function);
 /** Add a typed parameter to the function's parameter list. */
 void vm_function_parameter_add(vm_function *function, char *name, char *type);
 
-/** Render all variables as "name=value\n" pairs. Caller frees result. */
+/** Render all variables as "name=value\n" pairs. Caller frees vm_result. */
 char *vm_function_variables_to_string(vm_function *function);
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -1100,9 +1097,9 @@ typedef struct {
 /** A compiled module containing all functions from a single source. */
 typedef struct {
   verb_context *verb_context_; /**< Optional verb dispatch context. */
-  cmap *functions;             /**< Maps function name → vm_function*. */
-  sequence *errors;            /**< List of vm_module_error*. */
-  sequence *functions_list;    /**< Functions in declaration order. */
+  vm_map *functions;           /**< Maps function name → vm_function*. */
+  vm_list *errors;             /**< List of vm_module_error*. */
+  vm_list *functions_list;     /**< Functions in declaration order. */
 } vm_module;
 
 /** Create a new empty module (verb_context may be NULL). */
@@ -1121,7 +1118,7 @@ void vm_module_error_add(vm_module *module, size_t source_line_number,
 /** Free a single error record. */
 void vm_module_error_dispose(vm_module_error *error);
 
-/** Render the entire module's IL as a string. Caller frees result. */
+/** Render the entire module's IL as a string. Caller frees vm_result. */
 char *vm_module_to_string(vm_module *module);
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -1191,7 +1188,7 @@ char *vm_compiler_tmp_label_create(vm_compiler *generator);
 /** Push a label onto the tracking stack. */
 void vm_compiler_tracking_labels_push(vm_compiler *generator, char *label);
 
-/** Pop a label from the tracking stack. Caller frees result. */
+/** Pop a label from the tracking stack. Caller frees vm_result. */
 char *vm_compiler_tracking_labels_pop(vm_compiler *generator);
 
 /** Clear all labels from the tracking stack. */
@@ -1266,15 +1263,16 @@ void vm_module_runtime_stack_push_other(vm_module_runtime *runtime,
                                         void *other);
 
 /** Pop the top value off the evaluation stack. */
-result vm_module_runtime_stack_pop(vm_module_runtime *runtime,
-                                   vm_variable **out_variable);
+vm_result vm_module_runtime_stack_pop(vm_module_runtime *runtime,
+                                      vm_variable **out_variable);
 
 /** Set the external method dispatch callback. */
 void vm_module_runtime_set_call_ext_method_callback(
     vm_module_runtime *runtime, vm_call_ext_method_callback callback);
 
 /** Execute a function within this runtime. */
-result vm_module_runtime_run(vm_module_runtime *runtime, vm_function *function);
+vm_result vm_module_runtime_run(vm_module_runtime *runtime,
+                                vm_function *function);
 
 /* ═══════════════════════════════════════════════════════════════════════════
  *  8. Code Generator  —  IL emitter (vm_module_generator)
@@ -1293,8 +1291,8 @@ typedef struct vm_module_generator_t {
   size_t meta_state_input_index_previous;       /**< Tracks source position. */
   size_t meta_state_input_line_number_previous; /**< Tracks source line. */
 
-  queue *code_fragments;           /**< Active deferred code fragment queues. */
-  queue *completed_code_fragments; /**< Completed deferred fragments. */
+  vm_queue *code_fragments; /**< Active deferred code fragment queues. */
+  vm_queue *completed_code_fragments; /**< Completed deferred fragments. */
 } vm_module_generator;
 
 /** Create a generator bound to a module. */
@@ -1402,7 +1400,7 @@ void vm_compiler_post_processing_process(vm_module *module);
 void vm_compiler_verifier_verify(vm_module *module);
 
 /** Verify non-NULL invariants for the module-generator pipeline. */
-void vm_module_generator_verifier_verify_not_null(vm_module *module);
+void vm_module_generator_verifier_VM_ASSERT_NOT_NULL(vm_module *module);
 
 /** Post-processing pass for the module-generator pipeline. */
 void vm_module_generator_post_processing_process(vm_module *module);
@@ -1440,20 +1438,20 @@ typedef struct {
  * @param verb_context_  Optional verb context (may be NULL).
  * @param source         Null-terminated source string.
  * @param out_module     Output: the compiled module.
- * @return RESULT_OK on success.
+ * @return VM_OK on success.
  */
-result vm_module_parser_generate(verb_context *verb_context_,
-                                 const char *source, vm_module **out_module);
+vm_result vm_module_parser_generate(verb_context *verb_context_,
+                                    const char *source, vm_module **out_module);
 
 /** Compile source code into a module (convenience wrapper). */
-result vm_module_compile(verb_context *verb_context, const char *source,
-                         vm_module **out_module);
+vm_result vm_module_compile(verb_context *verb_context, const char *source,
+                            vm_module **out_module);
 
 /* ═══════════════════════════════════════════════════════════════════════════
  *  11. Eval  —  one-shot expression evaluator
  *
  *  Convenience layer that compiles + executes a single expression and
- *  extracts the result in one call.
+ *  extracts the vm_result in one call.
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
@@ -1464,39 +1462,39 @@ typedef struct vm_eval_t {
   vm_function *function;      /**< The compiled eval function. */
 
   vm_param_type_class result_type; /**< Expected return type. */
-  vm_variable *result;             /**< Result variable after execution. */
+  vm_variable *vm_result;          /**< Result variable after execution. */
 } vm_eval;
 
-/** Evaluation result wrapper. */
+/** Evaluation vm_result wrapper. */
 typedef struct vm_eval_result_t {
   vm_variable *return_var; /**< The return variable (caller disposes). */
 } vm_eval_result;
 
 /** Compile an expression into a reusable eval context. */
-result vm_eval_create(const char *expression, vm_param_type_class return_type,
-                      vm_eval **out_eval);
+vm_result vm_eval_create(const char *expression,
+                         vm_param_type_class return_type, vm_eval **out_eval);
 
-/** Execute the eval context and retrieve the result. */
-result vm_eval_run(vm_eval *eval, vm_eval_result **out_result);
+/** Execute the eval context and retrieve the vm_result. */
+vm_result vm_eval_run(vm_eval *eval, vm_eval_result **out_result);
 
 /** Dispose an eval context and its compiled module. */
-result vm_eval_dispose(vm_eval *eval);
+vm_result vm_eval_dispose(vm_eval *eval);
 
-/** Dispose an eval result. */
-result vm_eval_result_dispose(vm_eval_result *result);
+/** Dispose an eval vm_result. */
+vm_result vm_eval_result_dispose(vm_eval_result *vm_result);
 
 /* ═══════════════════════════════════════════════════════════════════════════
- *  12. Legacy Runtime  —  older queue-based runtime (vm_runtime)
+ *  12. Legacy Runtime  —  older vm_queue-based runtime (vm_runtime)
  *
- *  Pre-dates vm_module_runtime.  Uses a linked-list queue instead of a
+ *  Pre-dates vm_module_runtime.  Uses a linked-list vm_queue instead of a
  *  fixed-size stack.  Retained for backward compatibility.
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
-/** Legacy runtime with queue-based stack. */
+/** Legacy runtime with vm_queue-based stack. */
 typedef struct {
   vm_module *module; /**< The module to execute. */
-  queue *stack;      /**< Evaluation stack (linked-list). */
+  vm_queue *stack;   /**< Evaluation stack (linked-list). */
 } vm_runtime;
 
 /** Create a legacy runtime bound to a module. */
@@ -1521,7 +1519,7 @@ void vm_runtime_stack_push_number(vm_runtime *runtime, double value);
 void vm_runtime_stack_push_other(vm_runtime *runtime, void *other);
 
 /** Pop the top value off the legacy stack. */
-result vm_runtime_stack_pop(vm_runtime *runtime, vm_variable **out_variable);
+vm_result vm_runtime_stack_pop(vm_runtime *runtime, vm_variable **out_variable);
 
 /** Execute a function using the legacy runtime. */
 bool vm_runtime_run(vm_runtime *runtime, vm_function *function);

@@ -165,12 +165,12 @@ void _TEST_VM_MODULE_COMPILER_MODULE_COMPARE_ASSERT_FATAL(
   char *expected = load_file_content(expected_path);
 
   vm_module *module = NULL;
-  result r = vm_module_compile(NULL, source, &module);
-  TEST_ASSERT_EQUAL_RESULT_FATAL(RESULT_OK, r);
+  vm_result r = vm_module_compile(NULL, source, &module);
+  TEST_ASSERT_EQUAL_RESULT_FATAL(VM_OK, r);
   enx_assert_ptr_not_null(module);
   char *actual = vm_module_to_string(module);
 
-  if (!string_equals(expected, actual)) {
+  if (!vm_string_equals(expected, actual)) {
     char filename_il[512];
 #ifdef FIX_TEST_DATA
     snprintf(filename_il, sizeof(filename_il), "resources/vm/compiler/%s.il",
@@ -189,20 +189,20 @@ void _TEST_VM_MODULE_COMPILER_MODULE_COMPARE_ASSERT_FATAL(
            expected, actual);
 
 #ifdef FIX_TEST_DATA
-    file_write_text(filename_il, actual, string_length(actual));
+    file_write_text(filename_il, actual, vm_string_length(actual));
 #endif
 #ifndef FIX_TEST_DATA
     enx_assert_fail();
 #endif
   }
 
-  string_free(actual);
+  vm_string_free(actual);
   free(source);
   if (expected)
     free(expected);
   vm_module_dispose(module);
 
-  xmemory_report_exit_on_leaks();
+  vm_memory_report_exit_on_leaks();
 }
 
 // --- vm_module_declare_function_tests.h ---
@@ -236,11 +236,11 @@ extern enx_test_case_t vm_module_declare_function_tests[];
 static void
 test_vm_call_ext_method_callback(struct vm_module_runtime_t *runtime,
                                  vm_function *function) {
-  if (string_equals(function->name, "is_temperature_hot") ||
-      string_equals(function->name, "is_pressure_high")) {
+  if (vm_string_equals(function->name, "is_temperature_hot") ||
+      vm_string_equals(function->name, "is_pressure_high")) {
     vm_variable *var_param = NULL;
-    result r = vm_module_runtime_stack_pop(runtime, &var_param);
-    TEST_ASSERT_EQUAL_RESULT_FATAL(RESULT_OK, r);
+    vm_result r = vm_module_runtime_stack_pop(runtime, &var_param);
+    TEST_ASSERT_EQUAL_RESULT_FATAL(VM_OK, r);
     enx_assert_ptr_not_null(var_param);
     enx_assert_equal_int(ptcNUMBER, var_param->type_class);
 
@@ -250,16 +250,16 @@ test_vm_call_ext_method_callback(struct vm_module_runtime_t *runtime,
 
     //    } else
     //
-    // if (string_equals(function->name, "eval")) {
+    // if (vm_string_equals(function->name, "eval")) {
     //     vm_variable* var_param_a = NULL;
     //     vm_variable* var_param_b = NULL;
-    //     result r = vm_module_runtime_stack_pop(runtime, &var_param_a);
-    //     TEST_ASSERT_EQUAL_RESULT_FATAL(RESULT_OK, r);
+    //     vm_result r = vm_module_runtime_stack_pop(runtime, &var_param_a);
+    //     TEST_ASSERT_EQUAL_RESULT_FATAL(VM_OK, r);
     //     enx_assert_ptr_not_null(var_param_a);
     //     enx_assert_equal_int(ptcNUMBER, var_param_a->type_class);
 
     //     r = vm_module_runtime_stack_pop(runtime, &var_param_b);
-    //     TEST_ASSERT_EQUAL_RESULT_FATAL(RESULT_OK, r);
+    //     TEST_ASSERT_EQUAL_RESULT_FATAL(VM_OK, r);
     //     enx_assert_ptr_not_null(var_param_b);
     //     enx_assert_equal_int(ptcNUMBER, var_param_b->type_class);
 
@@ -268,16 +268,16 @@ test_vm_call_ext_method_callback(struct vm_module_runtime_t *runtime,
 
     //     vm_variable_dispose(var_param_a);
     //     vm_variable_dispose(var_param_b);
-  } else if (string_equals(function->name, "simple_add")) {
+  } else if (vm_string_equals(function->name, "simple_add")) {
     vm_variable *var_param_a = NULL;
     vm_variable *var_param_b = NULL;
-    result r = vm_module_runtime_stack_pop(runtime, &var_param_a);
-    TEST_ASSERT_EQUAL_RESULT_FATAL(RESULT_OK, r);
+    vm_result r = vm_module_runtime_stack_pop(runtime, &var_param_a);
+    TEST_ASSERT_EQUAL_RESULT_FATAL(VM_OK, r);
     enx_assert_ptr_not_null(var_param_a);
     enx_assert_equal_int(ptcNUMBER, var_param_a->type_class);
 
     r = vm_module_runtime_stack_pop(runtime, &var_param_b);
-    TEST_ASSERT_EQUAL_RESULT_FATAL(RESULT_OK, r);
+    TEST_ASSERT_EQUAL_RESULT_FATAL(VM_OK, r);
     enx_assert_ptr_not_null(var_param_b);
     enx_assert_equal_int(ptcNUMBER, var_param_b->type_class);
 
@@ -298,18 +298,18 @@ enx_test(should_successfully_use_declare_function_condition1) {
   char *source = load_file_content(
       "resources/vm/declare_function/declare_function_condition1.ts");
   enx_assert_ptr_not_null(source);
-  result r = vm_module_compile(NULL, source, &module);
+  vm_result r = vm_module_compile(NULL, source, &module);
   free(source);
-  TEST_ASSERT_EQUAL_RESULT_FATAL(RESULT_OK, r);
+  TEST_ASSERT_EQUAL_RESULT_FATAL(VM_OK, r);
   enx_assert_ptr_not_null(module);
 
 #ifdef _DEBUG_IL
   char *il = vm_module_to_string(module);
   puts(il);
-  xmemory_free(il);
+  VM_FREE(il);
 #endif
 
-  enx_assert_equal_size(0, sequence_count(module->errors));
+  enx_assert_equal_size(0, vm_list_count(module->errors));
 
   // Run
   vm_module_runtime *runtime = vm_module_runtime_create(module);
@@ -328,7 +328,7 @@ enx_test(should_successfully_use_declare_function_condition1) {
   vm_module_runtime_stack_push_number(runtime, pressure);
 
   r = vm_module_runtime_run(runtime, function);
-  TEST_ASSERT_EQUAL_RESULT_FATAL(RESULT_OK, r);
+  TEST_ASSERT_EQUAL_RESULT_FATAL(VM_OK, r);
 
   //    vm_compile_result r = vm_function_compile(function_condition1_ts,
   //    expected_return_type_class);
@@ -338,7 +338,7 @@ enx_test(should_successfully_use_declare_function_condition1) {
   // Check results
   vm_variable *return_var = NULL;
   r = vm_module_runtime_stack_pop(runtime, &return_var);
-  TEST_ASSERT_EQUAL_RESULT_FATAL(RESULT_OK, r);
+  TEST_ASSERT_EQUAL_RESULT_FATAL(VM_OK, r);
 
   enx_assert_equal_int(ptcBOOLEAN, return_var->type_class);
   enx_assert_equal_bool(true, return_var->value.boolean);
@@ -347,7 +347,7 @@ enx_test(should_successfully_use_declare_function_condition1) {
   vm_module_runtime_dispose(runtime);
   vm_module_dispose(module);
 
-  xmemory_report_exit_on_leaks();
+  vm_memory_report_exit_on_leaks();
 }
 
 enx_test(should_successfully_use_declare_function_calculation1) {
@@ -356,18 +356,18 @@ enx_test(should_successfully_use_declare_function_calculation1) {
   char *source = load_file_content(
       "resources/vm/declare_function/declare_function_calculation1.ts");
   enx_assert_ptr_not_null(source);
-  result r = vm_module_compile(NULL, source, &module);
+  vm_result r = vm_module_compile(NULL, source, &module);
   free(source);
-  TEST_ASSERT_EQUAL_RESULT_FATAL(RESULT_OK, r);
+  TEST_ASSERT_EQUAL_RESULT_FATAL(VM_OK, r);
   enx_assert_ptr_not_null(module);
 
 #ifdef _DEBUG_IL
   char *il = vm_module_to_string(module);
   puts(il);
-  xmemory_free(il);
+  VM_FREE(il);
 #endif
 
-  enx_assert_equal_size(0, sequence_count(module->errors));
+  enx_assert_equal_size(0, vm_list_count(module->errors));
 
   // Run
   vm_module_runtime *runtime = vm_module_runtime_create(module);
@@ -382,12 +382,12 @@ enx_test(should_successfully_use_declare_function_calculation1) {
   enx_assert_ptr_not_null(function);
 
   r = vm_module_runtime_run(runtime, function);
-  TEST_ASSERT_EQUAL_RESULT_FATAL(RESULT_OK, r);
+  TEST_ASSERT_EQUAL_RESULT_FATAL(VM_OK, r);
 
   // Check results
   vm_variable *return_var = NULL;
-  result rs = vm_module_runtime_stack_pop(runtime, &return_var);
-  TEST_ASSERT_EQUAL_RESULT_FATAL(RESULT_OK, rs);
+  vm_result rs = vm_module_runtime_stack_pop(runtime, &return_var);
+  TEST_ASSERT_EQUAL_RESULT_FATAL(VM_OK, rs);
   enx_assert_ptr_not_null(return_var);
 
   enx_assert_equal_int(ptcNUMBER, return_var->type_class);
@@ -397,7 +397,7 @@ enx_test(should_successfully_use_declare_function_calculation1) {
   vm_module_runtime_dispose(runtime);
   vm_module_dispose(module);
 
-  xmemory_report_exit_on_leaks();
+  vm_memory_report_exit_on_leaks();
 }
 
 enx_test_case_t vm_module_declare_function_tests[] = {
@@ -454,16 +454,16 @@ enx_test(should_successfully_function_condition1) {
   char *source =
       load_file_content("resources/vm/function/function_condition1.ts");
   enx_assert_ptr_not_null(source);
-  result r = vm_module_compile(NULL, source, &module);
+  vm_result r = vm_module_compile(NULL, source, &module);
   free(source);
-  TEST_ASSERT_EQUAL_RESULT_FATAL(RESULT_OK, r);
+  TEST_ASSERT_EQUAL_RESULT_FATAL(VM_OK, r);
   enx_assert_ptr_not_null(module);
-  enx_assert_equal_size(0, sequence_count(module->errors));
+  enx_assert_equal_size(0, vm_list_count(module->errors));
 
 #ifdef _DEBUG_IL
   char *il = vm_module_to_string(module);
   puts(il);
-  xmemory_free(il);
+  VM_FREE(il);
 #endif
 
   // Run
@@ -474,7 +474,7 @@ enx_test(should_successfully_function_condition1) {
   enx_assert_ptr_not_null(function);
 
   r = vm_module_runtime_run(runtime, function);
-  TEST_ASSERT_EQUAL_RESULT_FATAL(RESULT_OK, r);
+  TEST_ASSERT_EQUAL_RESULT_FATAL(VM_OK, r);
 
   //    vm_compile_result r = vm_function_compile(function_condition1_ts,
   //    expected_return_type_class);
@@ -484,7 +484,7 @@ enx_test(should_successfully_function_condition1) {
   // Check results
   vm_variable *return_var = NULL;
   r = vm_module_runtime_stack_pop(runtime, &return_var);
-  TEST_ASSERT_EQUAL_RESULT_FATAL(RESULT_OK, r);
+  TEST_ASSERT_EQUAL_RESULT_FATAL(VM_OK, r);
 
   enx_assert_equal_int(ptcBOOLEAN, return_var->type_class);
   enx_assert_equal_bool(false, return_var->value.boolean);
@@ -493,7 +493,7 @@ enx_test(should_successfully_function_condition1) {
   vm_module_runtime_dispose(runtime);
   vm_module_dispose(module);
 
-  xmemory_report_exit_on_leaks();
+  vm_memory_report_exit_on_leaks();
 }
 
 enx_test(should_successfully_function_condition2) {
@@ -502,15 +502,15 @@ enx_test(should_successfully_function_condition2) {
   char *source =
       load_file_content("resources/vm/function/function_condition2.ts");
   enx_assert_ptr_not_null(source);
-  result r = vm_module_compile(NULL, source, &module);
+  vm_result r = vm_module_compile(NULL, source, &module);
   free(source);
-  TEST_ASSERT_EQUAL_RESULT_FATAL(RESULT_OK, r);
+  TEST_ASSERT_EQUAL_RESULT_FATAL(VM_OK, r);
   enx_assert_ptr_not_null(module);
 
 #ifdef _DEBUG_IL
   char *il = vm_module_to_string(module);
   puts(il);
-  xmemory_free(il);
+  VM_FREE(il);
 #endif
 
   // Run
@@ -537,12 +537,12 @@ enx_test(should_successfully_function_condition2) {
     enx_assert_ptr_not_null(function);
 
     r = vm_module_runtime_run(runtime, function);
-    TEST_ASSERT_EQUAL_RESULT_FATAL(RESULT_OK, r);
+    TEST_ASSERT_EQUAL_RESULT_FATAL(VM_OK, r);
 
     // Check results
     vm_variable *return_var = NULL;
-    result rs = vm_module_runtime_stack_pop(runtime, &return_var);
-    TEST_ASSERT_EQUAL_RESULT_FATAL(RESULT_OK, rs);
+    vm_result rs = vm_module_runtime_stack_pop(runtime, &return_var);
+    TEST_ASSERT_EQUAL_RESULT_FATAL(VM_OK, rs);
     enx_assert_ptr_not_null(return_var);
 
     enx_assert_equal_int(ptcBOOLEAN, return_var->type_class);
@@ -554,7 +554,7 @@ enx_test(should_successfully_function_condition2) {
   vm_module_runtime_dispose(runtime);
   vm_module_dispose(module);
 
-  xmemory_report_exit_on_leaks();
+  vm_memory_report_exit_on_leaks();
 }
 
 enx_test(should_successfully_function_condition3) {
@@ -563,16 +563,16 @@ enx_test(should_successfully_function_condition3) {
   char *source =
       load_file_content("resources/vm/function/function_condition3.ts");
   enx_assert_ptr_not_null(source);
-  result r = vm_module_compile(NULL, source, &module);
+  vm_result r = vm_module_compile(NULL, source, &module);
   free(source);
-  TEST_ASSERT_EQUAL_RESULT_FATAL(RESULT_OK, r);
+  TEST_ASSERT_EQUAL_RESULT_FATAL(VM_OK, r);
   enx_assert_ptr_not_null(module);
-  enx_assert_equal_size(0, sequence_count(module->errors));
+  enx_assert_equal_size(0, vm_list_count(module->errors));
 
 #ifdef _DEBUG_IL
   char *il = vm_module_to_string(module);
   puts(il);
-  xmemory_free(il);
+  VM_FREE(il);
 #endif
 
   // Run
@@ -603,12 +603,12 @@ enx_test(should_successfully_function_condition3) {
     enx_assert_ptr_not_null(function);
 
     r = vm_module_runtime_run(runtime, function);
-    TEST_ASSERT_EQUAL_RESULT_FATAL(RESULT_OK, r);
+    TEST_ASSERT_EQUAL_RESULT_FATAL(VM_OK, r);
 
     // Check results
     vm_variable *return_var = NULL;
-    result rs = vm_module_runtime_stack_pop(runtime, &return_var);
-    TEST_ASSERT_EQUAL_RESULT_FATAL(RESULT_OK, rs);
+    vm_result rs = vm_module_runtime_stack_pop(runtime, &return_var);
+    TEST_ASSERT_EQUAL_RESULT_FATAL(VM_OK, rs);
     enx_assert_ptr_not_null(return_var);
 
     enx_assert_equal_int(ptcBOOLEAN, return_var->type_class);
@@ -620,7 +620,7 @@ enx_test(should_successfully_function_condition3) {
   vm_module_runtime_dispose(runtime);
   vm_module_dispose(module);
 
-  xmemory_report_exit_on_leaks();
+  vm_memory_report_exit_on_leaks();
 }
 
 enx_test(should_successfully_function_condition4) {
@@ -629,16 +629,16 @@ enx_test(should_successfully_function_condition4) {
   char *source =
       load_file_content("resources/vm/function/function_condition4.ts");
   enx_assert_ptr_not_null(source);
-  result r = vm_module_compile(NULL, source, &module);
+  vm_result r = vm_module_compile(NULL, source, &module);
   free(source);
-  TEST_ASSERT_EQUAL_RESULT_FATAL(RESULT_OK, r);
+  TEST_ASSERT_EQUAL_RESULT_FATAL(VM_OK, r);
   enx_assert_ptr_not_null(module);
-  enx_assert_equal_size(0, sequence_count(module->errors));
+  enx_assert_equal_size(0, vm_list_count(module->errors));
 
 #ifdef _DEBUG_IL
   char *il = vm_module_to_string(module);
   puts(il);
-  xmemory_free(il);
+  VM_FREE(il);
 #endif
 
   // Run
@@ -664,12 +664,12 @@ enx_test(should_successfully_function_condition4) {
     enx_assert_ptr_not_null(function);
 
     r = vm_module_runtime_run(runtime, function);
-    TEST_ASSERT_EQUAL_RESULT_FATAL(RESULT_OK, r);
+    TEST_ASSERT_EQUAL_RESULT_FATAL(VM_OK, r);
 
     // Check results
     vm_variable *return_var = NULL;
-    result rs = vm_module_runtime_stack_pop(runtime, &return_var);
-    TEST_ASSERT_EQUAL_RESULT_FATAL(RESULT_OK, rs);
+    vm_result rs = vm_module_runtime_stack_pop(runtime, &return_var);
+    TEST_ASSERT_EQUAL_RESULT_FATAL(VM_OK, rs);
     enx_assert_ptr_not_null(return_var);
 
     enx_assert_equal_int(ptcBOOLEAN, return_var->type_class);
@@ -681,7 +681,7 @@ enx_test(should_successfully_function_condition4) {
   vm_module_runtime_dispose(runtime);
   vm_module_dispose(module);
 
-  xmemory_report_exit_on_leaks();
+  vm_memory_report_exit_on_leaks();
 }
 
 enx_test(should_successfully_function_calculation1) {
@@ -690,16 +690,16 @@ enx_test(should_successfully_function_calculation1) {
   char *source =
       load_file_content("resources/vm/function/function_calculation1.ts");
   enx_assert_ptr_not_null(source);
-  result r = vm_module_compile(NULL, source, &module);
+  vm_result r = vm_module_compile(NULL, source, &module);
   free(source);
-  TEST_ASSERT_EQUAL_RESULT_FATAL(RESULT_OK, r);
+  TEST_ASSERT_EQUAL_RESULT_FATAL(VM_OK, r);
   enx_assert_ptr_not_null(module);
-  enx_assert_equal_size(0, sequence_count(module->errors));
+  enx_assert_equal_size(0, vm_list_count(module->errors));
 
 #ifdef _DEBUG_IL
   char *il = vm_module_to_string(module);
   puts(il);
-  xmemory_free(il);
+  VM_FREE(il);
 #endif
 
   // Run
@@ -712,12 +712,12 @@ enx_test(should_successfully_function_calculation1) {
   enx_assert_ptr_not_null(function);
 
   r = vm_module_runtime_run(runtime, function);
-  TEST_ASSERT_EQUAL_RESULT_FATAL(RESULT_OK, r);
+  TEST_ASSERT_EQUAL_RESULT_FATAL(VM_OK, r);
 
   // Check results
   vm_variable *return_var = NULL;
-  result rs = vm_module_runtime_stack_pop(runtime, &return_var);
-  TEST_ASSERT_EQUAL_RESULT_FATAL(RESULT_OK, rs);
+  vm_result rs = vm_module_runtime_stack_pop(runtime, &return_var);
+  TEST_ASSERT_EQUAL_RESULT_FATAL(VM_OK, rs);
   enx_assert_ptr_not_null(return_var);
 
   enx_assert_equal_int(ptcNUMBER, return_var->type_class);
@@ -727,7 +727,7 @@ enx_test(should_successfully_function_calculation1) {
   vm_module_runtime_dispose(runtime);
   vm_module_dispose(module);
 
-  xmemory_report_exit_on_leaks();
+  vm_memory_report_exit_on_leaks();
 }
 
 enx_test(should_successfully_function_calculation2) {
@@ -736,16 +736,16 @@ enx_test(should_successfully_function_calculation2) {
   char *source =
       load_file_content("resources/vm/function/function_calculation2.ts");
   enx_assert_ptr_not_null(source);
-  result r = vm_module_compile(NULL, source, &module);
+  vm_result r = vm_module_compile(NULL, source, &module);
   free(source);
-  TEST_ASSERT_EQUAL_RESULT_FATAL(RESULT_OK, r);
+  TEST_ASSERT_EQUAL_RESULT_FATAL(VM_OK, r);
   enx_assert_ptr_not_null(module);
-  enx_assert_equal_size(0, sequence_count(module->errors));
+  enx_assert_equal_size(0, vm_list_count(module->errors));
 
 #ifdef _DEBUG_IL
   char *il = vm_module_to_string(module);
   puts(il);
-  xmemory_free(il);
+  VM_FREE(il);
 #endif
 
   // Run
@@ -781,12 +781,12 @@ enx_test(should_successfully_function_calculation2) {
     enx_assert_ptr_not_null(function);
 
     r = vm_module_runtime_run(runtime, function);
-    TEST_ASSERT_EQUAL_RESULT_FATAL(RESULT_OK, r);
+    TEST_ASSERT_EQUAL_RESULT_FATAL(VM_OK, r);
 
     // Check results
     vm_variable *return_var = NULL;
-    result rs = vm_module_runtime_stack_pop(runtime, &return_var);
-    TEST_ASSERT_EQUAL_RESULT_FATAL(RESULT_OK, rs);
+    vm_result rs = vm_module_runtime_stack_pop(runtime, &return_var);
+    TEST_ASSERT_EQUAL_RESULT_FATAL(VM_OK, rs);
     enx_assert_ptr_not_null(return_var);
 
     enx_assert_equal_int(ptcNUMBER, return_var->type_class);
@@ -804,7 +804,7 @@ enx_test(should_successfully_function_calculation2) {
   vm_module_runtime_dispose(runtime);
   vm_module_dispose(module);
 
-  xmemory_report_exit_on_leaks();
+  vm_memory_report_exit_on_leaks();
 }
 
 enx_test(should_successfully_function_calculation3) {
@@ -813,16 +813,16 @@ enx_test(should_successfully_function_calculation3) {
   char *source =
       load_file_content("resources/vm/function/function_calculation3.ts");
   enx_assert_ptr_not_null(source);
-  result r = vm_module_compile(NULL, source, &module);
+  vm_result r = vm_module_compile(NULL, source, &module);
   free(source);
-  TEST_ASSERT_EQUAL_RESULT_FATAL(RESULT_OK, r);
+  TEST_ASSERT_EQUAL_RESULT_FATAL(VM_OK, r);
   enx_assert_ptr_not_null(module);
-  enx_assert_equal_size(0, sequence_count(module->errors));
+  enx_assert_equal_size(0, vm_list_count(module->errors));
 
 #ifdef _DEBUG_IL
   char *il = vm_module_to_string(module);
   puts(il);
-  xmemory_free(il);
+  VM_FREE(il);
 #endif
 
   // Run
@@ -855,12 +855,12 @@ enx_test(should_successfully_function_calculation3) {
     enx_assert_ptr_not_null(function);
 
     r = vm_module_runtime_run(runtime, function);
-    TEST_ASSERT_EQUAL_RESULT_FATAL(RESULT_OK, r);
+    TEST_ASSERT_EQUAL_RESULT_FATAL(VM_OK, r);
 
     // Check results
     vm_variable *return_var = NULL;
-    result rs = vm_module_runtime_stack_pop(runtime, &return_var);
-    TEST_ASSERT_EQUAL_RESULT_FATAL(RESULT_OK, rs);
+    vm_result rs = vm_module_runtime_stack_pop(runtime, &return_var);
+    TEST_ASSERT_EQUAL_RESULT_FATAL(VM_OK, rs);
     enx_assert_ptr_not_null(return_var);
 
     enx_assert_equal_int(ptcSTRING, return_var->type_class);
@@ -874,7 +874,7 @@ enx_test(should_successfully_function_calculation3) {
   vm_module_runtime_dispose(runtime);
   vm_module_dispose(module);
 
-  xmemory_report_exit_on_leaks();
+  vm_memory_report_exit_on_leaks();
 }
 
 enx_test_case_t vm_module_function_call_tests[] = {
@@ -972,20 +972,20 @@ void _TEST_VM_MODULE_RUNTIME_MODULE_COMPARE_ASSERT_FATAL(const char *name) {
   char *expected = load_file_content(expected_path);
 
   vm_module *module = NULL;
-  result r = vm_module_compile(NULL, source, &module);
-  TEST_ASSERT_EQUAL_RESULT_FATAL(RESULT_OK, r);
+  vm_result r = vm_module_compile(NULL, source, &module);
+  TEST_ASSERT_EQUAL_RESULT_FATAL(VM_OK, r);
   enx_assert_ptr_not_null(module);
 
 #ifdef _DEBUG_IL
   char *il = vm_module_to_string(module);
   puts(il);
-  xmemory_free(il);
+  VM_FREE(il);
 #endif
 
-  sequence_foreach_of(module->errors, vm_module_error *, error) {
+  vm_list_foreach_of(module->errors, vm_module_error *, error) {
     printf("ERROR: %zu:%s\n", error->source_line_number, error->message);
   }
-  enx_assert_equal_size(0, sequence_count(module->errors));
+  enx_assert_equal_size(0, vm_list_count(module->errors));
 
   vm_module_runtime *runtime = vm_module_runtime_create(module);
   enx_assert_ptr_not_null(runtime);
@@ -994,7 +994,7 @@ void _TEST_VM_MODULE_RUNTIME_MODULE_COMPARE_ASSERT_FATAL(const char *name) {
   enx_assert_ptr_not_null(function);
 
   r = vm_module_runtime_run(runtime, function);
-  TEST_ASSERT_EQUAL_RESULT_FATAL(RESULT_OK, r);
+  TEST_ASSERT_EQUAL_RESULT_FATAL(VM_OK, r);
 
   /// IL
   char *module_il = vm_module_to_string(module);
@@ -1002,19 +1002,19 @@ void _TEST_VM_MODULE_RUNTIME_MODULE_COMPARE_ASSERT_FATAL(const char *name) {
   snprintf(filename_il, sizeof(filename_il),
            "../enjector-core/test/resources/vm/runtime/%s_il.txt", name);
 #ifdef FIX_TEST_DATA
-  file_write_text(filename_il, module_il, string_length(module_il));
+  file_write_text(filename_il, module_il, vm_string_length(module_il));
 #endif
-  string_free(module_il);
+  vm_string_free(module_il);
   //////
 
   char *actual = vm_function_variables_to_string(function);
 
-  if (!string_equals(expected, actual)) {
+  if (!vm_string_equals(expected, actual)) {
 #ifdef FIX_TEST_DATA
     char filename_output[512];
     snprintf(filename_output, sizeof(filename_output),
              "../enjector-core/test/resources/vm/runtime/%s.txt", output_name);
-    file_write_text(filename_output, actual, string_length(actual));
+    file_write_text(filename_output, actual, vm_string_length(actual));
 #endif
 
     vm_variable *return_var = NULL;
@@ -1022,7 +1022,7 @@ void _TEST_VM_MODULE_RUNTIME_MODULE_COMPARE_ASSERT_FATAL(const char *name) {
     char *var_return_str = "(void)";
 
     if (r != RESULT_CORE_VM_EMPTY_STACK) {
-      TEST_ASSERT_EQUAL_RESULT_FATAL(RESULT_OK, r);
+      TEST_ASSERT_EQUAL_RESULT_FATAL(VM_OK, r);
       enx_assert_ptr_not_null(return_var);
       var_return_str = vm_variable_to_string(return_var);
     }
@@ -1038,7 +1038,7 @@ void _TEST_VM_MODULE_RUNTIME_MODULE_COMPARE_ASSERT_FATAL(const char *name) {
     enx_assert_fail();
   }
 
-  string_free(actual);
+  vm_string_free(actual);
   free((void *)source);
   if (expected)
     free((void *)expected);
@@ -1046,7 +1046,7 @@ void _TEST_VM_MODULE_RUNTIME_MODULE_COMPARE_ASSERT_FATAL(const char *name) {
   vm_module_runtime_dispose(runtime);
   vm_module_dispose(module);
 
-  xmemory_report_exit_on_leaks();
+  vm_memory_report_exit_on_leaks();
 }
 
 // --- vm_ts_wiring_tests.h ---
@@ -1094,13 +1094,13 @@ enx_test(should_compile_entire_ts_wiring_corpus) {
 
   // Compile the entire corpus as a single module
   vm_module *module = NULL;
-  result r = vm_module_compile(NULL, corpus_code, &module);
+  vm_result r = vm_module_compile(NULL, corpus_code, &module);
 
-  if (r != RESULT_OK) {
+  if (r != VM_OK) {
     printf("COMPILATION FAILED.\n");
   }
 
-  enx_assert_equal_int(RESULT_OK, r);
+  enx_assert_equal_int(VM_OK, r);
   enx_assert_ptr_not_null(module);
 
   vm_module_dispose(module);
@@ -1123,14 +1123,14 @@ static verb(test_greet_verb) {
   if (name) {
     char buf[256];
     snprintf(buf, sizeof(buf), "Hello %s", name);
-    return string_clone(buf);
+    return vm_string_clone(buf);
   }
-  return string_clone("Hello");
+  return vm_string_clone("Hello");
 }
 
 static verb(test_echo_verb) {
   const char *message = verb_arg("message");
-  return message ? string_clone(message) : string_clone("");
+  return message ? vm_string_clone(message) : vm_string_clone("");
 }
 
 static verb(test_add_verb) {
@@ -1138,17 +1138,17 @@ static verb(test_add_verb) {
   const char *b = verb_arg("b");
   char buf[64];
   snprintf(buf, sizeof(buf), "%d", atoi(a) + atoi(b));
-  return string_clone(buf);
+  return vm_string_clone(buf);
 }
 
-static verb(test_noparams_verb) { return string_clone("connected"); }
+static verb(test_noparams_verb) { return vm_string_clone("connected"); }
 
 /* 1. Register and find */
 enx_test(should_verb_register_and_find) {
   verb_context *ctx = verb_context_create();
 
   int r = verb_register(ctx, "greet", "name", test_greet_verb, NULL);
-  enx_assert_equal_int(r, RESULT_OK);
+  enx_assert_equal_int(r, VM_OK);
 
   verb_definition *def = verb_find(ctx, "greet");
   enx_assert_ptr_not_null(def);
@@ -1163,7 +1163,7 @@ enx_test(should_verb_register_duplicate) {
   verb_context *ctx = verb_context_create();
 
   int r = verb_register(ctx, "echo", "message", test_echo_verb, NULL);
-  enx_assert_equal_int(r, RESULT_OK);
+  enx_assert_equal_int(r, VM_OK);
 
   r = verb_register(ctx, "echo", "message", test_echo_verb, NULL);
   enx_assert_equal_int(r, RESULT_CORE_VERB_ERROR_ALREADY_REGISTERED);
@@ -1179,7 +1179,7 @@ enx_test(should_verb_exec_simple) {
 
   char *response = NULL;
   int r = verb_exec(ctx, "echo hello", &response);
-  enx_assert_equal_int(r, RESULT_OK);
+  enx_assert_equal_int(r, VM_OK);
   enx_assert_ptr_not_null(response);
   enx_assert_equal_string(response, "hello");
   free(response);
@@ -1220,11 +1220,11 @@ enx_test(should_verb_unregister) {
   verb_context *ctx = verb_context_create();
 
   int r = verb_register(ctx, "echo", "message", test_echo_verb, NULL);
-  enx_assert_equal_int(r, RESULT_OK);
+  enx_assert_equal_int(r, VM_OK);
   enx_assert_true(verb_exists(ctx, "echo"));
 
   r = verb_unregister(ctx, "echo");
-  enx_assert_equal_int(r, RESULT_OK);
+  enx_assert_equal_int(r, VM_OK);
   enx_assert_false(verb_exists(ctx, "echo"));
 
   verb_context_dispose(ctx);
@@ -1238,7 +1238,7 @@ enx_test(should_verb_exec_quoted_params) {
 
   char *response = NULL;
   int r = verb_exec(ctx, "greet 'Fred Smith'", &response);
-  enx_assert_equal_int(r, RESULT_OK);
+  enx_assert_equal_int(r, VM_OK);
   enx_assert_ptr_not_null(response);
   enx_assert_equal_string(response, "Hello Fred Smith");
   free(response);
@@ -1254,7 +1254,7 @@ enx_test(should_verb_enum) {
   verb_register(ctx, "greet", "name", test_greet_verb, NULL);
   verb_register(ctx, "connect", "", test_noparams_verb, NULL);
 
-  cmap *m = verb_enum(ctx);
+  vm_map *m = verb_enum(ctx);
   enx_assert_ptr_not_null(m);
   enx_assert_true(m->count == 3);
 
@@ -1269,7 +1269,7 @@ enx_test(should_verb_exec_noparams) {
 
   char *response = NULL;
   int r = verb_exec(ctx, "connect", &response);
-  enx_assert_equal_int(r, RESULT_OK);
+  enx_assert_equal_int(r, VM_OK);
   enx_assert_ptr_not_null(response);
   enx_assert_equal_string(response, "connected");
   free(response);
@@ -1285,7 +1285,7 @@ enx_test(should_verb_exec_two_params) {
 
   char *response = NULL;
   int r = verb_exec(ctx, "add 10 20", &response);
-  enx_assert_equal_int(r, RESULT_OK);
+  enx_assert_equal_int(r, VM_OK);
   enx_assert_ptr_not_null(response);
   enx_assert_equal_string(response, "30");
   free(response);
@@ -1375,7 +1375,7 @@ static verb(verb_create_signal) {
   size_t id = _handle_store(s);
   char buf[32];
   snprintf(buf, sizeof(buf), "%zu", id);
-  return string_clone(buf);
+  return vm_string_clone(buf);
 }
 
 /* rolling_mean <handle> <window> → returns new handle ID */
@@ -1388,7 +1388,7 @@ static verb(verb_rolling_mean) {
 
   signal_handle *src = _handle_get(src_id);
   if (!src)
-    return string_clone("ERROR: invalid handle");
+    return vm_string_clone("ERROR: invalid handle");
 
   signal_handle *dst = _signal_create(src->length);
   for (size_t i = 0; i < src->length; i++) {
@@ -1404,7 +1404,7 @@ static verb(verb_rolling_mean) {
   size_t dst_id = _handle_store(dst);
   char buf[32];
   snprintf(buf, sizeof(buf), "%zu", dst_id);
-  return string_clone(buf);
+  return vm_string_clone(buf);
 }
 
 /* signal_value_at <handle> <index> → returns value as string */
@@ -1417,11 +1417,11 @@ static verb(verb_signal_value_at) {
 
   signal_handle *s = _handle_get(id);
   if (!s || idx >= s->length)
-    return string_clone("ERROR: out of bounds");
+    return vm_string_clone("ERROR: out of bounds");
 
   char buf[64];
   snprintf(buf, sizeof(buf), "%.6f", s->data[idx]);
-  return string_clone(buf);
+  return vm_string_clone(buf);
 }
 
 /* signal_length <handle> → returns length as string */
@@ -1431,16 +1431,16 @@ static verb(verb_signal_length) {
 
   signal_handle *s = _handle_get(id);
   if (!s)
-    return string_clone("ERROR: invalid handle");
+    return vm_string_clone("ERROR: invalid handle");
 
   char buf[32];
   snprintf(buf, sizeof(buf), "%zu", s->length);
-  return string_clone(buf);
+  return vm_string_clone(buf);
 }
 
 /* ── Tests ── */
 
-/* 11. Create signal → verify handle and length */
+/* 11. Create signal → VM_ASSERT handle and length */
 enx_test(should_opaque_handle_create_signal) {
   _handle_registry_reset();
   verb_context *ctx = verb_context_create();
@@ -1450,14 +1450,14 @@ enx_test(should_opaque_handle_create_signal) {
 
   char *response = NULL;
   int r = verb_exec(ctx, "create_signal 10", &response);
-  enx_assert_equal_int(r, RESULT_OK);
+  enx_assert_equal_int(r, VM_OK);
   enx_assert_ptr_not_null(response);
   enx_assert_equal_string(response, "0"); /* first handle = 0 */
   free(response);
 
   /* Verify length */
   r = verb_exec(ctx, "signal_length 0", &response);
-  enx_assert_equal_int(r, RESULT_OK);
+  enx_assert_equal_int(r, VM_OK);
   enx_assert_equal_string(response, "10");
   free(response);
 
@@ -1465,7 +1465,7 @@ enx_test(should_opaque_handle_create_signal) {
   _handle_registry_reset();
 }
 
-/* 12. rolling_mean(input, 3) → verify smoothed values */
+/* 12. rolling_mean(input, 3) → VM_ASSERT smoothed values */
 enx_test(should_opaque_handle_rolling_mean) {
   _handle_registry_reset();
   verb_context *ctx = verb_context_create();
@@ -1607,14 +1607,14 @@ int main(int argc, const char *argv[]) {
   // system_enable_catch_exceptions();
 
   core_result_to_string_register();
-  xmemory_report_clear(); // Ignore memory used by the result registration
+  vm_memory_report_clear(); // Ignore memory used by the vm_result registration
 
   log_set_enable_debug(false);
   log_set_enable_info(true);
   log_set_enable_warn(false);
   log_set_enable_error(true);
 
-  bool result = test_suite_run(tests);
+  bool vm_result = test_suite_run(tests);
 
   // #ifdef _WIN32    // For running via Visual Studio
   //     printf("End, press key to close\n");
@@ -1623,5 +1623,5 @@ int main(int argc, const char *argv[]) {
   result_to_string_register_clear();
 
   // Return 0 for success and 1 fo failure
-  return result ? 0 : 1;
+  return vm_result ? 0 : 1;
 }

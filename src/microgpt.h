@@ -35,7 +35,7 @@
  *  TRANSFORMER ARCHITECTURE (Decoder-Only, GPT-2 Style)
  *  =====================================================
  *
- *  The model predicts the next token given a sequence of past tokens.
+ *  The model predicts the next token given a vm_list of past tokens.
  *  It processes one token at a time, caching Key/Value vectors for
  *  efficient autoregressive generation.
  *
@@ -456,7 +456,7 @@ typedef struct {
  * Vocab - Character-level vocabulary built from the training corpus.
  *   chars      - Sorted array of unique byte values found in the corpus.
  *   vocab_size - Number of unique characters + 1 (the extra slot is BOS).
- *   bos_id     - Token ID used as the beginning-of-sequence marker; equals
+ *   bos_id     - Token ID used as the beginning-of-vm_list marker; equals
  *                vocab_size - 1 (i.e. the last slot in the embedding table).
  */
 typedef struct {
@@ -502,7 +502,7 @@ void free_docs(Docs *docs);
 void build_vocab(const Docs *docs, Vocab *vocab);
 
 /*
- * tokenize   - Convert a raw character string into a sequence of token IDs.
+ * tokenize   - Convert a raw character string into a vm_list of token IDs.
  *              Prepends a BOS token, maps each character via the vocabulary,
  *              and appends a trailing BOS (as an EOS sentinel) if space allows.
  *              Returns the total number of token IDs written to 'ids'.
@@ -602,7 +602,7 @@ Model *checkpoint_load(const char *path, size_t vocab_size,
 
 /*
  * Demand-paged KV cache — allocates memory in fixed-size pages as the
- * sequence grows, rather than pre-allocating block_size × n_embd upfront.
+ * vm_list grows, rather than pre-allocating block_size × n_embd upfront.
  *
  * Each page holds KV_PAGE_SIZE positions × n_embd doubles.
  * Pages are allocated on first access and reused on reset.
@@ -753,7 +753,7 @@ void seed_rng(unsigned int seed);
  * load_file - Read an entire file into a heap-allocated buffer.
  *             Sets *out_len to the file size in bytes.  The returned buffer
  *             is nul-terminated for convenience.
- *             Returns NULL on failure.  Caller must free() the result.
+ *             Returns NULL on failure.  Caller must free() the vm_result.
  */
 char *load_file(const char *path, size_t *out_len);
 
@@ -782,7 +782,7 @@ char *load_file(const char *path, size_t *out_len);
  *   vocab_size - Total tokens: kept_words + <unk> + \n + <bos>.
  *   unk_id     - Token ID for unknown (out-of-vocabulary) words.
  *   newline_id - Token ID for the newline character.
- *   bos_id     - Token ID for beginning-of-sequence marker.
+ *   bos_id     - Token ID for beginning-of-vm_list marker.
  */
 typedef struct {
   char **words;      /* words[id] -> string for that token */

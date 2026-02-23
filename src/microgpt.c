@@ -77,7 +77,7 @@
  *   ──────────────────────────────────────────────
  *   build_word_vocab() — Frequency-ranked word vocabulary with hash table
  *   word_to_id()       — O(1) hash lookup for word → token ID
- *   tokenize_words()   — Split text on whitespace → token ID sequence
+ *   tokenize_words()   — Split text on whitespace → token ID vm_list
  *
  *
  * MEMORY LAYOUT (flat gradient / Adam buffers)
@@ -381,7 +381,7 @@ static size_t char_to_id(const Vocab *v, char c) {
 }
 
 /*
- * tokenize - Convert raw characters into a token-ID sequence.
+ * tokenize - Convert raw characters into a token-ID vm_list.
  *   Format: [BOS] [char_0] [char_1] ... [char_n] [BOS]
  *   The trailing BOS acts as an EOS sentinel so the model learns when to stop.
  *   Returns the number of IDs written to 'ids'.
@@ -393,11 +393,11 @@ size_t tokenize(const char *doc, size_t doc_len, const Vocab *vocab,
   size_t k = 0;
   if (k >= max_len)
     return k;
-  ids[k++] = vocab->bos_id; /* begin-of-sequence */
+  ids[k++] = vocab->bos_id; /* begin-of-vm_list */
   for (size_t i = 0; i < doc_len && k < max_len; i++)
     ids[k++] = char_to_id(vocab, doc[i]);
   if (k < max_len)
-    ids[k++] = vocab->bos_id; /* end-of-sequence */
+    ids[k++] = vocab->bos_id; /* end-of-vm_list */
   return k;
 }
 
@@ -473,7 +473,7 @@ static void dequantize_int8_to_fp64(const int8_t *src, scalar_t scale, size_t n,
 /*
  * quantize_vec_to_int8 — Quantize an activation vector (not weights).
  *   Same algorithm as weight quantisation, but returns the scale factor
- *   (needed for the caller to rescale the int8 matmul result).
+ *   (needed for the caller to rescale the int8 matmul vm_result).
  */
 static scalar_t quantize_vec_to_int8(const scalar_t *x, size_t n,
                                      int8_t *x_i8) {
@@ -500,11 +500,11 @@ static scalar_t quantize_vec_to_int8(const scalar_t *x, size_t n,
  *
  *   Computes acc[j] = Σ_i  x_i8[i] × W_i8[j×nin + i]
  *
- *   The result is accumulated into int64 to avoid overflow:
+ *   The vm_result is accumulated into int64 to avoid overflow:
  *   worst case each product is 127×127=16129, summed over nin elements.
  *   For nin=256: max_acc = 256×16129 ≈ 4M, well within int64 range.
  *
- *   The caller must rescale the result:  y_fp64[j] = sx × sw × acc[j]
+ *   The caller must rescale the vm_result:  y_fp64[j] = sx × sw × acc[j]
  *   where sx = activation scale, sw = weight scale.
  */
 static void lin_fwd_int8(const int8_t *x_i8, const int8_t *W_i8, size_t nin,
@@ -1804,7 +1804,7 @@ scalar_t forward_backward_one(const Model *model, size_t token_id,
     memcpy(sv_attn_w[L], attn_weights, (size_t)nh * bs * sizeof(scalar_t));
     memcpy(sv_x_attn[L], x_attn, ne * sizeof(scalar_t));
     /* Project attention output through Wo.
-     * INT8: quantise x_attn → int8, do integer matmul, rescale result.
+     * INT8: quantise x_attn → int8, do integer matmul, rescale vm_result.
      *   y_fp64 = scale_x × scale_w × int_accumulator
      * FP64: standard scalar_t-precision matrix multiply. */
 #if defined(QUANTIZATION_INT8) || defined(QUANTISATION_INT8)
@@ -2594,7 +2594,7 @@ char *load_file(const char *path, size_t *out_len) {
  * WORD-LEVEL TOKENISATION (alternative to character-level)
  * ────────────────────────────────────────────────────────
  * Instead of treating each character as a token, we treat each whitespace-
- * delimited word as a token.  This dramatically reduces sequence length
+ * delimited word as a token.  This dramatically reduces vm_list length
  * (and thus the number of forward/backward passes per training sample).
  *
  * The vocabulary is built by:

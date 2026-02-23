@@ -210,7 +210,7 @@ int opa_load_docs_multiline(const char *path, Docs *docs, int max_docs) {
  * organelle_generate — Feed a prompt into an organelle and generate a response.
  *
  *   The inference protocol follows a strict format:
- *     1. Feed BOS token (begin-of-sequence)
+ *     1. Feed BOS token (begin-of-vm_list)
  *     2. Feed each character of the prompt as a token
  *     3. Feed a newline separator ('\n') — this signals "your turn to respond"
  *     4. Auto-regressively sample tokens until:

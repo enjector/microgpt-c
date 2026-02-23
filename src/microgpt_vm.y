@@ -1,19 +1,22 @@
 /*
- * MicroGPT-C VM Engine — Bison Grammar
+ * microgpt_vm.y  —  Bison grammar for the MicroGPT-C Virtual Machine.
  *
- * Copyright (c) 2026 Ajay Soni (ajay.soni@enjector.com), Enjector Software Ltd.
+ * Copyright (c) 2026 Ajay Soni.  MIT License.
  *
- * SPDX-License-Identifier: MIT
- */
-
-/*
- * microgpt_vm.y  —  Bison grammar for the Virtual Machine parser.
- *
- * Defines the TypeScript-like language plus LaTeX mathematical notation.
+ * Defines a TypeScript-like language with LaTeX mathematical extensions.
  * Grammar actions directly emit bytecode via generator macros (no AST).
- * Uses "vm_module_parser_" prefix for all Bison symbols.
+ * All Bison symbols use the "vm_module_parser_" prefix (%define api.prefix).
  *
- * Copyright 2024 Enjector Software, Ltd.  MIT License.
+ * Grammar structure:
+ *   code → comments + functions
+ *   function →  TS-style  ( function name(...) { ... } )
+ *             | declare   ( declare name(...) )          — external binding
+ *             | LaTeX     ( f(x) = expr )                — mathematical
+ *   statement → assignment | call | return | yield | control-flow
+ *   expression → arithmetic | boolean | string | call | json | xpath
+ *
+ * Code generation:  Shorthand macros (emit, function_begin, create_register,
+ *                   etc.) delegate to vm_module_generator_* functions.
  */
 
 %define api.prefix {vm_module_parser_}
@@ -32,7 +35,7 @@
 	char* vm_tmp_var = 0;
 	char* vm_tmp_label = 0;
 	char* vm_tmp_type = 0;
-	queue* tracking_labels;
+	vm_queue* tracking_labels;
 
 	/* ── Code generation shorthand macros ─────────────────────────────── */
 
@@ -60,8 +63,9 @@
 %parse-param { vm_module_parser* parser }
 %lex-param { vm_module_parser* parser }
 
-/*
- * Declare the type of values in the grammar
+/* Semantic value type — all grammar values are heap-allocated C strings.
+ * The parser owns these strings; they are freed via the generator's
+ * symbol tracking (track()) on dispose.
  */
 
 %union
@@ -69,9 +73,7 @@
 	char* string;
 }
 
-/*
- * Token types: These are returned by the lexer
- */
+/* Token types returned by the Flex lexer (microgpt_vm.l) */
 
 %token <string> NAME NUMBER STRING BOOLEAN COMMENT
 %token VAR DECLARE
@@ -88,9 +90,7 @@
 %left '^'
 %nonassoc UMINUS
 
-/*
- * These are production names:
- */
+/* Non-terminal types — all carry a string semantic value */
 
 %type <string> code
 %type <string> var_declaration
@@ -131,33 +131,31 @@ functions
 |								{}
 ;
 
-/* End of the new function. This will cause a new Function to be created
- */
+/* A function definition: TS-style (with or without body), or LaTeX math. */
 function
 : comments function_header '{' statements '}'	{ function_end(); }
-| declare_function_header ';' 					{ emit(opCALL_EXT_METHOD, 0, 0, 0); function_end(); }
-| latex_math_function ';'						{}
-| latex_math_function 							{}
+| declare_function_header ';' 					{ emit(opCALL_EXT_METHOD, 0, 0, 0); function_end(); }  /* External (native) function stub */
+| latex_math_function ';'						{}  /* LaTeX math function with semicolon */
+| latex_math_function 							{}  /* LaTeX math function without semicolon */
 ;
 
 function_header
 : function_name '(' function_parameters ')' ':' NAME	{ function_return_type_set($1, $6); trait_type_set($1, $6, false); track($6); $$ = $1; }
-| function_name '(' function_parameters ')'				{ vm_tmp_type = string_clone("void"); function_return_type_set($1, vm_tmp_type); trait_type_set($1, vm_tmp_type, false); track(vm_tmp_type); $$ = $1; }
+| function_name '(' function_parameters ')'				{ vm_tmp_type = vm_string_clone("void"); function_return_type_set($1, vm_tmp_type); trait_type_set($1, vm_tmp_type, false); track(vm_tmp_type); $$ = $1; }
 ;
 
 declare_function_header
 : DECLARE function_name '(' declare_function_parameters ')' ':' NAME	{ function_return_type_set($2, $7); trait_type_set($2, $7, false); track($7); $$ = $2; }
-| DECLARE function_name '(' declare_function_parameters ')'				{ function_return_type_set($2, track(string_clone("void"))); trait_type_set($2, string_clone("void"), false); $$ = $2; }
+| DECLARE function_name '(' declare_function_parameters ')'				{ function_return_type_set($2, track(vm_string_clone("void"))); trait_type_set($2, vm_string_clone("void"), false); $$ = $2; }
 ;
 
-/* Create a new function
- */
+/* Create a new function and begin its scope. */
 function_name
 : FUNCTION NAME 		{ reset_registers(); function_begin($2); $$ = $2; }
 ;
 
-/* To get function parameters to populate they are poped from the stack and
- * placed into the variable names which is the parameter name
+/* Function parameters: each is popped from the VM stack into a named
+ * local variable.  The type annotation is used for trait tracking.
  */
 function_parameters
 : function_parameters ',' function_parameter	{ }
@@ -188,10 +186,14 @@ statements
 |						{}
 ;
 
-/* A statement can be one of the following:
- *	<variable name> = <expression>					assigns a variable to the value of an expression
- *	<object name>.<property name> = <expression>	assigns the property of an object to the value of an expression
- *	<function name>([<parameters>])					calls a function with optional parameters
+/* A statement: assignments, function calls, control flow, and returns.
+ *
+ *   <var> = <expr>              Assign expression result to variable
+ *   <obj>.<prop> = <expr>       Assign to object property
+ *   <fn>([args])                Function call (result discarded)
+ *   return [<expr>]             Return a value (or void) from current function
+ *   yield(<var>)                Co-routine yield point
+ *   while/for/if                Control flow
  */
 statement
 : var_declaration ';'							{ }
@@ -319,21 +321,18 @@ math_expression
 | '-' expression %prec UMINUS	        { vm_tmp_var = create_register(); emit(opNEG, $2,  0, vm_tmp_var); trait_type_link($2, vm_tmp_var); $$ = vm_tmp_var; }
 ;
 
-/* ═════════════════════════════════════════════════════════════════════════
- *  Function calls — parameters pushed onto stack, then CALL_METHOD
- * ═════════════════════════════════════════════════════════════════════════
+/* Function calls: push arguments onto the stack, then emit CALL_METHOD.
+ * For method calls (obj.method()), emit CALL_OBJ_METHOD instead.
+ * The return value (if any) is left on the stack for the caller.
  */
 
-/* Function calls involve the parameters to be placed onto the stack including
- * a tmp variable for any results
- */
 function_call
 : NAME '(' expression_params ')'			{ emit(opCALL_METHOD, $1, 0, 0); trait_type_link($1, function_return_type_get($1)); track($1); $$ = $1; }
 | NAME '.' NAME '(' expression_params ')'	{ emit(opCALL_OBJ_METHOD, $1, $3, 0); trait_type_link($3, function_return_type_get($3)); track($1); track($3); $$ = $3; /* Needs fix for $1.$3*/ }
 ;
 
-/* These are the function's parameters which are placed on the stack which
- * will be poped by the function.
+/* Function call arguments: pushed onto the VM stack in left-to-right
+ * order so the callee can pop them in the corresponding order.
  */
 expression_params
 : expression ',' expression_params	    { emit(opSTACK_PUSH, $1, 0, 0); }
@@ -353,7 +352,7 @@ latex_math_function
 ;
 
 latex_math_function_header
-: latex_math_function_name '(' latex_math_function_parameters ')'	{ function_return_type_set($1, track(string_clone("number"))); $$ = $1; }
+: latex_math_function_name '(' latex_math_function_parameters ')'	{ function_return_type_set($1, track(vm_string_clone("number"))); $$ = $1; }
 ;
 
 latex_math_function_parameters
