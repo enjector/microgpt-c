@@ -82,9 +82,7 @@
 /* Line 371 of yacc.c  */
 #line 10 "D:/dev/projects/enjector/microgpt-vm/main/core/src/vm_module_parser.y"
 
-#include <vm/queue.h>
-#include <vm/string.h>
-#include <vm/vm_module_parser.h>
+#include "microgpt_vm.h"
 
 #include <stdio.h>
 

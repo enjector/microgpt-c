@@ -740,10 +740,7 @@ char *yytext;
  */
 #define YY_NO_UNISTD_H 1
 #line 12 "D:/dev/projects/enjector/microgpt-vm/main/core/src/vm_module_parser.l"
-#include <vm/string.h>
-#include <vm/vm_function.h>
-#include <vm/vm_module.h>
-#include <vm/vm_module_parser.h>
+#include "microgpt_vm.h"
 #ifndef _WIN32
 #include <unistd.h>
 #else
@@ -756,7 +753,7 @@ char *yytext;
 #endif
 
 // Generated tokens
-#include "vm_module_parser.tab.hpp"
+#include "microgpt_vm_parser.tab.h"
 
 extern int vm_module_parser_char_fetch_next(vm_module_parser *parser);
 extern vm_module_parser *_vm_ctx_current_parser;

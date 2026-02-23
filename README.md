@@ -30,6 +30,8 @@ We ran two experiments back-to-back — a [lottery prediction](experiments/organ
 
 Same engine. Same architecture. One learns, one can't. **That's the proof.**
 
+The full research journey — from character-level Transformer to VM-based code generation — is documented in [*Composable Intelligence at the Edge*](docs/book/MicroGPT-C_Composable_Intelligence_at_the_Edge.pdf) (15 chapters, [online version](docs/book/MicroGPT-C_Composable_Intelligence_at_the_Edge.md)).
+
 ---
 
 ## Quick Start
@@ -66,7 +68,7 @@ All 11 game experiments, 2 real-world data experiments (lottery + markets), 3 pr
 | 🧬 **The stem cell philosophy** | [VISION.md](VISION.md) |
 | 💡 **Why this matters** | [VALUE_PROPOSITION.md](VALUE_PROPOSITION.md) |
 | 🗺️ **Roadmap** | [ROADMAP.md](ROADMAP.md) |
-| 📖 **Technical guide** (14 chapters) | [docs/book/0.md](docs/book/0.md) |
+| 📖 **Book: Composable Intelligence at the Edge** | [PDF](docs/book/MicroGPT-C_Composable_Intelligence_at_the_Edge.pdf) · [Online](docs/book/MicroGPT-C_Composable_Intelligence_at_the_Edge.md) · [Chapters](docs/book/0.md) |
 | 🏆 **Game leaderboard** (11 games) | [ORGANELLE_GAMES.md](docs/organelles/ORGANELLE_GAMES.md) |
 | 📈 **Market regime detection** (57% holdout) | [markets/README.md](experiments/organelles/markets/README.md) |
 | 🎲 **Lottery experiment** (entropy baseline) | [lottery/README.md](experiments/organelles/lottery/README.md) |
