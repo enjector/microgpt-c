@@ -28,6 +28,18 @@ This is our long-term vision. Rather than shipping hardware with a static, pre-t
 
 The idea that you don't need one brilliant model — you need several focused ones that work together. A single Connect-4 organelle produces ~50% invalid moves. But wrapped in a Judge + replan loop, the *system* wins 88% of games. The coordination is the intelligence, not any individual model.
 
+### Is this really "reasoning" or just pattern matching?
+
+We define "reasoning" in terms of systems engineering: **the ability to navigate a state-space and prune invalid paths without exhaustive search.** Whether that counts as "real reasoning" or "advanced heuristic pruning" is a semantic choice — but the functional result is the same.
+
+**System vs. model intelligence.** In MicroGPT-C, reasoning is a property of the *pipeline* first, and the *weights* second. The Planner-Worker-Judge loop acts as a "System 2" layer that forces the model to check its work against a deterministic VM.
+
+**The evidence (trace distillation).** At 64K parameters, the model is a stochastic parrot that needs 181 external corrections from the Judge to stay on track. At 460K parameters, trained on traces of those successful coordinations, the model internalises the logic natively — zero interventions, same performance. It has learned a compressed representation of the game's valid-move manifold.
+
+**The negative control.** If the model were hallucinating logic, it would show similar "success" patterns on random data. It doesn't. The [lottery experiment](experiments/organelles/lottery/) hits an entropy floor at ~0.50 — proving the model is sensitive to causal structure in the input, not just statistical token frequency.
+
+**What this is not.** It's not AGI. It's not general reasoning. It's task-specific state pruning that emerges when you train on coordination traces. For applications like fraud/risk engines, where you need auditable, inspectable logic, that's exactly what we want. See [ORGANELLE_REASONING_CONCLUSION.md](docs/organelles/ORGANELLE_REASONING_CONCLUSION.md) for the full research verdict.
+
 ---
 
 ## 🛠 Technical Implementation
