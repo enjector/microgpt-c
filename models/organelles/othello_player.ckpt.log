@@ -1,14 +1,43 @@
 
 ========================================
-Retroactive Log (training predates logging)
+Run: 2026-02-23 10:15:51
 ========================================
-Organelle: othello_player
-Game: Othello | Role: player
+Organelle: Player
+Corpus: 4496 docs | 397866 chars (388.5 KB)
+Vocab: 27 characters
 Architecture: N_EMBD=48 N_LAYER=3 N_HEAD=4 BLOCK_SIZE=128 MLP_DIM=192
-Params: ~92K
-Training: steps=25000 lr=0.001
-Corpus: ~3000 docs
-Checkpoint: othello_player.ckpt (1100172 bytes)
-Result: 67% win
+Params: 91680
+Training: batch=8 steps=25000 lr=0.0010
+
+--- Training ---
+step     1 / 25000 | loss 3.7116
+step  1000 / 25000 | loss 0.5716
+step  2000 / 25000 | loss 0.5382
+step  3000 / 25000 | loss 0.5640
+step  4000 / 25000 | loss 0.5733
+step  5000 / 25000 | loss 0.5786
+step  6000 / 25000 | loss 0.5471
+step  7000 / 25000 | loss 0.5573
+step  8000 / 25000 | loss 0.5214
+step  9000 / 25000 | loss 0.4785
+step 10000 / 25000 | loss 0.4659
+step 11000 / 25000 | loss 0.5418
+step 12000 / 25000 | loss 0.5164
+step 13000 / 25000 | loss 0.4542
+step 14000 / 25000 | loss 0.5102
+step 15000 / 25000 | loss 0.4397
+step 16000 / 25000 | loss 0.4288
+step 17000 / 25000 | loss 0.4273
+step 18000 / 25000 | loss 0.4624
+step 19000 / 25000 | loss 0.3914
+step 20000 / 25000 | loss 0.4508
+step 21000 / 25000 | loss 0.4284
+step 22000 / 25000 | loss 0.3304
+step 23000 / 25000 | loss 0.4480
+step 24000 / 25000 | loss 0.3843
+step 25000 / 25000 | loss 0.3752
+
+Training complete: 254.0s | best loss: 0.2823
+Checkpoint: othello_player.ckpt
 ========================================
 

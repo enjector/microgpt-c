@@ -1,14 +1,43 @@
 
 ========================================
-Retroactive Log (training predates logging)
+Run: 2026-02-23 10:38:41
 ========================================
-Organelle: klotski_player
-Game: Klotski | Role: player
+Organelle: Player
+Corpus: 232 docs | 15237 chars (14.9 KB)
+Vocab: 24 characters
 Architecture: N_EMBD=32 N_LAYER=2 N_HEAD=4 BLOCK_SIZE=128 MLP_DIM=128
-Params: ~30K
-Training: steps=25000 lr=0.001
-Corpus: ~199 docs
-Checkpoint: klotski_player.ckpt (362508 bytes)
-Result: 62% solve
+Params: 30208
+Training: batch=8 steps=25000 lr=0.0010
+
+--- Training ---
+step     1 / 25000 | loss 3.2060
+step  1000 / 25000 | loss 0.5641
+step  2000 / 25000 | loss 0.4739
+step  3000 / 25000 | loss 0.4463
+step  4000 / 25000 | loss 0.4397
+step  5000 / 25000 | loss 0.3444
+step  6000 / 25000 | loss 0.3617
+step  7000 / 25000 | loss 0.3068
+step  8000 / 25000 | loss 0.3000
+step  9000 / 25000 | loss 0.2943
+step 10000 / 25000 | loss 0.2900
+step 11000 / 25000 | loss 0.2358
+step 12000 / 25000 | loss 0.1837
+step 13000 / 25000 | loss 0.1927
+step 14000 / 25000 | loss 0.1625
+step 15000 / 25000 | loss 0.1726
+step 16000 / 25000 | loss 0.1863
+step 17000 / 25000 | loss 0.1403
+step 18000 / 25000 | loss 0.1252
+step 19000 / 25000 | loss 0.1367
+step 20000 / 25000 | loss 0.1342
+step 21000 / 25000 | loss 0.1122
+step 22000 / 25000 | loss 0.1152
+step 23000 / 25000 | loss 0.1039
+step 24000 / 25000 | loss 0.1095
+step 25000 / 25000 | loss 0.1105
+
+Training complete: 23.0s | best loss: 0.0911
+Checkpoint: klotski_player.ckpt
 ========================================
 

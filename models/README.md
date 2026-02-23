@@ -11,8 +11,10 @@ models/
   README.md                                 This file
 
   foundation/                               Base demo checkpoints
-    shakespeare.ckpt                        840K params — character-level Shakespeare
+    shakespeare.ckpt                        841K params — character-level Shakespeare
     shakespeare.ckpt.log                    Training log (loss curve, timing, samples)
+    shakespeare_word.ckpt                   510K params — word-level Shakespeare
+    shakespeare_word.ckpt.log               Training log (loss curve, timing, samples)
     names.ckpt.log                          Training log for name generation demo
 
   organelles/                               Organelle game + code checkpoints
@@ -59,7 +61,8 @@ Each `.ckpt.log` file contains the full training history (loss per step, timings
 
 | Model | Size | Params | Trained On | What It Does |
 |-------|------|--------|-----------|-------------|
-| `foundation/shakespeare.ckpt` | 9.6 MB | 840K | Complete works of Shakespeare | Character-level text generation |
+| `foundation/shakespeare.ckpt` | 9.6 MB | 841K | Complete works of Shakespeare | Character-level text generation (16K tok/s) |
+| `foundation/shakespeare_word.ckpt` | 5.8 MB | 510K | Complete works of Shakespeare | Word-level text generation (40K tok/s) |
 
 | `organelles/c_planner.ckpt` | 13.8 MB | 1.2M | Function composition plans | Planner for c_compose pipeline |
 | `organelles/c_judge.ckpt` | 13.8 MB | 1.2M | Plan validation pairs | Judge for c_compose pipeline |
@@ -179,6 +182,7 @@ Each checkpoint requires matching compile-time architecture. The demos handle th
 | Checkpoint | N_EMBD | N_HEAD | N_LAYER | BLOCK_SIZE | MLP_DIM |
 |-----------|--------|--------|---------|------------|---------| 
 | `shakespeare.ckpt` | 128 | 8 | 4 | 256 | 512 |
+| `shakespeare_word.ckpt` | 48 | 4 | 1 | 64 | 192 |
 
 | `organelles/c_planner.ckpt` / `c_judge.ckpt` | 128 | 8 | 6 | 128 | 512 |
 | `organelles/connect4_*.ckpt` | 96 | 8 | 4 | 128 | 384 |

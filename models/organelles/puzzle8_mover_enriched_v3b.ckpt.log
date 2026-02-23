@@ -1,0 +1,43 @@
+
+========================================
+Run: 2026-02-23 10:50:23
+========================================
+Organelle: Greedy-Mover
+Corpus: 255 docs | 16756 chars (16.4 KB)
+Vocab: 35 characters
+Architecture: N_EMBD=96 N_LAYER=4 N_HEAD=8 BLOCK_SIZE=128 MLP_DIM=384
+Params: 461376
+Training: batch=8 steps=25000 lr=0.0010
+
+--- Training ---
+step     1 / 25000 | loss 4.6595
+step  1000 / 25000 | loss 0.1291
+step  2000 / 25000 | loss 0.1311
+step  3000 / 25000 | loss 0.1077
+step  4000 / 25000 | loss 0.1168
+step  5000 / 25000 | loss 0.0955
+step  6000 / 25000 | loss 0.0949
+step  7000 / 25000 | loss 0.0978
+step  8000 / 25000 | loss 0.0963
+step  9000 / 25000 | loss 0.0929
+step 10000 / 25000 | loss 0.0855
+step 11000 / 25000 | loss 0.0836
+step 12000 / 25000 | loss 0.0841
+step 13000 / 25000 | loss 0.0903
+step 14000 / 25000 | loss 0.0837
+step 15000 / 25000 | loss 0.0754
+step 16000 / 25000 | loss 0.0782
+step 17000 / 25000 | loss 0.0802
+step 18000 / 25000 | loss 0.0804
+step 19000 / 25000 | loss 0.0888
+step 20000 / 25000 | loss 0.0840
+step 21000 / 25000 | loss 0.0846
+step 22000 / 25000 | loss 0.0737
+step 23000 / 25000 | loss 0.0787
+step 24000 / 25000 | loss 0.0807
+step 25000 / 25000 | loss 0.0823
+
+Training complete: 493.0s | best loss: 0.0618
+Checkpoint: puzzle8_mover_enriched_v3b.ckpt
+========================================
+

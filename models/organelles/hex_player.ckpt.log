@@ -1,14 +1,43 @@
 
 ========================================
-Retroactive Log (training predates logging)
+Run: 2026-02-23 10:28:43
 ========================================
-Organelle: hex_player
-Game: Hex | Role: player
+Organelle: Player
+Corpus: 4981 docs | 576588 chars (563.1 KB)
+Vocab: 25 characters
 Architecture: N_EMBD=48 N_LAYER=3 N_HEAD=4 BLOCK_SIZE=128 MLP_DIM=192
-Params: ~92K
-Training: steps=25000 lr=0.001
-Corpus: ~5000 docs
-Checkpoint: hex_player.ckpt (1097868 bytes)
-Result: 4% win
+Params: 91488
+Training: batch=8 steps=25000 lr=0.0010
+
+--- Training ---
+step     1 / 25000 | loss 3.2270
+step  1000 / 25000 | loss 0.5877
+step  2000 / 25000 | loss 0.5679
+step  3000 / 25000 | loss 0.3777
+step  4000 / 25000 | loss 0.5022
+step  5000 / 25000 | loss 0.4742
+step  6000 / 25000 | loss 0.5532
+step  7000 / 25000 | loss 0.5484
+step  8000 / 25000 | loss 0.4358
+step  9000 / 25000 | loss 0.5229
+step 10000 / 25000 | loss 0.4467
+step 11000 / 25000 | loss 0.4332
+step 12000 / 25000 | loss 0.4041
+step 13000 / 25000 | loss 0.3898
+step 14000 / 25000 | loss 0.4420
+step 15000 / 25000 | loss 0.4429
+step 16000 / 25000 | loss 0.3208
+step 17000 / 25000 | loss 0.3321
+step 18000 / 25000 | loss 0.3315
+step 19000 / 25000 | loss 0.4427
+step 20000 / 25000 | loss 0.3211
+step 21000 / 25000 | loss 0.4401
+step 22000 / 25000 | loss 0.3189
+step 23000 / 25000 | loss 0.4198
+step 24000 / 25000 | loss 0.3113
+step 25000 / 25000 | loss 0.3732
+
+Training complete: 108.0s | best loss: 0.2120
+Checkpoint: hex_player.ckpt
 ========================================
 

@@ -1,14 +1,43 @@
 
 ========================================
-Retroactive Log (training predates logging)
+Run: 2026-02-23 09:59:33
 ========================================
-Organelle: tictactoe_planner
-Game: Tic-Tac-Toe | Role: planner
+Organelle: Planner
+Corpus: 3252 docs | 177349 chars (173.2 KB)
+Vocab: 29 characters
 Architecture: N_EMBD=96 N_LAYER=4 N_HEAD=8 BLOCK_SIZE=128 MLP_DIM=384
-Params: ~460K
-Training: steps=25000 lr=0.001
-Corpus: ~5000 docs
-Checkpoint: tictactoe_planner.ckpt (5522700 bytes)
-Result: 90% w+d
+Params: 460224
+Training: batch=8 steps=25000 lr=0.0010
+
+--- Training ---
+step     1 / 25000 | loss 4.5957
+step  1000 / 25000 | loss 0.1728
+step  2000 / 25000 | loss 0.1734
+step  3000 / 25000 | loss 0.1949
+step  4000 / 25000 | loss 0.1861
+step  5000 / 25000 | loss 0.1720
+step  6000 / 25000 | loss 0.1869
+step  7000 / 25000 | loss 0.1902
+step  8000 / 25000 | loss 0.1854
+step  9000 / 25000 | loss 0.1727
+step 10000 / 25000 | loss 0.1656
+step 11000 / 25000 | loss 0.1826
+step 12000 / 25000 | loss 0.1653
+step 13000 / 25000 | loss 0.2119
+step 14000 / 25000 | loss 0.1722
+step 15000 / 25000 | loss 0.1609
+step 16000 / 25000 | loss 0.1625
+step 17000 / 25000 | loss 0.1617
+step 18000 / 25000 | loss 0.1465
+step 19000 / 25000 | loss 0.1562
+step 20000 / 25000 | loss 0.1430
+step 21000 / 25000 | loss 0.1520
+step 22000 / 25000 | loss 0.1564
+step 23000 / 25000 | loss 0.1580
+step 24000 / 25000 | loss 0.1467
+step 25000 / 25000 | loss 0.1615
+
+Training complete: 520.0s | best loss: 0.1323
+Checkpoint: tictactoe_planner.ckpt
 ========================================
 

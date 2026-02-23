@@ -1,14 +1,59 @@
 
 ========================================
-Retroactive Log (training predates logging)
+Run: 2026-02-23 10:45:25
 ========================================
-Organelle: puzzle8_detour_mover
-Game: 8-Puzzle | Role: detour_mover
+Organelle: Detour-Mover
+Corpus: 255 docs | 10535 chars (10.3 KB)
+Vocab: 34 characters
 Architecture: N_EMBD=96 N_LAYER=4 N_HEAD=8 BLOCK_SIZE=128 MLP_DIM=384
-Params: ~460K
-Training: steps=25000 lr=0.001
-Corpus: ~1000 docs
-Checkpoint: puzzle8_detour_mover_v3b.ckpt (5534220 bytes)
-Result: 60% solve
+Params: 461184
+Training: batch=8 steps=25000 lr=0.0010
+
+--- Training ---
+step     1 / 25000 | loss 4.5539
+step  1000 / 25000 | loss 0.1892
+step  2000 / 25000 | loss 0.1597
+step  3000 / 25000 | loss 0.1632
+step  4000 / 25000 | loss 0.1356
+step  5000 / 25000 | loss 0.1458
+step  6000 / 25000 | loss 0.1348
+step  7000 / 25000 | loss 0.1428
+step  8000 / 25000 | loss 0.1540
+step  9000 / 25000 | loss 0.1342
+step 10000 / 25000 | loss 0.1327
+step 11000 / 25000 | loss 0.1473
+step 12000 / 25000 | loss 0.1382
+step 13000 / 25000 | loss 0.1433
+step 14000 / 25000 | loss 0.1428
+step 15000 / 25000 | loss 0.1284
+step 16000 / 25000 | loss 0.1477
+step 17000 / 25000 | loss 0.1266
+step 18000 / 25000 | loss 0.1366
+step 19000 / 25000 | loss 0.1285
+step 20000 / 25000 | loss 0.1344
+step 21000 / 25000 | loss 0.1294
+step 22000 / 25000 | loss 0.1298
+step 23000 / 25000 | loss 0.1269
+step 24000 / 25000 | loss 0.1316
+step 25000 / 25000 | loss 0.1314
+
+Training complete: 163.0s | best loss: 0.1113
+Checkpoint: puzzle8_detour_mover_v3b.ckpt
+========================================
+
+
+========================================
+Run: 2026-02-23 10:50:21
+========================================
+Organelle: Detour-Mover
+Loaded checkpoint: puzzle8_detour_mover_v3b.ckpt (step 25000)
+========================================
+
+
+========================================
+Run: 2026-02-23 10:58:36
+========================================
+Organelle: Detour-Mover
+Loaded checkpoint: puzzle8_detour_mover_v3b.ckpt (step 25000)
 ========================================
 

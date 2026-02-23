@@ -1,14 +1,59 @@
 
 ========================================
-Retroactive Log (training predates logging)
+Run: 2026-02-23 10:39:54
 ========================================
-Organelle: puzzle8_strategist
-Game: 8-Puzzle | Role: strategist
+Organelle: Strategist
+Corpus: 422 docs | 6980 chars (6.8 KB)
+Vocab: 30 characters
 Architecture: N_EMBD=96 N_LAYER=4 N_HEAD=8 BLOCK_SIZE=128 MLP_DIM=384
-Params: ~460K
-Training: steps=25000 lr=0.001
-Corpus: ~1000 docs
-Checkpoint: puzzle8_strategist_v3b.ckpt (5525004 bytes)
-Result: 60% solve
+Params: 460416
+Training: batch=8 steps=25000 lr=0.0010
+
+--- Training ---
+step     1 / 25000 | loss 4.6316
+step  1000 / 25000 | loss 0.5424
+step  2000 / 25000 | loss 0.4289
+step  3000 / 25000 | loss 0.4075
+step  4000 / 25000 | loss 0.4026
+step  5000 / 25000 | loss 0.3629
+step  6000 / 25000 | loss 0.3559
+step  7000 / 25000 | loss 0.3610
+step  8000 / 25000 | loss 0.3576
+step  9000 / 25000 | loss 0.3552
+step 10000 / 25000 | loss 0.3909
+step 11000 / 25000 | loss 0.3668
+step 12000 / 25000 | loss 0.3798
+step 13000 / 25000 | loss 0.3323
+step 14000 / 25000 | loss 0.3457
+step 15000 / 25000 | loss 0.3661
+step 16000 / 25000 | loss 0.3610
+step 17000 / 25000 | loss 0.3375
+step 18000 / 25000 | loss 0.3455
+step 19000 / 25000 | loss 0.3512
+step 20000 / 25000 | loss 0.3373
+step 21000 / 25000 | loss 0.3403
+step 22000 / 25000 | loss 0.3483
+step 23000 / 25000 | loss 0.3150
+step 24000 / 25000 | loss 0.3506
+step 25000 / 25000 | loss 0.3574
+
+Training complete: 80.0s | best loss: 0.2927
+Checkpoint: puzzle8_strategist_v3b.ckpt
+========================================
+
+
+========================================
+Run: 2026-02-23 10:50:21
+========================================
+Organelle: Strategist
+Loaded checkpoint: puzzle8_strategist_v3b.ckpt (step 25000)
+========================================
+
+
+========================================
+Run: 2026-02-23 10:50:23
+========================================
+Organelle: Strategist
+Loaded checkpoint: puzzle8_strategist_v3b.ckpt (step 25000)
 ========================================
 

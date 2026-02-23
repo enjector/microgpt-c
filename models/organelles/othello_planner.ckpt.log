@@ -1,14 +1,43 @@
 
 ========================================
-Retroactive Log (training predates logging)
+Run: 2026-02-23 10:11:38
 ========================================
-Organelle: othello_planner
-Game: Othello | Role: planner
+Organelle: Planner
+Corpus: 2322 docs | 178274 chars (174.1 KB)
+Vocab: 31 characters
 Architecture: N_EMBD=48 N_LAYER=3 N_HEAD=4 BLOCK_SIZE=128 MLP_DIM=192
-Params: ~92K
-Training: steps=25000 lr=0.001
-Corpus: ~3000 docs
-Checkpoint: othello_planner.ckpt (1104780 bytes)
-Result: 67% win
+Params: 92064
+Training: batch=8 steps=25000 lr=0.0010
+
+--- Training ---
+step     1 / 25000 | loss 3.7263
+step  1000 / 25000 | loss 0.4447
+step  2000 / 25000 | loss 0.3896
+step  3000 / 25000 | loss 0.3865
+step  4000 / 25000 | loss 0.3189
+step  5000 / 25000 | loss 0.3873
+step  6000 / 25000 | loss 0.3941
+step  7000 / 25000 | loss 0.3885
+step  8000 / 25000 | loss 0.4304
+step  9000 / 25000 | loss 0.3703
+step 10000 / 25000 | loss 0.2793
+step 11000 / 25000 | loss 0.2888
+step 12000 / 25000 | loss 0.3797
+step 13000 / 25000 | loss 0.3564
+step 14000 / 25000 | loss 0.3498
+step 15000 / 25000 | loss 0.2761
+step 16000 / 25000 | loss 0.3429
+step 17000 / 25000 | loss 0.2432
+step 18000 / 25000 | loss 0.2747
+step 19000 / 25000 | loss 0.2486
+step 20000 / 25000 | loss 0.2405
+step 21000 / 25000 | loss 0.2807
+step 22000 / 25000 | loss 0.2623
+step 23000 / 25000 | loss 0.2677
+step 24000 / 25000 | loss 0.2832
+step 25000 / 25000 | loss 0.2462
+
+Training complete: 253.0s | best loss: 0.1876
+Checkpoint: othello_planner.ckpt
 ========================================
 

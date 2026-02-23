@@ -1,5 +1,6 @@
+
 ========================================
-Run: 2026-02-19 22:41:25
+Run: 2026-02-23 09:55:30
 ========================================
 Corpus: 32033 docs
 Vocab: 27 characters
@@ -21,7 +22,7 @@ step  800 / 1000 | loss 2.2042
 step  900 / 1000 | loss 2.3124
 step 1000 / 1000 | loss 2.4290
 
-Training complete: 0.10s | 9642.6 steps/s | 549.8k tok/s
+Training complete: 0.08s | 12019.2 steps/s | 685.3k tok/s
 
 --- Inference Summary ---
 samples: 20 | tokens: 110 | time: 0.00s | 110000.0 tok/s

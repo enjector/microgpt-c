@@ -1,14 +1,59 @@
 
 ========================================
-Retroactive Log (training predates logging)
+Run: 2026-02-23 10:48:08
 ========================================
-Organelle: puzzle8_judge
-Game: 8-Puzzle | Role: judge
+Organelle: Judge
+Corpus: 57344 docs | 1631569 chars (1593.3 KB)
+Vocab: 31 characters
 Architecture: N_EMBD=96 N_LAYER=4 N_HEAD=8 BLOCK_SIZE=128 MLP_DIM=384
-Params: ~460K
-Training: steps=25000 lr=0.001
-Corpus: ~1000 docs
-Checkpoint: puzzle8_judge_v3b.ckpt (5527308 bytes)
-Result: 60% solve
+Params: 460608
+Training: batch=8 steps=25000 lr=0.0010
+
+--- Training ---
+step     1 / 25000 | loss 4.2770
+step  1000 / 25000 | loss 0.5273
+step  2000 / 25000 | loss 0.4912
+step  3000 / 25000 | loss 0.4599
+step  4000 / 25000 | loss 0.4881
+step  5000 / 25000 | loss 0.4914
+step  6000 / 25000 | loss 0.4470
+step  7000 / 25000 | loss 0.4812
+step  8000 / 25000 | loss 0.4588
+step  9000 / 25000 | loss 0.4459
+step 10000 / 25000 | loss 0.5022
+step 11000 / 25000 | loss 0.4347
+step 12000 / 25000 | loss 0.4316
+step 13000 / 25000 | loss 0.4701
+step 14000 / 25000 | loss 0.4613
+step 15000 / 25000 | loss 0.4387
+step 16000 / 25000 | loss 0.4430
+step 17000 / 25000 | loss 0.4341
+step 18000 / 25000 | loss 0.4270
+step 19000 / 25000 | loss 0.4369
+step 20000 / 25000 | loss 0.4337
+step 21000 / 25000 | loss 0.4245
+step 22000 / 25000 | loss 0.4225
+step 23000 / 25000 | loss 0.4294
+step 24000 / 25000 | loss 0.4400
+step 25000 / 25000 | loss 0.4473
+
+Training complete: 114.0s | best loss: 0.3845
+Checkpoint: puzzle8_judge_v3b.ckpt
+========================================
+
+
+========================================
+Run: 2026-02-23 10:50:21
+========================================
+Organelle: Judge
+Loaded checkpoint: puzzle8_judge_v3b.ckpt (step 25000)
+========================================
+
+
+========================================
+Run: 2026-02-23 10:58:36
+========================================
+Organelle: Judge
+Loaded checkpoint: puzzle8_judge_v3b.ckpt (step 25000)
 ========================================
 

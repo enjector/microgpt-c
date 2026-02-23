@@ -1,6 +1,6 @@
 
 ========================================
-Run: 2026-02-20 09:30:50
+Run: 2026-02-23 10:11:36
 ========================================
 Organelle: Planner
 Corpus: 5000 docs | 509521 chars (497.6 KB)
@@ -37,7 +37,7 @@ step 23000 / 25000 | loss 0.1925
 step 24000 / 25000 | loss 0.1828
 step 25000 / 25000 | loss 0.1717
 
-Training complete: 458.0s | best loss: 0.1131
+Training complete: 628.0s | best loss: 0.1131
 Checkpoint: connect4_planner.ckpt
 ========================================
 

@@ -1,14 +1,43 @@
 
 ========================================
-Retroactive Log (training predates logging)
+Run: 2026-02-23 10:08:13
 ========================================
-Organelle: tictactoe_player
-Game: Tic-Tac-Toe | Role: player
+Organelle: Player
+Corpus: 5000 docs | 207128 chars (202.3 KB)
+Vocab: 28 characters
 Architecture: N_EMBD=96 N_LAYER=4 N_HEAD=8 BLOCK_SIZE=128 MLP_DIM=384
-Params: ~460K
-Training: steps=25000 lr=0.001
-Corpus: ~5000 docs
-Checkpoint: tictactoe_player.ckpt (5520396 bytes)
-Result: 90% w+d
+Params: 460032
+Training: batch=8 steps=25000 lr=0.0010
+
+--- Training ---
+step     1 / 25000 | loss 4.1366
+step  1000 / 25000 | loss 0.3311
+step  2000 / 25000 | loss 0.3051
+step  3000 / 25000 | loss 0.2881
+step  4000 / 25000 | loss 0.2896
+step  5000 / 25000 | loss 0.2767
+step  6000 / 25000 | loss 0.2698
+step  7000 / 25000 | loss 0.2922
+step  8000 / 25000 | loss 0.2578
+step  9000 / 25000 | loss 0.2733
+step 10000 / 25000 | loss 0.2369
+step 11000 / 25000 | loss 0.2354
+step 12000 / 25000 | loss 0.2586
+step 13000 / 25000 | loss 0.2601
+step 14000 / 25000 | loss 0.2357
+step 15000 / 25000 | loss 0.2463
+step 16000 / 25000 | loss 0.2727
+step 17000 / 25000 | loss 0.2113
+step 18000 / 25000 | loss 0.2491
+step 19000 / 25000 | loss 0.2325
+step 20000 / 25000 | loss 0.2237
+step 21000 / 25000 | loss 0.2330
+step 22000 / 25000 | loss 0.2204
+step 23000 / 25000 | loss 0.2281
+step 24000 / 25000 | loss 0.2179
+step 25000 / 25000 | loss 0.2172
+
+Training complete: 188.0s | best loss: 0.1980
+Checkpoint: tictactoe_player.ckpt
 ========================================
 

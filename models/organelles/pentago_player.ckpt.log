@@ -1,14 +1,43 @@
 
 ========================================
-Retroactive Log (training predates logging)
+Run: 2026-02-23 10:16:02
 ========================================
-Organelle: pentago_player
-Game: Pentago | Role: player
+Organelle: Player
+Corpus: 3477 docs | 413271 chars (403.6 KB)
+Vocab: 28 characters
 Architecture: N_EMBD=48 N_LAYER=3 N_HEAD=4 BLOCK_SIZE=128 MLP_DIM=192
-Params: ~92K
-Training: steps=25000 lr=0.001
-Corpus: ~5000 docs
-Checkpoint: pentago_player.ckpt (1101324 bytes)
-Result: 91% win
+Params: 91776
+Training: batch=8 steps=25000 lr=0.0010
+
+--- Training ---
+step     1 / 25000 | loss 3.6747
+step  1000 / 25000 | loss 0.4653
+step  2000 / 25000 | loss 0.4117
+step  3000 / 25000 | loss 0.5071
+step  4000 / 25000 | loss 0.4099
+step  5000 / 25000 | loss 0.4334
+step  6000 / 25000 | loss 0.3117
+step  7000 / 25000 | loss 0.4544
+step  8000 / 25000 | loss 0.4564
+step  9000 / 25000 | loss 0.4642
+step 10000 / 25000 | loss 0.4104
+step 11000 / 25000 | loss 0.3836
+step 12000 / 25000 | loss 0.4070
+step 13000 / 25000 | loss 0.3651
+step 14000 / 25000 | loss 0.3114
+step 15000 / 25000 | loss 0.2845
+step 16000 / 25000 | loss 0.3082
+step 17000 / 25000 | loss 0.2846
+step 18000 / 25000 | loss 0.3828
+step 19000 / 25000 | loss 0.2279
+step 20000 / 25000 | loss 0.2542
+step 21000 / 25000 | loss 0.2657
+step 22000 / 25000 | loss 0.3534
+step 23000 / 25000 | loss 0.3058
+step 24000 / 25000 | loss 0.3585
+step 25000 / 25000 | loss 0.2649
+
+Training complete: 281.0s | best loss: 0.1448
+Checkpoint: pentago_player.ckpt
 ========================================
 

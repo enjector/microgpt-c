@@ -1,6 +1,6 @@
 
 ========================================
-Run: 2026-02-20 09:27:18
+Run: 2026-02-23 09:59:48
 ========================================
 Organelle: Planner
 Corpus: 988 docs | 78905 chars (77.1 KB)
@@ -37,7 +37,7 @@ step 23000 / 25000 | loss 0.1033
 step 24000 / 25000 | loss 0.1029
 step 25000 / 25000 | loss 0.1178
 
-Training complete: 82.0s | best loss: 0.0819
+Training complete: 252.0s | best loss: 0.0819
 Checkpoint: mastermind_planner.ckpt
 ========================================
 

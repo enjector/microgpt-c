@@ -1,6 +1,6 @@
 
 ========================================
-Run: 2026-02-20 09:28:40
+Run: 2026-02-23 10:04:00
 ========================================
 Organelle: Player
 Corpus: 1975 docs | 117646 chars (114.9 KB)
@@ -37,7 +37,7 @@ step 23000 / 25000 | loss 0.1302
 step 24000 / 25000 | loss 0.1298
 step 25000 / 25000 | loss 0.1332
 
-Training complete: 62.0s | best loss: 0.1102
+Training complete: 203.0s | best loss: 0.1102
 Checkpoint: mastermind_player.ckpt
 ========================================
 

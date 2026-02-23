@@ -1,6 +1,6 @@
 
 ========================================
-Run: 2026-02-20 09:38:28
+Run: 2026-02-23 10:22:04
 ========================================
 Organelle: Player
 Corpus: 5000 docs | 389560 chars (380.4 KB)
@@ -37,7 +37,7 @@ step 23000 / 25000 | loss 0.1103
 step 24000 / 25000 | loss 0.1093
 step 25000 / 25000 | loss 0.1092
 
-Training complete: 309.0s | best loss: 0.1041
+Training complete: 284.0s | best loss: 0.1041
 Checkpoint: connect4_player.ckpt
 ========================================
 

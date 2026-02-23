@@ -1,14 +1,59 @@
 
 ========================================
-Retroactive Log (training predates logging)
+Run: 2026-02-23 10:44:03
 ========================================
-Organelle: puzzle8_detector
-Game: 8-Puzzle | Role: detector
+Organelle: Detour-Detector
+Corpus: 427 docs | 7633 chars (7.5 KB)
+Vocab: 20 characters
 Architecture: N_EMBD=96 N_LAYER=4 N_HEAD=8 BLOCK_SIZE=128 MLP_DIM=384
-Params: ~460K
-Training: steps=25000 lr=0.001
-Corpus: ~1000 docs
-Checkpoint: puzzle8_detector_v3b.ckpt (5501964 bytes)
-Result: 60% solve
+Params: 458496
+Training: batch=8 steps=25000 lr=0.0010
+
+--- Training ---
+step     1 / 25000 | loss 4.2351
+step  1000 / 25000 | loss 0.3584
+step  2000 / 25000 | loss 0.3804
+step  3000 / 25000 | loss 0.3899
+step  4000 / 25000 | loss 0.3497
+step  5000 / 25000 | loss 0.3444
+step  6000 / 25000 | loss 0.3774
+step  7000 / 25000 | loss 0.3330
+step  8000 / 25000 | loss 0.3446
+step  9000 / 25000 | loss 0.3432
+step 10000 / 25000 | loss 0.3494
+step 11000 / 25000 | loss 0.3550
+step 12000 / 25000 | loss 0.3391
+step 13000 / 25000 | loss 0.3542
+step 14000 / 25000 | loss 0.3199
+step 15000 / 25000 | loss 0.3298
+step 16000 / 25000 | loss 0.3243
+step 17000 / 25000 | loss 0.3212
+step 18000 / 25000 | loss 0.3300
+step 19000 / 25000 | loss 0.3258
+step 20000 / 25000 | loss 0.3270
+step 21000 / 25000 | loss 0.3229
+step 22000 / 25000 | loss 0.3144
+step 23000 / 25000 | loss 0.3112
+step 24000 / 25000 | loss 0.3257
+step 25000 / 25000 | loss 0.3115
+
+Training complete: 82.0s | best loss: 0.2778
+Checkpoint: puzzle8_detector_v3b.ckpt
+========================================
+
+
+========================================
+Run: 2026-02-23 10:50:21
+========================================
+Organelle: Detour-Detector
+Loaded checkpoint: puzzle8_detector_v3b.ckpt (step 25000)
+========================================
+
+
+========================================
+Run: 2026-02-23 10:58:36
+========================================
+Organelle: Detour-Detector
+Loaded checkpoint: puzzle8_detector_v3b.ckpt (step 25000)
 ========================================
 

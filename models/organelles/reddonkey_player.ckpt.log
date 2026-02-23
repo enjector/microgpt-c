@@ -1,14 +1,43 @@
 
 ========================================
-Retroactive Log (training predates logging)
+Run: 2026-02-23 10:39:25
 ========================================
-Organelle: reddonkey_player
-Game: Red Donkey | Role: player
+Organelle: Player
+Corpus: 199 docs | 8833 chars (8.6 KB)
+Vocab: 22 characters
 Architecture: N_EMBD=32 N_LAYER=2 N_HEAD=4 BLOCK_SIZE=128 MLP_DIM=128
-Params: ~30K
-Training: steps=25000 lr=0.001
-Corpus: ~199 docs
-Checkpoint: reddonkey_player.ckpt (360972 bytes)
-Result: 12% solve
+Params: 30080
+Training: batch=8 steps=25000 lr=0.0010
+
+--- Training ---
+step     1 / 25000 | loss 3.2881
+step  1000 / 25000 | loss 0.5861
+step  2000 / 25000 | loss 0.4288
+step  3000 / 25000 | loss 0.3522
+step  4000 / 25000 | loss 0.3714
+step  5000 / 25000 | loss 0.3043
+step  6000 / 25000 | loss 0.2681
+step  7000 / 25000 | loss 0.2365
+step  8000 / 25000 | loss 0.2422
+step  9000 / 25000 | loss 0.2032
+step 10000 / 25000 | loss 0.1711
+step 11000 / 25000 | loss 0.1732
+step 12000 / 25000 | loss 0.1641
+step 13000 / 25000 | loss 0.1612
+step 14000 / 25000 | loss 0.1480
+step 15000 / 25000 | loss 0.1488
+step 16000 / 25000 | loss 0.1583
+step 17000 / 25000 | loss 0.1428
+step 18000 / 25000 | loss 0.1337
+step 19000 / 25000 | loss 0.1160
+step 20000 / 25000 | loss 0.1255
+step 21000 / 25000 | loss 0.1318
+step 22000 / 25000 | loss 0.1163
+step 23000 / 25000 | loss 0.1195
+step 24000 / 25000 | loss 0.1253
+step 25000 / 25000 | loss 0.1140
+
+Training complete: 15.0s | best loss: 0.1066
+Checkpoint: reddonkey_player.ckpt
 ========================================
 

@@ -1,14 +1,51 @@
 
 ========================================
-Retroactive Log (training predates logging)
+Run: 2026-02-23 10:41:14
 ========================================
-Organelle: puzzle8_mover
-Game: 8-Puzzle | Role: mover
+Organelle: Greedy-Mover
+Corpus: 1686 docs | 72300 chars (70.6 KB)
+Vocab: 34 characters
 Architecture: N_EMBD=96 N_LAYER=4 N_HEAD=8 BLOCK_SIZE=128 MLP_DIM=384
-Params: ~460K
-Training: steps=25000 lr=0.001
-Corpus: ~1000 docs
-Checkpoint: puzzle8_mover_v3b.ckpt (5534220 bytes)
-Result: 60% solve
+Params: 461184
+Training: batch=8 steps=25000 lr=0.0010
+
+--- Training ---
+step     1 / 25000 | loss 4.8009
+step  1000 / 25000 | loss 0.1914
+step  2000 / 25000 | loss 0.1974
+step  3000 / 25000 | loss 0.2252
+step  4000 / 25000 | loss 0.2217
+step  5000 / 25000 | loss 0.1888
+step  6000 / 25000 | loss 0.1957
+step  7000 / 25000 | loss 0.2010
+step  8000 / 25000 | loss 0.2085
+step  9000 / 25000 | loss 0.1944
+step 10000 / 25000 | loss 0.1845
+step 11000 / 25000 | loss 0.2042
+step 12000 / 25000 | loss 0.2037
+step 13000 / 25000 | loss 0.1832
+step 14000 / 25000 | loss 0.1880
+step 15000 / 25000 | loss 0.1758
+step 16000 / 25000 | loss 0.1813
+step 17000 / 25000 | loss 0.1770
+step 18000 / 25000 | loss 0.1842
+step 19000 / 25000 | loss 0.1894
+step 20000 / 25000 | loss 0.1665
+step 21000 / 25000 | loss 0.1751
+step 22000 / 25000 | loss 0.1728
+step 23000 / 25000 | loss 0.1829
+step 24000 / 25000 | loss 0.1732
+step 25000 / 25000 | loss 0.1659
+
+Training complete: 169.0s | best loss: 0.1514
+Checkpoint: puzzle8_mover_v3b.ckpt
+========================================
+
+
+========================================
+Run: 2026-02-23 10:50:21
+========================================
+Organelle: Greedy-Mover
+Loaded checkpoint: puzzle8_mover_v3b.ckpt (step 25000)
 ========================================
 

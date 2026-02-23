@@ -1,14 +1,43 @@
 
 ========================================
-Retroactive Log (training predates logging)
+Run: 2026-02-23 10:32:07
 ========================================
-Organelle: sudoku_player
-Game: Sudoku | Role: player
+Organelle: Player
+Corpus: 20000 docs | 1321838 chars (1290.9 KB)
+Vocab: 24 characters
 Architecture: N_EMBD=64 N_LAYER=3 N_HEAD=4 BLOCK_SIZE=128 MLP_DIM=256
-Params: ~160K
-Training: steps=25000 lr=0.001
-Corpus: ~20000 docs
-Checkpoint: sudoku_player.ckpt (1904652 bytes)
-Result: 78% solve
+Params: 158720
+Training: batch=8 steps=25000 lr=0.0010
+
+--- Training ---
+step     1 / 25000 | loss 3.5675
+step  1000 / 25000 | loss 0.4287
+step  2000 / 25000 | loss 0.3682
+step  3000 / 25000 | loss 0.2934
+step  4000 / 25000 | loss 0.3295
+step  5000 / 25000 | loss 0.3084
+step  6000 / 25000 | loss 0.2914
+step  7000 / 25000 | loss 0.2692
+step  8000 / 25000 | loss 0.2776
+step  9000 / 25000 | loss 0.3155
+step 10000 / 25000 | loss 0.2585
+step 11000 / 25000 | loss 0.2975
+step 12000 / 25000 | loss 0.2432
+step 13000 / 25000 | loss 0.2587
+step 14000 / 25000 | loss 0.2687
+step 15000 / 25000 | loss 0.2822
+step 16000 / 25000 | loss 0.2536
+step 17000 / 25000 | loss 0.2443
+step 18000 / 25000 | loss 0.2512
+step 19000 / 25000 | loss 0.2265
+step 20000 / 25000 | loss 0.2414
+step 21000 / 25000 | loss 0.2300
+step 22000 / 25000 | loss 0.2420
+step 23000 / 25000 | loss 0.2350
+step 24000 / 25000 | loss 0.2177
+step 25000 / 25000 | loss 0.2346
+
+Training complete: 95.0s | best loss: 0.2010
+Checkpoint: sudoku_player.ckpt
 ========================================
 
