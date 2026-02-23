@@ -20,12 +20,12 @@ static char *load_file_content(const char *filepath) {
 }
 // ---------------------------------
 
-// --- vm_benchmarks.c ---
 /*
- * vm_benchmarks.c
+ * MicroGPT-C VM Engine — Benchmarks
  *
- * Copyright 2024 Enjector Software, Ltd. All Rights Reserved.
+ * Copyright (c) 2026 Ajay Soni (ajay.soni@enjector.com), Enjector Software Ltd.
  *
+ * SPDX-License-Identifier: MIT
  */
 
 #include <assert.h>

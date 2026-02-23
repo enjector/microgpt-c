@@ -1,3 +1,11 @@
+/*
+ * MicroGPT-C — Test Framework Header
+ *
+ * Copyright (c) 2026 Ajay Soni (ajay.soni@enjector.com), Enjector Software Ltd.
+ *
+ * SPDX-License-Identifier: MIT
+ */
+
 #ifndef ENX_TEST_H
 #define ENX_TEST_H
 
