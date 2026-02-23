@@ -73,6 +73,31 @@ All benchmarks on Apple M2 Max, single-threaded unless noted. See [PERFORMANCE.m
 
 vs. Karpathy's **microgpt.py**: training is **1,000× faster**, inference is **700×+ faster**.
 
+### Game Leaderboard (11 Games)
+
+All games: trained organelle vs random opponent, 100 evaluation games each. Full details in [ORGANELLE_GAMES.md](docs/organelles/ORGANELLE_GAMES.md).
+
+| Game | Organelles | Params | Size | Total | Training | Result |
+|------|:----------:|-------:|-----:|------:|---------:|-------:|
+| **Pentago** | 2 | 92K | 1.1 MB | 2.2 MB | ~9 min | **91% win** |
+| **8-Puzzle** | 5 | 460K | 5.4 MB | 27 MB | ~7 min | **90% solve** |
+| **Connect-4** | 2 | 460K | 5.4 MB | 10.8 MB | ~21 min | **88% win** |
+| **Tic-Tac-Toe** | 2 | 460K | 5.4 MB | 10.8 MB | ~17 min | **87% w+d** |
+| **Mastermind** | 2 | 92K | 1.1 MB | 2.2 MB | ~8 min | **79% solve** |
+| **Sudoku** | 2 | 160K | 1.9 MB | 3.8 MB | ~3 min | **78% solve** |
+| **Othello** | 2 | 92K | 1.1 MB | 2.2 MB | ~8 min | **70% win** |
+| **Klotski** | 2 | 30K | 360 KB | 720 KB | ~36 sec | **62% solve** |
+| **Red Donkey** | 2 | 30K | 360 KB | 720 KB | ~38 sec | 12% solve |
+| **Lights Out** | 2 | 160K | 1.9 MB | 3.8 MB | ~4 min | 10% solve |
+| **Hex** | 2 | 92K | 1.1 MB | 2.2 MB | ~3 min | 4% win |
+
+### Real-World Data
+
+| Experiment | Organelles | Params | Size | Training | Result | Interpretation |
+|------------|:----------:|-------:|-----:|---------:|--------|----------------|
+| **Market regime** | 3 | 615K | 7.1 MB | ~10 min | **57% holdout** (2.8× baseline) | Learnable signal |
+| **Lottery** | 2 | 163K | 1.9 MB | ~5 min | Random wins | Negative control ✓ |
+
 ---
 
 ## Explore Further
