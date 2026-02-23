@@ -1900,21 +1900,22 @@ TEST(microgpt_config_mismatch) {
    * macro */
   cfg.n_embd = N_EMBD + 8;
 
-  /* Suppress the expected stderr output for this specific failure */
-  FILE *old_stderr = stderr;
+  /* Suppress the expected stderr output for this specific failure.
+     We use freopen which works on MSVC (where stderr is not an l-value). */
 #ifdef _WIN32
-  stderr = fopen("nul", "w");
+  freopen("NUL", "w", stderr);
 #else
-  stderr = fopen("/dev/null", "w");
+  freopen("/dev/null", "w", stderr);
 #endif
 
   Model *m = model_create(256, &cfg);
 
-  /* Restore stderr */
-  if (stderr != old_stderr) {
-    fclose(stderr);
-    stderr = old_stderr;
-  }
+  /* Restore stderr — reopen the console/terminal */
+#ifdef _WIN32
+  freopen("CON", "w", stderr);
+#else
+  freopen("/dev/stderr", "w", stderr);
+#endif
 
   /* The model creation must fail because the config dimensions don't match the
    * binary's macros. If it does NOT fail, it would lead to out-of-bounds
