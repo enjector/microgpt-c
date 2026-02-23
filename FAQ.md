@@ -171,7 +171,7 @@ cmake --build . --config Release
 # Train a name generator in < 1 second (4K params)
 ./names_demo
 
-# Train Shakespeare text generation (840K params, multi-threaded)
+# Train Shakespeare text generation (841K params, multi-threaded)
 ./shakespeare_demo
 
 # Run a multi-organelle game pipeline (88% win rate)
@@ -182,14 +182,15 @@ Requirements: a **C99 compiler** (GCC, Clang, or MSVC) and **CMake 3.10+**. Noth
 
 ### Where can I learn the theory?
 
-The project includes a **14-chapter technical guide** covering everything from transformer fundamentals to organelle pipeline design. Start at [docs/book/0.md](docs/book/0.md). Key documents:
+The project includes a **16-chapter technical guide** covering everything from transformer fundamentals to organelle pipeline design and the reasoning conclusion. Start at [docs/book/0.md](docs/book/0.md). Key documents:
 
 | Document | What it covers |
 |----------|---------------|
 | [VISION.md](VISION.md) | The stem cell philosophy |
 | [VALUE_PROPOSITION.md](VALUE_PROPOSITION.md) | Why this matters, who benefits |
-| [Technical guide](docs/book/0.md) | 14 chapters, from basics to advanced |
+| [Technical guide](docs/book/0.md) | 16 chapters, from basics to advanced |
 | [ORGANELLE_PIPELINE.md](docs/organelles/ORGANELLE_PIPELINE.md) | Pipeline wire format design |
+| [ORGANELLE_REASONING_CONCLUSION.md](docs/organelles/ORGANELLE_REASONING_CONCLUSION.md) | Reasoning verdict and learning frontier |
 | [TRAINING_STRATEGIES.md](docs/foundation/TRAINING_STRATEGIES.md) | LR scheduling, warmup, capacity scaling |
 
 ### Can I use MicroGPT-C as a library in my own project?
@@ -203,6 +204,8 @@ Yes. Include `microgpt.h`, link against `microgpt.c`, and you have access to the
 ### How do you handle "hallucinations"?
 
 In the OPA framework, hallucinations are mitigated by the **Judge** organelle. If a Worker proposes an invalid action, the Judge catches it before it is executed. In our game experiments, this coordination resulted in **zero invalid moves** over thousands of test cycles. The kanban replan loop ensures that rejected moves trigger a new attempt, not a crash.
+
+Our **Learning Frontier** research shows this scaffolding is not permanent: a 64K-parameter model needed 181 coordinator interventions, but at 460K parameters the model internalised the coordination logic entirely — zero interventions needed, identical performance with or without the pipeline. See [ORGANELLE_REASONING_CONCLUSION.md](docs/organelles/ORGANELLE_REASONING_CONCLUSION.md).
 
 ### Does it solve the lottery?
 

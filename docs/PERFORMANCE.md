@@ -13,6 +13,21 @@ Measured on the **character-level name generation** workload (1,000 training ste
 
 ---
 
+## Names Demo (N_EMBD=16, N_LAYER=1, vocab=27)
+
+The simplest possible model — generates plausible human names from a 32K-name corpus:
+
+| Metric | Value |
+|--------|-------|
+| **Model parameters** | 4,192 |
+| **Vocab** | 27 characters |
+| **Training throughput** | ~685K tok/s |
+| **Training time** | <0.1s (1K steps) |
+| **Inference throughput** | ~110K tok/s |
+| **Checkpoint size** | 49 KB |
+
+---
+
 ## Shakespeare Character-Level (N_EMBD=128, N_LAYER=4, vocab=84)
 
 Multi-threaded training with auto-detected workers (uses all available CPU cores):
@@ -38,6 +53,26 @@ Multi-threaded training with auto-detected workers (uses all available CPU cores
 | **Inference throughput** | ~40K tok/s |
 
 > Word-level models achieve **2.5× faster inference** than character-level (40K vs 16K tok/s) because each token represents a whole word, dramatically reducing sequence length for the same text.
+
+---
+
+## Organelle Game Pipeline (Evaluation Speed)
+
+Time to play 100 games using pretrained checkpoints (no training):
+
+| Game | Pipeline time | Games/sec |
+|------|-------------:|-----------:|
+| **Klotski** | 1.4s | 71 |
+| **Red Donkey** | 1.9s | 53 |
+| **Mastermind** | 1.0s | 100 |
+| **8-Puzzle** | 1.2s | 25 |
+| **Sudoku** | 1.7s | 60 |
+| **Tic-Tac-Toe** | 1.5s | 67 |
+| **Othello** | 5.7s | 18 |
+| **Pentago** | 6.5s | 15 |
+| **Connect-4** | 7.1s | 14 |
+| **Hex** | 11.4s | 9 |
+| **Lights Out** | 15.8s | 6 |
 
 ---
 
