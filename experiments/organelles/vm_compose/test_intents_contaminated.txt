@@ -1,0 +1,20 @@
+// compute factorial of n
+// compute absolute value
+// compute simple interest
+// compute sum of numbers from 1 to n
+// compute circle area from radius
+// compute cube root
+// calculate total with discount
+// find larger of three numbers
+// compute average of three numbers
+// compute sum of cubes from 1 to n
+// compute power of a number
+// convert temperature celsius to fahrenheit
+// compute perimeter of rectangle
+// calculate compound interest
+// compute fibonacci number
+// find minimum of two numbers
+// compute hypotenuse length
+// calculate bmi from weight and height
+// compute triangle area from base and height
+// convert miles to kilometers

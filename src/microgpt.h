@@ -519,6 +519,14 @@ size_t tokenize(const char *doc, size_t doc_len, const Vocab *vocab,
 /* ========================== Model Lifecycle =============================== */
 
 /*
+ * microgpt_verify_config - Validates that the runtime configuration matches
+ *   the compile-time macro definitions (N_EMBD, N_LAYER, etc.). This prevents
+ *   buffer overflows where the CFG dimension is smaller or larger than the
+ * stack arrays. Returns 0 on success, -1 on mismatch.
+ */
+int microgpt_verify_config(const MicrogptConfig *cfg);
+
+/*
  * model_create    - Allocate and randomly initialise a Transformer model
  *                   with the given vocabulary size and configuration.
  *                   Weights are drawn from N(0, 0.08²).

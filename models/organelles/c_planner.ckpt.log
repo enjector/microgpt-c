@@ -12,3 +12,32 @@ Checkpoint: c_planner.ckpt (14475276 bytes)
 Result: 83% exact match
 ========================================
 
+
+========================================
+Run: 2026-02-22 08:37:43
+========================================
+Organelle: c_planner
+Corpus: 1452 docs | 95559 chars (93.3 KB)
+Vocab: 40 characters
+Architecture: N_EMBD=128 N_LAYER=6 N_HEAD=8 BLOCK_SIZE=512 MLP_DIM=512
+Params: 1255424
+Training: batch=8 steps=50000 lr=0.0005
+
+--- Training ---
+step     1 / 50000 | loss 6.5232
+step  1000 / 50000 | loss 1.4116
+
+========================================
+Run: 2026-02-22 08:38:53
+========================================
+Organelle: c_planner
+Corpus: 1452 docs | 95559 chars (93.3 KB)
+Vocab: 40 characters
+Architecture: N_EMBD=128 N_LAYER=6 N_HEAD=8 BLOCK_SIZE=512 MLP_DIM=512
+Params: 1255424
+Training: batch=8 steps=50000 lr=0.0005
+
+--- Training ---
+step     1 / 50000 | loss 6.5232
+step  2000 / 50000 | loss 0.7000
+step  3000 / 50000 | loss 0.4238

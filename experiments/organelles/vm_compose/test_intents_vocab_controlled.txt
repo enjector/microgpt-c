@@ -1,0 +1,20 @@
+// compute product of two values and add one
+// find largest of two numbers
+// compute product of even numbers up to n
+// calculate distance between two values
+// compute double of a number
+// find smallest of three numbers
+// calculate area of triangle from base and height
+// compute sum of odd numbers up to n
+// compute total cost from price and amount
+// calculate net profit from price and cost
+// compute cube of a number
+// find if number is even or odd
+// calculate total tax from income and rate
+// compute square root approximation using newton method
+// find halfway point between two values
+// compute sum of cubes of even numbers up to n
+// compute absolute difference of two numbers
+// count even numbers from 1 to n
+// calculate compound growth after n steps
+// compute sum of digits of a number

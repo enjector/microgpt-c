@@ -1,0 +1,757 @@
+// compute cube root
+function cube_root(x: number): number {
+    var guess = x / 3;
+    for (var i = 0; i < 20; i++) {
+        guess = (2 * guess + x / (guess * guess)) / 3;
+    }
+    return guess;
+}
+
+// compute circle area from radius
+function circle_area(radius: number): number {
+    return 3.14159 * radius * radius;
+}
+
+// calculate total with discount
+function total_with_discount(price: number, discount: number): number {
+    return price * (1 - discount / 100);
+}
+
+// find larger of three numbers
+function max_of_three(a: number, b: number, c: number): number {
+    var result = a;
+    if (b > result) {
+        result = b;
+    }
+    if (c > result) {
+        result = c;
+    }
+    return result;
+}
+
+// compute average of three numbers
+function avg_three(a: number, b: number, c: number): number {
+    return (a + b + c) / 3;
+}
+
+// compute sum of cubes from 1 to n
+function sum_cubes(n: number): number {
+    var total = 0;
+    for (var i = 1; i <= n; i++) {
+        total = total + i * i * i;
+    }
+    return total;
+}
+
+// compute power of a number
+function power(base: number, exp: number): number {
+    var result = 1;
+    for (var i = 0; i < exp; i++) {
+        result = result * base;
+    }
+    return result;
+}
+
+// calculate compound interest
+function compound_interest(principal: number, rate: number, years: number): number {
+    var amount = principal;
+    for (var i = 0; i < years; i++) {
+        amount = amount * (1 + rate / 100);
+    }
+    return amount - principal;
+}
+
+// compute fibonacci number
+function fib(n: number): number {
+    var a = 0;
+    var b = 1;
+    for (var i = 0; i < n; i++) {
+        var temp = b;
+        b = a + b;
+        a = temp;
+    }
+    return a;
+}
+
+// compute hypotenuse length
+function hypotenuse(a: number, b: number): number {
+    var sum = a * a + b * b;
+    var guess = sum / 2;
+    for (var i = 0; i < 20; i++) {
+        guess = (guess + sum / guess) / 2;
+    }
+    return guess;
+}
+
+// calculate bmi from weight and height
+function bmi(weight: number, height: number): number {
+    return weight / (height * height);
+}
+
+// compute triangle area from base and height
+function triangle_area(base: number, height: number): number {
+    return base * height / 2;
+}
+
+// convert miles to kilometers
+function miles_to_km(miles: number): number {
+    return miles * 1.60934;
+}
+
+// convert kilometers to miles
+function km_to_miles(km: number): number {
+    return km / 1.60934;
+}
+
+// compute square root using newton method
+function sqrt(x: number): number {
+    var guess = x / 2;
+    for (var i = 0; i < 20; i++) {
+        guess = (guess + x / guess) / 2;
+    }
+    return guess;
+}
+
+// compute floor of number
+function floor_val(x: number): number {
+    var result = 0;
+    if (x >= 0) {
+        for (var i = 0; i < x; i++) {
+            result = i;
+        }
+    }
+    return result;
+}
+
+// compute ceiling of number
+function ceil_val(x: number): number {
+    var result = 0;
+    for (var i = 0; i <= x; i++) {
+        result = i;
+    }
+    if (result < x) {
+        result = result + 1;
+    }
+    return result;
+}
+
+// compute logarithm base 2 approximation
+function log2_approx(x: number): number {
+    var result = 0;
+    var val = x;
+    for (var i = 0; i < 30; i++) {
+        if (val >= 2) {
+            val = val / 2;
+            result = result + 1;
+        }
+    }
+    return result;
+}
+
+// compute modular exponentiation
+function mod_pow(base: number, exp: number, modulus: number): number {
+    var result = 1;
+    for (var i = 0; i < exp; i++) {
+        result = result * base;
+        result = result - (result / modulus) * modulus;
+    }
+    return result;
+}
+
+// check if number is prime
+function is_prime(n: number): number {
+    if (n < 2) {
+        return 0;
+    }
+    for (var i = 2; i < n; i++) {
+        if (n - (n / i) * i == 0) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+// count digits in number
+function count_digits(n: number): number {
+    var count = 0;
+    var val = n;
+    if (val < 0) {
+        val = 0 - val;
+    }
+    if (val == 0) {
+        return 1;
+    }
+    for (var i = 0; i < 20; i++) {
+        if (val > 0) {
+            val = val / 10;
+            count = count + 1;
+        }
+    }
+    return count;
+}
+
+// compute sum of digits
+function sum_digits(n: number): number {
+    var total = 0;
+    var val = n;
+    if (val < 0) {
+        val = 0 - val;
+    }
+    for (var i = 0; i < 20; i++) {
+        if (val > 0) {
+            total = total + val - (val / 10) * 10;
+            val = val / 10;
+        }
+    }
+    return total;
+}
+
+// reverse digits of number
+function reverse_number(n: number): number {
+    var result = 0;
+    var val = n;
+    for (var i = 0; i < 10; i++) {
+        if (val > 0) {
+            result = result * 10 + val - (val / 10) * 10;
+            val = val / 10;
+        }
+    }
+    return result;
+}
+
+// check if number is palindrome
+function is_palindrome(n: number): number {
+    var original = n;
+    var reversed = 0;
+    var val = n;
+    for (var i = 0; i < 10; i++) {
+        if (val > 0) {
+            reversed = reversed * 10 + val - (val / 10) * 10;
+            val = val / 10;
+        }
+    }
+    if (reversed == original) {
+        return 1;
+    }
+    return 0;
+}
+
+// compute harmonic sum up to n
+function harmonic_sum(n: number): number {
+    var total = 0;
+    for (var i = 1; i <= n; i++) {
+        total = total + 1 / i;
+    }
+    return total;
+}
+
+// compute geometric sum
+function geometric_sum(ratio: number, terms: number): number {
+    var total = 0;
+    var power = 1;
+    for (var i = 0; i < terms; i++) {
+        total = total + power;
+        power = power * ratio;
+    }
+    return total;
+}
+
+// compute arithmetic series sum
+function arithmetic_series(first: number, diff: number, n: number): number {
+    return n * (2 * first + (n - 1) * diff) / 2;
+}
+
+// compute weighted average of two values
+function weighted_avg(a: number, b: number, weight: number): number {
+    return a * weight + b * (1 - weight);
+}
+
+// linear interpolation between two values
+function lerp(a: number, b: number, t: number): number {
+    return a + (b - a) * t;
+}
+
+// compute distance between two points
+function distance_2d(x1: number, y1: number, x2: number, y2: number): number {
+    var dx = x2 - x1;
+    var dy = y2 - y1;
+    var sum = dx * dx + dy * dy;
+    var guess = sum / 2;
+    for (var i = 0; i < 20; i++) {
+        guess = (guess + sum / guess) / 2;
+    }
+    return guess;
+}
+
+// compute midpoint of two values
+function midpoint(a: number, b: number): number {
+    return (a + b) / 2;
+}
+
+// map value from one range to another
+function map_range(val: number, in_min: number, in_max: number, out_min: number, out_max: number): number {
+    return (val - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
+
+// compute running average
+function running_avg(old_avg: number, new_val: number, count: number): number {
+    return (old_avg * (count - 1) + new_val) / count;
+}
+
+// compute exponential moving average step
+function ema_step(prev: number, value: number, alpha: number): number {
+    return alpha * value + (1 - alpha) * prev;
+}
+
+// compute variance of two values
+function variance_two(a: number, b: number): number {
+    var mean = (a + b) / 2;
+    var d1 = a - mean;
+    var d2 = b - mean;
+    return (d1 * d1 + d2 * d2) / 2;
+}
+
+// normalize value to zero one range
+function normalize(val: number, min_val: number, max_val: number): number {
+    return (val - min_val) / (max_val - min_val);
+}
+
+// denormalize value from zero one range
+function denormalize(val: number, min_val: number, max_val: number): number {
+    return val * (max_val - min_val) + min_val;
+}
+
+// compute tax amount
+function tax_amount(income: number, rate: number): number {
+    return income * rate / 100;
+}
+
+// compute net salary after tax
+function net_salary(gross: number, tax_rate: number): number {
+    return gross * (1 - tax_rate / 100);
+}
+
+// compute tip amount
+function tip_amount(bill: number, percent: number): number {
+    return bill * percent / 100;
+}
+
+// compute total bill with tip
+function total_with_tip(bill: number, tip_pct: number): number {
+    return bill + bill * tip_pct / 100;
+}
+
+// split bill among people
+function split_bill(total: number, people: number): number {
+    return total / people;
+}
+
+// compute monthly payment
+function monthly_payment(principal: number, rate: number, months: number): number {
+    var monthly_rate = rate / 100 / 12;
+    var payment = principal * monthly_rate;
+    return payment;
+}
+
+// convert hours to minutes
+function hours_to_minutes(hours: number): number {
+    return hours * 60;
+}
+
+// convert minutes to seconds
+function minutes_to_seconds(minutes: number): number {
+    return minutes * 60;
+}
+
+// convert days to hours
+function days_to_hours(days: number): number {
+    return days * 24;
+}
+
+// convert inches to centimeters
+function inches_to_cm(inches: number): number {
+    return inches * 2.54;
+}
+
+// convert centimeters to inches
+function cm_to_inches(cm: number): number {
+    return cm / 2.54;
+}
+
+// convert pounds to kilograms
+function lbs_to_kg(lbs: number): number {
+    return lbs * 0.453592;
+}
+
+// convert kilograms to pounds
+function kg_to_lbs(kg: number): number {
+    return kg / 0.453592;
+}
+
+// compute speed from distance and time
+function speed(distance: number, time: number): number {
+    return distance / time;
+}
+
+// compute distance from speed and time
+function distance_from_speed(speed: number, time: number): number {
+    return speed * time;
+}
+
+// compute time from distance and speed
+function time_from_distance(distance: number, speed: number): number {
+    return distance / speed;
+}
+
+// compute profit percentage
+function profit_percent(cost: number, selling: number): number {
+    return (selling - cost) / cost * 100;
+}
+
+// compute loss percentage
+function loss_percent(cost: number, selling: number): number {
+    return (cost - selling) / cost * 100;
+}
+
+// compute selling price from cost and markup
+function selling_price(cost: number, markup: number): number {
+    return cost * (1 + markup / 100);
+}
+
+// compute cost price from selling price and profit
+function cost_price(selling: number, profit_pct: number): number {
+    return selling / (1 + profit_pct / 100);
+}
+
+// compute nth power of two
+function power_of_two(n: number): number {
+    var result = 1;
+    for (var i = 0; i < n; i++) {
+        result = result * 2;
+    }
+    return result;
+}
+
+// compute collatz next step
+function collatz_step(n: number): number {
+    if (n - (n / 2) * 2 == 0) {
+        return n / 2;
+    }
+    return 3 * n + 1;
+}
+
+// compute collatz sequence length
+function collatz_length(n: number): number {
+    var count = 0;
+    var val = n;
+    for (var i = 0; i < 200; i++) {
+        if (val > 1) {
+            if (val - (val / 2) * 2 == 0) {
+                val = val / 2;
+            } else {
+                val = 3 * val + 1;
+            }
+            count = count + 1;
+        }
+    }
+    return count;
+}
+
+// compute digital root of number
+function digital_root(n: number): number {
+    var val = n;
+    for (var iter = 0; iter < 10; iter++) {
+        if (val >= 10) {
+            var total = 0;
+            for (var i = 0; i < 10; i++) {
+                if (val > 0) {
+                    total = total + val - (val / 10) * 10;
+                    val = val / 10;
+                }
+            }
+            val = total;
+        }
+    }
+    return val;
+}
+
+// compute binomial coefficient n choose k
+function binomial(n: number, k: number): number {
+    var result = 1;
+    for (var i = 0; i < k; i++) {
+        result = result * (n - i) / (i + 1);
+    }
+    return result;
+}
+
+// compute catalan number
+function catalan(n: number): number {
+    var result = 1;
+    for (var i = 0; i < n; i++) {
+        result = result * 2 * (2 * i + 1) / (i + 2);
+    }
+    return result;
+}
+
+// compute lucas number at position n
+function lucas(n: number): number {
+    var a = 2;
+    var b = 1;
+    for (var i = 0; i < n; i++) {
+        var temp = b;
+        b = a + b;
+        a = temp;
+    }
+    return a;
+}
+
+// compute tribonacci number
+function tribonacci(n: number): number {
+    var a = 0;
+    var b = 0;
+    var c = 1;
+    for (var i = 0; i < n; i++) {
+        var next = a + b + c;
+        a = b;
+        b = c;
+        c = next;
+    }
+    return a;
+}
+
+// compute pentagonal number
+function pentagonal(n: number): number {
+    return n * (3 * n - 1) / 2;
+}
+
+// compute hexagonal number
+function hexagonal(n: number): number {
+    return n * (2 * n - 1);
+}
+
+// compute tetrahedral number
+function tetrahedral(n: number): number {
+    return n * (n + 1) * (n + 2) / 6;
+}
+
+// compute sum of reciprocals up to n
+function sum_reciprocals(n: number): number {
+    var total = 0;
+    for (var i = 1; i <= n; i++) {
+        total = total + 1 / i;
+    }
+    return total;
+}
+
+// compute alternating sum from 1 to n
+function alternating_sum(n: number): number {
+    var total = 0;
+    var sign = 1;
+    for (var i = 1; i <= n; i++) {
+        total = total + sign * i;
+        sign = 0 - sign;
+    }
+    return total;
+}
+
+// compute sum of powers of two up to n terms
+function sum_powers_two(n: number): number {
+    var total = 0;
+    var power = 1;
+    for (var i = 0; i < n; i++) {
+        total = total + power;
+        power = power * 2;
+    }
+    return total;
+}
+
+// compute exponential approximation using taylor series
+function exp_approx(x: number): number {
+    var result = 1;
+    var term = 1;
+    for (var i = 1; i <= 10; i++) {
+        term = term * x / i;
+        result = result + term;
+    }
+    return result;
+}
+
+// compute sine approximation using taylor series
+function sin_approx(x: number): number {
+    var result = x;
+    var term = x;
+    for (var i = 1; i <= 5; i++) {
+        term = 0 - term * x * x / ((2 * i) * (2 * i + 1));
+        result = result + term;
+    }
+    return result;
+}
+
+// compute cosine approximation using taylor series
+function cos_approx(x: number): number {
+    var result = 1;
+    var term = 1;
+    for (var i = 1; i <= 5; i++) {
+        term = 0 - term * x * x / ((2 * i - 1) * (2 * i));
+        result = result + term;
+    }
+    return result;
+}
+
+// compute softmax denominator for two values
+function softmax_denom(a: number, b: number): number {
+    var ea = 1;
+    var eb = 1;
+    var ta = 1;
+    var tb = 1;
+    for (var i = 1; i <= 10; i++) {
+        ta = ta * a / i;
+        ea = ea + ta;
+        tb = tb * b / i;
+        eb = eb + tb;
+    }
+    return ea + eb;
+}
+
+// compute batch normalization
+function batch_norm(x: number, mean: number, variance: number): number {
+    var std = variance;
+    var guess = std / 2;
+    for (var i = 0; i < 20; i++) {
+        guess = (guess + std / guess) / 2;
+    }
+    return (x - mean) / (guess + 0.00001);
+}
+
+// compute dot product of two 2d vectors
+function dot_2d(x1: number, y1: number, x2: number, y2: number): number {
+    return x1 * x2 + y1 * y2;
+}
+
+// compute cross product magnitude of two 2d vectors
+function cross_2d(x1: number, y1: number, x2: number, y2: number): number {
+    return x1 * y2 - y1 * x2;
+}
+
+// compute vector magnitude 2d
+function magnitude_2d(x: number, y: number): number {
+    var sum = x * x + y * y;
+    var guess = sum / 2;
+    for (var i = 0; i < 20; i++) {
+        guess = (guess + sum / guess) / 2;
+    }
+    return guess;
+}
+
+// compute angle between two vectors using dot product
+function angle_between(x1: number, y1: number, x2: number, y2: number): number {
+    var dot = x1 * x2 + y1 * y2;
+    var m1 = x1 * x1 + y1 * y1;
+    var m2 = x2 * x2 + y2 * y2;
+    return dot / (m1 * m2);
+}
+
+// compute area of trapezoid
+function trapezoid_area(a: number, b: number, height: number): number {
+    return (a + b) * height / 2;
+}
+
+// compute volume of sphere
+function sphere_volume(radius: number): number {
+    return 4 * 3.14159 * radius * radius * radius / 3;
+}
+
+// compute surface area of sphere
+function sphere_surface(radius: number): number {
+    return 4 * 3.14159 * radius * radius;
+}
+
+// compute volume of cylinder
+function cylinder_volume(radius: number, height: number): number {
+    return 3.14159 * radius * radius * height;
+}
+
+// compute volume of cone
+function cone_volume(radius: number, height: number): number {
+    return 3.14159 * radius * radius * height / 3;
+}
+
+// compute circumference of circle
+function circumference(radius: number): number {
+    return 2 * 3.14159 * radius;
+}
+
+// compute arc length
+function arc_length(radius: number, angle: number): number {
+    return radius * angle;
+}
+
+// compute sector area
+function sector_area(radius: number, angle: number): number {
+    return radius * radius * angle / 2;
+}
+
+// compute elastic potential energy
+function elastic_energy(k: number, x: number): number {
+    return 0.5 * k * x * x;
+}
+
+// compute gravitational force
+function gravity_force(m1: number, m2: number, distance: number): number {
+    return 6.674 * m1 * m2 / (distance * distance);
+}
+
+// compute ohms law voltage
+function ohms_voltage(current: number, resistance: number): number {
+    return current * resistance;
+}
+
+// compute ohms law current
+function ohms_current(voltage: number, resistance: number): number {
+    return voltage / resistance;
+}
+
+// compute electrical power
+function electrical_power(voltage: number, current: number): number {
+    return voltage * current;
+}
+
+// compute thermal energy
+function thermal_energy(mass: number, temp_change: number, specific_heat: number): number {
+    return mass * specific_heat * temp_change;
+}
+
+// compute wave frequency from period
+function wave_frequency(period: number): number {
+    return 1 / period;
+}
+
+// compute wavelength from speed and frequency
+function wavelength(speed: number, frequency: number): number {
+    return speed / frequency;
+}
+
+// compute density from mass and volume
+function density(mass: number, volume: number): number {
+    return mass / volume;
+}
+
+// compute pressure from force and area
+function pressure(force: number, area: number): number {
+    return force / area;
+}
+
+// compute work done
+function work_done(force: number, distance: number): number {
+    return force * distance;
+}
+
+// compute impulse
+function impulse(force: number, time: number): number {
+    return force * time;
+}
+
+// compute momentum
+function momentum(mass: number, velocity: number): number {
+    return mass * velocity;
+}

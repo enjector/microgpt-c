@@ -1,0 +1,34 @@
+
+// ------------------------------------------------------------
+// main()
+// ------------------------------------------------------------
+  0)	main:
+
+  1)	// *** Line 2: function main() {
+  2)	      CREATE_SET_VAR	{c    }       100:number     {n}	                 :              	            total:number     {n}
+
+  3)	// *** Line 4: var finished = false;
+  4)	      CREATE_SET_VAR	{c    }     false:boolean    {b}	                 :              	         finished:boolean    {b}
+
+  5)	// *** Line 6: while (!finished) {
+  6)	L0:
+
+  7)	// *** Line 6: (!finished) {
+  8)	                 NOT	         finished:boolean    {b}	                 :              	{ r[0]}       r$0:boolean    {b}
+  9)	      CONDITION_TRUE	{ r[0]}       r$0:boolean    {b}	                 :              	{ r[1]}       r$1:boolean    {b}
+ 10)	       JUMP_IF_FALSE	{ r[1]}       r$1:boolean    {b}	                 :              	                       L1 [21]
+
+ 11)	// *** Line 7: total = total - 1;
+ 12)	                 SUB	            total:number     {n}	{c    }         1:number     {n}	{ r[2]}       r$2:number     {n}
+ 13)	             SET_VAR	{ r[2]}       r$2:number     {n}	                 :              	            total:number     {n}
+
+ 14)	// *** Line 8: if (total > 0) {
+ 15)	        CONDITION_GT	            total:number     {n}	{c    }         0:number     {n}	{ r[3]}       r$3:boolean    {b}
+ 16)	       JUMP_IF_FALSE	{ r[3]}       r$3:boolean    {b}	                 :              	                       L2 [19]
+
+ 17)	// *** Line 9: finished = true;
+ 18)	             SET_VAR	{c    }      true:boolean    {b}	                 :              	         finished:boolean    {b}
+ 19)	L2:
+ 20)	                JUMP	                 :              	                 :              	                       L0 [6]
+ 21)	L1:
+ 22)	              RETURN	                 :              	                 :              	                 :              

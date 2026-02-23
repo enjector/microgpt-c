@@ -1,0 +1,248 @@
+function vec_scale(a: number, b: number, c: number, d: number) {}
+function minmax_normalize(a: number, b: number, c: number, d: number) {}
+function vec_normalize(a: number, b: number, c: number, d: number) {}
+function moving_max(a: number, b: number, c: number, d: number) {}
+function moving_min(a: number, b: number, c: number, d: number) {}
+function gen_sine(a: number, b: number, c: number, d: number) {}
+function add_noise(a: number, b: number, c: number, d: number) {}
+function rolling_mean(a: number, b: number, c: number, d: number) {}
+function conv(a: number, b: number, c: number, d: number) {}
+function zscore_normalize(a: number, b: number, c: number, d: number) {}
+function mat_vec(a: number, b: number, c: number, d: number) {}
+function softmax(a: number, b: number, c: number, d: number) {}
+function mean(a: number, b: number, c: number, d: number) {}
+function stddev(a: number, b: number, c: number, d: number) {}
+function diff_central(a: number, b: number, c: number, d: number) {}
+function lowpass(a: number, b: number, c: number, d: number) {}
+function downsample(a: number, b: number, c: number, d: number) {}
+function upsample(a: number, b: number, c: number, d: number) {}
+function moving_avg(a: number, b: number, c: number, d: number) {}
+function signal_rms(a: number, b: number, c: number, d: number) {}
+function max_val(a: number, b: number, c: number, d: number) {}
+function min_val(a: number, b: number, c: number, d: number) {}
+function clamp(a: number, b: number, c: number, d: number) {}
+function sigmoid(a: number, b: number, c: number, d: number) {}
+function relu(a: number, b: number, c: number, d: number) {}
+function softplus(a: number, b: number, c: number, d: number) {}
+function leaky_relu(a: number, b: number, c: number, d: number) {}
+function tanh_approx(a: number, b: number, c: number, d: number) {}
+function sign(a: number, b: number, c: number, d: number) {}
+function lerp(a: number, b: number, c: number, d: number) {}
+function sqrt(a: number, b: number, c: number, d: number) {}
+function mse(a: number, b: number, c: number, d: number) {}
+function mae(a: number, b: number, c: number, d: number) {}
+function bubble_sort(a: number, b: number, c: number, d: number) {}
+function percentile(a: number, b: number, c: number, d: number) {}
+function iqr(a: number, b: number, c: number, d: number) {}
+function trimmed_mean(a: number, b: number, c: number, d: number) {}
+function median(a: number, b: number, c: number, d: number) {}
+function ema_series(a: number, b: number, c: number, d: number) {}
+function cumsum(a: number, b: number, c: number, d: number) {}
+function hamming_window(a: number, b: number, c: number, d: number) {}
+function fft_radix2(a: number, b: number, c: number, d: number) {}
+function fft_magnitude(a: number, b: number, c: number, d: number) {}
+function fft_phase(a: number, b: number, c: number, d: number) {}
+function bandpass_filter(a: number, b: number, c: number, d: number) {}
+function hilbert_envelope(a: number, b: number, c: number, d: number) {}
+function correlation(a: number, b: number, c: number, d: number) {}
+function dot(a: number, b: number, c: number, d: number) {}
+function variance(a: number, b: number, c: number, d: number) {}
+function covariance(a: number, b: number, c: number, d: number) {}
+function cross_entropy(a: number, b: number, c: number, d: number) {}
+function kl_divergence(a: number, b: number, c: number, d: number) {}
+function entropy(a: number, b: number, c: number, d: number) {}
+function compute_ranks(a: number, b: number, c: number, d: number) {}
+function vec_norm(a: number, b: number, c: number, d: number) {}
+function map_range(a: number, b: number, c: number, d: number) {}
+function log(a: number, b: number, c: number, d: number) {}
+function signal_energy(a: number, b: number, c: number, d: number) {}
+function histogram(a: number, b: number, c: number, d: number) {}
+function running_stddev(a: number, b: number, c: number, d: number) {}
+function autocorrelation(a: number, b: number, c: number, d: number) {}
+function zero_crossings(a: number, b: number, c: number, d: number) {}
+function cosine_similarity(a: number, b: number, c: number, d: number) {}
+function exp(a: number, b: number, c: number, d: number) {}
+function linreg(a: number, b: number, c: number, d: number) {}
+function median_filter(a: number, b: number, c: number, d: number) {}
+function sma(a: number, b: number, c: number, d: number) {}
+function fir_filter(a: number, b: number, c: number, d: number) {}
+function sin(a: number, b: number, c: number, d: number) {}
+function argmax(a: number, b: number, c: number, d: number) {}
+function gradient_descent(a: number, b: number, c: number, d: number) {}
+function welford_update(a: number, b: number, c: number, d: number) {}
+function outer_product(a: number, b: number, c: number, d: number) {}
+function prefix_sum(a: number, b: number, c: number, d: number) {}
+function cumulative_product(a: number, b: number, c: number, d: number) {}
+function poly_eval(a: number, b: number, c: number, d: number) {}
+function horner(a: number, b: number, c: number, d: number) {}
+
+/* compute coefficient of variation */
+function coeff_of_variation(x: number) {
+    return stddev(x) / mean(x);
+}
+
+/* compute signal to noise ratio */
+function compute_snr(signal: number, noise: number) {
+    return signal_rms(signal) / signal_rms(noise);
+}
+
+/* compute range of array values */
+function array_range(x: number) {
+    return max_val(x) - min_val(x);
+}
+
+/* root mean square difference of two arrays */
+function rms_diff(a: number, b: number) {
+    return sqrt(mse(a, b));
+}
+
+/* mean of absolute element-wise differences */
+function mean_abs_diff(a: number, b: number) {
+    return mae(a, b);
+}
+
+/* compute mean of two arrays then difference */
+function mean_diff(a: number, b: number) {
+    return mean(a) - mean(b);
+}
+
+/* compute variance ratio of two arrays */
+function variance_ratio(a: number, b: number) {
+    return variance(a) / variance(b);
+}
+
+/* compute ratio of standard deviations */
+function stddev_ratio(a: number, b: number) {
+    return stddev(a) / stddev(b);
+}
+
+/* compute covariance then normalize to correlation */
+function cov_to_corr(a: number, b: number) {
+    return covariance(a, b) / (stddev(a) * stddev(b));
+}
+
+/* compute cross entropy between two distributions */
+function array_cross_entropy(p: number, q: number) {
+    return cross_entropy(p, q);
+}
+
+/* compute KL divergence between two distributions */
+function array_kl_div(p: number, q: number) {
+    return kl_divergence(p, q);
+}
+
+/* compute Euclidean norm of array */
+function array_norm(x: number) {
+    return vec_norm(x);
+}
+
+/* scale array by constant factor */
+function scale_array(x: number, k: number) {
+    var out = vec_scale(x, k);
+    return out;
+}
+
+/* map values to range zero to one */
+function map_to_unit(x: number) {
+    var out = minmax_normalize(x);
+    return out;
+}
+
+/* compute mean then ratio to maximum */
+function mean_to_max_ratio(x: number) {
+    return mean(x) / max_val(x);
+}
+
+/* compute two vectors then return their cosine similarity */
+function array_cosine_sim(a: number, b: number) {
+    return cosine_similarity(a, b);
+}
+
+/* scale vector to unit length */
+function unit_vector(x: number) {
+    var out = vec_normalize(x);
+    return out;
+}
+
+/* project vector a onto vector b */
+function project_onto(a: number, b: number) {
+    var out = vec_scale(b, scale);
+    return out;
+}
+
+/* compute mean and variance in single pass */
+function mean_variance(x: number) {
+    out_mean = mean(x);
+    out_var = variance(x);
+    return out;
+}
+
+/* compute mean and standard deviation */
+function mean_stddev(x: number) {
+    out_mean = mean(x);
+    out_std = stddev(x);
+    return out;
+}
+
+/* compute min and max */
+function min_max(x: number) {
+    out_min = min_val(x);
+    out_max = max_val(x);
+    return out;
+}
+
+/* compute rolling max of array */
+function rolling_maximum(x: number, period: number) {
+    var out = moving_max(x, period);
+    return out;
+}
+
+/* compute rolling min of array */
+function rolling_minimum(x: number, period: number) {
+    var out = moving_min(x, period);
+    return out;
+}
+
+/* generate sine wave then add noise */
+function noisy_sine(freq: number, noise_level: number) {
+    var out = gen_sine(freq);
+    var out = add_noise(noise_level);
+    return out;
+}
+
+/* compute index of maximum value */
+function index_of_max(x: number) {
+    return argmax(x);
+}
+
+/* conditional smoothing based on variance */
+function adaptive_smooth(x: number, period: number) {
+    if (v > 1.0) {
+    var out = rolling_mean(x, period * 2);
+    } else {
+    var out = rolling_mean(x, period);
+    }
+    return out;
+}
+
+/* compute convolution then normalize */
+function conv_normalize(x: number, h: number, nx: number, nh: number) {
+    var out = conv(x, nx, h, nh);
+    var out = zscore_normalize(out, nx + nh - 1);
+    return out;
+}
+
+/* matrix vector multiply then normalize */
+function matvec_normalize(M: number, x: number, m: number) {
+    var out = mat_vec(M, x, m);
+    var out = vec_normalize(out, m);
+    return out;
+}
+
+/* matrix vector multiply then softmax */
+function matvec_softmax(M: number, x: number, m: number) {
+    var out = mat_vec(M, x, m);
+    var out = softmax(out, m);
+    return out;
+}
+

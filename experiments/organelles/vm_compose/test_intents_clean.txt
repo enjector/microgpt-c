@@ -1,0 +1,20 @@
+// determine if a year is a leap year
+// compute the nth triangular number
+// convert degrees to radians
+// calculate the surface area of a cube
+// find the digital root of a number
+// compute the harmonic mean of two values
+// determine the sign of a number
+// calculate elapsed seconds from hours and minutes
+// compute the manhattan distance between two points
+// find the greatest common divisor of two numbers
+// calculate the volume of a pyramid
+// compute the arithmetic progression nth term
+// determine if a number is within a range
+// calculate the diagonal of a rectangle
+// compute the sum of even numbers up to n
+// find the midpoint between two values
+// calculate the area of a trapezoid
+// convert seconds to minutes
+// compute the geometric mean of two numbers
+// determine if a number is a perfect square

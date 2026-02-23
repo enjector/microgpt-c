@@ -252,19 +252,7 @@ add_demo(
           MAX_VOCAB=5000 MAX_DOCS=200000 MAX_DOC_LEN=512
 )
 
-# ==================================================================
-#  Organelle: C code generation
-# ==================================================================
 
-add_demo(
-  NAME    c_codegen
-  SOURCE  experiments/organelles/c_codegen/main.c
-  THREADS METAL BLAS
-  COPY    experiments/organelles/c_codegen/c_functions.txt
-  DEFINES N_EMBD=128 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=512 MLP_DIM=512
-          NUM_STEPS=50000 LEARNING_RATE=0.0003 BATCH_SIZE=16
-          MAX_VOCAB=200 MAX_DOCS=5000 MAX_DOC_LEN=1024
-)
 
 # ==================================================================
 #  Organelle: VM code generation (constrained DSL experiment)
@@ -275,59 +263,30 @@ add_demo(
   SOURCE  experiments/organelles/vm_codegen/main.c
   THREADS METAL BLAS
   COPY    experiments/organelles/vm_codegen/vm_functions_combined.txt
-  DEFINES N_EMBD=64 N_HEAD=4 N_LAYER=1 BLOCK_SIZE=256 MLP_DIM=256
+  DEFINES N_EMBD=96 N_HEAD=4 N_LAYER=2 BLOCK_SIZE=256 MLP_DIM=384
           NUM_STEPS=15000 LEARNING_RATE=0.0005 BATCH_SIZE=16
-          MAX_VOCAB=500 MAX_DOCS=5000 MAX_DOC_LEN=512
+          MAX_VOCAB=1200 MAX_DOCS=5000 MAX_DOC_LEN=512
 )
 target_link_libraries(vm_codegen PRIVATE microgpt_vm_lib)
 
 # ==================================================================
-#  Organelle: C wiring generation
+#  Organelle: VM compose pipeline (generate → validate → retry)
 # ==================================================================
 
 add_demo(
-  NAME    c_wiringgen
-  SOURCE  experiments/organelles/c_wiringgen/main.c
-  THREADS METAL BLAS
-  COPY    experiments/organelles/c_wiringgen/c_wiring.txt
-  DEFINES N_EMBD=128 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=512 MLP_DIM=512
-          NUM_STEPS=50000 LEARNING_RATE=0.0003 BATCH_SIZE=16
-          MAX_VOCAB=200 MAX_DOCS=5000 MAX_DOC_LEN=1024
-)
-
-# ==================================================================
-#  Organelle: TS wiring generation (three model sizes)
-# ==================================================================
-
-add_demo(
-  NAME    ts_wiringgen_tiny
-  SOURCE  experiments/organelles/ts_wiringgen_engine/main.c
-  THREADS METAL BLAS
-  COPY    experiments/organelles/ts_wiringgen/ts_wiring_expanded.txt
-  DEFINES N_EMBD=32 N_HEAD=2 N_LAYER=1 BLOCK_SIZE=512 MLP_DIM=128
-          NUM_STEPS=15000 LEARNING_RATE=0.001 BATCH_SIZE=8
-          MAX_VOCAB=250 MAX_DOCS=5000 MAX_DOC_LEN=1024
-)
-
-add_demo(
-  NAME    ts_wiringgen_small
-  SOURCE  experiments/organelles/ts_wiringgen_engine/main.c
-  THREADS METAL BLAS
-  COPY    experiments/organelles/ts_wiringgen/ts_wiring_expanded.txt
-  DEFINES N_EMBD=64 N_HEAD=4 N_LAYER=2 BLOCK_SIZE=512 MLP_DIM=256
+  NAME    vm_compose
+  SOURCE  experiments/organelles/vm_compose/main.c
+  METAL BLAS
+  COPY    experiments/organelles/vm_codegen/vm_functions_combined.txt
+          experiments/organelles/vm_compose/test_intents.txt
+          experiments/organelles/vm_compose/test_signatures.txt
+  DEFINES N_EMBD=96 N_HEAD=4 N_LAYER=2 BLOCK_SIZE=256 MLP_DIM=384
           NUM_STEPS=15000 LEARNING_RATE=0.0005 BATCH_SIZE=16
-          MAX_VOCAB=250 MAX_DOCS=5000 MAX_DOC_LEN=1024
+          MAX_VOCAB=1200 MAX_DOCS=5000 MAX_DOC_LEN=512
 )
+target_link_libraries(vm_compose PRIVATE microgpt_vm_lib)
 
-add_demo(
-  NAME    ts_wiringgen_engine
-  SOURCE  experiments/organelles/ts_wiringgen_engine/main.c
-  THREADS METAL BLAS
-  COPY    experiments/organelles/ts_wiringgen/ts_wiring_expanded.txt
-  DEFINES N_EMBD=128 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=512 MLP_DIM=512
-          NUM_STEPS=15000 LEARNING_RATE=0.0003 BATCH_SIZE=16
-          MAX_VOCAB=250 MAX_DOCS=5000 MAX_DOC_LEN=1024
-)
+
 
 # ==================================================================
 #  Organelle: 8-Puzzle multi-organelle pipeline
@@ -350,48 +309,7 @@ add_demo(
           MAX_VOCAB=200 MAX_DOCS=5000 MAX_DOC_LEN=256
 )
 
-# ==================================================================
-#  Organelle: OPA Code Composition Pipeline v3 (with Syntax Judge)
-# ==================================================================
 
-add_demo(
-  NAME    c_compose_v3
-  SOURCE  experiments/organelles/c_compose_v3/main.c
-  THREADS METAL BLAS
-  COPY    experiments/organelles/c_compose/c_planner.txt
-          experiments/organelles/c_compose/c_judge.txt
-          experiments/organelles/c_compose/c_registry.txt
-          experiments/organelles/c_compose/test_intents.txt
-          experiments/organelles/c_wiringgen/c_wiring.txt
-  DEFINES N_EMBD=128 N_HEAD=8 N_LAYER=6 BLOCK_SIZE=512 MLP_DIM=512
-          NUM_STEPS=50000 LEARNING_RATE=0.0005 BATCH_SIZE=8 WARMUP_STEPS=2500
-          MAX_VOCAB=200 MAX_DOCS=5000 MAX_DOC_LEN=256
-          WIRING_N_EMBD=128 WIRING_N_HEAD=8 WIRING_N_LAYER=6
-          WIRING_BLOCK_SIZE=512 WIRING_MLP_DIM=512 WIRING_NUM_STEPS=20000
-          WIRING_MAX_DOC_LEN=1024 GEN_LEN=600
-)
-
-# ==================================================================
-#  Organelle: VM Code Composition Pipeline v4
-# ==================================================================
-
-add_demo(
-  NAME    vm_compose_v4
-  SOURCE  experiments/organelles/vm_compose_v4/main.c
-  THREADS METAL BLAS
-  COPY    experiments/organelles/c_compose/c_planner.txt
-          experiments/organelles/c_compose/c_judge.txt
-          experiments/organelles/c_compose/c_registry.txt
-          experiments/organelles/c_compose/test_intents.txt
-          experiments/organelles/ts_wiringgen/ts_wiring.txt
-  DEFINES N_EMBD=128 N_HEAD=8 N_LAYER=6 BLOCK_SIZE=512 MLP_DIM=512
-          NUM_STEPS=50000 LEARNING_RATE=0.0005 BATCH_SIZE=8 WARMUP_STEPS=2500
-          MAX_VOCAB=200 MAX_DOCS=5000 MAX_DOC_LEN=256
-          WIRING_N_EMBD=128 WIRING_N_HEAD=4 WIRING_N_LAYER=4
-          WIRING_BLOCK_SIZE=512 WIRING_MLP_DIM=512 WIRING_NUM_STEPS=15000
-          WIRING_MAX_DOC_LEN=1024 GEN_LEN=600
-)
-target_link_libraries(vm_compose_v4 PRIVATE microgpt_vm_lib)
 
 add_demo(
   NAME    puzzle8_demo
@@ -787,3 +705,51 @@ if(NOT MSVC)
   target_link_libraries(bench_microgpt_organelle PRIVATE m)
 endif()
 
+# ==================================================================
+#  Virtual Machine Engine
+# ==================================================================
+
+find_package(FLEX)
+find_package(BISON)
+
+set(VM_PARSER_SOURCES)
+if(FLEX_FOUND AND BISON_FOUND)
+    flex_target(vm_scanner
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/microgpt_vm.l
+        ${CMAKE_CURRENT_BINARY_DIR}/microgpt_vm_parser.l.c)
+    bison_target(vm_parser
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/microgpt_vm.y
+        ${CMAKE_CURRENT_BINARY_DIR}/microgpt_vm_parser.tab.c)
+    add_flex_bison_dependency(vm_scanner vm_parser)
+    list(APPEND VM_PARSER_SOURCES
+        ${FLEX_vm_scanner_OUTPUTS}
+        ${BISON_vm_parser_OUTPUTS})
+else()
+    message(FATAL_ERROR "Flex/Bison not found — necessary to build microgpt VM Engine")
+endif()
+
+add_library(microgpt_vm_lib STATIC src/microgpt_vm.c ${VM_PARSER_SOURCES})
+target_include_directories(microgpt_vm_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_BINARY_DIR})
+
+add_executable(test_microgpt_vm tests/test_microgpt_vm.c)
+target_link_libraries(test_microgpt_vm PRIVATE microgpt_vm_lib)
+target_include_directories(test_microgpt_vm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+if(NOT MSVC)
+  target_link_libraries(test_microgpt_vm PRIVATE m)
+endif()
+
+# Copy test resources dynamically for test_microgpt_vm
+add_custom_command(TARGET test_microgpt_vm POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_directory
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/resources/tests/vm"
+    "$<TARGET_FILE_DIR:test_microgpt_vm>/resources/vm"
+  COMMENT "Copying VM test resources"
+)
+add_test(NAME microgpt_vm_tests COMMAND test_microgpt_vm WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+add_executable(bench_microgpt_vm tests/bench_microgpt_vm.c)
+target_link_libraries(bench_microgpt_vm PRIVATE microgpt_vm_lib)
+target_include_directories(bench_microgpt_vm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+if(NOT MSVC)
+  target_link_libraries(bench_microgpt_vm PRIVATE m)
+endif()

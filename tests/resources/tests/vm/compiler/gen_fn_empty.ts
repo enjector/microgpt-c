@@ -1,0 +1,1 @@
+function test1(): Customer { }

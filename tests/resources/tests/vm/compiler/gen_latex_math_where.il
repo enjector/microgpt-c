@@ -1,0 +1,414 @@
+
+// ------------------------------------------------------------
+// a2(x)
+// ------------------------------------------------------------
+  0)	a2:
+
+  1)	// *** Line 3: // a1() = (123 + 1 + (2 * 2))
+  2)	           STACK_POP	                 :              	                 :              	                x:number     {n}
+
+  3)	// *** Line 5: = x + 1
+  4)	                 ADD	                x:number     {n}	{c    }         1:number     {n}	{ r[0]}       r$0:number     {n}
+  5)	          STACK_PUSH	{ r[0]}       r$0:number     {n}	                 :              	                 :              
+  6)	              RETURN	                 :              	                 :              	                 :              
+
+// ------------------------------------------------------------
+// b(x, y)
+// ------------------------------------------------------------
+  0)	b:
+
+  1)	// *** Line 5: x, y) = x + y
+  2)	           STACK_POP	                 :              	                 :              	                x:number     {n}
+
+  3)	// *** Line 5: y) = x + y
+  4)	           STACK_POP	                 :              	                 :              	                y:number     {n}
+
+  5)	// *** Line 7: = x + y
+  6)	                 ADD	                x:number     {n}	                y:number     {n}	{ r[0]}       r$0:number     {n}
+  7)	          STACK_PUSH	{ r[0]}       r$0:number     {n}	                 :              	                 :              
+  8)	              RETURN	                 :              	                 :              	                 :              
+
+// ------------------------------------------------------------
+// c(x, y)
+// ------------------------------------------------------------
+  0)	c:
+
+  1)	// *** Line 7: x, y) = x ^ 2 + y ^ 3
+  2)	           STACK_POP	                 :              	                 :              	                x:number     {n}
+
+  3)	// *** Line 7: y) = x ^ 2 + y ^ 3
+  4)	           STACK_POP	                 :              	                 :              	                y:number     {n}
+
+  5)	// *** Line 7: = x ^ 2 + y ^ 3
+  6)	                 POW	                x:number     {n}	{c    }         2:number     {n}	{ r[0]}       r$0:number     {n}
+
+  7)	// *** Line 7: + y ^ 3
+  8)	                 POW	                y:number     {n}	{c    }         3:number     {n}	{ r[1]}       r$1:number     {n}
+
+  9)	// *** Line 9: d(\alpha) = \alpha + 1
+ 10)	                 ADD	{ r[0]}       r$0:number     {n}	{ r[1]}       r$1:number     {n}	{ r[2]}       r$2:number     {n}
+ 11)	          STACK_PUSH	{ r[2]}       r$2:number     {n}	                 :              	                 :              
+ 12)	              RETURN	                 :              	                 :              	                 :              
+
+// ------------------------------------------------------------
+// d(alpha)
+// ------------------------------------------------------------
+  0)	d:
+
+  1)	// *** Line 9: \alpha) = \alpha + 1
+  2)	           STACK_POP	                 :              	                 :              	            alpha:number     {n}
+
+  3)	// *** Line 11: ) = \alpha + 1
+  4)	                 ADD	            alpha:number     {n}	{c    }         1:number     {n}	{ r[0]}       r$0:number     {n}
+  5)	          STACK_PUSH	{ r[0]}       r$0:number     {n}	                 :              	                 :              
+  6)	              RETURN	                 :              	                 :              	                 :              
+
+// ------------------------------------------------------------
+// e()
+// ------------------------------------------------------------
+  0)	e:
+
+  1)	// *** Line 11: sum-of: begin
+  2)	      CREATE_SET_VAR	{c    }         0:number     {n}	                 :              	                i:number     {n}
+  3)	L0:
+  4)	        CONDITION_LT	                i:number     {n}	{c    }        20:number     {n}	{ r[1]}       r$1:boolean    {b}
+  5)	       JUMP_IF_FALSE	{ r[1]}       r$1:boolean    {b}	                 :              	                       L1 [16]
+
+  6)	// *** Line 11: apply-to: begin
+
+  7)	// *** Line 13: + 3
+  8)	                 ADD	                i:number     {n}	{c    }         3:number     {n}	{ r[2]}       r$2:number     {n}
+
+  9)	// *** Line 13: sum-of: end
+
+ 10)	// *** Line 13: sum-of: summation
+ 11)	                 ADD	{ r[0]}       r$0:number     {n}	{ r[2]}       r$2:number     {n}	{ r[0]}       r$0:number     {n}
+
+ 12)	// *** Line 11: apply-to: end
+
+ 13)	// *** Line 11: sum-of: increment
+ 14)	                 INC	                i:number     {n}	                 :              	                 :              
+ 15)	                JUMP	                 :              	                 :              	                       L0 [3]
+ 16)	L1:
+ 17)	          STACK_PUSH	{ r[0]}       r$0:number     {n}	                 :              	                 :              
+ 18)	              RETURN	                 :              	                 :              	                 :              
+
+// ------------------------------------------------------------
+// f()
+// ------------------------------------------------------------
+  0)	f:
+
+  1)	// *** Line 13: sum-of: begin
+  2)	      CREATE_SET_VAR	{c    }         0:number     {n}	                 :              	                i:number     {n}
+  3)	L0:
+  4)	        CONDITION_LT	                i:number     {n}	{c    }        20:number     {n}	{ r[1]}       r$1:boolean    {b}
+  5)	       JUMP_IF_FALSE	{ r[1]}       r$1:boolean    {b}	                 :              	                       L1 [18]
+
+  6)	// *** Line 13: apply-to: begin
+
+  7)	// *** Line 13: i + 3) + i
+  8)	                 ADD	                i:number     {n}	{c    }         3:number     {n}	{ r[2]}       r$2:number     {n}
+
+  9)	// *** Line 15: + i
+ 10)	                 ADD	{ r[2]}       r$2:number     {n}	                i:number     {n}	{ r[3]}       r$3:number     {n}
+
+ 11)	// *** Line 15: sum-of: end
+
+ 12)	// *** Line 15: sum-of: summation
+ 13)	                 ADD	{ r[0]}       r$0:number     {n}	{ r[3]}       r$3:number     {n}	{ r[0]}       r$0:number     {n}
+
+ 14)	// *** Line 13: apply-to: end
+
+ 15)	// *** Line 13: sum-of: increment
+ 16)	                 INC	                i:number     {n}	                 :              	                 :              
+ 17)	                JUMP	                 :              	                 :              	                       L0 [3]
+ 18)	L1:
+ 19)	          STACK_PUSH	{ r[0]}       r$0:number     {n}	                 :              	                 :              
+ 20)	              RETURN	                 :              	                 :              	                 :              
+
+// ------------------------------------------------------------
+// g()
+// ------------------------------------------------------------
+  0)	g:
+
+  1)	// *** Line 15: sum-of: begin
+  2)	      CREATE_SET_VAR	{c    }         0:number     {n}	                 :              	                i:number     {n}
+  3)	L0:
+  4)	        CONDITION_LT	                i:number     {n}	{c    }        10:number     {n}	{ r[1]}       r$1:boolean    {b}
+  5)	       JUMP_IF_FALSE	{ r[1]}       r$1:boolean    {b}	                 :              	                       L1 [30]
+
+  6)	// *** Line 15: apply-to: begin
+
+  7)	// *** Line 15: sum-of: begin
+  8)	      CREATE_SET_VAR	{c    }         0:number     {n}	                 :              	                j:number     {n}
+  9)	L2:
+ 10)	        CONDITION_LT	                j:number     {n}	{c    }         5:number     {n}	{ r[3]}       r$3:boolean    {b}
+ 11)	       JUMP_IF_FALSE	{ r[3]}       r$3:boolean    {b}	                 :              	                       L3 [22]
+
+ 12)	// *** Line 15: apply-to: begin
+
+ 13)	// *** Line 17: + j
+ 14)	                 ADD	                i:number     {n}	                j:number     {n}	{ r[4]}       r$4:number     {n}
+
+ 15)	// *** Line 17: sum-of: end
+
+ 16)	// *** Line 17: sum-of: summation
+ 17)	                 ADD	{ r[2]}       r$2:number     {n}	{ r[4]}       r$4:number     {n}	{ r[2]}       r$2:number     {n}
+
+ 18)	// *** Line 15: apply-to: end
+
+ 19)	// *** Line 15: sum-of: increment
+ 20)	                 INC	                j:number     {n}	                 :              	                 :              
+ 21)	                JUMP	                 :              	                 :              	                       L2 [9]
+ 22)	L3:
+
+ 23)	// *** Line 17: sum-of: end
+
+ 24)	// *** Line 17: sum-of: summation
+ 25)	                 ADD	{ r[0]}       r$0:number     {n}	{ r[2]}       r$2:number     {n}	{ r[0]}       r$0:number     {n}
+
+ 26)	// *** Line 15: apply-to: end
+
+ 27)	// *** Line 15: sum-of: increment
+ 28)	                 INC	                i:number     {n}	                 :              	                 :              
+ 29)	                JUMP	                 :              	                 :              	                       L0 [3]
+ 30)	L1:
+ 31)	          STACK_PUSH	{ r[0]}       r$0:number     {n}	                 :              	                 :              
+ 32)	              RETURN	                 :              	                 :              	                 :              
+
+// ------------------------------------------------------------
+// h(n)
+// ------------------------------------------------------------
+  0)	h:
+
+  1)	// *** Line 17: n) =\sum_{ i = 0 }^ n \sum_{ j = 0 }^ n i + j
+  2)	           STACK_POP	                 :              	                 :              	                n:number     {n}
+
+  3)	// *** Line 17: sum-of: begin
+  4)	      CREATE_SET_VAR	{c    }         0:number     {n}	                 :              	                i:number     {n}
+  5)	L0:
+  6)	        CONDITION_LT	                i:number     {n}	                n:number     {n}	{ r[1]}       r$1:boolean    {b}
+  7)	       JUMP_IF_FALSE	{ r[1]}       r$1:boolean    {b}	                 :              	                       L1 [32]
+
+  8)	// *** Line 17: apply-to: begin
+
+  9)	// *** Line 17: sum-of: begin
+ 10)	      CREATE_SET_VAR	{c    }         0:number     {n}	                 :              	                j:number     {n}
+ 11)	L2:
+ 12)	        CONDITION_LT	                j:number     {n}	                n:number     {n}	{ r[3]}       r$3:boolean    {b}
+ 13)	       JUMP_IF_FALSE	{ r[3]}       r$3:boolean    {b}	                 :              	                       L3 [24]
+
+ 14)	// *** Line 17: apply-to: begin
+
+ 15)	// *** Line 19: + j
+ 16)	                 ADD	                i:number     {n}	                j:number     {n}	{ r[4]}       r$4:number     {n}
+
+ 17)	// *** Line 19: sum-of: end
+
+ 18)	// *** Line 19: sum-of: summation
+ 19)	                 ADD	{ r[2]}       r$2:number     {n}	{ r[4]}       r$4:number     {n}	{ r[2]}       r$2:number     {n}
+
+ 20)	// *** Line 17: apply-to: end
+
+ 21)	// *** Line 17: sum-of: increment
+ 22)	                 INC	                j:number     {n}	                 :              	                 :              
+ 23)	                JUMP	                 :              	                 :              	                       L2 [11]
+ 24)	L3:
+
+ 25)	// *** Line 19: sum-of: end
+
+ 26)	// *** Line 19: sum-of: summation
+ 27)	                 ADD	{ r[0]}       r$0:number     {n}	{ r[2]}       r$2:number     {n}	{ r[0]}       r$0:number     {n}
+
+ 28)	// *** Line 17: apply-to: end
+
+ 29)	// *** Line 17: sum-of: increment
+ 30)	                 INC	                i:number     {n}	                 :              	                 :              
+ 31)	                JUMP	                 :              	                 :              	                       L0 [5]
+ 32)	L1:
+ 33)	          STACK_PUSH	{ r[0]}       r$0:number     {n}	                 :              	                 :              
+ 34)	              RETURN	                 :              	                 :              	                 :              
+
+// ------------------------------------------------------------
+// k(n)
+// ------------------------------------------------------------
+  0)	k:
+
+  1)	// *** Line 19: n) =\sum_{ i = 0 }^ 10 \sum_{ j = 0 }^ (n + 1) i + j
+  2)	           STACK_POP	                 :              	                 :              	                n:number     {n}
+
+  3)	// *** Line 19: sum-of: begin
+  4)	      CREATE_SET_VAR	{c    }         0:number     {n}	                 :              	                i:number     {n}
+  5)	L0:
+  6)	        CONDITION_LT	                i:number     {n}	{c    }        10:number     {n}	{ r[1]}       r$1:boolean    {b}
+  7)	       JUMP_IF_FALSE	{ r[1]}       r$1:boolean    {b}	                 :              	                       L1 [34]
+
+  8)	// *** Line 19: apply-to: begin
+
+  9)	// *** Line 19: j = 0 }^ (n + 1) i + j
+ 10)	                 ADD	                n:number     {n}	{c    }         1:number     {n}	{ r[2]}       r$2:number     {n}
+
+ 11)	// *** Line 19: sum-of: begin
+ 12)	      CREATE_SET_VAR	{c    }         0:number     {n}	                 :              	                j:number     {n}
+ 13)	L2:
+ 14)	        CONDITION_LT	                j:number     {n}	{ r[2]}       r$2:number     {n}	{ r[4]}       r$4:boolean    {b}
+ 15)	       JUMP_IF_FALSE	{ r[4]}       r$4:boolean    {b}	                 :              	                       L3 [26]
+
+ 16)	// *** Line 19: apply-to: begin
+
+ 17)	// *** Line 21: + j
+ 18)	                 ADD	                i:number     {n}	                j:number     {n}	{ r[5]}       r$5:number     {n}
+
+ 19)	// *** Line 21: sum-of: end
+
+ 20)	// *** Line 21: sum-of: summation
+ 21)	                 ADD	{ r[3]}       r$3:number     {n}	{ r[5]}       r$5:number     {n}	{ r[3]}       r$3:number     {n}
+
+ 22)	// *** Line 19: apply-to: end
+
+ 23)	// *** Line 19: sum-of: increment
+ 24)	                 INC	                j:number     {n}	                 :              	                 :              
+ 25)	                JUMP	                 :              	                 :              	                       L2 [13]
+ 26)	L3:
+
+ 27)	// *** Line 21: sum-of: end
+
+ 28)	// *** Line 21: sum-of: summation
+ 29)	                 ADD	{ r[0]}       r$0:number     {n}	{ r[3]}       r$3:number     {n}	{ r[0]}       r$0:number     {n}
+
+ 30)	// *** Line 19: apply-to: end
+
+ 31)	// *** Line 19: sum-of: increment
+ 32)	                 INC	                i:number     {n}	                 :              	                 :              
+ 33)	                JUMP	                 :              	                 :              	                       L0 [5]
+ 34)	L1:
+ 35)	          STACK_PUSH	{ r[0]}       r$0:number     {n}	                 :              	                 :              
+ 36)	              RETURN	                 :              	                 :              	                 :              
+
+// ------------------------------------------------------------
+// m(x, n)
+// ------------------------------------------------------------
+  0)	m:
+
+  1)	// *** Line 21: x, n) =\sum_{ i = 0 }^ 10 \sum_{ j = 0 }^ (n + 1) i + j * x
+  2)	           STACK_POP	                 :              	                 :              	                x:number     {n}
+
+  3)	// *** Line 21: n) =\sum_{ i = 0 }^ 10 \sum_{ j = 0 }^ (n + 1) i + j * x
+  4)	           STACK_POP	                 :              	                 :              	                n:number     {n}
+
+  5)	// *** Line 21: sum-of: begin
+  6)	      CREATE_SET_VAR	{c    }         0:number     {n}	                 :              	                i:number     {n}
+  7)	L0:
+  8)	        CONDITION_LT	                i:number     {n}	{c    }        10:number     {n}	{ r[1]}       r$1:boolean    {b}
+  9)	       JUMP_IF_FALSE	{ r[1]}       r$1:boolean    {b}	                 :              	                       L1 [37]
+
+ 10)	// *** Line 21: apply-to: begin
+
+ 11)	// *** Line 21: j = 0 }^ (n + 1) i + j * x
+ 12)	                 ADD	                n:number     {n}	{c    }         1:number     {n}	{ r[2]}       r$2:number     {n}
+
+ 13)	// *** Line 21: sum-of: begin
+ 14)	      CREATE_SET_VAR	{c    }         0:number     {n}	                 :              	                j:number     {n}
+ 15)	L2:
+ 16)	        CONDITION_LT	                j:number     {n}	{ r[2]}       r$2:number     {n}	{ r[4]}       r$4:boolean    {b}
+ 17)	       JUMP_IF_FALSE	{ r[4]}       r$4:boolean    {b}	                 :              	                       L3 [29]
+
+ 18)	// *** Line 21: apply-to: begin
+
+ 19)	// *** Line 23: + j * x
+ 20)	                 MUL	                j:number     {n}	                x:number     {n}	{ r[5]}       r$5:number     {n}
+ 21)	                 ADD	                i:number     {n}	{ r[5]}       r$5:number     {n}	{ r[6]}       r$6:number     {n}
+
+ 22)	// *** Line 23: sum-of: end
+
+ 23)	// *** Line 23: sum-of: summation
+ 24)	                 ADD	{ r[3]}       r$3:number     {n}	{ r[6]}       r$6:number     {n}	{ r[3]}       r$3:number     {n}
+
+ 25)	// *** Line 21: apply-to: end
+
+ 26)	// *** Line 21: sum-of: increment
+ 27)	                 INC	                j:number     {n}	                 :              	                 :              
+ 28)	                JUMP	                 :              	                 :              	                       L2 [15]
+ 29)	L3:
+
+ 30)	// *** Line 23: sum-of: end
+
+ 31)	// *** Line 23: sum-of: summation
+ 32)	                 ADD	{ r[0]}       r$0:number     {n}	{ r[3]}       r$3:number     {n}	{ r[0]}       r$0:number     {n}
+
+ 33)	// *** Line 21: apply-to: end
+
+ 34)	// *** Line 21: sum-of: increment
+ 35)	                 INC	                i:number     {n}	                 :              	                 :              
+ 36)	                JUMP	                 :              	                 :              	                       L0 [7]
+ 37)	L1:
+ 38)	          STACK_PUSH	{ r[0]}       r$0:number     {n}	                 :              	                 :              
+ 39)	              RETURN	                 :              	                 :              	                 :              
+
+// ------------------------------------------------------------
+// main()
+// ------------------------------------------------------------
+  0)	main:
+
+  1)	// *** Line 25: // var result_a1 = a1();
+
+  2)	// *** Line 26: var result_a2 = a2(5);
+  3)	          STACK_PUSH	{c    }         5:number     {n}	                 :              	                 :              
+  4)	         CALL_METHOD	               a2:number     {n}	                 :              	                 :              
+  5)	           STACK_POP	                 :              	                 :              	{ r[0]}       r$0:number     {n}
+  6)	      CREATE_SET_VAR	{ r[0]}       r$0:number     {n}	                 :              	        result_a2:number     {n}
+
+  7)	// *** Line 27: var result_b = b(4, 6);
+  8)	          STACK_PUSH	{c    }         6:number     {n}	                 :              	                 :              
+  9)	          STACK_PUSH	{c    }         4:number     {n}	                 :              	                 :              
+ 10)	         CALL_METHOD	                b:number     {n}	                 :              	                 :              
+ 11)	           STACK_POP	                 :              	                 :              	{ r[1]}       r$1:number     {n}
+ 12)	      CREATE_SET_VAR	{ r[1]}       r$1:number     {n}	                 :              	         result_b:number     {n}
+
+ 13)	// *** Line 28: var result_c = c(2, 3);
+ 14)	          STACK_PUSH	{c    }         3:number     {n}	                 :              	                 :              
+ 15)	          STACK_PUSH	{c    }         2:number     {n}	                 :              	                 :              
+ 16)	         CALL_METHOD	                c:number     {n}	                 :              	                 :              
+ 17)	           STACK_POP	                 :              	                 :              	{ r[2]}       r$2:number     {n}
+ 18)	      CREATE_SET_VAR	{ r[2]}       r$2:number     {n}	                 :              	         result_c:number     {n}
+
+ 19)	// *** Line 29: var result_d = d(3);
+ 20)	          STACK_PUSH	{c    }         3:number     {n}	                 :              	                 :              
+ 21)	         CALL_METHOD	                d:number     {n}	                 :              	                 :              
+ 22)	           STACK_POP	                 :              	                 :              	{ r[3]}       r$3:number     {n}
+ 23)	      CREATE_SET_VAR	{ r[3]}       r$3:number     {n}	                 :              	         result_d:number     {n}
+
+ 24)	// *** Line 30: var result_e = e();
+ 25)	         CALL_METHOD	                e:number     {n}	                 :              	                 :              
+ 26)	           STACK_POP	                 :              	                 :              	{ r[4]}       r$4:number     {n}
+ 27)	      CREATE_SET_VAR	{ r[4]}       r$4:number     {n}	                 :              	         result_e:number     {n}
+
+ 28)	// *** Line 31: var result_f = f();
+ 29)	         CALL_METHOD	                f:number     {n}	                 :              	                 :              
+ 30)	           STACK_POP	                 :              	                 :              	{ r[5]}       r$5:number     {n}
+ 31)	      CREATE_SET_VAR	{ r[5]}       r$5:number     {n}	                 :              	         result_f:number     {n}
+
+ 32)	// *** Line 32: var result_g = g();
+ 33)	         CALL_METHOD	                g:number     {n}	                 :              	                 :              
+ 34)	           STACK_POP	                 :              	                 :              	{ r[6]}       r$6:number     {n}
+ 35)	      CREATE_SET_VAR	{ r[6]}       r$6:number     {n}	                 :              	         result_g:number     {n}
+
+ 36)	// *** Line 33: var result_h = h(3);
+ 37)	          STACK_PUSH	{c    }         3:number     {n}	                 :              	                 :              
+ 38)	         CALL_METHOD	                h:number     {n}	                 :              	                 :              
+ 39)	           STACK_POP	                 :              	                 :              	{ r[7]}       r$7:number     {n}
+ 40)	      CREATE_SET_VAR	{ r[7]}       r$7:number     {n}	                 :              	         result_h:number     {n}
+
+ 41)	// *** Line 34: var result_k = k(3);
+ 42)	          STACK_PUSH	{c    }         3:number     {n}	                 :              	                 :              
+ 43)	         CALL_METHOD	                k:number     {n}	                 :              	                 :              
+ 44)	           STACK_POP	                 :              	                 :              	{ r[8]}       r$8:number     {n}
+ 45)	      CREATE_SET_VAR	{ r[8]}       r$8:number     {n}	                 :              	         result_k:number     {n}
+
+ 46)	// *** Line 35: var result_m = m(3, 5);
+ 47)	          STACK_PUSH	{c    }         5:number     {n}	                 :              	                 :              
+ 48)	          STACK_PUSH	{c    }         3:number     {n}	                 :              	                 :              
+ 49)	         CALL_METHOD	                m:number     {n}	                 :              	                 :              
+ 50)	           STACK_POP	                 :              	                 :              	{ r[9]}       r$9:number     {n}
+ 51)	      CREATE_SET_VAR	{ r[9]}       r$9:number     {n}	                 :              	         result_m:number     {n}
+ 52)	              RETURN	                 :              	                 :              	                 :              

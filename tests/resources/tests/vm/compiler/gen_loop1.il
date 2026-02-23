@@ -1,0 +1,24 @@
+
+// ------------------------------------------------------------
+// main()
+// ------------------------------------------------------------
+  0)	main:
+
+  1)	// *** Line 2: function main() {
+  2)	      CREATE_SET_VAR	{c    }       100:number     {n}	                 :              	            total:number     {n}
+
+  3)	// *** Line 4: while_loop_begin
+  4)	L0:
+
+  5)	// *** Line 4: (total > 0) {
+  6)	        CONDITION_GT	            total:number     {n}	{c    }         0:number     {n}	{ r[0]}       r$0:boolean    {b}
+  7)	       JUMP_IF_FALSE	{ r[0]}       r$0:boolean    {b}	                 :              	                       L1 [13]
+
+  8)	// *** Line 5: total = total - 1;
+  9)	                 SUB	            total:number     {n}	{c    }         1:number     {n}	{ r[1]}       r$1:number     {n}
+ 10)	             SET_VAR	{ r[1]}       r$1:number     {n}	                 :              	            total:number     {n}
+
+ 11)	// *** Line 6: while_loop_end
+ 12)	                JUMP	                 :              	                 :              	                       L0 [4]
+ 13)	L1:
+ 14)	              RETURN	                 :              	                 :              	                 :              

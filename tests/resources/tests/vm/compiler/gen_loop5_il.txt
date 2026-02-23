@@ -1,0 +1,44 @@
+
+// ------------------------------------------------------------
+// main()
+// ------------------------------------------------------------
+  0)	main:
+
+  1)	// *** Line 2: function main() {
+  2)	      CREATE_SET_VAR	{c    }         0:number     {n}	                 :              	            count:number     {n}
+
+  3)	// *** Line 3: for (var i = 0; i < 10; i++) {
+  4)	      CREATE_SET_VAR	{c    }         0:number     {n}	                 :              	                i:number     {n}
+  5)	L0:
+
+  6)	// *** Line 3: i < 10; i++) {
+  7)	        CONDITION_LT	                i:number     {n}	{c    }        10:number     {n}	{ r[0]}       r$0:boolean    {b}
+  8)	       JUMP_IF_FALSE	{ r[0]}       r$0:boolean    {b}	                 :              	                       L1 [14]
+
+  9)	// *** Line 4: ) {
+ 10)	                 INC	            count:number     {n}	                 :              	                 :              
+
+ 11)	// *** Line 3: i++) {
+ 12)	                 INC	                i:number     {n}	                 :              	                 :              
+ 13)	                JUMP	                 :              	                 :              	                       L0 [5]
+ 14)	L1:
+
+ 15)	// *** Line 7: var total = 0;
+ 16)	      CREATE_SET_VAR	{c    }         0:number     {n}	                 :              	            total:number     {n}
+
+ 17)	// *** Line 8: for (var j = 0; j < 10; j++) {
+ 18)	      CREATE_SET_VAR	{c    }         0:number     {n}	                 :              	                j:number     {n}
+ 19)	L2:
+
+ 20)	// *** Line 8: j < 10; j++) {
+ 21)	        CONDITION_LT	                j:number     {n}	{c    }        10:number     {n}	{ r[1]}       r$1:boolean    {b}
+ 22)	       JUMP_IF_FALSE	{ r[1]}       r$1:boolean    {b}	                 :              	                       L3 [28]
+
+ 23)	// *** Line 9: ) {
+ 24)	                 ADD	            total:number     {n}	                j:number     {n}	            total:number     {n}
+
+ 25)	// *** Line 8: j++) {
+ 26)	                 INC	                j:number     {n}	                 :              	                 :              
+ 27)	                JUMP	                 :              	                 :              	                       L2 [19]
+ 28)	L3:
+ 29)	              RETURN	                 :              	                 :              	                 :              

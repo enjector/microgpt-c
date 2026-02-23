@@ -41,8 +41,6 @@ models/
     klotski_player.ckpt    /  .ckpt.log
     reddonkey_planner.ckpt /  .ckpt.log      30K — Red Donkey
     reddonkey_player.ckpt  /  .ckpt.log
-    c_codegen.ckpt         /  .ckpt.log     875K — C code generation
-    c_wiringgen.ckpt       /  .ckpt.log     875K — C wiring generation
     c_planner.ckpt         /  .ckpt.log     1.2M — c_compose planner
     c_judge.ckpt           /  .ckpt.log     1.2M — c_compose judge
     lottery_analyser.ckpt  /  .ckpt.log     163K — Lottery analyser
@@ -62,8 +60,7 @@ Each `.ckpt.log` file contains the full training history (loss per step, timings
 | Model | Size | Params | Trained On | What It Does |
 |-------|------|--------|-----------|-------------|
 | `foundation/shakespeare.ckpt` | 9.6 MB | 840K | Complete works of Shakespeare | Character-level text generation |
-| `organelles/c_codegen.ckpt` | 20 MB | 875K | 2,081 C functions (math, physics, DSP) | Code retrieval — byte-perfect recall |
-| `organelles/c_wiringgen.ckpt` | 19.9 MB | 875K | C function compositions | Multi-function pipeline generation |
+
 | `organelles/c_planner.ckpt` | 13.8 MB | 1.2M | Function composition plans | Planner for c_compose pipeline |
 | `organelles/c_judge.ckpt` | 13.8 MB | 1.2M | Plan validation pairs | Judge for c_compose pipeline |
 | `organelles/market_analyser.ckpt` | 7.1 MB | 615K | 18-instrument market data (10yr) | Cross-asset analysis → 5-char compact output |
@@ -182,8 +179,7 @@ Each checkpoint requires matching compile-time architecture. The demos handle th
 | Checkpoint | N_EMBD | N_HEAD | N_LAYER | BLOCK_SIZE | MLP_DIM |
 |-----------|--------|--------|---------|------------|---------| 
 | `shakespeare.ckpt` | 128 | 8 | 4 | 256 | 512 |
-| `organelles/c_codegen.ckpt` | 128 | 4 | 4 | 512 | 512 |
-| `organelles/c_wiringgen.ckpt` | 128 | 4 | 4 | 512 | 512 |
+
 | `organelles/c_planner.ckpt` / `c_judge.ckpt` | 128 | 8 | 6 | 128 | 512 |
 | `organelles/connect4_*.ckpt` | 96 | 8 | 4 | 128 | 384 |
 | `organelles/tictactoe_*.ckpt` | 96 | 8 | 4 | 128 | 384 |

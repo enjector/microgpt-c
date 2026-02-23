@@ -1,0 +1,49 @@
+
+// ------------------------------------------------------------
+// main()
+// ------------------------------------------------------------
+  0)	main:
+
+  1)	// *** Line 2: function main() {
+  2)	      CREATE_SET_VAR	{c    }       100:number     {n}	                 :              	            total:number     {n}
+
+  3)	// *** Line 4: var finished = false;
+  4)	      CREATE_SET_VAR	{c    }     false:boolean    {b}	                 :              	         finished:boolean    {b}
+
+  5)	// *** Line 5: var i = 10;
+  6)	      CREATE_SET_VAR	{c    }        10:number     {n}	                 :              	                i:number     {n}
+
+  7)	// *** Line 7: while ((i < 100 && total < 100) || !finished) {
+  8)	L0:
+
+  9)	// *** Line 7: ((i < 100 && total < 100) || !finished) {
+ 10)	        CONDITION_LT	                i:number     {n}	{c    }       100:number     {n}	{ r[0]}       r$0:boolean    {b}
+
+ 11)	// *** Line 7: total < 100) || !finished) {
+ 12)	        CONDITION_LT	            total:number     {n}	{c    }       100:number     {n}	{ r[1]}       r$1:boolean    {b}
+ 13)	     CONDITIONAL_AND	{ r[0]}       r$0:boolean    {b}	{ r[1]}       r$1:boolean    {b}	{ r[2]}       r$2:boolean    {b}
+
+ 14)	// *** Line 7: || !finished) {
+ 15)	                 NOT	         finished:boolean    {b}	                 :              	{ r[3]}       r$3:boolean    {b}
+ 16)	      CONDITION_TRUE	{ r[3]}       r$3:boolean    {b}	                 :              	{ r[4]}       r$4:boolean    {b}
+ 17)	      CONDITIONAL_OR	{ r[2]}       r$2:boolean    {b}	{ r[4]}       r$4:boolean    {b}	{ r[5]}       r$5:boolean    {b}
+ 18)	       JUMP_IF_FALSE	{ r[5]}       r$5:boolean    {b}	                 :              	                       L1 [32]
+
+ 19)	// *** Line 8: i = i + 10;
+ 20)	                 ADD	                i:number     {n}	{c    }        10:number     {n}	{ r[6]}       r$6:number     {n}
+ 21)	             SET_VAR	{ r[6]}       r$6:number     {n}	                 :              	                i:number     {n}
+
+ 22)	// *** Line 9: total = total + 10;
+ 23)	                 ADD	            total:number     {n}	{c    }        10:number     {n}	{ r[7]}       r$7:number     {n}
+ 24)	             SET_VAR	{ r[7]}       r$7:number     {n}	                 :              	            total:number     {n}
+
+ 25)	// *** Line 11: if (i == total) {
+ 26)	        CONDITION_EQ	                i:number     {n}	            total:number     {n}	{ r[8]}       r$8:boolean    {b}
+ 27)	       JUMP_IF_FALSE	{ r[8]}       r$8:boolean    {b}	                 :              	                       L2 [30]
+
+ 28)	// *** Line 12: finished = true;
+ 29)	             SET_VAR	{c    }      true:boolean    {b}	                 :              	         finished:boolean    {b}
+ 30)	L2:
+ 31)	                JUMP	                 :              	                 :              	                       L0 [8]
+ 32)	L1:
+ 33)	              RETURN	                 :              	                 :              	                 :              

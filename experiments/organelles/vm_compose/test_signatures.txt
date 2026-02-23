@@ -1,0 +1,20 @@
+function triangle_number(n: number): number {
+function is_leap_year(year: number): number {
+function harmonic_mean(a: number, b: number): number {
+function manhattan_dist(x1: number, y1: number, x2: number, y2: number): number {
+function diagonal_length(width: number, height: number): number {
+function digital_sum(n: number): number {
+function perfect_square(n: number): number {
+function pyramid_vol(base: number, height: number): number {
+function arithmetic_nth(first: number, diff: number, n: number): number {
+function gcd_two(a: number, b: number): number {
+function celsius_convert(c: number): number {
+function sign_value(x: number): number {
+function seconds_convert(s: number): number {
+function midpoint_of(a: number, b: number): number {
+function sum_range_even(n: number): number {
+function cube_area(side: number): number {
+function radians_convert(deg: number): number {
+function elapsed_time(hours: number, minutes: number): number {
+function geometric_avg(a: number, b: number): number {
+function range_check(x: number, lo: number, hi: number): number {

@@ -1,0 +1,14 @@
+result_a1=128
+result_a2=128
+result_a3=128
+result_a4=128
+result_a5=128
+result_a6=128
+result_a7=128
+result_a8=128
+result_a9=128
+result_a10=128
+result_a10a=128
+result_a11=128
+result_a12=128
+result_a13=128

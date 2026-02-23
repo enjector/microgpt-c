@@ -1,0 +1,39 @@
+
+// ------------------------------------------------------------
+// main()
+// ------------------------------------------------------------
+  0)	main:
+
+  1)	// *** Line 2: function main() {
+  2)	      CREATE_SET_VAR	{c    }         0:number     {n}	                 :              	            total:number     {n}
+
+  3)	// *** Line 3: for (var i = 0; i < 10; i++) {
+  4)	      CREATE_SET_VAR	{c    }         0:number     {n}	                 :              	                i:number     {n}
+  5)	L0:
+
+  6)	// *** Line 3: i < 10; i++) {
+  7)	        CONDITION_LT	                i:number     {n}	{c    }        10:number     {n}	{ r[0]}       r$0:boolean    {b}
+  8)	       JUMP_IF_FALSE	{ r[0]}       r$0:boolean    {b}	                 :              	                       L1 [25]
+
+  9)	// *** Line 4: ) {
+ 10)	      CREATE_SET_VAR	{c    }         0:number     {n}	                 :              	                j:number     {n}
+ 11)	L2:
+
+ 12)	// *** Line 4: j < 10; j++) {
+ 13)	        CONDITION_LT	                j:number     {n}	{c    }        10:number     {n}	{ r[1]}       r$1:boolean    {b}
+ 14)	       JUMP_IF_FALSE	{ r[1]}       r$1:boolean    {b}	                 :              	                       L3 [21]
+
+ 15)	// *** Line 5: ) {
+ 16)	                 MUL	                i:number     {n}	                j:number     {n}	{ r[2]}       r$2:number     {n}
+ 17)	                 ADD	            total:number     {n}	{ r[2]}       r$2:number     {n}	            total:number     {n}
+
+ 18)	// *** Line 4: j++) {
+ 19)	                 INC	                j:number     {n}	                 :              	                 :              
+ 20)	                JUMP	                 :              	                 :              	                       L2 [11]
+ 21)	L3:
+
+ 22)	// *** Line 3: i++) {
+ 23)	                 INC	                i:number     {n}	                 :              	                 :              
+ 24)	                JUMP	                 :              	                 :              	                       L0 [5]
+ 25)	L1:
+ 26)	              RETURN	                 :              	                 :              	                 :              

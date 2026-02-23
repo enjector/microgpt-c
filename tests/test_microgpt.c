@@ -1538,21 +1538,18 @@ TEST(default_config_has_valid_fields) {
 
 TEST(custom_config_overrides) {
   MicrogptConfig cfg = microgpt_default_config();
-  cfg.n_embd = 32;
-  cfg.n_head = 4;
-  cfg.n_layer = 2;
-  cfg.block_size = 16;
-  cfg.mlp_dim = 64;
 
-  Model *m = model_create(10, &cfg);
-  ASSERT(m != NULL);
-  const MicrogptConfig *mc = model_config(m);
-  ASSERT_EQ(mc->n_embd, 32);
-  ASSERT_EQ(mc->n_head, 4);
-  ASSERT_EQ(mc->n_layer, 2);
-  ASSERT_EQ(mc->block_size, 16);
-  ASSERT_EQ(mc->mlp_dim, 64);
-  model_free(m);
+  /* We can override training hyperparameters freely */
+  cfg.learning_rate = 0.005f;
+  cfg.batch_size = 64;
+  cfg.warmup_steps = 1000;
+
+  /* But we should NOT override the architectural macros like n_embd or n_layer,
+   * because model_create() will reject them. */
+
+  ASSERT(fabs(cfg.learning_rate - 0.005f) < 1e-6);
+  ASSERT(cfg.batch_size == 64);
+  ASSERT(cfg.warmup_steps == 1000);
 }
 
 TEST(model_config_accessor) {
@@ -1897,6 +1894,34 @@ TEST(shuffle_docs_preserves_all_entries) {
     ASSERT_EQ(found[i], 1);
 }
 
+TEST(microgpt_config_mismatch) {
+  MicrogptConfig cfg = microgpt_default_config();
+  /* Deliberately mismatch the runtime dimension relative to the compile-time
+   * macro */
+  cfg.n_embd = N_EMBD + 8;
+
+  /* Suppress the expected stderr output for this specific failure */
+  FILE *old_stderr = stderr;
+#ifdef _WIN32
+  stderr = fopen("nul", "w");
+#else
+  stderr = fopen("/dev/null", "w");
+#endif
+
+  Model *m = model_create(256, &cfg);
+
+  /* Restore stderr */
+  if (stderr != old_stderr) {
+    fclose(stderr);
+    stderr = old_stderr;
+  }
+
+  /* The model creation must fail because the config dimensions don't match the
+   * binary's macros. If it does NOT fail, it would lead to out-of-bounds
+   * memcpy later. */
+  ASSERT(m == NULL);
+}
+
 /* ==================================================================== */
 /*                            MAIN                                       */
 /* ==================================================================== */
@@ -2001,6 +2026,7 @@ int main(void) {
   RUN(default_config_has_valid_fields);
   RUN(custom_config_overrides);
   RUN(model_config_accessor);
+  RUN(microgpt_config_mismatch);
 
   /* Softmax / Sampling edge cases */
   printf("\n[Softmax / Sampling Edge Cases]\n");

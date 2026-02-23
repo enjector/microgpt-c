@@ -679,12 +679,57 @@ static int alloc_layer_ptrs(Model *m, int n_layer) {
   return 0;
 }
 
+int microgpt_verify_config(const MicrogptConfig *cfg) {
+  int mismatch = 0;
+  if (cfg->n_embd != N_EMBD) {
+    fprintf(stderr, "ERROR: cfg->n_embd (%d) != N_EMBD macro (%d)\n",
+            cfg->n_embd, N_EMBD);
+    mismatch = 1;
+  }
+  if (cfg->n_layer != N_LAYER) {
+    fprintf(stderr, "ERROR: cfg->n_layer (%d) != N_LAYER macro (%d)\n",
+            cfg->n_layer, N_LAYER);
+    mismatch = 1;
+  }
+  if (cfg->n_head != N_HEAD) {
+    fprintf(stderr, "ERROR: cfg->n_head (%d) != N_HEAD macro (%d)\n",
+            cfg->n_head, N_HEAD);
+    mismatch = 1;
+  }
+  if (cfg->mlp_dim != MLP_DIM) {
+    fprintf(stderr, "ERROR: cfg->mlp_dim (%d) != MLP_DIM macro (%d)\n",
+            cfg->mlp_dim, MLP_DIM);
+    mismatch = 1;
+  }
+  if (cfg->block_size != BLOCK_SIZE) {
+    fprintf(stderr, "ERROR: cfg->block_size (%d) != BLOCK_SIZE macro (%d)\n",
+            cfg->block_size, BLOCK_SIZE);
+    mismatch = 1;
+  }
+
+  if (mismatch) {
+    fprintf(
+        stderr,
+        "FATAL: MicroGPT-C uses compile-time macros (N_EMBD, etc.) to size "
+        "stack arrays internally for maximum performance. You cannot supply "
+        "a runtime MicrogptConfig that differs from the binary's macros, "
+        "as this will cause buffer overflows during inference.\n");
+    return -1;
+  }
+  return 0;
+}
+
 Model *model_create(size_t vocab_size, const MicrogptConfig *cfg) {
   Model *m = (Model *)calloc(1, sizeof(Model));
   if (!m)
     return NULL;
   m->cfg = *cfg;
   m->vocab_size = vocab_size;
+
+  if (microgpt_verify_config(cfg) != 0) {
+    free(m);
+    return NULL;
+  }
   const size_t ne = (size_t)cfg->n_embd;
   const size_t bs = (size_t)cfg->block_size;
   const size_t md = (size_t)cfg->mlp_dim;

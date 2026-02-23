@@ -1,0 +1,1 @@
+function eval(data: number): boolean { return data == 2; }

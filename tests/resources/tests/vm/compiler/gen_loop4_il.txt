@@ -1,0 +1,28 @@
+
+// ------------------------------------------------------------
+// main()
+// ------------------------------------------------------------
+  0)	main:
+
+  1)	// *** Line 2: function main(): number {
+  2)	      CREATE_SET_VAR	{c    }         0:number     {n}	                 :              	            total:number     {n}
+
+  3)	// *** Line 4: for (var i = 0; i < 10; i++) {
+  4)	      CREATE_SET_VAR	{c    }         0:number     {n}	                 :              	                i:number     {n}
+  5)	L0:
+
+  6)	// *** Line 4: i < 10; i++) {
+  7)	        CONDITION_LT	                i:number     {n}	{c    }        10:number     {n}	{ r[0]}       r$0:boolean    {b}
+  8)	       JUMP_IF_FALSE	{ r[0]}       r$0:boolean    {b}	                 :              	                       L1 [14]
+
+  9)	// *** Line 5: ) {
+ 10)	                 ADD	            total:number     {n}	                i:number     {n}	            total:number     {n}
+
+ 11)	// *** Line 4: i++) {
+ 12)	                 INC	                i:number     {n}	                 :              	                 :              
+ 13)	                JUMP	                 :              	                 :              	                       L0 [5]
+ 14)	L1:
+
+ 15)	// *** Line 8: return total;
+ 16)	          STACK_PUSH	            total:number     {n}	                 :              	                 :              
+ 17)	              RETURN	                 :              	                 :              	                 :              

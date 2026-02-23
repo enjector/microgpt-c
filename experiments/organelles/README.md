@@ -46,8 +46,8 @@ Sub-1M parameter Transformers that can't compose alone — but chain into pipeli
 | Experiment | What It Tests | Key Result |
 |-----------|---------------|------------|
 | [C Code Composition](c_compose/) | Planner→Judge pipeline + LR scheduling | **83% exact match**, 98% parse, 1.2M params |
-| [C Code Generation](c_codegen/) | Retrieval fidelity + novel composition | 7/7 byte-perfect recall, 0/10 novel |
-| [C Wiring Generation](c_wiringgen/) | Composition grammar hypothesis | Training in progress |
+| [VM Code Generation](vm_codegen/) | Constrained DSL retrieval fidelity | 1,597 functions, 863 tokens, 0% UNK |
+| [VM Compose](vm_compose/) | Multi-candidate best-of-N generation | **15% in-vocab**, **5% OOV** (first ever) |
 
 ### The Coordination Funnel
 
@@ -131,6 +131,8 @@ Architecture and protocol docs that explain the theory behind these experiments:
 | [ORGANELLE_GAMES.md](../../docs/organelles/ORGANELLE_GAMES.md) | Game leaderboard + recommended next puzzles |
 | [ORGANELLE_WHY_LOGIC_GAMES.md](../../docs/organelles/ORGANELLE_WHY_LOGIC_GAMES.md) | Why games are the experimental apparatus, not the goal |
 | [ORGANELLE_VISION.md](../../docs/organelles/ORGANELLE_VISION.md) | CLI tooling design — `microgpt create/train/infer/pipeline` |
+| [ORGANELLE_GENERALISATION_VM.md](../../docs/organelles/ORGANELLE_GENERALISATION_VM.md) | VM generalisation research — "Composition in the pipeline, not the model" |
+| [ORGANELLE_REASONING.md](../../docs/organelles/ORGANELLE_REASONING.md) | Reasoning experiments — retrieval vs true reasoning |
 
 ---
 

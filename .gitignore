@@ -2,6 +2,31 @@
 journals/
 REVIEW.md
 
+# Debug/temp artifacts
+test_stdout*.txt
+actual*.txt
+expected*.txt
+build*.txt
+build_err*.txt
+crash_dump.txt
+make_output.txt
+run_output.txt
+stdout.txt
+test_out.txt
+test_run.log
+debug_tool.py
+run_lldb.sh
+old_*.c
+test_crash.c
+test_error.c
+
+# Root checkpoint copies (keep only models/ dir)
+/ts_*.ckpt*
+/vm_compose_v*
+
+# Old build dirs
+build.old/
+
 # Generated experiment artifacts (produced at runtime, not source)
 experiments/organelles/puzzle8_reasoning/puzzle8_mover_combined.txt
 experiments/organelles/puzzle8_reasoning/puzzle8_mover_enriched.txt
