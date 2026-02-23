@@ -514,3 +514,14 @@ Just as changing the state-space encoding of the 8-puzzle raised success rates f
 
 The word-level tokenisation result (0% → 60%) independently confirms this: a better **input representation** (word tokens vs character tokens) produces the same dramatic improvement, without changing model capacity at all.
 
+---
+
+## Related Documents
+
+| Document | Relationship |
+|---|---|
+| [ORGANELLE_REASONING_CONCLUSION.md](ORGANELLE_REASONING_CONCLUSION.md) | Unified synthesis connecting VM generalisation and reasoning research |
+| [ORGANELLE_REASONING.md](ORGANELLE_REASONING.md) | The retrieval–reasoning boundary: theory, evidence, OpaTrace experiments |
+| [ORGANELLE_NAR.md](ORGANELLE_NAR.md) | Neural Algorithmic Reasoning: the academic foundation |
+| [ORGANELLE_VM.md](ORGANELLE_VM.md) | The MicroGPT Virtual Machine implementation |
+

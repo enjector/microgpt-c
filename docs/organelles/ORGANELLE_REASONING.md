@@ -1287,6 +1287,7 @@ This is the **Reasoning Traces as Training Data** hypothesis. It is analogous to
 
 | Document | Relationship |
 |---|---|
+| [ORGANELLE_REASONING_CONCLUSION.md](ORGANELLE_REASONING_CONCLUSION.md) | Unified synthesis: reasoning as constraint satisfaction through elimination |
 | [ORGANELLE_INTELLIGENCE.md](ORGANELLE_INTELLIGENCE.md) | Experimental proof that organelles learn (retrieval verification) |
 | [ORGANELLE_PIPELINE.md](ORGANELLE_PIPELINE.md) | The OPA architecture that provides compositional novelty |
 | [ORGANELLE_GAMES.md](ORGANELLE_GAMES.md) | Game leaderboard showing the three performance tiers |
