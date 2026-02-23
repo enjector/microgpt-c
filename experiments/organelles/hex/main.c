@@ -21,10 +21,10 @@
 #include <string.h>
 #include <time.h>
 
-#define PLANNER_CORPUS "hex_planner.txt"
-#define PLAYER_CORPUS "hex_player.txt"
-#define PLANNER_CKPT "hex_planner.ckpt"
-#define PLAYER_CKPT "hex_player.ckpt"
+#define PLANNER_CORPUS (GRID == 5 ? "hex5_planner.txt" : "hex_planner.txt")
+#define PLAYER_CORPUS (GRID == 5 ? "hex5_player.txt" : "hex_player.txt")
+#define PLANNER_CKPT (GRID == 5 ? "hex5_planner.ckpt" : "hex_planner.ckpt")
+#define PLAYER_CKPT (GRID == 5 ? "hex5_player.ckpt" : "hex_player.ckpt")
 
 #define ORGANELLE_TEMP 0.2
 #define INF_GEN_LEN 60
@@ -33,8 +33,11 @@
 #define MAX_LAST_HISTORY 3
 #define ENSEMBLE_VOTES 3
 
-#define GRID 7
-#define BOARD_SIZE (GRID * GRID) /* 49 */
+#ifndef HEX_GRID
+#define HEX_GRID 7
+#endif
+#define GRID HEX_GRID
+#define BOARD_SIZE (GRID * GRID)
 #define EMPTY '.'
 #define PLAYER_X 'X'
 #define PLAYER_O 'O'

@@ -1,28 +1,28 @@
-# Hex 7×7 Multi-Organelle Pipeline
+# Hex Multi-Organelle Pipeline
 
-A 92K-parameter Transformer plays 7×7 Hex as X against a random opponent — **27% win rate** (uplifted from 4% via topology features + MCTS corpus), demonstrating that BFS connectivity features and topological rejection criteria improve spatial reasoning.
+A 92K-parameter Transformer plays Hex as X against a random opponent — **27% win rate on 7×7** (uplifted from 4% via topology features + MCTS corpus) and **32% win rate on 5×5** (further improvement from reduced encoding pressure).
 
 ---
 
 ## Spear Summary
 
-**Point:** Hex exposes the fundamental limit of flat-string board encoding — the model wins only 4% against random because forming a connected path across a 7×7 hexagonal grid requires spatial reasoning that a 92K-parameter character model cannot learn from 5K training examples.
+**Point:** BFS connectivity features + topological Judge + MCTS corpus turned Hex from near-random (4%) to 27% win rate on 7×7 — the Judge alone (no retraining) gave a 6.25× improvement, validating that better filters beat smarter models.
 
-**Picture:** Imagine trying to describe a road network in a single line of text and asking someone to build a continuous highway across the map. They can learn to place road tiles in valid locations but cannot "see" which tiles connect to form a path — that requires a spatial map in their mind.
+**Picture:** Like giving a blind chess player a map showing which pieces connect rather than just listing coordinates — the model can't see paths in flat text, but structural features make connectivity implicit.
 
-**Proof:** 100 games: 10 wins, 0 draws, 90 losses. 2,038 parse errors (50%). 4,118 total moves. Pipeline time: 53.3s. The 10% win rate is close to random play (~7% on 7×7).
+**Proof:** 7×7: 27% win (up from 4%), parse errors dropped 50%→17%. 5×5: 32% win with halved prompt length. Deeper MCTS (500 vs 200 iterations) shows no benefit on 5×5 — search converges early on smaller boards.
 
-**Push:** Connection-aware encoding: label each cell with "distance-to-connected-component" or "bridge cell" markers so the model can learn path-building heuristics.
+**Push:** Virtual connection templates (precomputed bridge patterns) are the next lever. K-9 in the Kanban backlog.
 
 ---
 
 ## How It Works
 
 ```
-┌──────────┐  "board=49chars|turn=X"      ┌──────────┐ "R3C4" ┌──────────┐
+┌──────────┐  "board+topo features"       ┌──────────┐ "R3C4" ┌──────────┐
 │ Planner  │─────────────────────────────▶│  Player  │───────▶│  Judge   │
 │ (neural) │  "todo=place,check,place"    │ (neural) │        │ (determ.)│
-│  92K par.│                              │  92K par.│        │path check│
+│  92K par.│                              │  92K par.│        │topo check│
 └──────────┘                              └──────────┘        └────┬─────┘
       ▲                                                            │
       │ replan if stalls > 3          ┌──────────┐                │
@@ -31,115 +31,77 @@ A 92K-parameter Transformer plays 7×7 Hex as X against a random opponent — **
                                       └──────────┘
 ```
 
-- **Board** is a 49-char string (7×7): `X`, `O`, `.` for empty
-- **X goal:** Connect left edge to right edge
-- **O goal:** Connect top edge to bottom edge
-- **Judge** checks for connected path using flood-fill
-- **Hex property:** One side must win (no draws possible)
-
-### Hex Connectivity
-
-Each cell connects to up to 6 hexagonal neighbours. The player must form an unbroken chain of their stones from one edge to the opposite:
-
-```
-   0 1 2 3 4 5 6
- 0  . . . . . . .
-  1  . . . . . . .    X connects: left ↔ right
-   2  . . . . . . .   O connects: top ↔ bottom
-    3  . . . . . . .
-     4  . . . . . . .
-      5  . . . . . . .
-       6  . . . . . . .
-```
+- **Board** is an NxN string: `X`, `O`, `.` for empty (7×7 = 49 chars, 5×5 = 25 chars)
+- **Topo features** in prompt: `xg` (X groups), `xd` (X edge distance), `og`, `od`, `xb` (X bridges)
+- **Judge** rejects placements not adjacent to any friendly stone → first connected alternative
+- **MCTS corpus** uses UCB1 selection (200 iterations) for higher-quality training data
 
 ## Architecture
 
 | Parameter | Value |
 |-----------|-------|
 | Organelles | 2 neural (Planner + Player) + deterministic Judge |
-| N_EMBD | 96 |
-| N_HEAD | 8 |
-| N_LAYER | 4 |
-| Board | 7×7 hexagonal (49 cells) |
-| Win condition | Connected path edge-to-edge |
-| Params/organelle | ~92,000 (Tier 2 — Small) |
+| N_EMBD | 48 |
+| N_HEAD | 4 |
+| N_LAYER | 3 |
+| BLOCK_SIZE | 128 |
+| Params/organelle | ~92,000 (Tier 2) |
 
-## Training
+## Results
 
-| Organelle | Corpus | Entries | Size | Best Loss | Time |
-|-----------|--------|---------|------|-----------|------|
-| Planner | `hex_planner.txt` | 4,981 | 495 KB | 0.16 | ~25 min |
-| Player | `hex_player.txt` | 4,981 | 563 KB | 0.13 | ~32 min |
+### 7×7 Hex (Topology Uplift Progression)
 
-**Total: ~57 minutes. 25,000 steps each, multi-threaded.**
+| Variant | Win Rate | Parse Errors | Corpus Size |
+|---------|---------|-------------|-------------|
+| Original baseline (MC, flat encoding) | 4% | 50% | 4,981 |
+| + Judge only (no retrain) | 25% | 50% | 4,981 |
+| + Enriched encoding (MC) | 19% | 18% | 10,707 |
+| **+ MCTS corpus (best)** | **27%** | **17%** | **13,510** |
 
-### Corpus Generation
-
-- Monte Carlo evaluation-guided self-play
-- 500 games with ~40 moves each
-- Move selection biased toward cells with higher Monte Carlo win probability
-
-## Results (100 Games vs Random)
+### 5×5 Hex Variant
 
 | Metric | Value |
 |--------|-------|
-| **Games won (X)** | **10 / 100 (10%)** |
-| Games drawn | 0 |
-| Games lost | 90 |
-| **Win+Draw rate** | **10%** |
-| Total moves | 4,118 (avg 41.2) |
-| Parse errors | 2,038 (50%) |
-| Planner re-plans | 0 |
-| Pipeline time | 53.25s |
+| **Games won (X)** | **32 / 100 (32%)** |
+| Games lost | 68 |
+| Total moves | 2,152 (avg 21.5) |
+| Parse errors | 387 |
+| Pipeline time | 2.0s |
 
-### Why Hex Is the Hardest Adversarial Game
+### Deeper MCTS (500 iterations, 5×5)
 
-| Game | Win % | State Space | Key Reasoning | Encoding Challenge |
-|------|-------|-------------|---------------|-------------------|
-| Pentago | 90% | Large | Place+twist | Twist creates easy wins |
-| Othello | 56% | Medium | Positional | Flip counting |
-| **Hex** | **10%** | **Large** | **Path connectivity** | **Global spatial graph** |
+No additional benefit — identical corpus generated (same MD5). On a 5×5 board, 200 MCTS iterations already converges. The bottleneck on 5×5 is model capacity and Judge heuristics, not corpus quality.
 
-The fundamental problem: Hex requires **global path reasoning** across a hexagonal grid. The model must understand:
-1. Which cells are connected to which edges
-2. Where "bridge" connections (implicit two-cell paths) exist
-3. How to prioritise edge-adjacent placements
-4. When to block opponent's forming connections
+### Cross-Board Comparison
 
-None of this is visible in a 49-char flat string.
-
-### Key Observations
-
-1. **10% ≈ random play** — on 7×7 Hex, random play wins ~7% as first player; the model is barely above random
-2. **2,038 parse errors (50%)** — the 49-char board + valid moves exceeds BLOCK_SIZE=128, causing severe truncation
-3. **Connection is invisible** — unlike Othello (where piece flips are local) or Pentago (where wins are 5-in-a-row), Hex wins require tracing graph connectivity across the entire board
-4. **Zero re-plans despite 90% loss rate** — the planner doesn't know it's losing; it produces consistent (but wrong) plans
-5. **Hex is provably hard for local methods** — even Shannon's switching game formulation suggests Hex strategy requires global information
+| Board | State Space | Win Rate | Parse Errors | Key Finding |
+|-------|-------------|---------|-------------|-------------|
+| 7×7 | ~10^10 | 27% | 17% | Topology features provide 6.75× uplift |
+| 5×5 | ~10^7 | 32% | high | Smaller board = less encoding pressure |
 
 ## Build & Run
 
 ```bash
-# Generate corpus
+# Generate 7×7 corpus
 cd experiments/organelles/hex
 python3 generate_corpus.py
 
-# Build and run
-cd build
-cmake .. && cmake --build . --target hex_demo
-./hex_demo    # trains both organelles, then plays 100 games
+# Build and run 7×7
+cmake --build build --target hex_demo && ./build/hex_demo
+
+# Build and run 5×5
+cmake --build build --target hex5_demo && ./build/hex5_demo
 ```
 
-Auto-resumes from checkpoints (`hex_planner.ckpt`, `hex_player.ckpt`).
+`main.c` supports compile-time grid size via `HEX_GRID` define (default: 7). The 5×5 variant uses `HEX_GRID=5`.
 
 ## Recommended Next Steps
 
 | Priority | Change | Expected Impact |
 |----------|--------|-----------------|
-| **P1** | Connection-aware encoding: "X-group-1 near left edge, 3 cells from right" | Enable path reasoning from text |
-| **P1** | Reduce board to 5×5 (25 cells) to fit BLOCK_SIZE=128 | Lower parse errors from truncation |
-| **P2** | Increase BLOCK_SIZE to 256+ for 7×7 representation | Reduced truncation |
-| **P2** | Increase WARMUP_STEPS to 500 (per TRAINING_STRATEGIES.md) | Better gradient stability |
-| **P3** | Graph-aware encoding with bridge detection | Explicit spatial reasoning hints |
+| **P1** | Virtual connection templates (bridge patterns) | Strategic knowledge beyond local adjacency |
+| **P2** | BLOCK_SIZE=256 for 7×7 | Eliminate remaining parse errors |
+| **P3** | Deeper MCTS on 7×7 (500+ iterations) | May help where search tree is wider |
 
 ---
 

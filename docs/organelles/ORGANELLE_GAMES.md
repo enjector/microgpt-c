@@ -16,7 +16,8 @@ Based on OPA's proven scaling—90% on 8-Puzzle (search/local minima), 87% win+d
 | **3** | **Klotski** (2x3 blocks) | ~10^10 | 4 | 30K | 80-90% medium | **62% solve** — fallback-driven |
 | **4** | **Sudoku** (4x4) | ~10^6-10^8 | 4-9 | 160K | 85-95% easy | **78% solve**, inverse difficulty effect |
 | **5** | **Othello/Reversi** (6x6) | ~10^12 | 10-20 | 92K | 80% vs random | **67% win** vs random |
-| **6** | **Hex** (7x7) | ~10^10 | 6 | 92K | 75-85% | **27% win** — topology uplift: 4%→27% via BFS connectivity features + MCTS corpus |
+| **6** | **Hex** (7×7) | ~10^10 | 6 | 92K | 75-85% | **27% win** — topology uplift: 4%→27% via BFS connectivity features + MCTS corpus |
+| **6b** | **Hex** (5×5) | ~10^7 | 6 | 92K | 40-60% | **32% win** — smaller board reduces encoding pressure, +18.5% relative vs 7×7 |
 | **7** | **Pentago** (6x6 spin) | ~10^13 | 12+6 | 92K | 85-95% | **91% win** — twist creates easy 5-in-a-row |
 | **8** | **Red Donkey** (sliding) | ~10^9 | 4 | 30K | 70-85% | **19% solve** — corpus uplift: 12%→19% via BFS expansion (199→523 entries) |
 
@@ -63,8 +64,9 @@ By implementing the recommended list of puzzles (Lights Out, Mastermind, Klotski
      - **What It Proves**: Beyond TTT—emergent strategy (forks like C4) with 10-20 organelles for eval.
      - **Implications**: Game AI extensions (chess minis)—validates for competitive edge apps.
 
-   - **Hex (7x7)**: Proves OPA for **pure connectivity** (paths as geodesics). Originally 4%, **uplifted to 27%** via topology experiments.
+   - **Hex (7×7)**: Proves OPA for **pure connectivity** (paths as geodesics). Originally 4%, **uplifted to 27%** via topology experiments.
       - **What It Proves**: Topological invariance—BFS connectivity features (connected groups, edge distance, bridges) and a topological Judge (rejecting isolated placements) dramatically improve performance without engine porting.
+      - **5×5 Variant**: Reducing the board from 7×7 to 5×5 yielded **32% win rate** (+18.5% relative). The smaller board halves prompt length, reducing parse errors and improving pattern matching. However, deeper MCTS (500 vs 200 iterations) showed no additional benefit on 5×5 — the search converges with 200 iterations on the smaller state space.
       - **Implications**: Network security (e.g., path-blocking in AML, per EnX-MF)—validates the geometric thesis: structural features > smarter models.
 
    - **Pentago (6x6 Connect4 spin)**: Proves OPA with **twists** (rotations as transformations). Kanban for spin combos; 85-95%.

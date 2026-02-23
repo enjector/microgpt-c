@@ -604,6 +604,22 @@ add_demo(
 )
 
 # ==================================================================
+#  Organelle: Hex 5x5 variant (smaller board, same topology features)
+# ==================================================================
+
+add_demo(
+  NAME    hex5_demo
+  SOURCE  experiments/organelles/hex/main.c
+  THREADS
+  COPY    experiments/organelles/hex/hex5_planner.txt
+          experiments/organelles/hex/hex5_player.txt
+  DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=3 BLOCK_SIZE=128 MLP_DIM=192
+          NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
+          MAX_VOCAB=50 MAX_DOCS=10000 MAX_DOC_LEN=128
+          HEX_GRID=5
+)
+
+# ==================================================================
 #  Organelle: Pentago multi-organelle pipeline
 # ==================================================================
 
