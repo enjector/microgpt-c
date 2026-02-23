@@ -1122,8 +1122,7 @@ YY_DECL {
 #line 87 "D:/dev/projects/enjector/microgpt-vm/main/core/src/vm_module_parser.l"
         {
           size_t yystring_len = strlen(yytext);
-          vm_module_parser_lval.string =
-              (char *)xmemory_malloc(yystring_len - 1);
+          vm_module_parser_lval.string = (char *)malloc(yystring_len - 1);
           strncpy(vm_module_parser_lval.string, &yytext[1], yystring_len - 2);
           return STRING;
         }

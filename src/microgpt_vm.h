@@ -298,7 +298,7 @@ static inline void sequence_merge(sequence *dst, sequence *src) {
   for (size_t i = 0; i < src->count; i++) {
     sequence_add(dst, src->items[i].value);
     dst->items[dst->count - 1].type =
-        src->items[i].type ? strdup(src->items[i].type) : NULL;
+        src->items[i].type ? string_clone(src->items[i].type) : NULL;
   }
 }
 
