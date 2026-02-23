@@ -168,3 +168,26 @@ The "stem cell" organelles were differentiated using specific generated datasets
 
 - **Name Generation Corpus:** `examples/names/names.txt`
 - **Shakespeare Character Corpus:** `examples/shakespeare/`
+
+## Appendix E: Changelog
+
+A version history of the book, reconstructed from the git commit log.
+
+| Version | Date | Commit | Changes |
+|---------|------|--------|---------|
+| **1.1.0** | Feb 23, 2026 | `ea87a68` | Hex topology uplift (4%→27%), Red Donkey corpus expansion (12%→19%), MCTS corpus generation, Chapter 7 leaderboard updated, Appendix E changelog added |
+| **1.0.8** | Feb 23, 2026 | `851182a` | Fresh benchmark data across PERFORMANCE.md and README |
+| **1.0.7** | Feb 23, 2026 | `2783ad3` | Chapter 16 added: "The Nature of Reasoning — Unified Synthesis", reasoning conclusion document |
+| | | `000e748` | Learning frontier section: what must be engineered vs what can be learned |
+| **1.0.4** | Feb 23, 2026 | `9dd512e` | VM engine chapter updates, VM experiment findings integrated, test and benchmark fixes |
+| **1.0.3** | Feb 21, 2026 | `d8a3b9b` | Inference cost economics ($5/experiment) added across VALUE_PROPOSITION and book chapters |
+| | | `905434f` | Neural Algorithmic Reasoning (NAR) framing integrated across project docs |
+| | | `1f3772d` | NAR reframing: "generalist monolith problem" — models waste budget on 30-80 line algorithms |
+| | | `9519576` | Details and diagrams improved throughout |
+| | | `b4c09d7` | Formatting pass across all chapters |
+| **1.0.2** | Feb 21, 2026 | `e50e4c8` | Book logo updated |
+| **1.0.1** | Feb 21, 2026 | `04dc7cf` | Cover updated with NAR framing |
+| **1.0.0** | Feb 20, 2026 | `59f7f85` | First complete edition — 16 chapters + Appendix A, initial research integrated |
+| | | `d4e5c76` | Chapter content updates |
+| | | `2565c4a` | OPA biology analogy infographic added to Chapter 4 |
+| | | `17bc4eb` | Chapter links added to table of contents |
