@@ -30,7 +30,7 @@ We ran two experiments back-to-back — a [lottery prediction](experiments/organ
 
 Same engine. Same architecture. One learns, one can't. **That's the proof.**
 
-The full research journey — from character-level Transformer to VM-based code generation — is documented in [*Composable Intelligence at the Edge*](docs/book/MicroGPT-C_Composable_Intelligence_at_the_Edge.pdf) (15 chapters, [online version](docs/book/MicroGPT-C_Composable_Intelligence_at_the_Edge.md)).
+The full research journey — from character-level Transformer to VM-based code generation — is documented in [*Composable Intelligence at the Edge*](docs/book/MicroGPT-C_Composable_Intelligence_at_the_Edge.pdf) (16 chapters, [online version](docs/book/MicroGPT-C_Composable_Intelligence_at_the_Edge.md)).
 
 ---
 
@@ -73,6 +73,7 @@ All 11 game experiments, 2 real-world data experiments (lottery + markets), 3 pr
 | 📈 **Market regime detection** (57% holdout) | [markets/README.md](experiments/organelles/markets/README.md) |
 | 🎲 **Lottery experiment** (entropy baseline) | [lottery/README.md](experiments/organelles/lottery/README.md) |
 | 🔬 **Pipeline architecture** (white paper) | [ORGANELLE_PIPELINE.md](docs/organelles/ORGANELLE_PIPELINE.md) |
+| 🧠 **Reasoning conclusion** | [ORGANELLE_REASONING_CONCLUSION.md](docs/organelles/ORGANELLE_REASONING_CONCLUSION.md) |
 | 📚 **Using as a library** | [LIBRARY_GUIDE.md](docs/LIBRARY_GUIDE.md) |
 | ⚡ **Performance & benchmarks** | [PERFORMANCE.md](docs/PERFORMANCE.md) |
 | 🔧 **Build options** (Metal, BLAS, INT8, SIMD) | [BUILD_OPTIONS.md](docs/BUILD_OPTIONS.md) |

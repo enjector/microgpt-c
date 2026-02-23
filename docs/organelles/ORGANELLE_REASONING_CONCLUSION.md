@@ -12,6 +12,8 @@
 
 **Picture:** A librarian who can't write a sentence, a bouncer who only says "no," and an accountant who tracks rejected ideas walk into a room. None of them can solve the puzzle. But together — the librarian proposes, the bouncer rejects the illegal, the accountant remembers what failed — they converge on a solution. No individual reasoned. The room did.
 
+Alternatively: a sculptor who doesn't add clay — they chisel away the excess until the statue emerges. The organelle proposes the rough block. The pipeline is the chisel.
+
 **Proof:** 340 lines of C coordination logic transform 50%-accurate models into 90%-successful systems. At 460K params, removing all pipeline scaffolding causes zero regression — the model has internalised enough pattern matching that the scaffolding is redundant. But the 90% ceiling is unchanged at any scale or configuration: 3 hard puzzles fail everywhere, requiring search depth that retrieval cannot approximate.
 
 **Push:** This synthesis connects two previously independent analyses — the VM generalisation journey and the reasoning boundary research — into a single architectural thesis. It also reframes what "VM code generation for reasoning" requires: not a 100M-param model, but a better linker over a standard library of retrieved functions.
@@ -42,6 +44,18 @@ The natural question — "just make the model bigger until it reasons" — fails
 ### The Middle Ground: 4M Parameters
 
 A 4M-param model (256-dim, 4-layer) sits between the current 400K and the 100M+ threshold. For a constrained 800-token DSL like the VM language, the compositional phase transition *might* occur at a lower threshold than general-purpose code. This is a genuine research question — but it's a bet, not a certainty, and it would increase training from minutes to hours.
+
+### The Three-Tier Capability Spectrum
+
+Across all experiments, organelle capabilities fall into three distinct tiers:
+
+| Tier | Capability | Example | Performance | Mechanism |
+|---|---|---|---|---|
+| **1. Retrieval** | Byte-perfect reproduction of memorised patterns | `c_codegen`: 100% on trained functions, 0% on novel | 100% within distribution | Direct lookup from weights |
+| **2. Compositional Retrieval** | Pipeline assembles known pieces into novel combinations | `c_compose`: 65% judge-pass via Planner→Worker→Judge | 50–91% depending on coordination | Retrieval + deterministic wiring |
+| **3. Emergent Reasoning** | Novel solutions from first principles | Hex: 4% win, Lights Out: 10% | 4–12% | Not achieved at <1M params |
+
+The conclusion: **Tier 3 is unattainable at edge scale.** But Tier 2 — compositional retrieval through coordinated elimination — is sufficient for real-world tasks. The question is not "how do we make models reason?" but "how do we make elimination fast and thorough enough to simulate reasoning?"
 
 ---
 
@@ -180,6 +194,20 @@ The progress metric (Manhattan distance, confidence score, syntax pass rate) is 
 - **Good move** (md went down) → accept, continue
 
 This scalar progress signal, combined with rejection sampling, produces convergence toward a solution. But the mechanism is **elimination**, not **optimisation**. The system narrows the space of bad options until what remains is correct.
+
+### Rejection Speed: The Critical Metric
+
+The practical effectiveness of elimination reasoning depends not on the quality of proposals but on the **speed of rejection**. Across the game experiments:
+
+| Game | Invalid move rate | Judge rejection time | Pipeline success |
+|---|---|---|---|
+| Connect-4 | ~50% of proposals | O(1) — bounds check | 91% wins |
+| Mastermind | ~35% of proposals | O(1) — format check | 79% solves |
+| 8-Puzzle | ~10% of proposals (460K) | O(1) — OOB + md check | 90% solves |
+
+The pattern: **O(1) rejection of invalid proposals is what enables the pipeline to converge within its move budget.** If rejection were O(n) — requiring simulation or deep analysis — the pipeline would exhaust its attempts before finding a solution. Fast rejection is the substrate that makes elimination reasoning viable on edge hardware.
+
+This is the sculptor analogy in practice: the chisel must be sharp enough to remove stone quickly. A dull chisel (slow rejection) means the sculptor runs out of time before the statue emerges.
 
 ### The Definition of Reasoning in This Framework
 
