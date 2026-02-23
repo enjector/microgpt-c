@@ -13,15 +13,31 @@ Measured on the **character-level name generation** workload (1,000 training ste
 
 ---
 
-## Shakespeare Character-Level (N_EMBD=128, N_LAYER=4, vocab≈84)
+## Shakespeare Character-Level (N_EMBD=128, N_LAYER=4, vocab=84)
 
 Multi-threaded training with auto-detected workers (uses all available CPU cores):
 
 | Metric | Value |
 |--------|-------|
-| **Model parameters** | ~1M |
-| **Vocab** | ~84 characters (zero `<unk>`) |
-| **Throughput** | ~85 steps/s, ~64k tok/s (12 threads) |
+| **Model parameters** | ~841K |
+| **Vocab** | 84 characters (zero `<unk>`) |
+| **Training throughput** | ~28K tok/s (12 threads) |
+| **Training time** | ~14 min (30K steps) |
+| **Inference throughput** | ~16K tok/s |
+
+---
+
+## Shakespeare Word-Level (N_EMBD=48, N_LAYER=1, vocab=5000)
+
+| Metric | Value |
+|--------|-------|
+| **Model parameters** | ~510K |
+| **Vocab** | 5,000 words (7.4% UNK rate) |
+| **Training throughput** | ~12.5K tok/s (12 threads) |
+| **Training time** | ~2 min (10K steps) |
+| **Inference throughput** | ~40K tok/s |
+
+> Word-level models achieve **2.5× faster inference** than character-level (40K vs 16K tok/s) because each token represents a whole word, dramatically reducing sequence length for the same text.
 
 ---
 
@@ -31,12 +47,21 @@ Run `./bench_microgpt` to reproduce on your machine. Default build uses **float3
 
 | Operation | float32 (default) | double64 | Speedup |
 |---|---|---|---|
-| `forward_backward_one` | **530k fwd+bwd/s** | 353k fwd+bwd/s | **1.50×** |
-| `adam_step` | **646k steps/s** | 289k steps/s | **2.23×** |
-| `sample_token` (vocab=50) | **6.8M samples/s** | 5.4M samples/s | **1.25×** |
-| Full training step (seq=8) | **677k tok/s** | 536k tok/s | **1.26×** |
-| `checkpoint_save` + `load` | **5,757 rt/s** | 4,846 rt/s | **1.19×** |
-| `forward_inference` (1 tok) | 1,413k infer/s | 1,724k infer/s | ~1× (noise) |
+| `forward_backward_one` | **551k fwd+bwd/s** | 353k fwd+bwd/s | **1.56×** |
+| `adam_step` | **662k steps/s** | 289k steps/s | **2.29×** |
+| `sample_token` (vocab=50) | **6.5M samples/s** | 5.4M samples/s | **1.20×** |
+| Full training step (seq=8) | **642k tok/s** | 536k tok/s | **1.20×** |
+| `checkpoint_save` + `load` | **4,972 rt/s** | 4,846 rt/s | **1.03×** |
+| `forward_inference` (1 tok) | **1,554k infer/s** | 1,724k infer/s | ~1× (noise) |
+| Auto-regressive inference (seq=16) | **1,180k tok/s** | — | — |
+
+**Tokenisation throughput:**
+
+| Tokeniser | Throughput |
+|---|---|
+| Character-level (12 chars) | **33.2M tok/s** |
+| Word-level (1KB text) | **854K tok/s** |
+| Vocabulary build (1KB text) | **249K builds/s** |
 
 **Matrix operations** (where precision matters most):
 
@@ -56,6 +81,21 @@ Run `./bench_microgpt` to reproduce on your machine. Default build uses **float3
 > **Convergence:** Both precisions reach identical loss (0.0011 after 100 steps). Float32 is the recommended default — use `-DMICROGPT_USE_FLOAT=OFF` only if you need double-precision research comparisons.
 >
 > **INT8 quantised build:** ~25% slower training than float32 on this tiny model, but **~8× smaller** weight storage — ideal for constrained devices.
+
+---
+
+## VM Engine Benchmarks (Single Thread)
+
+Run `./bench_microgpt_vm` to reproduce. All operations measured on a **single thread**:
+
+| Operation | Dispatches/sec |
+|---|---|
+| Simple function execution | **3.7M/s** |
+| Conditional branching (if/else) | **5.8M/s** |
+| Function call (single param) | **4.0M/s** |
+| Opaque handle + rolling mean | **643K/s** |
+
+The VM executes deterministic validation and function calls at millions of operations per second, making it practical for O(1) judge-speed rejection in the OPA pipeline.
 
 ---
 

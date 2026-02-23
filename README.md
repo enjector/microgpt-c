@@ -60,6 +60,21 @@ All 11 game experiments, 2 real-world data experiments (lottery + markets), 3 pr
 
 ---
 
+## Performance Highlights
+
+All benchmarks on Apple M2 Max, single-threaded unless noted. See [PERFORMANCE.md](docs/PERFORMANCE.md) for full details.
+
+| Engine | Params | Training | Inference | Notes |
+|--------|--------|----------|-----------|-------|
+| **Character-level** (Shakespeare) | 841K | 28K tok/s | 16K tok/s | 14 min, 12 threads |
+| **Word-level** (Shakespeare) | 510K | 12.5K tok/s | 40K tok/s | 2 min, 12 threads |
+| **VM engine** (dispatch) | — | — | 3.7–5.8M ops/s | Single-threaded |
+| **Micro-benchmark** (tiny model) | 6.5K | 642K tok/s | 1.55M infer/s | Float32, 1 thread |
+
+vs. Karpathy's **microgpt.py**: training is **1,000× faster**, inference is **700×+ faster**.
+
+---
+
 ## Explore Further
 
 | Topic | Link |

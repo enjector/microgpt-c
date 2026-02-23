@@ -21,7 +21,7 @@
     
     {\large \today\par}
     \vspace{0.3cm}
-    {\normalsize\texttt{Version 1.0.7}\par}
+    {\normalsize\texttt{Version 1.0.8}\par}
 \end{titlepage}
 
 % --- Copyright Page ---
@@ -32,7 +32,7 @@
 \noindent
 \textbf{MicroGPT-C: Composable Intelligence at the Edge}\\
 From Stem Cell Models to Real-World AI Pipelines \textendash{} Architecture, Implementation, and Research\\
-\textit{Version 1.0.7}\\[2em]
+\textit{Version 1.0.8}\\[2em]
 
 \noindent
 \textbf{Research Team}\\
@@ -2542,7 +2542,47 @@ If intelligence in MicroGPT-C emerges from coordinated retrieval — with coordi
 
 Chain-of-thought prompting creates an external Kanban. Self-consistency sampling is ensemble voting. Beam search is the rejection loop. The mechanisms are identical; the implementation differs. OPA does it with inspectable C code. LLMs do it with millions of opaque parameters.
 
-The MicroGPT-C project does not claim that organelles reason. It asks a harder question: **does anyone reason from first principles**, or is intelligence — at every scale — constraint satisfaction through coordinated retrieval, differing only in the density of the retrieval surface?
+The MicroGPT-C project does not claim that organelles reason. It asks a harder question: **does anyone reason from first principles**, or is intelligence -- at every scale -- constraint satisfaction through coordinated retrieval, differing only in the density of the retrieval surface?
+
+## The Learning Frontier
+
+A natural objection: if reasoning must be hand-engineered into the pipeline, doesn't that defeat the purpose? Must every domain be manually scaffolded?
+
+The answer is not binary. It is a **sliding boundary** -- and the experiments have already shown the pipeline being absorbed into model weights.
+
+### What Must Remain Deterministic
+
+Some coordination functions require guarantees that probabilistic models cannot provide at sub-1M parameters: state tracking (Kanban), validity checking (Judge), tree search (BFS/A*), and cycle detection all require either perfect memory, 100% correctness, or exponential state representation. These remain as ~340 lines of C -- cheap, provably correct, and more reliable than any learned approximation.
+
+### What Has Already Been Learned
+
+The Phase 5 scaffolding removal experiment (Chapter 6) proved this is not hypothetical:
+
+| Capability | 64K model | 460K model |
+|---|---|---|
+| Oscillation avoidance | 181 cycle breaks needed | 0 -- **learned** |
+| Prompt parsing | 98% errors | 0 -- **learned** |
+| Scaffold dependence | 3% without pipeline | 90% without -- **same as with** |
+
+The 460K model **internalised** the cycle breaker. It learned not to oscillate from training examples where oscillation correlates with failure. The scaffolding became redundant because the model absorbed what it was doing.
+
+### The Three Phases of Absorption
+
+The OpaTrace research (Chapter 15) outlines the next steps in this progression:
+
+1. **Safe augmentation (proven)**: Combining standard + trace-enriched training data preserves baseline performance exactly (90% vs 90%). Models can safely absorb coordination data.
+
+2. **Behavioural change (next)**: Scaling enriched traces to 30-50% of training data. If the model starts reducing cycle breaks on its own -- choosing different moves after stalls without being told to -- it has learned part of the coordinator's job.
+
+3. **Self-monitoring (proposed)**: An organelle that outputs a confidence score alongside its answer. Below a threshold, it rejects *itself* before the Judge sees it. The model learns *when it is uncertain* -- a form of learning the Judge's function.
+
+### The Sliding Boundary
+
+The architecture is not static. Over time, as enriched corpora grow, models absorb more coordination logic. The pipeline shifts from a **runtime component** to a **training signal generator**. The deterministic parts remain as safety nets, but the model needs them less frequently.
+
+The biological parallel is exact: DNA hardcodes the cell's coordination protocol (OPA). Proteins (organelles) are the learned components. Evolution doesn't re-learn coordination each generation -- it hardcodes the protocol and lets components specialise within it. But over evolutionary time, some coordinated behaviours become instinct, absorbed into the genome. The boundary slides.
+
+> *"The pipeline is scaffolding -- but good scaffolding teaches the building to stand on its own."*
 
 ## Summary
 
@@ -2553,6 +2593,7 @@ The MicroGPT-C project does not claim that organelles reason. It asks a harder q
 | **Engineered emergence** | Reasoning is a deliberate system property, not a surprise |
 | **Constraint elimination** | The pipeline converges by ruling out wrong answers, not by computing right ones |
 | **Better filters** | Smarter Judges and richer Kanban beat smarter models |
+| **Learning frontier** | Models absorb pipeline logic as they grow -- scaffolding teaches the building to stand on its own |
 | **The deep question** | Is all reasoning coordinated retrieval with constraint elimination? |
 
 The future of edge AI is not "bigger models that reason better." It is **computationally honest systems** that factor intelligence into what must be deterministic (validation, state tracking, search) and what must be learned (pattern retrieval, concept normalisation) — and coordinate the two into a system whose intelligence lives in neither component alone, but in the protocol between them.
