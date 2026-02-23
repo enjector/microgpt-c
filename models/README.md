@@ -96,9 +96,9 @@ Each `.ckpt.log` file contains the full training history (loss per step, timings
 | **Othello** | `othello_planner/player.ckpt` | 92K | **67% win** |
 | **Klotski** | `klotski_planner/player.ckpt` | 30K | **62% solve** |
 | **8-Puzzle** | `puzzle8_*_v3b.ckpt` (×5) | 460K | **60% solve** |
-| **Red Donkey** | `reddonkey_planner/player.ckpt` | 30K | **12% solve** |
+| **Red Donkey** | `reddonkey_planner/player.ckpt` | 30K | **19% solve** |
 | **Lights Out** | `lightsout_planner/player.ckpt` | 160K | **10% solve** |
-| **Hex** | `hex_planner/player.ckpt` | 92K | **4% win** |
+| **Hex** | `hex_planner/player.ckpt` | 92K | **27% win** |
 
 ### Real-World Data Results
 

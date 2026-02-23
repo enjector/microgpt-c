@@ -103,7 +103,7 @@ This is proven in sixteen experiments:
 - **Connect-4** — **88% win rate** with 2 organelles, zero invalid moves
 - **C Code Generation** — byte-perfect function recall
 - **C Wiring Generation** — multi-function composition
-- **8 additional games** — Pentago (**91% win**, 92K), Mastermind (**79% solve**, 92K), Sudoku (**78%**, 160K), Othello (**70% win**, 92K), Klotski (**62%**, 30K), Red Donkey (**12%**, 30K), Lights Out (**10%**, 160K), Hex (**4%**, 92K) — right-sized parameters per game
+- **8 additional games** — Pentago (**91% win**, 92K), Mastermind (**79% solve**, 92K), Sudoku (**78%**, 160K), Othello (**70% win**, 92K), Klotski (**62%**, 30K), Red Donkey (**19%**, 30K), Lights Out (**10%**, 160K), Hex (**27%**, 92K) — right-sized parameters per game
 - **Market regime detection** — **57% accuracy on unseen data** (2.8× baseline) with 3-organelle pipeline (615K params) — real-world cross-asset financial data
 - **Lottery prediction** — negative control proving OPA cannot learn from random data (entropy floor ~0.50)
 

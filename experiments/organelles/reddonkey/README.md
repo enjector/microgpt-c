@@ -1,6 +1,6 @@
 # Red Donkey (Huarong Dao) Multi-Organelle Pipeline
 
-A 30K-parameter Transformer solves simplified 4×3 Red Donkey sliding block puzzles — **12% solve rate** from only 199 training positions, limited by a tiny corpus and high parse error rate.
+A 30K-parameter Transformer solves simplified 4×3 Red Donkey sliding block puzzles — **19% solve rate** (uplifted from 12% via corpus expansion from 199 to 523 BFS-solved positions).
 
 ---
 

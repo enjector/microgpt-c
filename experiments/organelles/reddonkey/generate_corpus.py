@@ -18,6 +18,7 @@ with a tractable state space.
 import random
 from collections import deque
 import sys
+from multiprocessing import Pool, cpu_count
 
 ROWS = 4
 COLS = 3
@@ -121,45 +122,59 @@ def bfs_solve(start_board, max_states=100000):
     return None
 
 
-def generate_positions(num_scrambles=1000):
-    """Generate positions by scrambling from various starting positions."""
-    random.seed(42)
-    positions = {}
+def _solve_one_position(args):
+    """Worker: scramble from base, BFS solve, return (board_str, board, block_id, dir, sol_len) or None."""
+    si, seed = args
+    rng = random.Random(seed + si)
 
     base = make_start()
+    board = list(base)
+    num_moves = rng.randint(2, 20)
 
-    for si in range(num_scrambles):
-        board = list(base)
-        num_moves = random.randint(2, 12)
-
-        for _ in range(num_moves):
-            blocks = get_all_blocks(board)
-            random.shuffle(blocks)
-            moved = False
-            for bid in blocks:
-                random.shuffle(DIR_LETTERS)
-                for d in DIR_LETTERS:
-                    if can_move(board, bid, d):
-                        board = apply_move(board, bid, d)
-                        moved = True
-                        break
-                if moved:
+    dir_letters = list(DIR_LETTERS)
+    for _ in range(num_moves):
+        blocks = get_all_blocks(board)
+        rng.shuffle(blocks)
+        moved = False
+        for bid in blocks:
+            rng.shuffle(dir_letters)
+            for d in dir_letters:
+                if can_move(board, bid, d):
+                    board = apply_move(board, bid, d)
+                    moved = True
                     break
+            if moved:
+                break
 
-        if is_goal(board):
-            continue
+    if is_goal(board):
+        return None
 
-        board_str = board_to_str(board)
-        if board_str in positions:
-            continue
+    board_str = board_to_str(board)
+    solution = bfs_solve(board, max_states=200000)
+    if solution is not None and len(solution) > 0:
+        _, block_id, direction = solution[0]
+        return (board_str, list(board), block_id, direction, len(solution))
+    return None
 
-        solution = bfs_solve(board, max_states=50000)
-        if solution is not None and len(solution) > 0:
-            _, block_id, direction = solution[0]
-            positions[board_str] = (list(board), block_id, direction, len(solution))
 
-        if (si + 1) % 100 == 0:
-            print(f"  Scramble: {si+1}/{num_scrambles}, {len(positions)} positions", file=sys.stderr)
+def generate_positions(num_scrambles=5000):
+    """Generate positions by parallel scrambling and BFS solving."""
+    num_workers = min(cpu_count(), 8)
+    print(f"  Using {num_workers} workers for parallel BFS solving", file=sys.stderr)
+
+    args = [(si, 42) for si in range(num_scrambles)]
+    positions = {}
+    completed = 0
+
+    with Pool(num_workers) as pool:
+        for result in pool.imap_unordered(_solve_one_position, args, chunksize=8):
+            completed += 1
+            if result is not None:
+                board_str, board, block_id, direction, sol_len = result
+                if board_str not in positions:
+                    positions[board_str] = (board, block_id, direction, sol_len)
+            if completed % 500 == 0:
+                print(f"  Scramble: {completed}/{num_scrambles}, {len(positions)} positions", file=sys.stderr)
 
     return positions
 
@@ -201,9 +216,9 @@ def generate_player_corpus(positions):
 
 
 def main():
-    print("Generating Red Donkey training corpora (simplified 4x3)...\n", file=sys.stderr)
+    print("Generating Red Donkey training corpora (expanded, parallel BFS)...\n", file=sys.stderr)
 
-    positions = generate_positions(num_scrambles=1000)
+    positions = generate_positions(num_scrambles=5000)
     print(f"  Positions: {len(positions)}", file=sys.stderr)
 
     planner_entries = generate_planner_corpus(positions)

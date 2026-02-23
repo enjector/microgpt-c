@@ -1,6 +1,6 @@
 # Hex 7×7 Multi-Organelle Pipeline
 
-A 92K-parameter Transformer plays 7×7 Hex as X against a random opponent — **4% win rate**, revealing that connection-based games demand spatial reasoning beyond character-level pattern matching.
+A 92K-parameter Transformer plays 7×7 Hex as X against a random opponent — **27% win rate** (uplifted from 4% via topology features + MCTS corpus), demonstrating that BFS connectivity features and topological rejection criteria improve spatial reasoning.
 
 ---
 

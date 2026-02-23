@@ -64,6 +64,137 @@ static int get_empties(const char *board, int positions[][2]) {
   return count;
 }
 
+/* --- Topological feature functions --- */
+
+static int count_groups(const char *board, char player) {
+  /* Count connected components (Betti-0) of player's stones via BFS. */
+  int visited[BOARD_SIZE];
+  memset(visited, 0, sizeof(visited));
+  int groups = 0;
+  int queue[BOARD_SIZE][2];
+
+  for (int r = 0; r < GRID; r++) {
+    for (int c = 0; c < GRID; c++) {
+      if (board[cell(r, c)] == player && !visited[cell(r, c)]) {
+        groups++;
+        int qh = 0, qt = 0;
+        queue[qt][0] = r;
+        queue[qt][1] = c;
+        qt++;
+        visited[cell(r, c)] = 1;
+        while (qh < qt) {
+          int cr = queue[qh][0], cc = queue[qh][1];
+          qh++;
+          for (int d = 0; d < 6; d++) {
+            int nr = cr + HEX_DR[d], nc = cc + HEX_DC[d];
+            if (nr >= 0 && nr < GRID && nc >= 0 && nc < GRID &&
+                !visited[cell(nr, nc)] && board[cell(nr, nc)] == player) {
+              visited[cell(nr, nc)] = 1;
+              queue[qt][0] = nr;
+              queue[qt][1] = nc;
+              qt++;
+            }
+          }
+        }
+      }
+    }
+  }
+  return groups;
+}
+
+static int shortest_edge_distance(const char *board, char player) {
+  /* BFS distance from player's stones to target edge.
+   * X targets bottom (r=GRID-1), O targets right (c=GRID-1).
+   * Returns 0 if connected, 99 if no stones. */
+  int dist[BOARD_SIZE];
+  for (int i = 0; i < BOARD_SIZE; i++)
+    dist[i] = 99;
+  int queue[BOARD_SIZE * 2][3]; /* r, c, d */
+  int qh = 0, qt = 0;
+
+  /* Seed from target edge */
+  if (player == PLAYER_X) {
+    for (int c = 0; c < GRID; c++) {
+      queue[qt][0] = GRID - 1;
+      queue[qt][1] = c;
+      queue[qt][2] = 0;
+      qt++;
+      dist[cell(GRID - 1, c)] = 0;
+    }
+  } else {
+    for (int r = 0; r < GRID; r++) {
+      queue[qt][0] = r;
+      queue[qt][1] = GRID - 1;
+      queue[qt][2] = 0;
+      qt++;
+      dist[cell(r, GRID - 1)] = 0;
+    }
+  }
+
+  while (qh < qt) {
+    int r = queue[qh][0], c = queue[qh][1], d = queue[qh][2];
+    qh++;
+    for (int dir = 0; dir < 6; dir++) {
+      int nr = r + HEX_DR[dir], nc = c + HEX_DC[dir];
+      if (nr < 0 || nr >= GRID || nc < 0 || nc >= GRID)
+        continue;
+      int nd = d;
+      char ch = board[cell(nr, nc)];
+      if (ch == player)
+        nd = d; /* free to traverse own stone */
+      else if (ch == EMPTY)
+        nd = d + 1;
+      else
+        continue; /* can't traverse enemy */
+      if (nd < dist[cell(nr, nc)]) {
+        dist[cell(nr, nc)] = nd;
+        queue[qt][0] = nr;
+        queue[qt][1] = nc;
+        queue[qt][2] = nd;
+        qt++;
+      }
+    }
+  }
+
+  /* Min dist over all player stones */
+  int min_d = 99;
+  for (int r = 0; r < GRID; r++)
+    for (int c = 0; c < GRID; c++)
+      if (board[cell(r, c)] == player && dist[cell(r, c)] < min_d)
+        min_d = dist[cell(r, c)];
+  return min_d;
+}
+
+static int count_bridges(const char *board, char player) {
+  /* Count empty cells adjacent to 2+ friendly stones. */
+  int bridges = 0;
+  for (int r = 0; r < GRID; r++)
+    for (int c = 0; c < GRID; c++)
+      if (board[cell(r, c)] == EMPTY) {
+        int friendly = 0;
+        for (int d = 0; d < 6; d++) {
+          int nr = r + HEX_DR[d], nc = c + HEX_DC[d];
+          if (nr >= 0 && nr < GRID && nc >= 0 && nc < GRID &&
+              board[cell(nr, nc)] == player)
+            friendly++;
+        }
+        if (friendly >= 2)
+          bridges++;
+      }
+  return bridges;
+}
+
+static int has_friendly_neighbour(const char *board, int r, int c,
+                                  char player) {
+  for (int d = 0; d < 6; d++) {
+    int nr = r + HEX_DR[d], nc = c + HEX_DC[d];
+    if (nr >= 0 && nr < GRID && nc >= 0 && nc < GRID &&
+        board[cell(nr, nc)] == player)
+      return 1;
+  }
+  return 0;
+}
+
 static int check_connection(const char *board, char player) {
   /* BFS: X top→bottom, O left→right */
   int visited[BOARD_SIZE];
@@ -186,31 +317,17 @@ int main(void) {
           kb.stalls = 0;
         }
 
-        char valid_str[256] = "";
-        size_t vs = 0;
-        int limit = nempty < 20 ? nempty : 20;
-        for (int i = 0; i < limit; i++) {
-          if (i > 0 && vs < sizeof(valid_str)) {
-            int n = snprintf(valid_str + vs, sizeof(valid_str) - vs, ",");
-            if (n > 0)
-              vs += (size_t)n;
-          }
-          if (vs < sizeof(valid_str)) {
-            int n = snprintf(valid_str + vs, sizeof(valid_str) - vs, "R%dC%d",
-                             empties[i][0], empties[i][1]);
-            if (n > 0)
-              vs += (size_t)n;
-          }
-        }
+        /* Compute topological features */
+        int xg = count_groups(board, PLAYER_X);
+        int xd = shortest_edge_distance(board, PLAYER_X);
+        int og = count_groups(board, PLAYER_O);
+        int od = shortest_edge_distance(board, PLAYER_O);
+        int xb = count_bridges(board, PLAYER_X);
 
         char player_prompt[256];
-        if (kb.blocked[0])
-          snprintf(player_prompt, sizeof(player_prompt),
-                   "board=%s|valid=%s|blocked=%s", board_str, valid_str,
-                   kb.blocked);
-        else
-          snprintf(player_prompt, sizeof(player_prompt), "board=%s|valid=%s",
-                   board_str, valid_str);
+        snprintf(player_prompt, sizeof(player_prompt),
+                 "board=%s|xg=%d|xd=%d|og=%d|od=%d|xb=%d", board_str, xg, xd,
+                 og, od, xb);
 
         char move_output[INF_GEN_LEN + 1];
         scalar_t conf = 0;
@@ -230,6 +347,22 @@ int main(void) {
           total_parse_errors++;
           pr = empties[0][0];
           pc = empties[0][1];
+          kb.stalls++;
+        }
+
+        /* Topological Judge: reject isolated placements */
+        if (nempty > 5 && xg > 0 &&
+            !has_friendly_neighbour(board, pr, pc, PLAYER_X)) {
+          /* Move would create a disconnected stone — find a connected
+           * alternative */
+          for (int i = 0; i < nempty; i++) {
+            if (has_friendly_neighbour(board, empties[i][0], empties[i][1],
+                                       PLAYER_X)) {
+              pr = empties[i][0];
+              pc = empties[i][1];
+              break;
+            }
+          }
           kb.stalls++;
         }
 

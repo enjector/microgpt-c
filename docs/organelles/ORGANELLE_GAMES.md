@@ -16,11 +16,11 @@ Based on OPA's proven scaling—90% on 8-Puzzle (search/local minima), 87% win+d
 | **3** | **Klotski** (2x3 blocks) | ~10^10 | 4 | 30K | 80-90% medium | **62% solve** — fallback-driven |
 | **4** | **Sudoku** (4x4) | ~10^6-10^8 | 4-9 | 160K | 85-95% easy | **78% solve**, inverse difficulty effect |
 | **5** | **Othello/Reversi** (6x6) | ~10^12 | 10-20 | 92K | 80% vs random | **67% win** vs random |
-| **6** | **Hex** (7x7) | ~10^10 | 6 | 92K | 75-85% | **4% win** — connection reasoning needs spatial encoding |
+| **6** | **Hex** (7x7) | ~10^10 | 6 | 92K | 75-85% | **27% win** — topology uplift: 4%→27% via BFS connectivity features + MCTS corpus |
 | **7** | **Pentago** (6x6 spin) | ~10^13 | 12+6 | 92K | 85-95% | **91% win** — twist creates easy 5-in-a-row |
-| **8** | **Red Donkey** (sliding) | ~10^9 | 4 | 30K | 70-85% | **12% solve** — tiny corpus (199 entries) |
+| **8** | **Red Donkey** (sliding) | ~10^9 | 4 | 30K | 70-85% | **19% solve** — corpus uplift: 12%→19% via BFS expansion (199→523 entries) |
 
-The results reveal three distinct performance tiers: games where coordination dominates (90%+), games where right-sizing unlocks gains (60–79%), and games limited by encoding or corpus quality (<15%). The pattern is clear — the pipeline is the intelligence, and matching model capacity to corpus complexity matters more than raw parameter count.
+The results reveal three distinct performance tiers: games where coordination dominates (90%+), games where right-sizing unlocks gains (60–79%), and games limited by encoding or corpus quality (<30%). The pattern is clear — the pipeline is the intelligence, and matching model capacity to corpus complexity matters more than raw parameter count. The Feb 2026 topology experiments confirmed that **topological features and structural rejection criteria** can break through encoding limitations — Hex improved 6.75× via BFS connectivity features and MCTS corpus generation.
 
 ![Organelle Game Leaderboard — 11 games ranked by performance tier, with strategic takeaways on right-sizing and the coordination funnel](images/MicroGPT-C%20Organelle%20Game%20Leaderboard.jpg)
 
@@ -63,17 +63,17 @@ By implementing the recommended list of puzzles (Lights Out, Mastermind, Klotski
      - **What It Proves**: Beyond TTT—emergent strategy (forks like C4) with 10-20 organelles for eval.
      - **Implications**: Game AI extensions (chess minis)—validates for competitive edge apps.
 
-   - **Hex (7x7)**: Proves OPA for **pure connectivity** (paths as geodesics). Kanban probes bridges; 75-85%.
-     - **What It Proves**: Topological invariance (echoing PDFs' manifolds/Riemann surfaces)—retrieval for "holes" (genus-like).
-     - **Implications**: Network security (e.g., path-blocking in AML, per EnX-MF)—kanban for cycle detection.
+   - **Hex (7x7)**: Proves OPA for **pure connectivity** (paths as geodesics). Originally 4%, **uplifted to 27%** via topology experiments.
+      - **What It Proves**: Topological invariance—BFS connectivity features (connected groups, edge distance, bridges) and a topological Judge (rejecting isolated placements) dramatically improve performance without engine porting.
+      - **Implications**: Network security (e.g., path-blocking in AML, per EnX-MF)—validates the geometric thesis: structural features > smarter models.
 
    - **Pentago (6x6 Connect4 spin)**: Proves OPA with **twists** (rotations as transformations). Kanban for spin combos; 85-95%.
      - **What It Proves**: Handles state mutations beyond C4—multi-step chaining for post-rotate evals.
      - **Implications**: Dynamic environments (e.g., sensor reorientation in IoT)—links to PDFs' "shape-shifting" (KANs for rotations).
 
-   - **Red Donkey (sliding animal)**: Proves OPA on **asymmetric constraints** (animals as multi-piece). Kanban for locks; 70-85%.
-     - **What It Proves**: Generalizes 8-Puzzle to irregular shapes—tests Worker parallelism.
-     - **Implications**: Puzzle-like ops (e.g., logistics in manufacturing)—validates edge scalability.
+   - **Red Donkey (sliding animal)**: Proves OPA on **asymmetric constraints** (animals as multi-piece). Originally 12%, **uplifted to 19%** via corpus expansion (199→523 BFS-solved positions).
+      - **What It Proves**: Generalizes 8-Puzzle to irregular shapes—corpus quality is the primary bottleneck for small-state-space puzzles.
+      - **Implications**: Puzzle-like ops (e.g., logistics in manufacturing)—validates edge scalability.
 
 ### 3. **Overall Implications of Success/Failure**
 - **Success (80-95% Across List)**: Proves OPA's **generalization ceiling**—from search (8-Puzzle) to constraints (Sudoku) and topology (Hex)—positioning MicroGPT-C as a framework for "micro-agents" in games/optimization. Implications: Attracts contributors (e.g., for chess minis); validates for real apps (e.g., EnX-MF's homology chaining). Echoes PDFs' "unbreakable rules"—OPA as "axioms" for puzzles.
@@ -84,6 +84,6 @@ By implementing the recommended list of puzzles (Lights Out, Mastermind, Klotski
 - **Gen Corpora**: Use Python (like generate_corpus.py)—minimax/BFS for 10-100K states (~hours). Focus subsets (e.g., mid-game Hex).
 - **Organelle Scaling**: 15-20 (Planner + 8 Workers for branches + Judges)—test kanban on "traps" (P1 in reports).
 - **Metrics**: Solve rate, invalids rescued, replans/game—aim 85%+ avg.
-- **Improvements**: Add MD-delta (reports P1); hybrid search (MCTS Worker); geometry from PDFs (e.g., manifold evals for Hex voids).
+- **Improvements**: Add MD-delta (reports P1); hybrid search (MCTS Worker); geometry from PDFs (e.g., manifold evals for Hex voids). The topology experiments (Feb 2026) demonstrated that **BFS connectivity features + topological Judge + MCTS corpus generation** are effective zero-cost interventions.
 
 This list pushes OPA's boundaries—start with Lights Out for quick wins!

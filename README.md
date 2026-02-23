@@ -87,9 +87,9 @@ All games: trained organelle vs random opponent, 100 evaluation games each. Full
 | **Sudoku** | 2 | 160K | 1.9 MB | 3.8 MB | ~3 min | **78% solve** |
 | **Othello** | 2 | 92K | 1.1 MB | 2.2 MB | ~8 min | **70% win** |
 | **Klotski** | 2 | 30K | 360 KB | 720 KB | ~36 sec | **62% solve** |
-| **Red Donkey** | 2 | 30K | 360 KB | 720 KB | ~38 sec | 12% solve |
+| **Red Donkey** | 2 | 30K | 360 KB | 720 KB | ~38 sec | 19% solve |
 | **Lights Out** | 2 | 160K | 1.9 MB | 3.8 MB | ~4 min | 10% solve |
-| **Hex** | 2 | 92K | 1.1 MB | 2.2 MB | ~3 min | 4% win |
+| **Hex** | 2 | 92K | 1.1 MB | 2.2 MB | ~3 min | 27% win |
 
 ### Real-World Data
 

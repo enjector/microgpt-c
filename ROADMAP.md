@@ -60,9 +60,9 @@ A living roadmap for MicroGPT-C — a zero-dependency C99 GPT engine designed fo
 - [x] **Klotski** — sliding block puzzle with multi-piece constraints (**62% solve**, 30K params)
 - [x] **Sudoku** — constraint satisfaction with row/column/box validation (**78% solve**, 160K params)
 - [x] **Othello** — adversarial flipping with strategic planning (**67% win** vs random, 92K params)
-- [x] **Hex** — connectivity-based strategy on hexagonal grid (**4% win** — spatial encoding challenge, 92K params)
+- [x] **Hex** — connectivity-based strategy on hexagonal grid (**27% win** — topology uplift from 4%, 92K params)
 - [x] **Pentago** — rotation-based strategy with combined move+rotate actions (**91% win** vs random, 92K params)
-- [x] **Red Donkey** — sliding block variant with asymmetric piece constraints (**12% solve**, 30K params)
+- [x] **Red Donkey** — sliding block variant with asymmetric piece constraints (**19% solve**, 30K params)
 - [x] **Lottery prediction** — EuroMillions 2-organelle pipeline: negative control proving OPA **cannot learn from random data** (loss floor ~0.50, matching theoretical entropy)
 - [x] **Market regime detection** — 3-organelle pipeline with APL-inspired compact encoding: **57% holdout accuracy** (2.8× random baseline, 615K params), proving OPA **learns genuine signal from real-world cross-asset data**
 - [x] **Capacity scaling experiment** — 7× capacity increase (64K→460K) reduced parse errors by 32–100% across all games; fixed runtime config bug that prevented scaling
