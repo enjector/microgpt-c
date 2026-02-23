@@ -24,7 +24,7 @@
 
 The current AI landscape is dominated by "Generalist Monoliths"—Large Language Models (LLMs) with billions of parameters requiring massive infrastructure and complex protocols (like MCP) to interact with the real world.
 
-**MicroGPT-C** proposes a paradigm shift: **Specialized Micro-Intelligence**. By implementing a high-performance, C99-native Transformer engine with built-in training capabilities, we enable the creation of "Intelligent LEGO Blocks." These are not just smaller versions of large models; they are biological-style **organelles** designed to differentiate, specialize, and evolve directly on the edge.
+**MicroGPT-C** explores an alternative approach: **Specialized Micro-Intelligence**. By implementing a high-performance, C99-native Transformer engine with built-in training capabilities, we enable the creation of "Intelligent LEGO Blocks." These are not just smaller versions of large models; they are biological-style **organelles** designed to differentiate, specialize, and compose into pipelines.
 
 ---
 
@@ -278,7 +278,7 @@ This means differentiation of a LEGO block from a 10,000-example corpus takes se
 
 ### 8. Conclusion
 
-The future of AI isn't just "bigger." It is **faster, smaller, and more autonomous.** MicroGPT-C provides the C99 baseline for this future—a world where intelligence is a composable, low-power, and self-evolving component of every device we touch.
+The future of AI may not be exclusively about scale. MicroGPT-C explores what happens when intelligence is **composable, low-power, and focused**. Sixteen experiments suggest this direction has merit, though we're still early in understanding where coordination outperforms scale and where it doesn't.
 
 The stem cell doesn't need to become the whole organism. It just needs to become exactly the right cell, in exactly the right place.
 

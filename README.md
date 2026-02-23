@@ -4,7 +4,7 @@
 [![CodeQL](https://github.com/enjector/microgpt-c/actions/workflows/codeql.yml/badge.svg)](https://github.com/enjector/microgpt-c/actions/workflows/codeql.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-### Tiny specialist models, coordinated by a pipeline, outperform monoliths on focused tasks — using 4,000× fewer resources.
+### Tiny specialist models, coordinated by a pipeline, outperform single models on focused tasks.
 
 ![Composable Intelligence — the four phases of MicroGPT-C: stem cell foundation, targeted differentiation, organelle pipeline coordination, and proven results across logic games and code composition](docs/organelles/images/Composable%20Intelligence%20Small%20AI%20Infographic.jpg)
 
@@ -12,7 +12,7 @@
 
 ## The Story
 
-This project started as a C port of Andrej Karpathy's [microGPT.py](https://gist.github.com/karpathy/8627fe009c40f57531cb18360106ce95) — a ~200 line Python GPT that trains a character-level Transformer from scratch. We rewrote it in pure C99 with zero dependencies, and it got **1,000× faster**.
+This project started as a C port of Andrej Karpathy's [microGPT.py](https://gist.github.com/karpathy/8627fe009c40f57531cb18360106ce95) — a ~200 line Python GPT that trains a character-level Transformer from scratch. We rewrote it in pure C99 with zero dependencies, and as you'd expect from C, it's much faster.
 
 Then we asked a bigger question: **can tiny models actually be intelligent?**
 
@@ -52,7 +52,7 @@ cmake --build . --config Release
 # Train Shakespeare word-level generation (510K params, ~40K tok/s inference, 2 min training)
 ./shakespeare_word_demo
 
-# Run a multi-organelle game pipeline (90% win rate)
+# Run a multi-organelle game pipeline (88% win rate)
 ./connect4_demo
 ```
 
@@ -62,7 +62,7 @@ All 11 game experiments, 2 real-world data experiments (lottery + markets), 3 pr
 
 ## Performance Highlights
 
-All benchmarks on Apple M2 Max, single-threaded unless noted. See [PERFORMANCE.md](docs/PERFORMANCE.md) for full details.
+All benchmarks on Apple M2 Max (dev machine), single-threaded unless noted. Models are 360KB–5.4MB and compile anywhere with a C99 compiler. Edge device testing is a future research stage. See [PERFORMANCE.md](docs/PERFORMANCE.md) for full details.
 
 | Engine | Params | Training | Inference | Notes |
 |--------|--------|----------|-----------|-------|
@@ -71,7 +71,7 @@ All benchmarks on Apple M2 Max, single-threaded unless noted. See [PERFORMANCE.m
 | **VM engine** (dispatch) | — | — | 3.7–5.8M ops/s | Single-threaded |
 | **Micro-benchmark** (tiny model) | 6.5K | 642K tok/s | 1.55M infer/s | Float32, 1 thread |
 
-vs. Karpathy's **microgpt.py**: training is **1,000× faster**, inference is **700×+ faster**.
+vs. Karpathy's **microgpt.py**: ~1,000× faster training, ~700× faster inference (expected for C vs Python; the real contribution is the orchestration layer).
 
 ### Game Leaderboard (11 Games)
 

@@ -1,6 +1,6 @@
 # Why MicroGPT-C Matters
 
-> A zero-dependency C99 GPT engine that runs anywhere — from data centres to Raspberry Pis.
+> A zero-dependency C99 GPT engine that compiles anywhere with a C compiler. Currently tested on macOS, Linux, and Windows.
 
 ---
 
@@ -46,7 +46,7 @@ A single C99 file pair (`microgpt.h` + `microgpt.c`) implements:
 
 | Challenge | MicroGPT-C Solution |
 |-----------|---------------------|
-| GPU costs dominate runway | Runs on $5 hardware (Raspberry Pi) |
+| GPU costs dominate runway | Runs on commodity hardware (laptops, servers, potentially SBCs like Raspberry Pi — not yet tested) |
 | Inference costs add up | **Near-zero ongoing cost** — CPU-resident, ~0.3s per query, no API, no per-token billing. Training is a one-time cost (62s–29min on CPU); inference is effectively free thereafter |
 | Vendor lock-in (OpenAI, Anthropic) | Self-hosted, MIT-licensed, no API keys |
 | Privacy regulations (GDPR, HIPAA) | All data stays on-device |
@@ -103,7 +103,7 @@ This is proven in sixteen experiments:
 - **Connect-4** — **88% win rate** with 2 organelles, zero invalid moves
 - **C Code Generation** — byte-perfect function recall
 - **C Wiring Generation** — multi-function composition
-- **8 additional games** — Pentago (**90% win**, 92K), Mastermind (**86% solve**, 92K), Sudoku (**76%**, 160K), Othello (**56% win**, 92K), Klotski (**59%**, 30K), Red Donkey (**30%**, 30K), Lights Out (**12%**, 160K), Hex (**10%**, 92K) — right-sized parameters per game
+- **8 additional games** — Pentago (**91% win**, 92K), Mastermind (**79% solve**, 92K), Sudoku (**78%**, 160K), Othello (**70% win**, 92K), Klotski (**62%**, 30K), Red Donkey (**12%**, 30K), Lights Out (**10%**, 160K), Hex (**4%**, 92K) — right-sized parameters per game
 - **Market regime detection** — **57% accuracy on unseen data** (2.8× baseline) with 3-organelle pipeline (615K params) — real-world cross-asset financial data
 - **Lottery prediction** — negative control proving OPA cannot learn from random data (entropy floor ~0.50)
 
@@ -136,7 +136,7 @@ MicroGPT-C makes AI accessible to anyone with a C compiler.
 
 The organelle architecture shows that **small, specialised models composed into pipelines can solve problems that individual models cannot** — at a fraction of the parameter cost. From game-playing to market regime detection, the evidence spans 16 experiments across 11 game domains, 3 code generation tasks, and 2 real-world data experiments.
 
-This is not a toy. This is a foundation.
+This is not a toy. It's an early-stage research platform with real results across 16 experiments.
 
 ---
 

@@ -123,15 +123,15 @@ Focus: enable **organelle chaining** — multiple specialised blocks working tog
 - [ ] Vocabulary merging: combine vocabs from multiple organelles
 
 ### 5. Community & Release
-- [ ] v1.0 release with changelog and binary releases for major platforms
+- [x] v1.0.0 release (tagged February 2026)
 - [ ] Example organelle library: pre-trained blocks for common tasks (email validation, date parsing, unit conversion)
 - [ ] Documentation: "Build Your First Organelle" tutorial
 
 ---
 
-## 🔭 Long-Term (2027+): Autonomous Edge Ecosystem
+## 🔭 Long-Term (2027+): Exploring Edge Deployment
 
-Focus: a world where intelligence is a **composable, self-evolving component** of every device.
+Focus: explore what happens when composable intelligence moves to **real edge hardware and federated scenarios**. These are research directions, not commitments.
 
 ### 1. Federated Differentiation
 - [ ] Multiple edge devices contribute gradient updates to improve a shared organelle
