@@ -257,6 +257,82 @@ The MicroGPT-C project does not claim that organelles reason. It asks a harder q
 
 ---
 
+## 6. The Learning Frontier: What Must Be Engineered vs What Can Be Learned
+
+A natural objection: if reasoning requires an upfront, hand-engineered pipeline, doesn't that defeat the purpose? Must every domain be manually scaffolded before the system can reason?
+
+The answer is not binary. It is a **sliding boundary** — and the experiments have already shown parts of the pipeline being absorbed into model weights.
+
+### What Must Remain Deterministic
+
+Some coordination functions require guarantees that probabilistic models cannot provide at any scale below 1M parameters:
+
+| Component | Why it can't be learned | What it does |
+|---|---|---|
+| **Kanban state tracking** | Requires perfect memory across arbitrary steps | Remembers which moves failed |
+| **Judge / validity checker** | Must be 100% correct — models are probabilistic | Rejects illegal outputs |
+| **BFS / A* search** | Exponential state space — can't fit in weights | Explores solution trees |
+| **Cycle detection** | Requires exact sequence matching | Breaks oscillation loops |
+
+These are the ~340 lines of C. They are cheap, deterministic, and provably correct. Attempting to learn them would be wasteful even if it were possible — a 460K-param model approximating BFS would be slower and less reliable than a 30-line C queue.
+
+### What Has Already Been Learned
+
+The Phase 5 scaffolding removal experiment proved that capacity growth causes models to absorb coordination functions:
+
+| Capability | 64K model (needs scaffolding) | 460K model (doesn't) |
+|---|---|---|
+| Oscillation avoidance | 181 cycle breaks needed | 0 cycle breaks — **learned** |
+| Prompt parsing | 98% parse errors | 0 parse errors — **learned** |
+| Scaffold dependence | Collapses without pipeline (3% bare) | Identical with or without (90% bare) |
+
+The 460K model has **internalised** the cycle breaker and blocked-direction tracker into its weights. It learned not to oscillate from training examples where oscillation correlates with failure. The scaffolding became redundant — not because it was removed, but because the model learned to do what it was doing.
+
+### What Could Be Learned Next (The Research Frontier)
+
+The OpaTrace reasoning traces hypothesis represents the next step in this progression:
+
+```
+Today:      Model learns  "board state → best move"                    (fact retrieval)
+OpaTrace:   Model learns  "board state + rejection history → adapted move"  (process retrieval)
+Future:     Model learns  "when am I likely wrong? → reject myself"         (self-monitoring)
+```
+
+Three phases of absorption:
+
+1. **Safe augmentation (proven)**: Phase 4b showed that combining standard + trace-enriched corpora preserves baseline performance exactly (90% vs 90%). The model can safely absorb pipeline coordination data without regression.
+
+2. **Behavioural change (next)**: Scaling the enriched corpus to 30–50% of the training data. If the model starts reducing cycle breaks on its own — choosing different moves after stalls without being told to — it has **learned part of the coordinator's job**.
+
+3. **Self-monitoring (proposed)**: An organelle that outputs a confidence score alongside its answer. Below a threshold, it rejects *itself* before the Judge ever sees it. The model learns when it's uncertain — which is a form of learning the Judge's function.
+
+### The Sliding Boundary
+
+The architecture is not static. Over time, models absorb more of the pipeline's coordination logic:
+
+```
+Fully Engineered ◄─────────────────────────────────► Fully Learned
+     │                                                      │
+  BFS / A* search                                    Pattern retrieval
+  Judge (hard rules)                                 Prompt parsing
+  Kanban (perfect state)                             Oscillation avoidance
+     │                    ◄── FRONTIER ──►                  │
+  Cycle detection              OpaTrace              Self-monitoring
+  Replan triggers           Process retrieval        Confidence gating
+```
+
+The pipeline doesn't disappear — it becomes a **training signal generator** rather than a runtime component. The deterministic parts (Judge, Kanban) remain as safety nets, but the model needs them less frequently as it absorbs more coordination knowledge. The scaffolding teaches the building to stand on its own.
+
+### The Biological Parallel
+
+This mirrors biological evolution exactly. DNA hardcodes the cell's coordination protocol — the equivalent of OPA's deterministic pipeline. Proteins (organelles) are the learned, adaptive components. Evolution doesn't re-learn coordination each generation; it hardcodes the protocol and lets the components specialise within it.
+
+But over evolutionary time, some coordinated behaviours become instinct — learned into the genome itself. The sliding boundary between "engineered" and "learned" moves slowly toward "learned," but the hardcoded coordination protocol remains as the substrate.
+
+> *"The pipeline is scaffolding — but good scaffolding teaches the building to stand on its own."*
+
+---
+
 ## Related Documents
 
 | Document | Relationship |
