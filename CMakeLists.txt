@@ -725,7 +725,10 @@ if(FLEX_FOUND AND BISON_FOUND)
         ${FLEX_vm_scanner_OUTPUTS}
         ${BISON_vm_parser_OUTPUTS})
 else()
-    message(FATAL_ERROR "Flex/Bison not found — necessary to build microgpt VM Engine")
+    message(STATUS "Flex/Bison not found — using pre-generated parser sources")
+    list(APPEND VM_PARSER_SOURCES
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/microgpt_vm_parser.l.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/microgpt_vm_parser.tab.c)
 endif()
 
 add_library(microgpt_vm_lib STATIC src/microgpt_vm.c ${VM_PARSER_SOURCES})
