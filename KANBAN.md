@@ -1,13 +1,12 @@
 # MicroGPT-C Kanban Board
 
-> Last updated: Feb 23, 2026 (late evening)
+> Last updated: Feb 24, 2026
 
 ## Backlog
 
 | ID | Title | Priority |
 |----|-------|----------|
-| K-9 | Hex virtual connection templates (precomputed bridge patterns) | 🟡 Medium |
-| K-10 | Red Donkey classic 5×4 layout with bounded-depth BFS/A* | 🟢 Low |
+| | | |
 
 ## In Progress
 
@@ -27,6 +26,8 @@
 | K-6 | Create `/run-definition-of-done` workflow | Feb 23 |
 | K-7 | Create `/use-kanban` workflow | Feb 23 |
 | K-8 | Hex 5×5 variant (32% win rate) | Feb 23 |
+| K-9 | Hex virtual connections — negative result (prompt overflow) | Feb 24 |
+| K-10 | Red Donkey 5×4 (0% solve — board too large) | Feb 24 |
 | K-11 | Deeper MCTS for 5×5 Hex (no additional benefit) | Feb 23 |
 
 ---

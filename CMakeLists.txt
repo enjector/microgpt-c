@@ -650,6 +650,22 @@ add_demo(
 )
 
 # ==================================================================
+#  Organelle: Red Donkey 5×4 classic Huarong Dao layout
+# ==================================================================
+
+add_demo(
+  NAME    rd54_demo
+  SOURCE  experiments/organelles/reddonkey/main.c
+  THREADS
+  COPY    experiments/organelles/reddonkey/rd54_planner.txt
+          experiments/organelles/reddonkey/rd54_player.txt
+  DEFINES N_EMBD=32 N_HEAD=4 N_LAYER=2 BLOCK_SIZE=128 MLP_DIM=128
+          NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
+          MAX_VOCAB=50 MAX_DOCS=10000 MAX_DOC_LEN=128
+          RD_ROWS=5 RD_COLS=4
+)
+
+# ==================================================================
 #  Organelle: EuroMillions Lottery prediction pipeline
 # ==================================================================
 

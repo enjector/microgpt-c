@@ -198,6 +198,102 @@ static int has_friendly_neighbour(const char *board, int r, int c,
   return 0;
 }
 
+static int count_virtual_connections(const char *board, char player) {
+  /* Count virtual connections (true Hex bridges).
+   * A bridge: two friendly stones sharing exactly 2 common empty hex
+   * neighbours. If opponent plays one, player responds on the other. */
+  int stones[BOARD_SIZE][2];
+  int nstones = 0;
+  for (int r = 0; r < GRID; r++)
+    for (int c = 0; c < GRID; c++)
+      if (board[cell(r, c)] == player) {
+        stones[nstones][0] = r;
+        stones[nstones][1] = c;
+        nstones++;
+      }
+
+  int bridges = 0;
+  for (int i = 0; i < nstones; i++) {
+    int r1 = stones[i][0], c1 = stones[i][1];
+    /* Get neighbours of stone 1 */
+    int n1[6][2];
+    int nn1 = 0;
+    for (int d = 0; d < 6; d++) {
+      int nr = r1 + HEX_DR[d], nc = c1 + HEX_DC[d];
+      if (nr >= 0 && nr < GRID && nc >= 0 && nc < GRID) {
+        n1[nn1][0] = nr;
+        n1[nn1][1] = nc;
+        nn1++;
+      }
+    }
+    for (int j = i + 1; j < nstones; j++) {
+      int r2 = stones[j][0], c2 = stones[j][1];
+      /* Count common empty neighbours */
+      int common_empty = 0;
+      for (int k = 0; k < nn1; k++) {
+        int nr1 = n1[k][0], nc1 = n1[k][1];
+        if (board[cell(nr1, nc1)] != EMPTY)
+          continue;
+        /* Check if also neighbour of stone 2 */
+        for (int d = 0; d < 6; d++) {
+          int nr2 = r2 + HEX_DR[d], nc2 = c2 + HEX_DC[d];
+          if (nr2 == nr1 && nc2 == nc1) {
+            common_empty++;
+            break;
+          }
+        }
+      }
+      if (common_empty == 2)
+        bridges++;
+    }
+  }
+  return bridges;
+}
+
+static int is_bridge_cell(const char *board, int r, int c, char player) {
+  /* Check if empty cell (r,c) is part of a virtual connection for player.
+   * i.e., it's a common empty neighbour of two friendly stones that share
+   * exactly 2 common empty neighbours including this one. */
+  if (board[cell(r, c)] != EMPTY)
+    return 0;
+  /* Find all friendly neighbours of this cell */
+  int fn[6][2];
+  int nfn = 0;
+  for (int d = 0; d < 6; d++) {
+    int nr = r + HEX_DR[d], nc = c + HEX_DC[d];
+    if (nr >= 0 && nr < GRID && nc >= 0 && nc < GRID &&
+        board[cell(nr, nc)] == player) {
+      fn[nfn][0] = nr;
+      fn[nfn][1] = nc;
+      nfn++;
+    }
+  }
+  /* For each pair of friendly neighbours, check if they form a bridge */
+  for (int i = 0; i < nfn; i++)
+    for (int j = i + 1; j < nfn; j++) {
+      int r1 = fn[i][0], c1 = fn[i][1];
+      int r2 = fn[j][0], c2 = fn[j][1];
+      int common_empty = 0;
+      for (int d1 = 0; d1 < 6; d1++) {
+        int nr1 = r1 + HEX_DR[d1], nc1 = c1 + HEX_DC[d1];
+        if (nr1 < 0 || nr1 >= GRID || nc1 < 0 || nc1 >= GRID)
+          continue;
+        if (board[cell(nr1, nc1)] != EMPTY)
+          continue;
+        for (int d2 = 0; d2 < 6; d2++) {
+          int nr2 = r2 + HEX_DR[d2], nc2 = c2 + HEX_DC[d2];
+          if (nr2 == nr1 && nc2 == nc1) {
+            common_empty++;
+            break;
+          }
+        }
+      }
+      if (common_empty == 2)
+        return 1;
+    }
+  return 0;
+}
+
 static int check_connection(const char *board, char player) {
   /* BFS: X top→bottom, O left→right */
   int visited[BOARD_SIZE];
@@ -353,17 +449,27 @@ int main(void) {
           kb.stalls++;
         }
 
-        /* Topological Judge: reject isolated placements */
+        /* Topological Judge: reject isolated placements, prefer bridges */
         if (nempty > 5 && xg > 0 &&
             !has_friendly_neighbour(board, pr, pc, PLAYER_X)) {
-          /* Move would create a disconnected stone — find a connected
-           * alternative */
-          for (int i = 0; i < nempty; i++) {
+          /* Move would create a disconnected stone — first try bridge cells,
+           * then any connected alternative */
+          int found = 0;
+          /* Priority 1: bridge cells (virtual connection maintenance) */
+          for (int i = 0; i < nempty && !found; i++) {
+            if (is_bridge_cell(board, empties[i][0], empties[i][1], PLAYER_X)) {
+              pr = empties[i][0];
+              pc = empties[i][1];
+              found = 1;
+            }
+          }
+          /* Priority 2: any connected cell */
+          for (int i = 0; i < nempty && !found; i++) {
             if (has_friendly_neighbour(board, empties[i][0], empties[i][1],
                                        PLAYER_X)) {
               pr = empties[i][0];
               pc = empties[i][1];
-              break;
+              found = 1;
             }
           }
           kb.stalls++;

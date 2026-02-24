@@ -20,6 +20,7 @@ Based on OPA's proven scaling—90% on 8-Puzzle (search/local minima), 87% win+d
 | **6b** | **Hex** (5×5) | ~10^7 | 6 | 92K | 40-60% | **32% win** — smaller board reduces encoding pressure, +18.5% relative vs 7×7 |
 | **7** | **Pentago** (6x6 spin) | ~10^13 | 12+6 | 92K | 85-95% | **91% win** — twist creates easy 5-in-a-row |
 | **8** | **Red Donkey** (sliding) | ~10^9 | 4 | 30K | 70-85% | **19% solve** — corpus uplift: 12%→19% via BFS expansion (199→523 entries) |
+| **8b** | **Red Donkey** (5×4) | ~10^12 | 4 | 30K | 10-30% | **0% solve** — 3,174 parse errors; board too large for BLOCK_SIZE=128 |
 
 The results reveal three distinct performance tiers: games where coordination dominates (90%+), games where right-sizing unlocks gains (60–79%), and games limited by encoding or corpus quality (<30%). The pattern is clear — the pipeline is the intelligence, and matching model capacity to corpus complexity matters more than raw parameter count. The Feb 2026 topology experiments confirmed that **topological features and structural rejection criteria** can break through encoding limitations — Hex improved 6.75× via BFS connectivity features and MCTS corpus generation.
 
@@ -66,16 +67,18 @@ By implementing the recommended list of puzzles (Lights Out, Mastermind, Klotski
 
    - **Hex (7×7)**: Proves OPA for **pure connectivity** (paths as geodesics). Originally 4%, **uplifted to 27%** via topology experiments.
       - **What It Proves**: Topological invariance—BFS connectivity features (connected groups, edge distance, bridges) and a topological Judge (rejecting isolated placements) dramatically improve performance without engine porting.
-      - **5×5 Variant**: Reducing the board from 7×7 to 5×5 yielded **32% win rate** (+18.5% relative). The smaller board halves prompt length, reducing parse errors and improving pattern matching. However, deeper MCTS (500 vs 200 iterations) showed no additional benefit on 5×5 — the search converges with 200 iterations on the smaller state space.
-      - **Implications**: Network security (e.g., path-blocking in AML, per EnX-MF)—validates the geometric thesis: structural features > smarter models.
+       - **5×5 Variant**: Reducing the board from 7×7 to 5×5 yielded **32% win rate** (+18.5% relative). The smaller board halves prompt length, reducing parse errors and improving pattern matching. However, deeper MCTS (500 vs 200 iterations) showed no additional benefit on 5×5 — the search converges with 200 iterations on the smaller state space.
+       - **Virtual Connections (K-9 — Negative Result)**: Adding true Hex bridge detection (`xv` feature) to the prompt **hurt performance** — 7×7 dropped from 27% to 20%, 5×5 from 32% to 27%. Root cause: the extra feature makes prompts longer, overflowing BLOCK_SIZE=128 and increasing parse errors (598 vs 387 on 7×7). The bridge-aware Judge (preferring bridge cells over arbitrary connected cells) was retained but the `xv` prompt feature was reverted. **Lesson**: features that add strategic depth are worthless if they exceed the model's context window.
+       - **Implications**: Network security (e.g., path-blocking in AML, per EnX-MF)—validates the geometric thesis: structural features > smarter models.
 
    - **Pentago (6x6 Connect4 spin)**: Proves OPA with **twists** (rotations as transformations). Kanban for spin combos; 85-95%.
      - **What It Proves**: Handles state mutations beyond C4—multi-step chaining for post-rotate evals.
      - **Implications**: Dynamic environments (e.g., sensor reorientation in IoT)—links to PDFs' "shape-shifting" (KANs for rotations).
 
    - **Red Donkey (sliding animal)**: Proves OPA on **asymmetric constraints** (animals as multi-piece). Originally 12%, **uplifted to 19%** via corpus expansion (199→523 BFS-solved positions).
-      - **What It Proves**: Generalizes 8-Puzzle to irregular shapes—corpus quality is the primary bottleneck for small-state-space puzzles.
-      - **Implications**: Puzzle-like ops (e.g., logistics in manufacturing)—validates edge scalability.
+       - **What It Proves**: Generalizes 8-Puzzle to irregular shapes—corpus quality is the primary bottleneck for small-state-space puzzles.
+       - **5×4 Variant (K-10)**: Scaled to a 5×4 board with 7 pieces and 7 empties, generating 2,420 BFS-solved positions. Result: **0% solve rate** (3,174 parse errors). The 20-char board encoding with 10+ valid moves per position far exceeds BLOCK_SIZE=128. Confirms that board encoding length is the fundamental bottleneck for sliding puzzles.
+       - **Implications**: Puzzle-like ops (e.g., logistics in manufacturing)—validates edge scalability.
 
 ### 3. **Overall Implications of Success/Failure**
 - **Success (80-95% Across List)**: Proves OPA's **generalization ceiling**—from search (8-Puzzle) to constraints (Sudoku) and topology (Hex)—positioning MicroGPT-C as a framework for "micro-agents" in games/optimization. Implications: Attracts contributors (e.g., for chess minis); validates for real apps (e.g., EnX-MF's homology chaining). Echoes PDFs' "unbreakable rules"—OPA as "axioms" for puzzles.

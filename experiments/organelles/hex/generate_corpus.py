@@ -153,6 +153,31 @@ def count_bridges(board, player):
     return bridges
 
 
+def count_virtual_connections(board, player):
+    """Count virtual connections (Hex bridges).
+    A bridge: two friendly stones that share exactly 2 common empty hex neighbours.
+    If opponent plays one, player responds on the other to maintain connection.
+    Returns (num_bridges, num_bridge_cells) — bridge cells are the empty cells in bridges."""
+    stones = [(r, c) for r in range(SIZE) for c in range(SIZE) if board[idx(r, c)] == player]
+    bridges = 0
+    bridge_cells = set()
+    seen_pairs = set()
+    for i, (r1, c1) in enumerate(stones):
+        n1 = set(get_neighbours(r1, c1))
+        for r2, c2 in stones[i+1:]:
+            pair = (min(idx(r1,c1), idx(r2,c2)), max(idx(r1,c1), idx(r2,c2)))
+            if pair in seen_pairs:
+                continue
+            # Check if stones are at distance 2 (not adjacent) — classic bridge pattern
+            n2 = set(get_neighbours(r2, c2))
+            common_empty = [(r, c) for r, c in (n1 & n2) if board[idx(r, c)] == EMPTY]
+            if len(common_empty) == 2:
+                bridges += 1
+                bridge_cells.update(common_empty)
+                seen_pairs.add(pair)
+    return bridges, len(bridge_cells)
+
+
 def compute_topo_features(board, player):
     """Compute topological features for the board from player's perspective."""
     opp = WHITE if player == BLACK else BLACK

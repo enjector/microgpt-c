@@ -25,10 +25,22 @@
 #include <string.h>
 #include <time.h>
 
-#define PLANNER_CORPUS "reddonkey_planner.txt"
-#define PLAYER_CORPUS "reddonkey_player.txt"
-#define PLANNER_CKPT "reddonkey_planner.ckpt"
-#define PLAYER_CKPT "reddonkey_player.ckpt"
+#ifndef RD_ROWS
+#define RD_ROWS 4
+#endif
+#ifndef RD_COLS
+#define RD_COLS 3
+#endif
+
+#define ROWS RD_ROWS
+#define COLS RD_COLS
+
+#define PLANNER_CORPUS                                                         \
+  (ROWS == 5 ? "rd54_planner.txt" : "reddonkey_planner.txt")
+#define PLAYER_CORPUS (ROWS == 5 ? "rd54_player.txt" : "reddonkey_player.txt")
+#define PLANNER_CKPT                                                           \
+  (ROWS == 5 ? "rd54_planner.ckpt" : "reddonkey_planner.ckpt")
+#define PLAYER_CKPT (ROWS == 5 ? "rd54_player.ckpt" : "reddonkey_player.ckpt")
 
 #define ORGANELLE_TEMP 0.2
 #define INF_GEN_LEN 60
@@ -38,9 +50,7 @@
 #define ENSEMBLE_VOTES 3
 #define MAX_SLIDES 60
 
-#define ROWS 4
-#define COLS 3
-#define BOARD_SIZE (ROWS * COLS) /* 12 */
+#define BOARD_SIZE (ROWS * COLS)
 #define EMPTY '.'
 
 static MicrogptConfig g_cfg;
@@ -99,9 +109,15 @@ static void apply_move(char *board, char block_id, char direction) {
 }
 
 static int is_goal(const char *board) {
+#if RD_ROWS == 5
+  /* A at bottom center: rows 3-4, cols 1-2 */
+  return board[cell(3, 1)] == 'A' && board[cell(3, 2)] == 'A' &&
+         board[cell(4, 1)] == 'A' && board[cell(4, 2)] == 'A';
+#else
   /* A at bottom: rows 2-3, cols 0-1 */
   return board[cell(2, 0)] == 'A' && board[cell(2, 1)] == 'A' &&
          board[cell(3, 0)] == 'A' && board[cell(3, 1)] == 'A';
+#endif
 }
 
 static void get_valid_moves(const char *board, char *valid_str, int max_len) {
@@ -129,17 +145,33 @@ static void get_valid_moves(const char *board, char *valid_str, int max_len) {
 
 static void make_start(char *board) {
   memset(board, EMPTY, BOARD_SIZE);
-  /* A = 2x2 at (0,0) */
+#if RD_ROWS == 5
+  /* Medium 5x4 layout: 7 pieces + 7 empties for tractable BFS */
+  board[cell(0, 1)] = 'A';
+  board[cell(0, 2)] = 'A';
+  board[cell(1, 1)] = 'A';
+  board[cell(1, 2)] = 'A';
+  board[cell(0, 0)] = 'B';
+  board[cell(1, 0)] = 'B';
+  board[cell(0, 3)] = 'C';
+  board[cell(1, 3)] = 'C';
+  board[cell(2, 0)] = 'D';
+  board[cell(3, 0)] = 'D';
+  board[cell(2, 1)] = 'E';
+  board[cell(2, 2)] = 'F';
+  board[cell(2, 3)] = 'G';
+  /* Empty: (3,1)-(3,3), (4,0)-(4,3) = 7 empties */
+#else
+  /* Simple 4x3 layout */
   board[cell(0, 0)] = 'A';
   board[cell(0, 1)] = 'A';
   board[cell(1, 0)] = 'A';
   board[cell(1, 1)] = 'A';
-  /* B at (0,2), C at (1,2), D at (2,2), E at (3,2) */
   board[cell(0, 2)] = 'B';
   board[cell(1, 2)] = 'C';
   board[cell(2, 2)] = 'D';
   board[cell(3, 2)] = 'E';
-  /* Empty: (2,0), (2,1), (3,0), (3,1) */
+#endif
 }
 
 static void generate_puzzle(char *board, unsigned int *seed) {

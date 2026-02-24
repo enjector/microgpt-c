@@ -16,13 +16,22 @@ with a tractable state space.
 """
 
 import random
-from collections import deque
 import sys
+import os
+from collections import deque
 from multiprocessing import Pool, cpu_count
 
-ROWS = 4
-COLS = 3
-BOARD_SIZE = ROWS * COLS  # 12
+# Layout selection: "simple" (4x3), "classic" (5x4)
+LAYOUT = os.environ.get('RD_LAYOUT', 'simple')
+
+if LAYOUT == 'classic':
+    ROWS = 5
+    COLS = 4
+else:
+    ROWS = 4
+    COLS = 3
+
+BOARD_SIZE = ROWS * COLS
 EMPTY = '.'
 
 DIRS = {'U': (-1, 0), 'D': (1, 0), 'L': (0, -1), 'R': (0, 1)}
@@ -71,27 +80,59 @@ def apply_move(board, block_id, direction):
 
 
 def is_goal(board):
-    """A at bottom-left: rows 2-3, cols 0-1."""
+    """A at bottom: for 4x3 -> rows 2-3 cols 0-1; for 5x4 -> rows 3-4 cols 1-2."""
+    if LAYOUT == 'classic':
+        return (board[idx(3, 1)] == 'A' and board[idx(3, 2)] == 'A' and
+                board[idx(4, 1)] == 'A' and board[idx(4, 2)] == 'A')
     return (board[idx(2, 0)] == 'A' and board[idx(2, 1)] == 'A' and
             board[idx(3, 0)] == 'A' and board[idx(3, 1)] == 'A')
 
 
 def make_start():
-    """Starting position: A at top-left, small blocks scattered."""
+    """Starting position for 4x3 layout."""
     board = [EMPTY] * BOARD_SIZE
-    # A = 2x2 at (0,0)
     board[idx(0, 0)] = 'A'; board[idx(0, 1)] = 'A'
     board[idx(1, 0)] = 'A'; board[idx(1, 1)] = 'A'
-    # B at (0,2)
     board[idx(0, 2)] = 'B'
-    # C at (1,2)
     board[idx(1, 2)] = 'C'
-    # D at (2,2)
     board[idx(2, 2)] = 'D'
-    # E at (3,2)
     board[idx(3, 2)] = 'E'
-    # Empty: (2,0), (2,1), (3,0), (3,1)
     return board
+
+
+def make_start_5x4():
+    """Starting position for medium 5x4 layout.
+    A = 2x2 (rows 0-1, cols 1-2)
+    B = 1x2 vertical (rows 0-1, col 0)
+    C = 1x2 vertical (rows 0-1, col 3)
+    D = 1x2 vertical (rows 2-3, col 0)
+    E = 1x1 (row 2, col 1)
+    F = 1x1 (row 2, col 2)
+    G = 1x1 (row 2, col 3)
+    Empty: (3,1), (3,2), (3,3), (4,0)-(4,3) => 4 empties at bottom rows
+    Goal: A at rows 3-4, cols 1-2"""
+    board = [EMPTY] * BOARD_SIZE
+    # A = 2x2 at center top
+    board[idx(0, 1)] = 'A'; board[idx(0, 2)] = 'A'
+    board[idx(1, 1)] = 'A'; board[idx(1, 2)] = 'A'
+    # B = 1x2 vertical left
+    board[idx(0, 0)] = 'B'; board[idx(1, 0)] = 'B'
+    # C = 1x2 vertical right
+    board[idx(0, 3)] = 'C'; board[idx(1, 3)] = 'C'
+    # D = 1x2 vertical bottom-left
+    board[idx(2, 0)] = 'D'; board[idx(3, 0)] = 'D'
+    # E, F, G = 1x1 blocks
+    board[idx(2, 1)] = 'E'
+    board[idx(2, 2)] = 'F'
+    board[idx(2, 3)] = 'G'
+    # Empty: (3,1), (3,2), (3,3), (4,0), (4,1), (4,2), (4,3) = 7 empties
+    return board
+
+
+def get_start_board():
+    if LAYOUT == 'classic':
+        return make_start_5x4()
+    return make_start()
 
 
 def bfs_solve(start_board, max_states=100000):
@@ -127,7 +168,7 @@ def _solve_one_position(args):
     si, seed = args
     rng = random.Random(seed + si)
 
-    base = make_start()
+    base = get_start_board()
     board = list(base)
     num_moves = rng.randint(2, 20)
 
@@ -216,7 +257,7 @@ def generate_player_corpus(positions):
 
 
 def main():
-    print("Generating Red Donkey training corpora (expanded, parallel BFS)...\n", file=sys.stderr)
+    print(f"Generating Red Donkey training corpora ({ROWS}x{COLS} {LAYOUT}, parallel BFS)...\n", file=sys.stderr)
 
     positions = generate_positions(num_scrambles=5000)
     print(f"  Positions: {len(positions)}", file=sys.stderr)
@@ -225,9 +266,10 @@ def main():
     player_entries = generate_player_corpus(positions)
     print(f"  Planner: {len(planner_entries)}, Player: {len(player_entries)}", file=sys.stderr)
 
+    prefix = "rd54" if LAYOUT == 'classic' else "reddonkey"
     for name, entries in [
-        ("reddonkey_planner.txt", planner_entries),
-        ("reddonkey_player.txt", player_entries),
+        (f"{prefix}_planner.txt", planner_entries),
+        (f"{prefix}_player.txt", player_entries),
     ]:
         content = "\n\n".join(entries) + "\n"
         with open(name, "w") as f:
