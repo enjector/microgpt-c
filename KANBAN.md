@@ -31,6 +31,7 @@
 | K-11 | Deeper MCTS for 5×5 Hex (no additional benefit) | Feb 23 |
 | K-12 | Transfer learning TTT→Othello (no transfer benefit) | Feb 24 |
 | K-13 | Transfer+FT: TTT→Othello +4% over scratch | Feb 24 |
+| K-14 | Same-game transfer: Planner→Player +9% over random | Feb 24 |
 
 ---
 
@@ -154,3 +155,14 @@
 - **Push:** Try same-game transfer (K-14: planner→player) where vocab overlap should amplify the effect.
 
 **Outcome:** Added `organelle_train_transfer()` to library (refactored `organelle_train()` into internal helper). Updated `transfer_demo` to 4 conditions. Positive result: internal transformer representations do transfer value when combined with fine-tuning, even across different games.
+
+---
+
+### K-14: Same-game transfer: Planner→Player +9% over random
+
+- **Point:** Planner representations transfer to Player within the same game (TTT), giving +9% over random.
+- **Picture:** Like a coach (planner) sharing their game understanding with a player — the player benefits from the coach's knowledge but still plays best with direct practice.
+- **Proof:** SCRATCH=79%, TRANSFER+FT=73%, RANDOM=64%. Parse errors: 14/23/305. Transfer+FT >> Random.
+- **Push:** The 6% gap between scratch and transfer+FT may close with more fine-tuning steps or curriculum learning.
+
+**Outcome:** Created `transfer_same_demo` experiment. Planner→Player within TTT. Vocab overlap (29 vs 28 chars) is near-complete. Transfer+FT outperforms random by 9% but scratch-trained player is still 6% better.

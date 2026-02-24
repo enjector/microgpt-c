@@ -713,6 +713,17 @@ add_demo(
           MAX_VOCAB=50 MAX_DOCS=10000 MAX_DOC_LEN=128
 )
 
+add_demo(
+  NAME    transfer_same_demo
+  SOURCE  experiments/organelles/transfer_same_demo/main.c
+  THREADS
+  COPY    experiments/organelles/tictactoe/tictactoe_planner.txt
+          experiments/organelles/tictactoe/tictactoe_player.txt
+  DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=3 BLOCK_SIZE=128 MLP_DIM=192
+          NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
+          MAX_VOCAB=50 MAX_DOCS=10000 MAX_DOC_LEN=128
+)
+
 # ==================================================================
 #  Tests
 # ==================================================================
