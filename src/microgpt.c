@@ -1183,6 +1183,32 @@ Model *checkpoint_load(const char *path, size_t vocab_size,
 }
 #endif
 
+/* ======================== Transfer Learning =============================== */
+
+void model_transfer_weights(const Model *src, Model *dst,
+                            const MicrogptConfig *cfg) {
+  const size_t ne = (size_t)cfg->n_embd;
+  const size_t bs = (size_t)cfg->block_size;
+  const size_t md = (size_t)cfg->mlp_dim;
+  const int nl = cfg->n_layer;
+
+  /* Copy position embedding (vocab-agnostic) */
+  memcpy(dst->wpe, src->wpe, bs * ne * sizeof(scalar_t));
+
+  /* Copy per-layer attention and MLP weights */
+  for (int L = 0; L < nl; L++) {
+    memcpy(dst->attn_wq[L], src->attn_wq[L], ne * ne * sizeof(scalar_t));
+    memcpy(dst->attn_wk[L], src->attn_wk[L], ne * ne * sizeof(scalar_t));
+    memcpy(dst->attn_wv[L], src->attn_wv[L], ne * ne * sizeof(scalar_t));
+    memcpy(dst->attn_wo[L], src->attn_wo[L], ne * ne * sizeof(scalar_t));
+    memcpy(dst->mlp_fc1[L], src->mlp_fc1[L], md * ne * sizeof(scalar_t));
+    memcpy(dst->mlp_fc2[L], src->mlp_fc2[L], ne * md * sizeof(scalar_t));
+  }
+
+  printf("  Transferred: wpe (%zux%zu) + %d layers (attn+MLP) = %zu params\n",
+         bs, ne, nl, bs * ne + (size_t)nl * (4 * ne * ne + md * ne + ne * md));
+}
+
 /* ===================== Neural Network Primitives ========================= */
 /*
  * These are the two fundamental building blocks of neural networks:

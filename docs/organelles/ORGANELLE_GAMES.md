@@ -80,6 +80,17 @@ By implementing the recommended list of puzzles (Lights Out, Mastermind, Klotski
        - **5×4 Variant (K-10)**: Scaled to a 5×4 board with 7 pieces and 7 empties, generating 2,420 BFS-solved positions. Result: **0% solve rate** (3,174 parse errors). The 20-char board encoding with 10+ valid moves per position far exceeds BLOCK_SIZE=128. Confirms that board encoding length is the fundamental bottleneck for sliding puzzles.
        - **Implications**: Puzzle-like ops (e.g., logistics in manufacturing)—validates edge scalability.
 
+### 2.5 **Cross-Game Transfer Learning (K-12)**
+
+   - **Experiment**: Transfer internal transformer weights (wpe + attention Q/K/V/O + MLP fc1/fc2) from a trained TicTacToe Player to an Othello Player. Both share architecture 48/4/3/128/192. Only vocab-dependent layers (wte, lm_head) are reinitialised.
+   - **Conditions**:
+     - **SCRATCH**: Othello trained 25K steps from random init → **43% win** vs random
+     - **TRANSFER (TTT→Oth)**: C4 internal weights, random Othello embedding → **32% win** vs random
+     - **RANDOM**: Fully untrained → **33% win** vs random
+   - **Result**: Transfer ≈ Random. **No evidence of representation transfer** without fine-tuning. The ~1,600 parse errors per condition suggest all conditions generate mostly invalid output — only scratch training learns the correct vocabulary patterns.
+   - **Why**: Character-level game models are dominated by the token embedding (wte) and output head (lm_head). These encode the vocabulary mapping and game-specific output format. Without fine-tuning, the transferred attention/MLP weights produce activations that the randomly-initialised lm_head cannot interpret.
+   - **Next Steps**: Fine-tuning the transferred model on Othello corpus is needed to measure transfer benefit. Same-game transfer (planner→player) may show stronger signal since the vocabularies overlap.
+
 ### 3. **Overall Implications of Success/Failure**
 - **Success (80-95% Across List)**: Proves OPA's **generalization ceiling**—from search (8-Puzzle) to constraints (Sudoku) and topology (Hex)—positioning MicroGPT-C as a framework for "micro-agents" in games/optimization. Implications: Attracts contributors (e.g., for chess minis); validates for real apps (e.g., EnX-MF's homology chaining). Echoes PDFs' "unbreakable rules"—OPA as "axioms" for puzzles.
 - **Failure Modes**: High invalids (like C4 50%) prove kanban's limits on deep branching—implications: Need hybrid (e.g., deterministic Workers for evals). Low perf on Hex/Pentago highlights topology gaps—add PDFs-inspired manifolds.

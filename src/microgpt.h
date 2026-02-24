@@ -546,6 +546,15 @@ void model_free(Model *model);
  */
 size_t model_num_params(const Model *model);
 
+/*
+ * model_transfer_weights - Copy internal transformer weights (wpe, attention
+ *   Q/K/V/O, MLP fc1/fc2) from a source model to a destination model.
+ *   Does NOT copy: token embedding (wte) or output head (lm_head) which are
+ *   vocab-dependent.  Both models must share the same architecture.
+ */
+void model_transfer_weights(const Model *src, Model *dst,
+                            const MicrogptConfig *cfg);
+
 /* ========================= Checkpointing (fp64) ========================== */
 
 /*

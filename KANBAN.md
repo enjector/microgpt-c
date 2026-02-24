@@ -29,6 +29,7 @@
 | K-9 | Hex virtual connections — negative result (prompt overflow) | Feb 24 |
 | K-10 | Red Donkey 5×4 (0% solve — board too large) | Feb 24 |
 | K-11 | Deeper MCTS for 5×5 Hex (no additional benefit) | Feb 23 |
+| K-12 | Transfer learning TTT→Othello (no transfer benefit) | Feb 24 |
 
 ---
 
@@ -130,3 +131,14 @@
 - **Push:** Deeper MCTS may still help on 7×7 where the tree is much wider. On 5×5, the bottleneck is elsewhere (model capacity or Judge quality, not corpus quality).
 
 **Outcome:** Tested and confirmed. No separate commit needed — the finding is documented here and in ORGANELLE_GAMES.md.
+
+---
+
+### K-12: Transfer learning TTT→Othello (no transfer benefit)
+
+- **Point:** Internal transformer weights (attention + MLP) trained on TicTacToe don't transfer to Othello without fine-tuning.
+- **Picture:** Like transplanting a chess player's intuition into a Go player's body — the muscle memory is for the wrong game.
+- **Proof:** SCRATCH=43% win, TRANSFER(TTT→Oth)=32% win, RANDOM(untrained)=33% win. Transfer ≈ Random.
+- **Push:** Fine-tuning the transferred model on Othello corpus could show benefit. Also try same-game transfer (e.g., TTT planner→TTT player).
+
+**Outcome:** Added `model_transfer_weights()` to `microgpt.h`/`microgpt.c`. Created `transfer_demo` experiment with CMake target. Three conditions tested over 100 Othello games each. Transfer without fine-tuning provides no advantage over random initialization, confirming that vocab-dependent layers (wte/lm_head) dominate for character-level game models.
