@@ -456,9 +456,11 @@ void organelle_generate_multiline(const Organelle *org,
  *   @param num_steps    Total training steps (typically 25000)
  *   @return             Trained organelle ready for inference, or NULL on error
  */
-Organelle *organelle_train(const char *name, const char *corpus_path,
-                           const char *ckpt_path, MicrogptConfig *cfg,
-                           int num_steps) {
+static Organelle *organelle_train_impl_(const char *name,
+                                        const char *corpus_path,
+                                        const char *ckpt_path,
+                                        MicrogptConfig *cfg, int num_steps,
+                                        const Model *source_model) {
   const int nl = cfg->n_layer;
 
   /* Derive training log path by appending ".log" to the checkpoint path.
@@ -501,6 +503,12 @@ Organelle *organelle_train(const char *name, const char *corpus_path,
     free_docs(&org->docs);
     free(org);
     return NULL;
+  }
+
+  /* Transfer internal weights from source model if provided (K-13) */
+  if (source_model) {
+    printf("  Transferring internal weights from source model...\n");
+    model_transfer_weights(source_model, model, cfg);
   }
   size_t nparams = model_num_params(model);
 
@@ -731,6 +739,20 @@ Organelle *organelle_train(const char *name, const char *corpus_path,
 
   org->model = model;
   return org;
+}
+
+Organelle *organelle_train(const char *name, const char *corpus_path,
+                           const char *ckpt_path, MicrogptConfig *cfg,
+                           int num_steps) {
+  return organelle_train_impl_(name, corpus_path, ckpt_path, cfg, num_steps,
+                               NULL);
+}
+
+Organelle *organelle_train_transfer(const char *name, const char *corpus_path,
+                                    const char *ckpt_path, MicrogptConfig *cfg,
+                                    int num_steps, const Model *source_model) {
+  return organelle_train_impl_(name, corpus_path, ckpt_path, cfg, num_steps,
+                               source_model);
 }
 
 /* ======================== Organelle Cleanup ================================

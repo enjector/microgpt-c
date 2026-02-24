@@ -70,6 +70,16 @@ void organelle_generate_multiline(const Organelle *org,
  */
 void organelle_free(Organelle *org);
 
+/*
+ * Train an organelle with transferred internal weights from a source model.
+ * Same as organelle_train() but copies vocab-agnostic weights (wpe, attention,
+ * MLP) from source_model before training.  Vocab-dependent layers (wte,
+ * lm_head) are freshly randomised for the new corpus.
+ */
+Organelle *organelle_train_transfer(const char *name, const char *corpus_path,
+                                    const char *ckpt_path, MicrogptConfig *cfg,
+                                    int num_steps, const Model *source_model);
+
 /* ======================== Kanban State =================================== */
 /*
  * Tracks blocked actions, recent action history, stall counts, and replans.

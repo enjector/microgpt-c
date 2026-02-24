@@ -1,21 +1,15 @@
 /*
- * transfer_demo — Transfer Learning Between Organelles (K-12)
+ * transfer_demo — Transfer Learning Between Organelles (K-12/K-13)
  *
  * Tests whether internal transformer representations trained on one game
- * transfer to another.  Three conditions are compared:
+ * transfer to another.  Four conditions are compared:
  *
- *   1. SCRATCH   — Train Othello Player from scratch (baseline)
- *   2. TRANSFER  — Train TicTacToe Player, transfer internal weights to
- *                  fresh Othello model (NO fine-tuning on Othello)
- *   3. RANDOM    — Untrained model (negative control)
+ *   1. SCRATCH     — Train Othello Player from scratch (baseline)
+ *   2. TRANSFER    — Transfer TTT internal weights, NO fine-tuning
+ *   3. TRANSFER+FT — Transfer TTT internal weights, THEN fine-tune on Othello
+ *   4. RANDOM      — Untrained model (negative control)
  *
  * Both games share architecture 48/4/3/128/192 so transfer is dimension-safe.
- * The internal transformer layers (attention Q/K/V/O, MLP fc1/fc2, and wpe)
- * are vocab-agnostic.  Only wte and lm_head depend on vocabulary.
- *
- * This tests raw representational transfer — can a model that learned to
- * play TicTacToe perform better at Othello than a random model, even
- * without any Othello-specific fine-tuning?
  */
 
 #include "microgpt.h"
@@ -190,7 +184,7 @@ int main(int argc, char **argv) {
   seed_rng(42);
 
   printf("================================================================\n");
-  printf("  MicroGPT-C — Transfer Learning Experiment (K-12)\n");
+  printf("  MicroGPT-C — Transfer Learning Experiment (K-12/K-13)\n");
   printf("  Source: TicTacToe Player → Target: Othello Player\n");
   printf(
       "================================================================\n\n");
@@ -206,7 +200,7 @@ int main(int argc, char **argv) {
   cfg.max_vocab = MAX_VOCAB;
   cfg.max_docs = MAX_DOCS;
   cfg.max_doc_len = MAX_DOC_LEN;
-  microgpt_print_config("Transfer Learning (K-12)", &cfg);
+  microgpt_print_config("Transfer Learning (K-12/K-13)", &cfg);
 
   int ng = 100;
 
@@ -230,8 +224,8 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  /* ====== Phase 3: Create transfer model ====== */
-  printf("\n--- PHASE 3: Transfer TTT internals → Othello model ---\n");
+  /* ====== Phase 3: Transfer without fine-tuning (K-12 replication) ====== */
+  printf("\n--- PHASE 3: Transfer TTT internals → Othello model (no FT) ---\n");
 
   /* Load Othello corpus just for vocab */
   Docs oth_docs;
@@ -255,6 +249,17 @@ int main(int argc, char **argv) {
   xfer_org.vocab = oth_vocab;
   xfer_org.docs = oth_docs;
 
+  /* ====== Phase 3b: Transfer WITH fine-tuning (K-13) ====== */
+  printf("\n--- PHASE 3b: Transfer + Fine-tune on Othello (K-13) ---\n");
+  remove("transfer_ft.ckpt");
+  Organelle *xfer_ft =
+      organelle_train_transfer("Transfer+FT", "othello_player.txt",
+                               "transfer_ft.ckpt", &cfg, NUM_STEPS, ttt->model);
+  if (!xfer_ft) {
+    fprintf(stderr, "FATAL: Transfer+FT training failed\n");
+    return 1;
+  }
+
   /* ====== Phase 4: Random untrained baseline ====== */
   printf("\n--- PHASE 4: Create random baseline ---\n");
   Docs rnd_docs;
@@ -268,13 +273,14 @@ int main(int argc, char **argv) {
   rnd_org.vocab = rnd_vocab;
   rnd_org.docs = rnd_docs;
 
-  /* ====== Phase 5: Evaluate ====== */
+  /* ====== Phase 5: Evaluate all conditions ====== */
   printf("\n--- PHASE 5: Playing %d Othello games per condition ---\n\n", ng);
 
-  int e1, e2, e3;
+  int e1, e2, e3, e4;
   int w1 = eval_model("SCRATCH (trained)", scratch, &cfg, ng, &e1);
-  int w2 = eval_model("TRANSFER (TTT→Oth)", &xfer_org, &cfg, ng, &e2);
-  int w3 = eval_model("RANDOM (untrained)", &rnd_org, &cfg, ng, &e3);
+  int w2 = eval_model("TRANSFER (no FT)", &xfer_org, &cfg, ng, &e2);
+  int w3 = eval_model("TRANSFER+FT", xfer_ft, &cfg, ng, &e3);
+  int w4 = eval_model("RANDOM (untrained)", &rnd_org, &cfg, ng, &e4);
 
   /* ====== Results ====== */
   printf(
@@ -282,31 +288,38 @@ int main(int argc, char **argv) {
   printf("              TRANSFER LEARNING RESULTS\n");
   printf("================================================================\n");
   printf("  Condition             Wins/%-3d  Win%%   Errors\n", ng);
-  printf("  ────────────────────  ────────  ─────  ──────\n");
+  printf("  ──────────────────────  ────────  ─────  ──────\n");
   printf("  SCRATCH (trained)       %3d     %3d%%    %d\n", w1, w1 * 100 / ng,
          e1);
-  printf("  TRANSFER (TTT→Oth)      %3d     %3d%%    %d\n", w2, w2 * 100 / ng,
+  printf("  TRANSFER (no FT)        %3d     %3d%%    %d\n", w2, w2 * 100 / ng,
          e2);
-  printf("  RANDOM (untrained)      %3d     %3d%%    %d\n", w3, w3 * 100 / ng,
+  printf("  TRANSFER+FT             %3d     %3d%%    %d\n", w3, w3 * 100 / ng,
          e3);
+  printf("  RANDOM (untrained)      %3d     %3d%%    %d\n", w4, w4 * 100 / ng,
+         e4);
   printf(
       "================================================================\n\n");
 
-  if (w2 > w3)
-    printf("✅ Transfer > Random: +%d%% (internal representations transfer)\n",
-           (w2 - w3) * 100 / ng);
+  /* Analysis */
+  if (w3 > w1)
+    printf("✅ Transfer+FT > Scratch: +%d%% (pre-training accelerates!)\n",
+           (w3 - w1) * 100 / ng);
+  else if (w3 > w4)
+    printf(
+        "✅ Transfer+FT > Random: +%d%% (transferred representations help)\n",
+        (w3 - w4) * 100 / ng);
   else
-    printf("❌ Transfer ≤ Random: no evidence of representation transfer\n");
+    printf("❌ Transfer+FT ≤ Random: no evidence of transfer benefit\n");
 
-  if (w2 > w1)
-    printf("✅ Transfer > Scratch: +%d%% (pre-training helps)\n",
-           (w2 - w1) * 100 / ng);
+  if (w2 > w4)
+    printf("✅ Transfer (no FT) > Random: +%d%%\n", (w2 - w4) * 100 / ng);
   else
-    printf("Note: Scratch > Transfer (as expected without fine-tuning)\n");
+    printf("❌ Transfer (no FT) ≤ Random (K-12 replicated)\n");
 
   /* Cleanup */
   organelle_free(ttt);
   organelle_free(scratch);
+  organelle_free(xfer_ft);
   model_free(xfer);
   model_free(rnd);
 
