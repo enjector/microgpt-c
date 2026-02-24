@@ -32,6 +32,7 @@
 | K-12 | Transfer learning TTT→Othello (no transfer benefit) | Feb 24 |
 | K-13 | Transfer+FT: TTT→Othello +4% over scratch | Feb 24 |
 | K-14 | Same-game transfer: Planner→Player +9% over random | Feb 24 |
+| K-15 | BLOCK_SIZE=256 uplift: no improvement (Hex 25%, RD 0%) | Feb 24 |
 
 ---
 
@@ -166,3 +167,14 @@
 - **Push:** The 6% gap between scratch and transfer+FT may close with more fine-tuning steps or curriculum learning.
 
 **Outcome:** Created `transfer_same_demo` experiment. Planner→Player within TTT. Vocab overlap (29 vs 28 chars) is near-complete. Transfer+FT outperforms random by 9% but scratch-trained player is still 6% better.
+
+---
+
+### K-15: BLOCK_SIZE=256 uplift: no improvement
+
+- **Point:** Doubling the context window from 128→256 tokens does not improve Hex 7×7 or Red Donkey 5×4.
+- **Picture:** Giving a student a bigger desk doesn’t make the exam easier if the student hasn’t studied enough.
+- **Proof:** Hex 256=25% (same as Hex 128=25%). Red Donkey 256=0% (same as RD 128=0%).
+- **Push:** The bottleneck is model capacity and game complexity, not context length. Larger n_embd/n_layer or more training data may help.
+
+**Outcome:** Added `hex_256_demo` and `rd54_256_demo` CMake targets. Fixed hardcoded `block_size=128` in hex and reddonkey to use `BLOCK_SIZE` macro. Both experiments confirm no improvement.

@@ -349,7 +349,7 @@ int main(void) {
   g_cfg.n_head = N_HEAD;
   g_cfg.mlp_dim = MLP_DIM;
   g_cfg.n_layer = N_LAYER;
-  g_cfg.block_size = 128;
+  g_cfg.block_size = BLOCK_SIZE;
   g_cfg.batch_size = 8;
   g_cfg.num_steps = 25000;
   g_cfg.learning_rate = 0.001;
