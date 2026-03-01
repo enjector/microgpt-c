@@ -14,7 +14,7 @@
 
 ### What is the "Organelle Pipeline Architecture" (OPA)?
 
-OPA is a coordination framework for Small Language Models (SLMs). Instead of training one large monolith, we train multiple "micro-models" (organelles) specialized for specific roles: **Planners** (strategy), **Workers** (execution), and **Judges** (validation). By piping the output of one organelle into the next, the system architecture compensates for the cognitive limits of individual micro-models. See [ORGANELLE_PIPELINE.md](docs/organelles/ORGANELLE_PIPELINE.md) for the full design.
+OPA is a coordination framework for Small Language Models (SLMs). Instead of training one large monolith, we train multiple "micro-models" (organelles) specialized for specific roles: **Planners** (strategy), **Workers** (execution), and **Judges** (validation). By piping the output of one organelle into the next, the system architecture compensates for the cognitive limits of individual micro-models. See [RESEARCH_ORGANELLE_PIPELINE](docs/research/RESEARCH_ORGANELLE_PIPELINE.md) for the full design.
 
 ### Why use Agile/Scrum roles like "Planner" and "Judge"?
 
@@ -36,9 +36,9 @@ We define "reasoning" in terms of systems engineering: **the ability to navigate
 
 **The evidence (trace distillation).** At 64K parameters, the model is a stochastic parrot that needs 181 external corrections from the Judge to stay on track. At 460K parameters, trained on traces of those successful coordinations, the model internalises the logic natively — zero interventions, same performance. It has learned a compressed representation of the game's valid-move manifold.
 
-**The negative control.** If the model were hallucinating logic, it would show similar "success" patterns on random data. It doesn't. The [lottery experiment](experiments/organelles/lottery/) hits an entropy floor at ~0.50 — proving the model is sensitive to causal structure in the input, not just statistical token frequency.
+**The negative control.** If the model were hallucinating logic, it would show similar "success" patterns on random data. It doesn't. The [lottery experiment](demos/character-level/lottery/) hits an entropy floor at ~0.50 — proving the model is sensitive to causal structure in the input, not just statistical token frequency.
 
-**What this is not.** It's not AGI. It's not general reasoning. It's task-specific state pruning that emerges when you train on coordination traces. For applications like fraud/risk engines, where you need auditable, inspectable logic, that's exactly what we want. See [ORGANELLE_REASONING_CONCLUSION.md](docs/organelles/ORGANELLE_REASONING_CONCLUSION.md) for the full research verdict.
+**What this is not.** It's not AGI. It's not general reasoning. It's task-specific state pruning that emerges when you train on coordination traces. For applications like fraud/risk engines, where you need auditable, inspectable logic, that's exactly what we want. See [RESEARCH_ORGANELLE_REASONING](docs/research/RESEARCH_ORGANELLE_REASONING.md) for the full research verdict.
 
 ---
 
@@ -61,7 +61,7 @@ They use a shared **pipe-string protocol**. Instead of passing verbose natural l
 - **Worker input**: `board=...|planner_hint=defensive`
 - **Worker output**: `action=place(3)`
 
-This wire format is documented in [ORGANELLE_PIPELINE.md](docs/organelles/ORGANELLE_PIPELINE.md).
+This wire format is documented in [RESEARCH_ORGANELLE_PIPELINE](docs/research/RESEARCH_ORGANELLE_PIPELINE.md).
 
 ### How does on-device training work?
 
@@ -93,7 +93,7 @@ All architecture parameters are **compile-time constants** set via CMake defines
 | `BLOCK_SIZE` | 16 | `-DBLOCK_SIZE=256` | Maximum sequence length |
 | `scalar_t` | `float` | `-DMICROGPT_USE_FLOAT=OFF` | Switch to `double` precision |
 
-See [BUILD_OPTIONS.md](docs/BUILD_OPTIONS.md) for the full set of options including Metal GPU, BLAS, INT8 quantisation, and SIMD flags.
+See [BUILD_OPTIONS](docs/BUILD_OPTIONS.md) for the full set of options including Metal GPU, BLAS, INT8 quantisation, and SIMD flags.
 
 ---
 
@@ -106,16 +106,16 @@ See [BUILD_OPTIONS.md](docs/BUILD_OPTIONS.md) for the full set of options includ
 | Category | Experiments | Highlights |
 |----------|-------------|------------|
 | **Logic games** (11) | Tic-Tac-Toe, Connect-4, 8-Puzzle, Sudoku, Mastermind, Othello, Pentago, Hex, Lights Out, Klotski, Red Donkey | 87–91% win rates, zero invalid moves |
-| **Code generation** (3) | c_codegen, c_wiringgen, c_compose | 83% exact match, 98% parse rate |
-| **Real-world data** (2) | Market regime detection, Lottery prediction | 57% holdout accuracy vs 0.50 entropy floor |
+| **Code generation** (3) | c_codegen, c_wiringgen, c99_compose | 83% exact match, 98% parse rate |
+| **Real-world data** (2) | Market regime detection, Lottery prediction | 60% holdout accuracy vs 0.50 entropy floor |
 
-See the full leaderboard in [ORGANELLE_GAMES.md](docs/organelles/ORGANELLE_GAMES.md) and individual experiment READMEs in `experiments/organelles/`.
+See the full leaderboard in [RESEARCH_ORGANELLE_GAMES](docs/research/RESEARCH_ORGANELLE_GAMES.md) and individual experiment READMEs in `demos/character-level/`.
 
 ### What do the market and lottery experiments prove?
 
 They demonstrate that OPA can distinguish **learnable signal from randomness**:
 
-- **Market regime detection** (positive test): A 3-organelle pipeline trained on real cross-asset financial data achieves **57% accuracy on unseen data** — 2.8× the random baseline of 20%. The model reached 0.03–0.06 training loss.
+- **Market regime detection** (positive test): A 3-organelle pipeline trained on real cross-asset financial data achieves **60% accuracy on unseen data** — 3.0× the random baseline of 20%. The model reached 0.03–0.06 training loss.
 - **Lottery prediction** (negative control): A 2-organelle pipeline trained on EuroMillions draws hit an **entropy floor at ~0.50 loss** — exactly what theory predicts for random data. It learned nothing.
 
 Same engine, same architecture. One learns, one can't. **That's the proof** that the engine has integrity and doesn't hallucinate patterns where none exist.
@@ -129,7 +129,7 @@ Yes. The shared organelle library makes this straightforward. Each experiment fo
 3. Train organelles using `organelle_train()`
 4. Wire them into a pipeline with `OpaKanban` for coordination
 
-Look at any experiment in `experiments/organelles/` as a template. Simpler games (Tic-Tac-Toe, Pentago) are good starting points.
+Look at any experiment in `demos/character-level/` as a template. Simpler games (Tic-Tac-Toe, Pentago) are good starting points.
 
 ---
 
@@ -165,7 +165,7 @@ The core engine is **pure C99 with zero dependencies** — it compiles anywhere.
 | Apple Accelerate / BLAS | `-DMICROGPT_BLAS=ON` | Single-threaded inference |
 | Multi-threaded training | Built-in | Multi-core CPUs |
 
-For current model sizes, pure C99 with compiler auto-vectorisation is actually the fastest option. See [PERFORMANCE.md](docs/PERFORMANCE.md) for benchmarks.
+For current model sizes, pure C99 with compiler auto-vectorisation is actually the fastest option. See [PERFORMANCE](docs/testing/PERFORMANCE.md) for benchmarks.
 
 ---
 
@@ -194,20 +194,20 @@ Requirements: a **C99 compiler** (GCC, Clang, or MSVC) and **CMake 3.10+**. Noth
 
 ### Where can I learn the theory?
 
-The project includes a **16-chapter technical guide** covering everything from transformer fundamentals to organelle pipeline design and the reasoning conclusion. Start at [docs/book/0.md](docs/book/0.md). Key documents:
+The project includes a **16-chapter technical guide** covering everything from transformer fundamentals to organelle pipeline design and the reasoning conclusion. Start at [book/0.md](book/0.md). Key documents:
 
 | Document | What it covers |
 |----------|---------------|
 | [VISION.md](VISION.md) | The stem cell philosophy |
 | [VALUE_PROPOSITION.md](VALUE_PROPOSITION.md) | Why this matters, who benefits |
-| [Technical guide](docs/book/0.md) | 16 chapters, from basics to advanced |
-| [ORGANELLE_PIPELINE.md](docs/organelles/ORGANELLE_PIPELINE.md) | Pipeline wire format design |
-| [ORGANELLE_REASONING_CONCLUSION.md](docs/organelles/ORGANELLE_REASONING_CONCLUSION.md) | Reasoning verdict and learning frontier |
-| [TRAINING_STRATEGIES.md](docs/foundation/TRAINING_STRATEGIES.md) | LR scheduling, warmup, capacity scaling |
+| [Technical guide](book/0.md) | 16 chapters, from basics to advanced |
+| [RESEARCH_ORGANELLE_PIPELINE](docs/research/RESEARCH_ORGANELLE_PIPELINE.md) | Pipeline wire format design |
+| [RESEARCH_ORGANELLE_REASONING](docs/research/RESEARCH_ORGANELLE_REASONING.md) | Reasoning verdict and learning frontier |
+| [RESEARCH_TRAINING_STRATEGIES](docs/research/RESEARCH_TRAINING_STRATEGIES.md) | LR scheduling, warmup, capacity scaling |
 
 ### Can I use MicroGPT-C as a library in my own project?
 
-Yes. Include `microgpt.h`, link against `microgpt.c`, and you have access to the full API: model creation, training, inference, checkpointing, and tokenisation. See [LIBRARY_GUIDE.md](docs/LIBRARY_GUIDE.md) for a worked example.
+Yes. Include `microgpt.h`, link against `microgpt.c`, and you have access to the full API: model creation, training, inference, checkpointing, and tokenisation. See [FUNCTIONAL_SPEC](docs/FUNCTIONAL_SPEC.md) for a worked example.
 
 ---
 
@@ -217,7 +217,7 @@ Yes. Include `microgpt.h`, link against `microgpt.c`, and you have access to the
 
 In the OPA framework, hallucinations are mitigated by the **Judge** organelle. If a Worker proposes an invalid action, the Judge catches it before it is executed. In our game experiments, this coordination resulted in **zero invalid moves** over thousands of test cycles. The kanban replan loop ensures that rejected moves trigger a new attempt, not a crash.
 
-Our **Learning Frontier** research shows this scaffolding is not permanent: a 64K-parameter model needed 181 coordinator interventions, but at 460K parameters the model internalised the coordination logic entirely — zero interventions needed, identical performance with or without the pipeline. See [ORGANELLE_REASONING_CONCLUSION.md](docs/organelles/ORGANELLE_REASONING_CONCLUSION.md).
+Our **Learning Frontier** research shows this scaffolding is not permanent: a 64K-parameter model needed 181 coordinator interventions, but at 460K parameters the model internalised the coordination logic entirely — zero interventions needed, identical performance with or without the pipeline. See [RESEARCH_ORGANELLE_REASONING](docs/research/RESEARCH_ORGANELLE_REASONING.md).
 
 ### Does it solve the lottery?
 
@@ -225,7 +225,7 @@ Our **Learning Frontier** research shows this scaffolding is not permanent: a 64
 
 ### Can the models learn from random data?
 
-No — and that's by design. The lottery experiment confirms that OPA pipelines **cannot extract signal from noise**. This is a feature, not a bug. It means that when a model *does* learn (e.g., market regime detection at 57% accuracy), you can trust that real patterns exist in the data.
+No — and that's by design. The lottery experiment confirms that OPA pipelines **cannot extract signal from noise**. This is a feature, not a bug. It means that when a model *does* learn (e.g., market regime detection at 60% accuracy), you can trust that real patterns exist in the data.
 
 ---
 

@@ -112,6 +112,7 @@
 
 #include "microgpt_organelle.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -675,6 +676,9 @@ static Organelle *organelle_train_impl_(const char *name,
     scalar_t mean_loss =
         batch_positions > 0 ? batch_loss / (scalar_t)batch_positions : 0;
 
+    /* Apply gradient clipping (no-op if GRAD_CLIP <= 0) */
+    clip_gradients(grads, nparams);
+
     /* Apply Adam optimiser step with cosine LR schedule */
     adam_step(model, grads, m_adam, v_adam, step);
 
@@ -755,6 +759,250 @@ Organelle *organelle_train_transfer(const char *name, const char *corpus_path,
                                source_model);
 }
 
+/* ── Model Soup: train N seeds, average weights ────────────────────────── */
+
+/* Helper: evaluate model loss on a sample of the training corpus.
+ * Returns average per-position cross-entropy loss over sample_docs documents.
+ * This is used by greedy soup to decide whether adding a model improves
+ * the average. */
+static scalar_t soup_eval_loss_(const Model *model, const Docs *docs,
+                                const Vocab *vocab, const MicrogptConfig *cfg,
+                                int sample_docs) {
+  const size_t ne = (size_t)cfg->n_embd;
+  const int nl = cfg->n_layer;
+  size_t np = model_num_params(model);
+
+  /* Allocate KV cache and grad buffer (grads discarded) */
+  scalar_t **keys = (scalar_t **)malloc((size_t)nl * sizeof(scalar_t *));
+  scalar_t **vals = (scalar_t **)malloc((size_t)nl * sizeof(scalar_t *));
+  size_t *clen = (size_t *)calloc((size_t)nl, sizeof(size_t));
+  scalar_t *grads = (scalar_t *)calloc(np, sizeof(scalar_t));
+  if (!keys || !vals || !clen || !grads) {
+    free(keys);
+    free(vals);
+    free(clen);
+    free(grads);
+    return 999.0;
+  }
+  for (int L = 0; L < nl; L++) {
+    keys[L] =
+        (scalar_t *)calloc((size_t)cfg->block_size * ne, sizeof(scalar_t));
+    vals[L] =
+        (scalar_t *)calloc((size_t)cfg->block_size * ne, sizeof(scalar_t));
+  }
+
+  scalar_t total_loss = 0;
+  int total_positions = 0;
+  int n =
+      (sample_docs < (int)docs->num_docs) ? sample_docs : (int)docs->num_docs;
+
+  size_t *ids =
+      (size_t *)malloc(((size_t)cfg->block_size + 2) * sizeof(size_t));
+  if (!ids) { /* cleanup and bail */
+    for (int L = 0; L < nl; L++) {
+      free(keys[L]);
+      free(vals[L]);
+    }
+    free(keys);
+    free(vals);
+    free(clen);
+    free(grads);
+    return 999.0;
+  }
+
+  for (int d = 0; d < n; d++) {
+    size_t ntok = tokenize(docs->lines[d], docs->doc_lens[d], vocab, ids,
+                           (size_t)cfg->block_size + 1);
+    if (ntok < 3)
+      continue;
+
+    /* Reset KV cache */
+    for (int L = 0; L < nl; L++)
+      clen[L] = 0;
+    memset(grads, 0, np * sizeof(scalar_t));
+
+    /* Evaluate loss on first block_size tokens */
+    int max_pos = (int)ntok - 1;
+    if (max_pos > cfg->block_size)
+      max_pos = cfg->block_size;
+    for (int p = 0; p < max_pos; p++) {
+      scalar_t loss = forward_backward_one(model, ids[p], (size_t)p, ids[p + 1],
+                                           keys, vals, clen, grads);
+      total_loss += loss;
+      total_positions++;
+    }
+  }
+
+  /* Cleanup */
+  free(ids);
+  for (int L = 0; L < nl; L++) {
+    free(keys[L]);
+    free(vals[L]);
+  }
+  free(keys);
+  free(vals);
+  free(clen);
+  free(grads);
+
+  return (total_positions > 0) ? total_loss / (scalar_t)total_positions : 999.0;
+}
+
+Organelle *organelle_train_soup(const char *name, const char *corpus_path,
+                                MicrogptConfig *cfg, int num_steps,
+                                int n_seeds) {
+  if (n_seeds < 1)
+    return NULL;
+  if (n_seeds == 1) {
+    /* Degenerate case: just train one model */
+    return organelle_train(name, corpus_path, NULL, cfg, num_steps);
+  }
+
+#if defined(MODEL_SOUP_GREEDY) && MODEL_SOUP_GREEDY
+  printf("\n  [%s] Greedy Soup: training %d seeds × %d steps\n", name, n_seeds,
+         num_steps);
+#else
+  printf("\n  [%s] Model Soup: training %d seeds × %d steps\n", name, n_seeds,
+         num_steps);
+#endif
+
+  /* Train N independent models with different seeds */
+  Organelle **seeds =
+      (Organelle **)calloc((size_t)n_seeds, sizeof(Organelle *));
+  if (!seeds)
+    return NULL;
+
+  for (int s = 0; s < n_seeds; s++) {
+    /* Each seed gets a unique RNG state */
+    seed_rng((unsigned int)(42 + s * 7919)); /* 7919 is prime → well-spaced */
+
+    char ckpt_name[256];
+    snprintf(ckpt_name, sizeof(ckpt_name), "%s_soup_seed%d.ckpt", name, s);
+
+    printf("  [%s] Seed %d/%d (rng=%d):\n", name, s + 1, n_seeds,
+           42 + s * 7919);
+
+    seeds[s] = organelle_train_impl_(name, corpus_path, ckpt_name, cfg,
+                                     num_steps, NULL);
+    if (!seeds[s]) {
+      fprintf(stderr, "  [%s] Seed %d training failed\n", name, s + 1);
+      /* Free previously trained seeds */
+      for (int j = 0; j < s; j++)
+        organelle_free(seeds[j]);
+      free(seeds);
+      return NULL;
+    }
+  }
+
+#if defined(MODEL_SOUP_GREEDY) && MODEL_SOUP_GREEDY
+  /* ── Greedy Soup: iteratively add models that improve validation loss ── */
+
+  /* Evaluate each seed's loss on a sample of training data */
+  scalar_t *losses = (scalar_t *)malloc((size_t)n_seeds * sizeof(scalar_t));
+  for (int s = 0; s < n_seeds; s++) {
+    losses[s] = soup_eval_loss_(seeds[s]->model, &seeds[s]->docs,
+                                &seeds[s]->vocab, cfg, 50);
+    printf("  [%s] Seed %d validation loss: %.4f\n", name, s + 1,
+           (double)losses[s]);
+  }
+
+  /* Find the best single seed */
+  int best_idx = 0;
+  for (int s = 1; s < n_seeds; s++)
+    if (losses[s] < losses[best_idx])
+      best_idx = s;
+
+  printf("  [%s] Best seed: %d (loss=%.4f)\n", name, best_idx + 1,
+         (double)losses[best_idx]);
+
+  /* Start with the best seed, try adding others */
+  /* We'll keep the running average in a separate model to allow rollback */
+  int n_in_soup = 1;
+  int *in_soup = (int *)calloc((size_t)n_seeds, sizeof(int));
+  in_soup[best_idx] = 1;
+
+  for (int s = 0; s < n_seeds; s++) {
+    if (s == best_idx)
+      continue;
+
+    /* Try averaging this seed into the current soup */
+    Model **trial_models =
+        (Model **)malloc(((size_t)n_in_soup + 1) * sizeof(Model *));
+    int ti = 0;
+    for (int j = 0; j < n_seeds; j++)
+      if (in_soup[j])
+        trial_models[ti++] = seeds[j]->model;
+    trial_models[ti] = seeds[s]->model;
+
+    /* Create a temporary model to test the average */
+    Model *trial = model_create(seeds[s]->vocab.vocab_size, cfg);
+    model_soup_average(trial, trial_models, n_in_soup + 1);
+
+    /* Evaluate */
+    scalar_t trial_loss = soup_eval_loss_(trial, &seeds[best_idx]->docs,
+                                          &seeds[best_idx]->vocab, cfg, 50);
+
+    scalar_t current_loss =
+        soup_eval_loss_(seeds[best_idx]->model, &seeds[best_idx]->docs,
+                        &seeds[best_idx]->vocab, cfg, 50);
+
+    printf("  [%s] + seed %d: trial_loss=%.4f vs current=%.4f → ", name, s + 1,
+           (double)trial_loss, (double)current_loss);
+
+    if (trial_loss <= current_loss) {
+      /* Accept: copy trial weights into best seed's model */
+      model_soup_average(seeds[best_idx]->model, trial_models, n_in_soup + 1);
+      in_soup[s] = 1;
+      n_in_soup++;
+      printf("ACCEPTED (%d seeds in soup)\n", n_in_soup);
+    } else {
+      printf("REJECTED\n");
+    }
+
+    model_free(trial);
+    free(trial_models);
+  }
+
+  free(losses);
+  free(in_soup);
+
+  /* Keep best_idx (now contains greedy-averaged weights), free the rest */
+  Organelle *result = seeds[best_idx];
+  for (int s = 0; s < n_seeds; s++)
+    if (s != best_idx)
+      organelle_free(seeds[s]);
+  free(seeds);
+
+  printf("  [%s] Greedy soup complete: %d/%d seeds selected\n\n", name,
+         n_in_soup, n_seeds);
+  return result;
+
+#else
+  /* ── Uniform Soup: average all models' weights ── */
+
+  Model **models = (Model **)malloc((size_t)n_seeds * sizeof(Model *));
+  if (!models) {
+    for (int s = 0; s < n_seeds; s++)
+      organelle_free(seeds[s]);
+    free(seeds);
+    return NULL;
+  }
+  for (int s = 0; s < n_seeds; s++)
+    models[s] = seeds[s]->model;
+
+  model_soup_average(seeds[0]->model, models, n_seeds);
+  free(models);
+
+  /* Keep seeds[0] (now contains averaged weights), free the rest */
+  Organelle *result = seeds[0];
+  for (int s = 1; s < n_seeds; s++)
+    organelle_free(seeds[s]);
+  free(seeds);
+
+  printf("  [%s] Soup complete: %d seeds averaged\n\n", name, n_seeds);
+  return result;
+#endif
+}
+
 /* ======================== Organelle Cleanup ================================
  */
 
@@ -773,11 +1021,474 @@ void organelle_free(Organelle *org) {
   if (org->model)
     model_free(org->model);
   free_docs(&org->docs);
+  if (org->word_level)
+    free_word_vocab(&org->word_vocab);
   free(org);
 }
 
-/* ======================== Kanban State Tracker =============================
+/* ======================== Word-Level Organelle =============================
  */
+/*
+ * Word-level variants of the organelle train/generate pipeline.
+ *
+ * These mirror the character-level API but use WordVocab (from microgpt.h)
+ * instead of Vocab.  Key differences:
+ *   - Vocabulary is built via build_word_vocab() (frequency-based, top-N)
+ *   - Tokenisation uses tokenize_words() (whitespace-delimited)
+ *   - Training is single-threaded (inline loop, not TrainWorker)
+ *   - Generation maps sampled tokens back to word strings
+ *
+ * Why single-threaded training: TrainWorker uses `const Vocab *vocab` and
+ * train_worker_run() calls char-level tokenize().  Modifying TrainWorker
+ * would affect all existing experiments.  Single-threaded is simpler and
+ * sufficient for the initial word-level experiments (corpora are shorter
+ * in word tokens, so training is already faster per step).
+ */
+
+/*
+ * organelle_train_words — Full training pipeline for a word-level organelle.
+ *
+ *   1. Load corpus via opa_load_docs_multiline()
+ *   2. Concatenate all docs into a single text buffer for vocabulary building
+ *   3. Build word-level vocabulary (top max_words by frequency)
+ *   4. Create model with vocab_size = word_vocab.vocab_size
+ *   5. Single-threaded training loop:
+ *      - For each step, pick a random doc
+ *      - Tokenize with tokenize_words() (BOS prepended)
+ *      - Forward+backward for each position pair
+ *      - Accumulate gradients, apply Adam with cosine LR
+ *   6. Save checkpoint + training log
+ *   7. Set org->word_level = 1
+ */
+Organelle *organelle_train_words(const char *name, const char *corpus_path,
+                                 const char *ckpt_path, MicrogptConfig *cfg,
+                                 int num_steps, size_t max_words) {
+  const int nl = cfg->n_layer;
+
+  /* Derive training log path */
+  char log_path[512];
+  snprintf(log_path, sizeof(log_path), "%s.log", ckpt_path);
+
+  printf("\n========================================\n");
+  printf("ORGANELLE (word-level): %s\n", name);
+  printf("========================================\n");
+
+  Organelle *org = (Organelle *)calloc(1, sizeof(Organelle));
+  if (!org)
+    return NULL;
+  org->word_level = 1;
+
+  /* ---- Phase 1: Load corpus ---- */
+  if (opa_load_docs_multiline(corpus_path, &org->docs, cfg->max_docs) != 0) {
+    fprintf(stderr, "ERROR: cannot open %s\n", corpus_path);
+    free(org);
+    return NULL;
+  }
+
+  /* Concatenate all docs into a single text buffer for vocab building */
+  size_t total_chars = 0;
+  for (size_t i = 0; i < org->docs.num_docs; i++)
+    total_chars += org->docs.doc_lens[i];
+
+  char *all_text = (char *)malloc(total_chars + 1);
+  if (!all_text) {
+    free_docs(&org->docs);
+    free(org);
+    return NULL;
+  }
+  size_t offset = 0;
+  for (size_t i = 0; i < org->docs.num_docs; i++) {
+    memcpy(all_text + offset, org->docs.lines[i], org->docs.doc_lens[i]);
+    offset += org->docs.doc_lens[i];
+  }
+  all_text[total_chars] = '\0';
+
+  printf("corpus: %zu docs | %zu chars (%.1f KB)\n", org->docs.num_docs,
+         total_chars, (double)total_chars / 1024.0);
+
+  /* ---- Phase 2: Build word vocabulary ---- */
+  if (build_word_vocab(all_text, total_chars, max_words, &org->word_vocab) !=
+      0) {
+    fprintf(stderr, "ERROR: build_word_vocab failed for %s\n", name);
+    free(all_text);
+    free_docs(&org->docs);
+    free(org);
+    return NULL;
+  }
+  free(all_text); /* no longer needed after vocab is built */
+
+  printf("vocab: %zu word tokens (max_words=%zu, unk_id=%zu, nl_id=%zu, "
+         "bos_id=%zu)\n",
+         org->word_vocab.vocab_size, max_words, org->word_vocab.unk_id,
+         org->word_vocab.newline_id, org->word_vocab.bos_id);
+
+  /* ---- Phase 3: Create model and attempt checkpoint resume ---- */
+  int resume_step = 0;
+  Model *model = model_create(org->word_vocab.vocab_size, cfg);
+  if (!model) {
+    fprintf(stderr, "ERROR: model_create failed for %s\n", name);
+    free_word_vocab(&org->word_vocab);
+    free_docs(&org->docs);
+    free(org);
+    return NULL;
+  }
+  size_t nparams = model_num_params(model);
+
+  /* Allocate Adam optimiser state */
+  scalar_t *m_adam = (scalar_t *)calloc(nparams, sizeof(scalar_t));
+  scalar_t *v_adam = (scalar_t *)calloc(nparams, sizeof(scalar_t));
+
+  /* Try loading an existing checkpoint */
+  if (ckpt_path) {
+    Model *loaded = checkpoint_load(ckpt_path, org->word_vocab.vocab_size, cfg,
+                                    m_adam, v_adam, &resume_step);
+    if (loaded) {
+      printf("loaded checkpoint %s (step %d) -- skipping training\n", ckpt_path,
+             resume_step);
+      model_free(model);
+      free(m_adam);
+      free(v_adam);
+      org->model = loaded;
+      return org;
+    }
+  }
+
+  /* ---- Phase 4: Single-threaded word-level training ---- */
+  printf("params: %zu | steps %d | lr %.4f\n\n", nparams, num_steps,
+         (double)cfg->learning_rate);
+
+  /* Open training log */
+  FILE *logf = fopen(log_path, "a");
+  if (logf) {
+    time_t now = time(NULL);
+    struct tm *lt = localtime(&now);
+    fprintf(logf, "\n========================================\n");
+    fprintf(logf, "Run: %04d-%02d-%02d %02d:%02d:%02d\n", lt->tm_year + 1900,
+            lt->tm_mon + 1, lt->tm_mday, lt->tm_hour, lt->tm_min, lt->tm_sec);
+    fprintf(logf, "========================================\n");
+    fprintf(logf, "Organelle (word-level): %s\n", name);
+    fprintf(logf, "Corpus: %zu docs | %zu chars (%.1f KB)\n",
+            org->docs.num_docs, total_chars, (double)total_chars / 1024.0);
+    fprintf(logf, "Vocab: %zu word tokens (max_words=%zu)\n",
+            org->word_vocab.vocab_size, max_words);
+    fprintf(logf,
+            "Architecture: N_EMBD=%d N_LAYER=%d N_HEAD=%d BLOCK_SIZE=%d "
+            "MLP_DIM=%d\n",
+            cfg->n_embd, cfg->n_layer, cfg->n_head, cfg->block_size,
+            cfg->mlp_dim);
+    fprintf(logf, "Params: %zu\n", nparams);
+    fprintf(logf, "Training: steps=%d lr=%.4f\n", num_steps,
+            (double)cfg->learning_rate);
+    fprintf(logf, "\n--- Training ---\n");
+    fflush(logf);
+  }
+
+  /* Allocate token buffer and gradient buffer */
+  size_t *token_buf =
+      (size_t *)malloc(((size_t)cfg->block_size + 2) * sizeof(size_t));
+  scalar_t *grads = (scalar_t *)calloc(nparams, sizeof(scalar_t));
+
+  /* Allocate KV cache for training */
+  scalar_t **keys = (scalar_t **)malloc((size_t)nl * sizeof(scalar_t *));
+  scalar_t **values = (scalar_t **)malloc((size_t)nl * sizeof(scalar_t *));
+  size_t *cache_len = (size_t *)calloc((size_t)nl, sizeof(size_t));
+  for (int l = 0; l < nl; l++) {
+    keys[l] = kv_cache_alloc(cfg);
+    values[l] = kv_cache_alloc(cfg);
+  }
+
+  shuffle_docs(&org->docs);
+
+  time_t t0 = time(NULL);
+  scalar_t best_loss = 1e9;
+  unsigned int rng_seed = 42;
+
+  for (int step = 0; step < num_steps; step++) {
+    memset(grads, 0, nparams * sizeof(scalar_t));
+    scalar_t step_loss = 0;
+    size_t step_positions = 0;
+
+    /* Process batch_size documents per step */
+    int docs_this_step = cfg->batch_size;
+    if (docs_this_step < 1)
+      docs_this_step = 1;
+
+    for (int b = 0; b < docs_this_step; b++) {
+      /* Reset KV cache for each document */
+      for (int l = 0; l < nl; l++)
+        cache_len[l] = 0;
+
+      /* Pick a random document */
+      size_t di = (size_t)rand_r(&rng_seed) % org->docs.num_docs;
+      const char *doc = org->docs.lines[di];
+      size_t doc_len = org->docs.doc_lens[di];
+
+      /* Tokenize at word level: [BOS] word1 word2 ... */
+      token_buf[0] = org->word_vocab.bos_id;
+      size_t n_tok = tokenize_words(doc, doc_len, &org->word_vocab,
+                                    token_buf + 1, (size_t)cfg->block_size) +
+                     1;
+
+      size_t n = n_tok - 1;
+      if (n > (size_t)cfg->block_size)
+        n = (size_t)cfg->block_size;
+      if (n == 0)
+        continue;
+
+      step_positions += n;
+
+      /* Forward+backward for each position */
+      for (size_t pos = 0; pos < n; pos++) {
+        scalar_t loss =
+            forward_backward_one(model, token_buf[pos], pos, token_buf[pos + 1],
+                                 keys, values, cache_len, grads);
+        step_loss += loss;
+      }
+    }
+
+    /* Normalise gradients by total positions */
+    if (step_positions > 0) {
+      scalar_t scale = 1.0 / (scalar_t)step_positions;
+      for (size_t p = 0; p < nparams; p++)
+        grads[p] *= scale;
+    }
+
+    scalar_t mean_loss =
+        step_positions > 0 ? step_loss / (scalar_t)step_positions : 0;
+
+    clip_gradients(grads, nparams);
+    adam_step(model, grads, m_adam, v_adam, step);
+
+    /* Progress logging */
+    if ((step + 1) % 1000 == 0 || step == 0) {
+      double elapsed = difftime(time(NULL), t0);
+      if (elapsed < 1.0)
+        elapsed = 1.0;
+      double eta = (num_steps - step - 1) / ((step + 1) / elapsed);
+      printf("  [%s] step %5d/%d | loss %.4f | %.0fs elapsed, ETA %.0fs\n",
+             name, step + 1, num_steps, mean_loss, elapsed, eta);
+      fflush(stdout);
+
+      if (logf) {
+        fprintf(logf, "step %5d / %d | loss %.4f\n", step + 1, num_steps,
+                mean_loss);
+        fflush(logf);
+      }
+    }
+
+    if (mean_loss < best_loss)
+      best_loss = mean_loss;
+  }
+
+  /* ---- Phase 5: Save checkpoint and training log ---- */
+  double train_time = difftime(time(NULL), t0);
+  printf("  [%s] training complete: %.1fs | best loss: %.4f\n", name,
+         train_time, best_loss);
+
+  if (ckpt_path) {
+    checkpoint_save(model, m_adam, v_adam, num_steps, ckpt_path);
+    printf("  [%s] saved checkpoint: %s\n", name, ckpt_path);
+  }
+
+  if (logf) {
+    fprintf(logf, "\nTraining complete: %.1fs | best loss: %.4f\n", train_time,
+            best_loss);
+    if (ckpt_path)
+      fprintf(logf, "Checkpoint: %s\n", ckpt_path);
+    fprintf(logf, "========================================\n\n");
+    fclose(logf);
+    printf("  [%s] training log: %s\n", name, log_path);
+  }
+
+  /* ---- Cleanup training resources ---- */
+  for (int l = 0; l < nl; l++) {
+    kv_cache_free(keys[l]);
+    kv_cache_free(values[l]);
+  }
+  free(keys);
+  free(values);
+  free(cache_len);
+  free(token_buf);
+  free(grads);
+  free(m_adam);
+  free(v_adam);
+
+  org->model = model;
+  return org;
+}
+
+/* ── organelle_generate_words ────────────────────────────────────────────────
+ */
+/*
+ * Word-level inference.  Tokenises the prompt into word tokens, feeds them
+ * through the model, then auto-regressively samples word tokens.
+ *
+ * Output format: words are separated by spaces.  The output stops at:
+ *   - Newline token (word_vocab.newline_id)
+ *   - BOS token
+ *   - max_len characters written
+ *   - block_size reached
+ */
+void organelle_generate_words(const Organelle *org, const MicrogptConfig *cfg,
+                              const char *prompt, char *output, int max_len,
+                              scalar_t temperature) {
+  const int nl = cfg->n_layer;
+  const WordVocab *wv = &org->word_vocab;
+
+  /* Allocate KV cache */
+  scalar_t **inf_keys = (scalar_t **)malloc((size_t)nl * sizeof(scalar_t *));
+  scalar_t **inf_values = (scalar_t **)malloc((size_t)nl * sizeof(scalar_t *));
+  size_t *inf_cache_len = (size_t *)calloc((size_t)nl, sizeof(size_t));
+  for (int l = 0; l < nl; l++) {
+    inf_keys[l] = kv_cache_alloc(cfg);
+    inf_values[l] = kv_cache_alloc(cfg);
+  }
+
+  scalar_t *logits_buf =
+      (scalar_t *)malloc((size_t)cfg->max_vocab * sizeof(scalar_t));
+
+  int pos = 0;
+  int out_pos = 0;
+
+  /* Step 1: Feed BOS token */
+  size_t token = wv->bos_id;
+  forward_inference(org->model, token, pos, inf_keys, inf_values, inf_cache_len,
+                    logits_buf);
+  pos++;
+
+  /* Step 2: Tokenize prompt at word level and feed each token */
+  size_t prompt_len = strlen(prompt);
+  size_t *prompt_ids =
+      (size_t *)malloc(((size_t)cfg->block_size + 1) * sizeof(size_t));
+  size_t n_prompt = tokenize_words(prompt, prompt_len, wv, prompt_ids,
+                                   (size_t)cfg->block_size);
+
+  for (size_t i = 0; i < n_prompt && pos < cfg->block_size - 1; i++) {
+    forward_inference(org->model, prompt_ids[i], pos, inf_keys, inf_values,
+                      inf_cache_len, logits_buf);
+    pos++;
+  }
+  free(prompt_ids);
+
+  /* Step 3: Feed newline separator (signals "your turn to respond") */
+  forward_inference(org->model, wv->newline_id, pos, inf_keys, inf_values,
+                    inf_cache_len, logits_buf);
+  pos++;
+
+  /* Step 4: Auto-regressive word decoding */
+  for (int g = 0; g < max_len && pos < cfg->block_size; g++) {
+    token = sample_token(logits_buf, wv->vocab_size, temperature);
+
+    /* Stop on BOS token */
+    if (token == wv->bos_id)
+      break;
+
+    /* Stop on newline token */
+    if (token == wv->newline_id)
+      break;
+
+    /* Map token back to word string */
+    const char *word = (token < wv->vocab_size && wv->words[token])
+                           ? wv->words[token]
+                           : "<unk>";
+
+    /* Append word to output with space separator */
+    size_t wlen = strlen(word);
+    if (out_pos > 0 && out_pos < max_len) {
+      output[out_pos++] = ' ';
+    }
+    for (size_t c = 0; c < wlen && out_pos < max_len; c++) {
+      output[out_pos++] = word[c];
+    }
+
+    if (out_pos >= max_len)
+      break;
+
+    forward_inference(org->model, token, pos, inf_keys, inf_values,
+                      inf_cache_len, logits_buf);
+    pos++;
+  }
+
+  output[out_pos] = '\0';
+
+  /* Cleanup */
+  for (int l = 0; l < nl; l++) {
+    kv_cache_free(inf_keys[l]);
+    kv_cache_free(inf_values[l]);
+  }
+  free(inf_keys);
+  free(inf_values);
+  free(inf_cache_len);
+  free(logits_buf);
+}
+
+/* ── organelle_generate_words_ensemble ───────────────────────────────────────
+ */
+/*
+ * Majority-vote inference for word-level organelles.
+ * Same pattern as organelle_generate_ensemble() but uses word-level inference.
+ */
+void organelle_generate_words_ensemble(const Organelle *org,
+                                       const MicrogptConfig *cfg,
+                                       const char *prompt, char *output,
+                                       int max_len, int n_votes,
+                                       scalar_t base_temp,
+                                       scalar_t *confidence) {
+  if (n_votes < 1)
+    n_votes = 1;
+  if (n_votes > OPA_MAX_VOTES)
+    n_votes = OPA_MAX_VOTES;
+
+  if (n_votes == 1) {
+    organelle_generate_words(org, cfg, prompt, output, max_len, base_temp);
+    if (confidence)
+      *confidence = (scalar_t)1.0;
+    return;
+  }
+
+  char candidates[OPA_MAX_VOTES][128];
+  int vote_counts[OPA_MAX_VOTES];
+  int unique = 0;
+
+  for (int v = 0; v < n_votes; v++) {
+    scalar_t jitter =
+        OPA_TEMP_JITTER * ((scalar_t)v - (scalar_t)n_votes / (scalar_t)2.0);
+    scalar_t temp = base_temp + jitter;
+    if (temp < (scalar_t)0.01)
+      temp = (scalar_t)0.01;
+
+    char buf[128];
+    int gen_len = max_len < 127 ? max_len : 127;
+    organelle_generate_words(org, cfg, prompt, buf, gen_len, temp);
+
+    int found = 0;
+    for (int u = 0; u < unique; u++) {
+      if (strcmp(candidates[u], buf) == 0) {
+        vote_counts[u]++;
+        found = 1;
+        break;
+      }
+    }
+    if (!found && unique < OPA_MAX_VOTES) {
+      strncpy(candidates[unique], buf, 127);
+      candidates[unique][127] = '\0';
+      vote_counts[unique] = 1;
+      unique++;
+    }
+  }
+
+  int best_idx = 0;
+  for (int u = 1; u < unique; u++) {
+    if (vote_counts[u] > vote_counts[best_idx])
+      best_idx = u;
+  }
+
+  strncpy(output, candidates[best_idx], (size_t)max_len);
+  output[max_len] = '\0';
+
+  if (confidence)
+    *confidence = (scalar_t)vote_counts[best_idx] / (scalar_t)n_votes;
+}
 
 /*
  * The Kanban board is a lightweight state tracker used during inference

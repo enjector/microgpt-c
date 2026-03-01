@@ -1,0 +1,1133 @@
+// compute factorial of n
+function factorial(n: number): number {
+    var result = 1;
+    for (var i = 2; i <= n; i++) {
+        result = result * i;
+    }
+    return result;
+}
+
+// compute fibonacci number at position n
+function fibonacci(n: number): number {
+    var a = 0;
+    var b = 1;
+    for (var i = 0; i < n; i++) {
+        var temp = b;
+        b = a + b;
+        a = temp;
+    }
+    return a;
+}
+
+// compute absolute value
+function abs_val(x: number): number {
+    if (x < 0) {
+        return 0 - x;
+    }
+    return x;
+}
+
+// compute maximum of two numbers
+function max_of_two(a: number, b: number): number {
+    if (a > b) {
+        return a;
+    }
+    return b;
+}
+
+// compute minimum of two numbers
+function min_of_two(a: number, b: number): number {
+    if (a < b) {
+        return a;
+    }
+    return b;
+}
+
+// compute power of base raised to exponent
+function power(base: number, exp: number): number {
+    var result = 1;
+    for (var i = 0; i < exp; i++) {
+        result = result * base;
+    }
+    return result;
+}
+
+// compute greatest common divisor
+function gcd(a: number, b: number): number {
+    var x = a;
+    var y = b;
+    for (var i = 0; i < 100; i++) {
+        if (y == 0) {
+            return x;
+        }
+        var temp = y;
+        y = x - (x / y) * y;
+        x = temp;
+    }
+    return x;
+}
+
+// compute sum of numbers from 1 to n
+function sum_to_n(n: number): number {
+    var total = 0;
+    for (var i = 1; i <= n; i++) {
+        total = total + i;
+    }
+    return total;
+}
+
+// compute sum of squares from 1 to n
+function sum_of_squares(n: number): number {
+    var total = 0;
+    for (var i = 1; i <= n; i++) {
+        total = total + i * i;
+    }
+    return total;
+}
+
+// count down from n to zero
+function count_down(n: number): number {
+    var count = 0;
+    for (var i = n; i > 0; i--) {
+        count = count + 1;
+    }
+    return count;
+}
+
+// compute simple interest
+function simple_interest(principal: number, rate: number, time: number): number {
+    return principal * rate * time;
+}
+
+// calculate compound amount
+function compound(principal: number, rate: number, periods: number): number {
+    var amount = principal;
+    for (var i = 0; i < periods; i++) {
+        amount = amount * (1 + rate);
+    }
+    return amount;
+}
+
+// check if number is even
+function is_even(n: number): boolean {
+    var half = n / 2;
+    if (half * 2 == n) {
+        return true;
+    }
+    return false;
+}
+
+// check if number is positive
+function is_positive(x: number): boolean {
+    if (x > 0) {
+        return true;
+    }
+    return false;
+}
+
+// check if number is negative
+function is_negative(x: number): boolean {
+    if (x < 0) {
+        return true;
+    }
+    return false;
+}
+
+// clamp value to range
+function clamp(x: number, lo: number, hi: number): number {
+    if (x < lo) {
+        return lo;
+    }
+    if (x > hi) {
+        return hi;
+    }
+    return x;
+}
+
+// compute sign of number
+function sign(x: number): number {
+    if (x > 0) {
+        return 1;
+    }
+    if (x < 0) {
+        return 0 - 1;
+    }
+    return 0;
+}
+
+// compute average of two numbers
+function average_two(a: number, b: number): number {
+    return (a + b) / 2;
+}
+
+// compute difference between two numbers
+function difference(a: number, b: number): number {
+    var d = a - b;
+    if (d < 0) {
+        return 0 - d;
+    }
+    return d;
+}
+
+// multiply two numbers
+function multiply(a: number, b: number): number {
+    return a * b;
+}
+
+// divide two numbers safely
+function safe_divide(a: number, b: number): number {
+    if (b == 0) {
+        return 0;
+    }
+    return a / b;
+}
+
+// compute remainder after division
+function modulo(a: number, b: number): number {
+    var quotient = a / b;
+    return a - quotient * b;
+}
+
+// compute percentage
+function percentage(value: number, total: number): number {
+    if (total == 0) {
+        return 0;
+    }
+    return (value / total) * 100;
+}
+
+// convert celsius to fahrenheit
+function celsius_to_fahrenheit(c: number): number {
+    return c * 9 / 5 + 32;
+}
+
+// convert fahrenheit to celsius
+function fahrenheit_to_celsius(f: number): number {
+    return (f - 32) * 5 / 9;
+}
+
+// compute area of rectangle
+function rectangle_area(width: number, height: number): number {
+    return width * height;
+}
+
+// compute perimeter of rectangle
+function rectangle_perimeter(width: number, height: number): number {
+    return 2 * (width + height);
+}
+
+// compute area of triangle
+function triangle_area(base: number, height: number): number {
+    return base * height / 2;
+}
+
+// compute hypotenuse using pythagorean theorem
+function hypotenuse(a: number, b: number): number {
+    return a * a + b * b;
+}
+
+// accumulate running total
+function running_total(n: number): number {
+    var total = 0;
+    for (var i = 1; i <= n; i++) {
+        total = total + i;
+    }
+    return total;
+}
+
+// compute product of numbers from 1 to n
+function product_to_n(n: number): number {
+    var result = 1;
+    for (var i = 1; i <= n; i++) {
+        result = result * i;
+    }
+    return result;
+}
+
+// count multiples of k up to n
+function count_multiples(n: number, k: number): number {
+    var count = 0;
+    for (var i = k; i <= n; i = i + k) {
+        count = count + 1;
+    }
+    return count;
+}
+
+// sum of even numbers up to n
+function sum_even(n: number): number {
+    var total = 0;
+    for (var i = 2; i <= n; i = i + 2) {
+        total = total + i;
+    }
+    return total;
+}
+
+// sum of odd numbers up to n
+function sum_odd(n: number): number {
+    var total = 0;
+    for (var i = 1; i <= n; i = i + 2) {
+        total = total + i;
+    }
+    return total;
+}
+
+// compute nth triangular number
+function triangular(n: number): number {
+    return n * (n + 1) / 2;
+}
+
+// compute nth square number
+function square_number(n: number): number {
+    return n * n;
+}
+
+// compute nth cube number
+function cube_number(n: number): number {
+    return n * n * n;
+}
+
+// double a value
+function double_val(x: number): number {
+    return x * 2;
+}
+
+// triple a value
+function triple_val(x: number): number {
+    return x * 3;
+}
+
+// half a value
+function half_val(x: number): number {
+    return x / 2;
+}
+
+// negate a value
+function negate(x: number): number {
+    return 0 - x;
+}
+
+// compute reciprocal
+function reciprocal(x: number): number {
+    if (x == 0) {
+        return 0;
+    }
+    return 1 / x;
+}
+
+// increment by one
+function increment(x: number): number {
+    return x + 1;
+}
+
+// decrement by one
+function decrement(x: number): number {
+    return x - 1;
+}
+
+// compute distance between two points
+function distance_1d(a: number, b: number): number {
+    var d = a - b;
+    if (d < 0) {
+        d = 0 - d;
+    }
+    return d;
+}
+
+// compute midpoint of two values
+function midpoint(a: number, b: number): number {
+    return (a + b) / 2;
+}
+
+// linear interpolation between two values
+function lerp(a: number, b: number, t: number): number {
+    return a + t * (b - a);
+}
+
+// compute weighted average of two values
+function weighted_avg(a: number, b: number, wa: number, wb: number): number {
+    return (a * wa + b * wb) / (wa + wb);
+}
+
+// count iterations until value exceeds threshold
+function count_until_exceeds(start: number, step: number, threshold: number): number {
+    var count = 0;
+    var value = start;
+    for (var i = 0; i < 1000; i++) {
+        if (value > threshold) {
+            return count;
+        }
+        value = value + step;
+        count = count + 1;
+    }
+    return count;
+}
+
+// compute geometric series sum
+function geometric_sum(first: number, ratio: number, terms: number): number {
+    var total = 0;
+    var term = first;
+    for (var i = 0; i < terms; i++) {
+        total = total + term;
+        term = term * ratio;
+    }
+    return total;
+}
+
+// compute arithmetic series sum
+function arithmetic_sum(first: number, diff: number, terms: number): number {
+    var total = 0;
+    for (var i = 0; i < terms; i++) {
+        total = total + first + i * diff;
+    }
+    return total;
+}
+
+// compute harmonic number
+function harmonic(n: number): number {
+    var sum = 0;
+    for (var i = 1; i <= n; i++) {
+        sum = sum + 1 / i;
+    }
+    return sum;
+}
+
+// compute discount factor
+function discount_factor(rate: number, periods: number): number {
+    var factor = 1;
+    for (var i = 0; i < periods; i++) {
+        factor = factor / (1 + rate);
+    }
+    return factor;
+}
+
+// compute present value
+function present_value(future: number, rate: number, periods: number): number {
+    var pv = future;
+    for (var i = 0; i < periods; i++) {
+        pv = pv / (1 + rate);
+    }
+    return pv;
+}
+
+// compute future value
+function future_value(present: number, rate: number, periods: number): number {
+    var fv = present;
+    for (var i = 0; i < periods; i++) {
+        fv = fv * (1 + rate);
+    }
+    return fv;
+}
+
+// compute annuity payment
+function annuity_payment(principal: number, rate: number, periods: number): number {
+    var factor = 1;
+    for (var i = 0; i < periods; i++) {
+        factor = factor * (1 + rate);
+    }
+    return principal * rate * factor / (factor - 1);
+}
+
+// compute total interest paid
+function total_interest(principal: number, rate: number, periods: number): number {
+    var total_paid = 0;
+    var balance = principal;
+    var payment = principal * rate * 2 / (2 - 1);
+    for (var i = 0; i < periods; i++) {
+        var interest = balance * rate;
+        balance = balance - (payment - interest);
+        total_paid = total_paid + interest;
+    }
+    return total_paid;
+}
+
+// compute profit margin
+function profit_margin(revenue: number, cost: number): number {
+    if (revenue == 0) {
+        return 0;
+    }
+    return (revenue - cost) / revenue * 100;
+}
+
+// compute return on investment
+function roi(gain: number, cost: number): number {
+    if (cost == 0) {
+        return 0;
+    }
+    return (gain - cost) / cost * 100;
+}
+
+// compute break even point
+function break_even(fixed_cost: number, price: number, variable_cost: number): number {
+    if (price <= variable_cost) {
+        return 0;
+    }
+    return fixed_cost / (price - variable_cost);
+}
+
+// check if value is in range
+function in_range(x: number, lo: number, hi: number): boolean {
+    if (x >= lo && x <= hi) {
+        return true;
+    }
+    return false;
+}
+
+// check if two values are approximately equal
+function approx_equal(a: number, b: number, tolerance: number): boolean {
+    var d = a - b;
+    if (d < 0) {
+        d = 0 - d;
+    }
+    if (d < tolerance) {
+        return true;
+    }
+    return false;
+}
+
+// compute step function
+function step(x: number, threshold: number): number {
+    if (x >= threshold) {
+        return 1;
+    }
+    return 0;
+}
+
+// compute ramp function
+function ramp(x: number): number {
+    if (x > 0) {
+        return x;
+    }
+    return 0;
+}
+
+// classify value as low medium or high
+function classify(x: number, low_thresh: number, high_thresh: number): number {
+    if (x < low_thresh) {
+        return 0;
+    }
+    if (x > high_thresh) {
+        return 2;
+    }
+    return 1;
+}
+
+// apply tax rate to income
+function apply_tax(income: number, rate: number): number {
+    return income * (1 - rate);
+}
+
+// compute tax amount
+function tax_amount(income: number, rate: number): number {
+    return income * rate;
+}
+
+// compute tip amount
+function tip(bill: number, percent: number): number {
+    return bill * percent / 100;
+}
+
+// compute total with tip
+function total_with_tip(bill: number, percent: number): number {
+    return bill + bill * percent / 100;
+}
+
+// split bill among people
+function split_bill(total: number, people: number): number {
+    if (people == 0) {
+        return 0;
+    }
+    return total / people;
+}
+
+// compute body mass index
+function bmi(weight: number, height: number): number {
+    if (height == 0) {
+        return 0;
+    }
+    return weight / (height * height);
+}
+
+// convert kilometers to miles
+function km_to_miles(km: number): number {
+    return km * 0.621371;
+}
+
+// convert miles to kilometers
+function miles_to_km(miles: number): number {
+    return miles * 1.60934;
+}
+
+// convert hours to minutes
+function hours_to_minutes(hours: number): number {
+    return hours * 60;
+}
+
+// convert minutes to seconds
+function minutes_to_seconds(minutes: number): number {
+    return minutes * 60;
+}
+
+// compute speed from distance and time
+function speed(distance: number, time: number): number {
+    if (time == 0) {
+        return 0;
+    }
+    return distance / time;
+}
+
+// compute distance from speed and time
+function calc_distance(speed: number, time: number): number {
+    return speed * time;
+}
+
+// compute time from distance and speed
+function calc_time(distance: number, speed: number): number {
+    if (speed == 0) {
+        return 0;
+    }
+    return distance / speed;
+}
+
+// compute kinetic energy
+function kinetic_energy(mass: number, velocity: number): number {
+    return 0.5 * mass * velocity * velocity;
+}
+
+// compute gravitational potential energy
+function potential_energy(mass: number, height: number): number {
+    return mass * 9.81 * height;
+}
+
+// compute momentum
+function momentum(mass: number, velocity: number): number {
+    return mass * velocity;
+}
+
+// compute force from mass and acceleration
+function force(mass: number, acceleration: number): number {
+    return mass * acceleration;
+}
+
+// compute work done
+function work(force: number, distance: number): number {
+    return force * distance;
+}
+
+// compute power from work and time
+function calc_power(work: number, time: number): number {
+    if (time == 0) {
+        return 0;
+    }
+    return work / time;
+}
+
+// compute density
+function density(mass: number, volume: number): number {
+    if (volume == 0) {
+        return 0;
+    }
+    return mass / volume;
+}
+
+// compute pressure
+function pressure(force: number, area: number): number {
+    if (area == 0) {
+        return 0;
+    }
+    return force / area;
+}
+
+// compute circle area from radius
+function circle_area(radius: number): number {
+    return 3.14159 * radius * radius;
+}
+
+// compute circle circumference
+function circumference(radius: number): number {
+    return 2 * 3.14159 * radius;
+}
+
+// compute sphere volume
+function sphere_volume(radius: number): number {
+    return 4 / 3 * 3.14159 * radius * radius * radius;
+}
+
+// compute cylinder volume
+function cylinder_volume(radius: number, height: number): number {
+    return 3.14159 * radius * radius * height;
+}
+
+// compute cone volume
+function cone_volume(radius: number, height: number): number {
+    return 3.14159 * radius * radius * height / 3;
+}
+
+// sum two results
+function sum_results(a: number, b: number): number {
+    var x = double_val(a);
+    var y = triple_val(b);
+    return x + y;
+}
+
+// compute compound interest amount
+function compound_interest(principal: number, rate: number, years: number): number {
+    var amount = compound(principal, rate, years);
+    return amount - principal;
+}
+
+// compute distance and midpoint
+function analyze_two_points(a: number, b: number): number {
+    var dist = distance_1d(a, b);
+    var mid = midpoint(a, b);
+    return dist + mid;
+}
+
+// compute clamped average
+function clamped_average(a: number, b: number, lo: number, hi: number): number {
+    var avg = average_two(a, b);
+    return clamp(avg, lo, hi);
+}
+
+// compute absolute difference
+function abs_difference(a: number, b: number): number {
+    var d = a - b;
+    return abs_val(d);
+}
+
+// compute tax after discount
+function discounted_tax(price: number, discount: number, tax_rate: number): number {
+    var discounted = price * (1 - discount);
+    return tax_amount(discounted, tax_rate);
+}
+
+// compute total cost with tax
+function total_with_tax(price: number, tax_rate: number): number {
+    var tax = tax_amount(price, tax_rate);
+    return price + tax;
+}
+
+// compute net pay after tax
+function net_pay(gross: number, tax_rate: number): number {
+    return apply_tax(gross, tax_rate);
+}
+
+// compute savings after expenses
+function savings(income: number, expenses: number): number {
+    var net = income - expenses;
+    if (net < 0) {
+        return 0;
+    }
+    return net;
+}
+
+// compute savings rate
+function savings_rate(income: number, expenses: number): number {
+    if (income == 0) {
+        return 0;
+    }
+    var saved = income - expenses;
+    return percentage(saved, income);
+}
+
+// accumulate with growth
+function accumulate_growth(start: number, growth: number, periods: number): number {
+    var value = start;
+    for (var i = 0; i < periods; i++) {
+        value = value + value * growth;
+    }
+    return value;
+}
+
+// compute exponential decay
+function decay(start: number, rate: number, periods: number): number {
+    var value = start;
+    for (var i = 0; i < periods; i++) {
+        value = value * (1 - rate);
+    }
+    return value;
+}
+
+// compute successive halvings
+function halving(start: number, steps: number): number {
+    var value = start;
+    for (var i = 0; i < steps; i++) {
+        value = value / 2;
+    }
+    return value;
+}
+
+// compute successive doublings
+function doubling(start: number, steps: number): number {
+    var value = start;
+    for (var i = 0; i < steps; i++) {
+        value = value * 2;
+    }
+    return value;
+}
+
+// count up by step
+function count_by_step(start: number, step: number, limit: number): number {
+    var count = 0;
+    var value = start;
+    for (var i = 0; i < 10000; i++) {
+        if (value >= limit) {
+            return count;
+        }
+        value = value + step;
+        count = count + 1;
+    }
+    return count;
+}
+
+// compute collatz sequence length
+function collatz_length(n: number): number {
+    var steps = 0;
+    var value = n;
+    for (var i = 0; i < 1000; i++) {
+        if (value <= 1) {
+            return steps;
+        }
+        var half = value / 2;
+        if (half * 2 == value) {
+            value = half;
+        } else {
+            value = 3 * value + 1;
+        }
+        steps = steps + 1;
+    }
+    return steps;
+}
+
+// compute digital root
+function digital_root(n: number): number {
+    var value = n;
+    for (var i = 0; i < 100; i++) {
+        if (value < 10) {
+            return value;
+        }
+        var sum = 0;
+        var temp = value;
+        for (var j = 0; j < 20; j++) {
+            if (temp <= 0) {
+                break;
+            }
+            var digit = temp - (temp / 10) * 10;
+            sum = sum + digit;
+            temp = temp / 10;
+        }
+        value = sum;
+    }
+    return value;
+}
+
+// sum digits of number
+function sum_digits(n: number): number {
+    var sum = 0;
+    var value = n;
+    for (var i = 0; i < 20; i++) {
+        if (value <= 0) {
+            return sum;
+        }
+        var digit = value - (value / 10) * 10;
+        sum = sum + digit;
+        value = value / 10;
+    }
+    return sum;
+}
+
+// count digits of number
+function count_digits(n: number): number {
+    var count = 0;
+    var value = n;
+    if (value == 0) {
+        return 1;
+    }
+    for (var i = 0; i < 20; i++) {
+        if (value <= 0) {
+            return count;
+        }
+        value = value / 10;
+        count = count + 1;
+    }
+    return count;
+}
+
+// compute binomial coefficient n choose k
+function binomial(n: number, k: number): number {
+    var result = 1;
+    for (var i = 0; i < k; i++) {
+        result = result * (n - i);
+        result = result / (i + 1);
+    }
+    return result;
+}
+
+// compute catalan number
+function catalan(n: number): number {
+    var b = binomial(2 * n, n);
+    return b / (n + 1);
+}
+
+// check if value exceeds limit
+function exceeds(value: number, limit: number): boolean {
+    if (value > limit) {
+        return true;
+    }
+    return false;
+}
+
+// compute bounded increment
+function bounded_increment(value: number, max: number): number {
+    var next = value + 1;
+    if (next > max) {
+        return max;
+    }
+    return next;
+}
+
+// compute bounded decrement
+function bounded_decrement(value: number, min: number): number {
+    var next = value - 1;
+    if (next < min) {
+        return min;
+    }
+    return next;
+}
+
+// wrap value around range
+function wrap(value: number, min: number, max: number): number {
+    var range = max - min;
+    if (range <= 0) {
+        return min;
+    }
+    var v = value - min;
+    for (var i = 0; i < 100; i++) {
+        if (v >= 0 && v < range) {
+            return min + v;
+        }
+        if (v < 0) {
+            v = v + range;
+        } else {
+            v = v - range;
+        }
+    }
+    return min + v;
+}
+
+// compute moving sum over window
+function moving_sum(values: number, window: number): number {
+    var sum = 0;
+    for (var i = 0; i < window; i++) {
+        sum = sum + values;
+    }
+    return sum;
+}
+
+// compute running average
+function running_average(total: number, count: number): number {
+    if (count == 0) {
+        return 0;
+    }
+    return total / count;
+}
+
+// compute exponential moving average step
+function ema_step(prev: number, current: number, alpha: number): number {
+    return alpha * current + (1 - alpha) * prev;
+}
+
+// apply smoothing factor
+function smooth(prev: number, current: number, factor: number): number {
+    return prev + factor * (current - prev);
+}
+
+// compute weighted sum of three values
+function weighted_sum3(a: number, b: number, c: number, wa: number, wb: number, wc: number): number {
+    return a * wa + b * wb + c * wc;
+}
+
+// normalize value to zero one range
+function normalize(value: number, min: number, max: number): number {
+    if (max == min) {
+        return 0;
+    }
+    return (value - min) / (max - min);
+}
+
+// denormalize from zero one range
+function denormalize(value: number, min: number, max: number): number {
+    return min + value * (max - min);
+}
+
+// map value from one range to another
+function map_range(value: number, in_min: number, in_max: number, out_min: number, out_max: number): number {
+    var normalized = normalize(value, in_min, in_max);
+    return denormalize(normalized, out_min, out_max);
+}
+
+// compute sigmoid activation
+function sigmoid(x: number): number {
+    if (x > 20) {
+        return 1;
+    }
+    if (x < 0 - 20) {
+        return 0;
+    }
+    return 1 / (1 + 1 / power(2.71828, x));
+}
+
+// compute relu activation
+function relu(x: number): number {
+    if (x > 0) {
+        return x;
+    }
+    return 0;
+}
+
+// compute leaky relu activation
+function leaky_relu(x: number, alpha: number): number {
+    if (x > 0) {
+        return x;
+    }
+    return alpha * x;
+}
+
+// compute binary cross entropy loss
+function binary_loss(predicted: number, actual: number): number {
+    var p = clamp(predicted, 0.0001, 0.9999);
+    if (actual == 1) {
+        return 0 - 1 / p;
+    }
+    return 0 - 1 / (1 - p);
+}
+
+// compute mean squared error
+function mse(predicted: number, actual: number): number {
+    var d = predicted - actual;
+    return d * d;
+}
+
+// compute mean absolute error
+function mae(predicted: number, actual: number): number {
+    var d = predicted - actual;
+    return abs_val(d);
+}
+
+// compute huber loss
+function huber_loss(predicted: number, actual: number, delta: number): number {
+    var d = abs_val(predicted - actual);
+    if (d <= delta) {
+        return 0.5 * d * d;
+    }
+    return delta * (d - 0.5 * delta);
+}
+
+// gradient descent step
+function gradient_step(weight: number, gradient: number, lr: number): number {
+    return weight - lr * gradient;
+}
+
+// compute momentum update
+function momentum_update(velocity: number, gradient: number, momentum: number, lr: number): number {
+    var new_velocity = momentum * velocity + lr * gradient;
+    return new_velocity;
+}
+
+// compute learning rate decay
+function lr_decay(initial_lr: number, decay_rate: number, epoch: number): number {
+    return initial_lr / (1 + decay_rate * epoch);
+}
+
+// compute accuracy from correct and total counts
+function accuracy(correct: number, total: number): number {
+    if (total == 0) {
+        return 0;
+    }
+    return correct / total * 100;
+}
+
+// compute f1 score from precision and recall
+function f1_score(precision: number, recall: number): number {
+    if (precision + recall == 0) {
+        return 0;
+    }
+    return 2 * precision * recall / (precision + recall);
+}
+
+// compute precision
+function calc_precision(true_pos: number, false_pos: number): number {
+    var total = true_pos + false_pos;
+    if (total == 0) {
+        return 0;
+    }
+    return true_pos / total;
+}
+
+// compute recall
+function calc_recall(true_pos: number, false_neg: number): number {
+    var total = true_pos + false_neg;
+    if (total == 0) {
+        return 0;
+    }
+    return true_pos / total;
+}
+
+// compute fibonacci and factorial product
+function fib_fact_product(n: number): number {
+    var fib = fibonacci(n);
+    var fact = factorial(n);
+    return fib * fact;
+}
+
+// compute double factorial
+function double_factorial(n: number): number {
+    var result = 1;
+    var start = n;
+    for (var i = start; i > 0; i = i - 2) {
+        result = result * i;
+    }
+    return result;
+}
+
+// compute rising factorial
+function rising_factorial(x: number, n: number): number {
+    var result = 1;
+    for (var i = 0; i < n; i++) {
+        result = result * (x + i);
+    }
+    return result;
+}
+
+// compute falling factorial
+function falling_factorial(x: number, n: number): number {
+    var result = 1;
+    for (var i = 0; i < n; i++) {
+        result = result * (x - i);
+    }
+    return result;
+}
+
+// compute compound then discount
+function net_present_value(cashflow: number, rate: number, years: number): number {
+    var fv = future_value(cashflow, rate, years);
+    var pv = present_value(fv, rate, years);
+    return pv;
+}
+
+// compute clamped sigmoid
+function clamped_sigmoid(x: number, lo: number, hi: number): number {
+    var s = sigmoid(x);
+    return clamp(s, lo, hi);
+}
+
+// compute relu then scale
+function scaled_relu(x: number, scale: number): number {
+    var r = relu(x);
+    return r * scale;
+}
+
+// compute gcd then multiply
+function gcd_product(a: number, b: number): number {
+    var g = gcd(a, b);
+    return g * a * b;
+}

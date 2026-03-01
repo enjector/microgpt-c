@@ -48,9 +48,9 @@ Thank you for your interest in MicroGPT-C! We welcome contributions from everyon
 
 ## Adding a New Organelle Experiment
 
-1. Create a directory under `experiments/organelles/your_experiment/`
+1. Create a directory under `demos/character-level/your_experiment/`
 2. Include a `main.c` with the training and inference loop
-3. Add a `README.md` using the [Spear framework](docs/organelles/) (Point, Picture, Proof, Push)
+3. Add a `README.md` using the [Spear framework](docs/research/) (Point, Picture, Proof, Push)
 4. Register the target in `CMakeLists.txt` using the `add_demo()` macro
 5. Document results — we value honest reporting, including failures
 

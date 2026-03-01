@@ -53,7 +53,7 @@
 #include <string.h>
 #include <time.h>
 
-#define TRAINING_LOG "names.ckpt.log"
+#define TRAINING_LOG "c_names.ckpt.log"
 
 /* ---------- Main ------------------------------------------------------- */
 
@@ -72,7 +72,7 @@ int main(void) {
 
   /* ---- Phase 1: Load and prepare data ---- */
   Docs docs = {0};
-  const char *path = "names.txt";
+  const char *path = "c_names.txt";
   if (load_docs(path, &docs, cfg.max_docs) != 0) {
     fprintf(stderr, "Cannot open names.txt\n");
     return 1;

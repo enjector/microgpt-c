@@ -7,7 +7,7 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 echo [*] Building project...
-cmake --build build --config Release
+cmake --build build --config Release --parallel 8
 if %ERRORLEVEL% NEQ 0 (
     echo [!] Build failed.
     exit /b %ERRORLEVEL%

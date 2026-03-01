@@ -94,7 +94,7 @@ MicroGPT-C's **organelle architecture** takes this further. Instead of one large
 
 **Total: 60K–480K parameters per pipeline. Right-sized by corpus complexity. Zero invalid moves.**
 
-**Why this outperforms a monolith of the same total budget:** Research in [Neural Algorithmic Reasoning](docs/organelles/ORGANELLE_REASONING.md) shows that LLMs spend significant capacity approximating deterministic algorithms — state tracking, cycle detection, validity checking — as fuzzy weight patterns. OPA externalises these to deterministic C (`OpaKanban`, `OpaCycleDetector`, `Judge`), freeing every model parameter to focus on pattern matching. The ~340-line coordination library handles what gradient descent handles poorly; each organelle handles what gradient descent handles well.
+**Why this outperforms a monolith of the same total budget:** Research in [Neural Algorithmic Reasoning](docs/research/RESEARCH_ORGANELLE_REASONING.md) shows that LLMs spend significant capacity approximating deterministic algorithms — state tracking, cycle detection, validity checking — as fuzzy weight patterns. OPA externalises these to deterministic C (`OpaKanban`, `OpaCycleDetector`, `Judge`), freeing every model parameter to focus on pattern matching. The ~340-line coordination library handles what gradient descent handles poorly; each organelle handles what gradient descent handles well.
 
 This is proven in sixteen experiments:
 - **C Code Composition** — **83% exact match** on function plans, 98% parse rate (1.2M params with LR scheduling)
@@ -103,8 +103,8 @@ This is proven in sixteen experiments:
 - **Connect-4** — **88% win rate** with 2 organelles, zero invalid moves
 - **C Code Generation** — byte-perfect function recall
 - **C Wiring Generation** — multi-function composition
-- **8 additional games** — Pentago (**91% win**, 92K), Mastermind (**79% solve**, 92K), Sudoku (**78%**, 160K), Othello (**70% win**, 92K), Klotski (**62%**, 30K), Red Donkey (**19%**, 30K), Lights Out (**10%**, 160K), Hex (**27%**, 92K) — right-sized parameters per game
-- **Market regime detection** — **57% accuracy on unseen data** (2.8× baseline) with 3-organelle pipeline (615K params) — real-world cross-asset financial data
+- **8 additional games** — Pentago (**91% win**, 92K), Mastermind (**79% solve**, 92K), Sudoku (**78%**, 160K), Othello (**67% win**, 92K), Klotski (**62%**, 30K), Red Donkey (**19%**, 30K), Lights Out (**10%**, 160K), Hex (**27%**, 92K) — right-sized parameters per game
+- **Continuous-domain exploration** — explored applying OPA to financial time-series, discovering the "Discretisation Wall" — the text wire format's 31-character vocabulary destroys continuous gradients needed for temporal prediction. This insight defines the boundary between game/classification tasks (where OPA excels) and continuous signal processing (which requires architectural extensions).
 - **Lottery prediction** — negative control proving OPA cannot learn from random data (entropy floor ~0.50)
 
 ---
@@ -134,10 +134,10 @@ MicroGPT-C makes AI accessible to anyone with a C compiler.
 - **For edge:** Deploy intelligent agents on hardware that can't run Python
 - **For education:** Train a GPT from scratch in under a minute
 
-The organelle architecture shows that **small, specialised models composed into pipelines can solve problems that individual models cannot** — at a fraction of the parameter cost. From game-playing to market regime detection, the evidence spans 16 experiments across 11 game domains, 3 code generation tasks, and 2 real-world data experiments.
+The organelle architecture shows that **small, specialised models composed into pipelines can solve problems that individual models cannot** — at a fraction of the parameter cost. From game-playing to honest negative results on market prediction, the evidence spans 16 experiments across 11 game domains, 3 code generation tasks, and 2 real-world data experiments.
 
 This is not a toy. It's an early-stage research platform with real results across 16 experiments.
 
 ---
 
-*See [VISION.md](VISION.md) for the full stem cell philosophy, or dive into `experiments/organelles/` for the evidence.*
+*See [VISION.md](VISION.md) for the full stem cell philosophy, or dive into `demos/character-level/` for the evidence.*

@@ -14,9 +14,9 @@
 
 **Picture:** A stem cell doesn't know what it will become until it encounters its environment. Hand it muscle tissue signals and it becomes muscle. Hand MicroGPT-C a shipping address corpus and it becomes an address validator. Same engine, infinite specialisations.
 
-**Proof:** Sixteen working experiments — name generation (trains in < 1s), Shakespeare text (840K params, zero `<unk>`), C code retrieval (byte-perfect on 2,081 functions), C code composition (**83% exact match**, 1.2M params with LR scheduling), 8-puzzle solving (**90% via 5-organelle pipeline, 460K params**), Tic-Tac-Toe (**87% win+draw**), Connect-4 (**88% win rate**), 8 game extensions, plus **market regime detection** (**57% on unseen data**, 2.8× baseline) and a **lottery control** (entropy floor ~0.50, proving OPA distinguishes learnable from random data). All game experiments share a [generic organelle library](src/microgpt_organelle.h) with ensemble voting + valid-move pre-filtering achieving **zero invalid moves**.
+**Proof:** Sixteen working experiments — name generation (trains in < 1s), Shakespeare text (840K params, zero `<unk>`), C code retrieval (byte-perfect on 2,081 functions), C code composition (**83% exact match**, 1.2M params with LR scheduling), 8-puzzle solving (**90% via 5-organelle pipeline, 460K params**), Tic-Tac-Toe (**87% win+draw**), Connect-4 (**88% win rate**), 8 game extensions, plus **market regime detection** (**60% on unseen data**, 3.0× baseline) and a **lottery control** (entropy floor ~0.50, proving OPA distinguishes learnable from random data). All game experiments share a [generic organelle library](src/microgpt_organelle.h) with ensemble voting + valid-move pre-filtering achieving **zero invalid moves**.
 
-**Push:** Read [VALUE_PROPOSITION.md](VALUE_PROPOSITION.md) for the business case, or jump straight to `experiments/organelles/` to see the experimental evidence.
+**Push:** Read [VALUE_PROPOSITION.md](VALUE_PROPOSITION.md) for the business case, or jump straight to `demos/character-level/` to see the experimental evidence.
 
 ---
 
@@ -36,9 +36,9 @@ In biology, a stem cell is a blank slate with the potential to become any specia
 * **Differentiation:** Given a small, specific corpus (e.g., 500 examples of valid shipping addresses), the block "specializes" through on-device training.
 * **Maturity:** The result is a high-confidence, low-power micro-model that performs one task—and only one task—with focused precision.
 
-**Why not make one big model instead?** Research in [Neural Algorithmic Reasoning (NAR)](docs/organelles/ORGANELLE_REASONING.md) shows that large monolithic models spend enormous parameter budgets approximating algorithms that can be expressed in 30–80 lines of deterministic code: state tracking, cycle detection, validity checking, and search. The OPA architecture externalises these as deterministic C (`OpaKanban`, `OpaCycleDetector`, `apply_move()`), freeing every model parameter to focus on the fuzzy pattern-matching task it was actually trained for. Same total computational budget — dramatically better allocation.
+**Why not make one big model instead?** Research in [Neural Algorithmic Reasoning (NAR)](docs/research/RESEARCH_ORGANELLE_REASONING.md) shows that large monolithic models spend enormous parameter budgets approximating algorithms that can be expressed in 30–80 lines of deterministic code: state tracking, cycle detection, validity checking, and search. The OPA architecture externalises these as deterministic C (`OpaKanban`, `OpaCycleDetector`, `apply_move()`), freeing every model parameter to focus on the fuzzy pattern-matching task it was actually trained for. Same total computational budget — dramatically better allocation.
 
-![The Biological Blueprint for Tiny AI — stem cell differentiation, the Planner-Worker-Judge triad, and the coordination funnel](docs/organelles/OPA_Biology_Analogy.jpg)
+![The Biological Blueprint for Tiny AI — stem cell differentiation, the Planner-Worker-Judge triad, and the coordination funnel](docs/research/OPA_Biology_Analogy.jpg)
 
 ---
 

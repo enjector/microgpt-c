@@ -330,6 +330,17 @@ typedef struct {
 #define INIT_STD 0.08
 #endif
 
+/* ---- Regularisation (opt-in: set > 0 via -D flag to enable) ---- */
+#ifndef WEIGHT_DECAY
+#define WEIGHT_DECAY 0.0 /* Decoupled weight decay (AdamW); 0 = off */
+#endif
+#ifndef GRAD_CLIP
+#define GRAD_CLIP 0.0 /* Max global gradient norm; 0 = no clipping */
+#endif
+#ifndef LABEL_SMOOTH
+#define LABEL_SMOOTH 0.0 /* Label smoothing coefficient; 0 = off */
+#endif
+
 /*
  * microgpt_default_config - Return a config populated with sensible defaults.
  *   These match the compile-time constants above.
@@ -555,6 +566,23 @@ size_t model_num_params(const Model *model);
 void model_transfer_weights(const Model *src, Model *dst,
                             const MicrogptConfig *cfg);
 
+/*
+ * model_soup_average - Element-wise average the weights of N source models
+ *   into a destination model (Model Soup / uniform soup).
+ *
+ *   All models must share the same architecture (N_EMBD, N_LAYER, etc.)
+ *   and vocabulary size.  The destination model's weights are overwritten
+ *   with the element-wise mean of all source models' weights.
+ *
+ *   This produces a single model that often generalises better than any
+ *   individual source, without increasing inference cost.
+ *
+ *   Reference: Wortsman et al., "Model soups: averaging weights of
+ *   multiple fine-tuned models improves accuracy without increasing
+ *   inference time" (ICML 2022).
+ */
+void model_soup_average(Model *dst, Model **sources, int n_sources);
+
 /* ========================= Checkpointing (fp64) ========================== */
 
 /*
@@ -709,6 +737,13 @@ scalar_t forward_backward_one(const Model *model, size_t token_id,
 /* ======================== Optimiser (Adam) ================================ */
 
 /*
+ * clip_gradients - Clip the global gradient norm to GRAD_CLIP.
+ *   If the L2 norm exceeds the threshold, all gradients are scaled down
+ *   proportionally.  No-op if GRAD_CLIP <= 0.
+ */
+void clip_gradients(scalar_t *grads, size_t n);
+
+/*
  * adam_step - Perform one Adam optimiser update on all model parameters.
  *
  *   grads - Gradient buffer (same layout as model parameters).
@@ -716,6 +751,9 @@ scalar_t forward_backward_one(const Model *model, size_t token_id,
  *   v     - Second-moment (variance) estimates; same size as 'grads'.
  *   step  - Current training step (0-indexed); used for bias correction
  *           and learning-rate linear decay.
+ *
+ *   When WEIGHT_DECAY > 0, decoupled weight decay (AdamW) is applied to
+ *   all matrices EXCEPT token/position embeddings (wte, wpe).
  *
  *   For INT8 models, Adam updates the fp64 master copy and then requantises
  *   all weight matrices back to int8 with fresh per-matrix scales.

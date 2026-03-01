@@ -27,8 +27,8 @@
 #define SHAKES_SAMPLES 5
 #define SHAKES_TEMP 0.7
 #define GEN_LEN 100 /* words to generate per sample */
-#define CHECKPOINT_FILE "shakespeare_word.ckpt"
-#define TRAINING_LOG "shakespeare_word.ckpt.log"
+#define CHECKPOINT_FILE "w_shakespeare.ckpt"
+#define TRAINING_LOG "w_shakespeare.ckpt.log"
 
 /* Max threads (actual count is auto-detected at runtime) */
 #ifndef MAX_THREADS
@@ -113,7 +113,7 @@ int main(void) {
 
   /* ---- Load Shakespeare as line-per-doc ---- */
   Docs docs = {0};
-  if (load_docs("shakespeare.txt", &docs, cfg.max_docs) != 0) {
+  if (load_docs("w_shakespeare.txt", &docs, cfg.max_docs) != 0) {
     fprintf(stderr, "Cannot open shakespeare.txt\n");
     return 1;
   }
@@ -380,6 +380,7 @@ int main(void) {
       scalar_t mean_loss = step_loss / (scalar_t)step_positions;
       for (size_t i = 0; i < nparams; i++)
         grad_buffer[i] /= (scalar_t)step_positions;
+      clip_gradients(grad_buffer, nparams);
       adam_step(model, grad_buffer, m_buf, v_buf, step);
 
       if ((step + 1) % 500 == 0 || step == 0) {

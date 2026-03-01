@@ -1,7 +1,3 @@
-# Local Development (not public)
-journals/
-REVIEW.md
-
 # Debug/temp artifacts
 test_stdout*.txt
 actual*.txt
@@ -36,7 +32,9 @@ __pycache__/
 
 # MacOS
 .DS_Store
-.idea
+.idea/
+.vscode/
+.agent/
 
 # Build
 build/
@@ -101,3 +99,6 @@ dkms.conf
 
 # debug information files
 *.dwo
+
+# Private extensions
+_private/

@@ -6,7 +6,7 @@
 
 ### Tiny specialist models, coordinated by a pipeline, outperform single models on focused tasks.
 
-![Composable Intelligence — the four phases of MicroGPT-C: stem cell foundation, targeted differentiation, organelle pipeline coordination, and proven results across logic games and code composition](docs/organelles/images/Composable%20Intelligence%20Small%20AI%20Infographic.jpg)
+![Composable Intelligence — the four phases of MicroGPT-C: stem cell foundation, targeted differentiation, organelle pipeline coordination, and proven results across logic games and code composition](docs/research/images/Composable%20Intelligence%20Small%20AI%20Infographic.jpg)
 
 ---
 
@@ -22,15 +22,17 @@ We call them **organelles** — like the specialised structures inside a biologi
 
 The result surprised us. A single organelle playing Connect-4 wins about 55% of the time. But when a planner and player coordinate through a shared protocol, the system hits **90%** — even though the individual models are still wrong half the time. The pipeline catches the mistakes. **The coordination is the intelligence.**
 
-We've now tested this across [11 logic games](docs/organelles/ORGANELLE_GAMES.md), from Tic-Tac-Toe to Sudoku, with models ranging from 30K to 460K parameters. The pattern holds: right-sized specialists working together consistently outperform a single larger model working alone.
+We've now tested this across [11 logic games](docs/research/RESEARCH_ORGANELLE_GAMES.md), from Tic-Tac-Toe to Sudoku, with models ranging from 30K to 460K parameters. The pattern holds: right-sized specialists working together consistently outperform a single larger model working alone.
 
 Then we asked: **does it work on real-world data?**
 
-We ran two experiments back-to-back — a [lottery prediction](experiments/organelles/lottery/) pipeline (negative control) and a [market regime detection](experiments/organelles/markets/) pipeline (positive test). The lottery model hit an entropy floor at 0.50 loss — it learned nothing, because lottery draws are random. The market model reached 0.03–0.06 loss and **57% accuracy on unseen data** (2.8× the random baseline) — because cross-asset correlations are real, learnable signal.
+We ran a [lottery prediction](demos/character-level/lottery/) experiment as a **negative control** for organelle intelligence. The lottery model hit an entropy floor at 0.50 loss — it learned nothing, because lottery draws are random. This proves the engine's integrity: the impressive 78–91% accuracy seen in Mastermind and Connect-4 is a result of the model genuinely learning underlying rules, not some hidden flaw in the training engine.
 
-Same engine. Same architecture. One learns, one can't. **That's the proof.**
+We also explored applying OPA to continuous-valued domains like financial time-series. This revealed a fundamental insight: the 31-character vocabulary that makes game coordination reliable *destroys* the continuous gradients that prediction requires — what we call the "Discretisation Wall." Bridging categorical reasoning with numerical sensing is an active research direction.
 
-The full research journey — from character-level Transformer to VM-based code generation — is documented in [*Composable Intelligence at the Edge*](docs/book/MicroGPT-C_Composable_Intelligence_at_the_Edge.pdf) (16 chapters, [online version](docs/book/MicroGPT-C_Composable_Intelligence_at_the_Edge.md)).
+Same engine. Same architecture. One learns game patterns, one hits an entropy floor on random data, and one maps the boundary between pattern matching and temporal prediction. **That's three kinds of proof.**
+
+The full research journey — from character-level Transformer to VM-based code generation — is documented in [*Composable Intelligence at the Edge*](book/MicroGPT-C_Composable_Intelligence_at_the_Edge.pdf) (16 chapters, [online version](book/MicroGPT-C_Composable_Intelligence_at_the_Edge.md)).
 
 ---
 
@@ -56,13 +58,13 @@ cmake --build . --config Release
 ./connect4_demo
 ```
 
-All 11 game experiments, 2 real-world data experiments (lottery + markets), 3 pretrained checkpoints, 97 unit tests, and 22 benchmarks are included. See the full list in `experiments/organelles/`.
+All 11 game experiments, the lottery negative control, 3 pretrained checkpoints, 97 unit tests, and 22 benchmarks are included. See the full list in `demos/character-level/`.
 
 ---
 
 ## Performance Highlights
 
-All benchmarks on Apple M2 Max (dev machine), single-threaded unless noted. Models are 360KB–5.4MB and compile anywhere with a C99 compiler. Edge device testing is a future research stage. See [PERFORMANCE.md](docs/PERFORMANCE.md) for full details.
+All benchmarks on Apple M2 Max (dev machine), single-threaded unless noted. Models are 360KB–5.4MB and compile anywhere with a C99 compiler. Edge device testing is a future research stage. See [PERFORMANCE](docs/testing/PERFORMANCE.md) for full details.
 
 | Engine | Params | Training | Inference | Notes |
 |--------|--------|----------|-----------|-------|
@@ -75,7 +77,7 @@ vs. Karpathy's **microgpt.py**: ~1,000× faster training, ~700× faster inferenc
 
 ### Game Leaderboard (11 Games)
 
-All games: trained organelle vs random opponent, 100 evaluation games each. Full details in [ORGANELLE_GAMES.md](docs/organelles/ORGANELLE_GAMES.md).
+All games: trained organelle vs random opponent, 100 evaluation games each. Full details in [RESEARCH_ORGANELLE_GAMES](docs/research/RESEARCH_ORGANELLE_GAMES.md).
 
 | Game | Organelles | Params | Size | Total | Training | Result |
 |------|:----------:|-------:|-----:|------:|---------:|-------:|
@@ -85,18 +87,17 @@ All games: trained organelle vs random opponent, 100 evaluation games each. Full
 | **Tic-Tac-Toe** | 2 | 460K | 5.4 MB | 10.8 MB | ~17 min | **87% w+d** |
 | **Mastermind** | 2 | 92K | 1.1 MB | 2.2 MB | ~8 min | **79% solve** |
 | **Sudoku** | 2 | 160K | 1.9 MB | 3.8 MB | ~3 min | **78% solve** |
-| **Othello** | 2 | 92K | 1.1 MB | 2.2 MB | ~8 min | **70% win** |
+| **Othello** | 2 | 92K | 1.1 MB | 2.2 MB | ~8 min | **67% win** |
 | **Klotski** | 2 | 30K | 360 KB | 720 KB | ~36 sec | **62% solve** |
 | **Red Donkey** | 2 | 30K | 360 KB | 720 KB | ~38 sec | 19% solve |
 | **Lights Out** | 2 | 160K | 1.9 MB | 3.8 MB | ~4 min | 10% solve |
 | **Hex** | 2 | 92K | 1.1 MB | 2.2 MB | ~3 min | 27% win |
 
-### Real-World Data
+### Negative Control
 
 | Experiment | Organelles | Params | Size | Training | Result | Interpretation |
 |------------|:----------:|-------:|-----:|---------:|--------|----------------|
-| **Market regime** | 3 | 615K | 7.1 MB | ~10 min | **57% holdout** (2.8× baseline) | Learnable signal |
-| **Lottery** | 2 | 163K | 1.9 MB | ~5 min | Random wins | Negative control ✓ |
+| **Lottery** | 2 | 163K | 1.9 MB | ~5 min | Entropy floor | Negative control ✓ |
 
 ---
 
@@ -108,15 +109,15 @@ All games: trained organelle vs random opponent, 100 evaluation games each. Full
 | 🧬 **The stem cell philosophy** | [VISION.md](VISION.md) |
 | 💡 **Why this matters** | [VALUE_PROPOSITION.md](VALUE_PROPOSITION.md) |
 | 🗺️ **Roadmap** | [ROADMAP.md](ROADMAP.md) |
-| 📖 **Book: Composable Intelligence at the Edge** | [PDF](docs/book/MicroGPT-C_Composable_Intelligence_at_the_Edge.pdf) · [Online](docs/book/MicroGPT-C_Composable_Intelligence_at_the_Edge.md) · [Chapters](docs/book/0.md) |
-| 🏆 **Game leaderboard** (11 games) | [ORGANELLE_GAMES.md](docs/organelles/ORGANELLE_GAMES.md) |
-| 📈 **Market regime detection** (57% holdout) | [markets/README.md](experiments/organelles/markets/README.md) |
-| 🎲 **Lottery experiment** (entropy baseline) | [lottery/README.md](experiments/organelles/lottery/README.md) |
-| 🔬 **Pipeline architecture** (white paper) | [ORGANELLE_PIPELINE.md](docs/organelles/ORGANELLE_PIPELINE.md) |
-| 🧠 **Reasoning conclusion** | [ORGANELLE_REASONING_CONCLUSION.md](docs/organelles/ORGANELLE_REASONING_CONCLUSION.md) |
-| 📚 **Using as a library** | [LIBRARY_GUIDE.md](docs/LIBRARY_GUIDE.md) |
-| ⚡ **Performance & benchmarks** | [PERFORMANCE.md](docs/PERFORMANCE.md) |
-| 🔧 **Build options** (Metal, BLAS, INT8, SIMD) | [BUILD_OPTIONS.md](docs/BUILD_OPTIONS.md) |
+| 📖 **Book: Composable Intelligence at the Edge** | [PDF](book/MicroGPT-C_Composable_Intelligence_at_the_Edge.pdf) · [Online](book/MicroGPT-C_Composable_Intelligence_at_the_Edge.md) · [Chapters](book/0.md) |
+| 🏆 **Game leaderboard** (11 games) | [RESEARCH_ORGANELLE_GAMES](docs/research/RESEARCH_ORGANELLE_GAMES.md) |
+
+| 🎲 **Lottery experiment** (entropy baseline) | [lottery/README.md](demos/character-level/lottery/README.md) |
+| 🔬 **Pipeline architecture** (white paper) | [RESEARCH_ORGANELLE_PIPELINE](docs/research/RESEARCH_ORGANELLE_PIPELINE.md) |
+| 🧠 **Reasoning conclusion** | [RESEARCH_ORGANELLE_REASONING](docs/research/RESEARCH_ORGANELLE_REASONING.md) |
+| 📚 **Using as a library** | [FUNCTIONAL_SPEC](docs/FUNCTIONAL_SPEC.md) |
+| ⚡ **Performance & benchmarks** | [PERFORMANCE](docs/testing/PERFORMANCE.md) |
+| 🔧 **Build options** (Metal, BLAS, INT8, SIMD) | [BUILD_OPTIONS](docs/BUILD_OPTIONS.md) |
 | 🤝 **Contributing** | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | 📋 **Data licensing** | [DATA_LICENSE.md](DATA_LICENSE.md) |
 

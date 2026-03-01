@@ -8,48 +8,43 @@ MicroGPT-C ships with pretrained checkpoints ready for **instant inference** —
 
 ```
 models/
-  README.md                                 This file
+  README.md                                          This file
 
-  foundation/                               Base demo checkpoints
-    shakespeare.ckpt                        841K params — character-level Shakespeare
-    shakespeare.ckpt.log                    Training log (loss curve, timing, samples)
-    shakespeare_word.ckpt                   510K params — word-level Shakespeare
-    shakespeare_word.ckpt.log               Training log (loss curve, timing, samples)
-    names.ckpt.log                          Training log for name generation demo
+  foundation/
+    character-level/
+      shakespeare.ckpt          / .ckpt.log          841K params — character-level Shakespeare
+      shakespeare_word.ckpt     / .ckpt.log          510K params — word-level Shakespeare
+      names.ckpt.log                                 Training log for name generation demo
 
-  organelles/                               Organelle game + code checkpoints
-    connect4_planner.ckpt  /  .ckpt.log     460K — Connect-4
-    connect4_player.ckpt   /  .ckpt.log
-    tictactoe_planner.ckpt /  .ckpt.log     460K — Tic-Tac-Toe
-    tictactoe_player.ckpt  /  .ckpt.log
-    puzzle8_strategist_v3b.ckpt / .ckpt.log 460K — 8-Puzzle (5 organelles)
-    puzzle8_mover_v3b.ckpt      / .ckpt.log
-    puzzle8_detector_v3b.ckpt   / .ckpt.log
-    puzzle8_detour_mover_v3b.ckpt / .ckpt.log
-    puzzle8_judge_v3b.ckpt      / .ckpt.log
-    pentago_planner.ckpt   /  .ckpt.log      92K — Pentago
-    pentago_player.ckpt    /  .ckpt.log
-    mastermind_planner.ckpt / .ckpt.log      92K — Mastermind
-    mastermind_player.ckpt  / .ckpt.log
-    othello_planner.ckpt   /  .ckpt.log      92K — Othello
-    othello_player.ckpt    /  .ckpt.log
-    hex_planner.ckpt       /  .ckpt.log      92K — Hex
-    hex_player.ckpt        /  .ckpt.log
-    sudoku_planner.ckpt    /  .ckpt.log     160K — Sudoku
-    sudoku_player.ckpt     /  .ckpt.log
-    lightsout_planner.ckpt /  .ckpt.log     160K — Lights Out
-    lightsout_player.ckpt  /  .ckpt.log
-    klotski_planner.ckpt   /  .ckpt.log      30K — Klotski
-    klotski_player.ckpt    /  .ckpt.log
-    reddonkey_planner.ckpt /  .ckpt.log      30K — Red Donkey
-    reddonkey_player.ckpt  /  .ckpt.log
-    c_planner.ckpt         /  .ckpt.log     1.2M — c_compose planner
-    c_judge.ckpt           /  .ckpt.log     1.2M — c_compose judge
-    lottery_analyser.ckpt  /  .ckpt.log     163K — Lottery analyser
-    lottery_predictor.ckpt /  .ckpt.log     163K — Lottery predictor
-    market_analyser.ckpt   /  .ckpt.log     615K — Market cross-asset analyser
-    market_regime.ckpt     /  .ckpt.log     621K — Market regime classifier
-    market_rotator.ckpt    /  .ckpt.log     618K — Market sector rotator
+  organelles/
+    character-level/
+      connect4_planner.ckpt     / .ckpt.log          460K — Connect-4
+      connect4_player.ckpt      / .ckpt.log
+      tictactoe_planner.ckpt    / .ckpt.log          460K — Tic-Tac-Toe
+      tictactoe_player.ckpt     / .ckpt.log
+      puzzle8_strategist_v3b.ckpt / .ckpt.log        460K — 8-Puzzle (5 organelles)
+      puzzle8_mover_v3b.ckpt      / .ckpt.log
+      puzzle8_detector_v3b.ckpt   / .ckpt.log
+      puzzle8_detour_mover_v3b.ckpt / .ckpt.log
+      puzzle8_judge_v3b.ckpt      / .ckpt.log
+      pentago_planner.ckpt      / .ckpt.log           92K — Pentago
+      pentago_player.ckpt       / .ckpt.log
+      mastermind_planner.ckpt   / .ckpt.log           92K — Mastermind
+      mastermind_player.ckpt    / .ckpt.log
+      othello_planner.ckpt      / .ckpt.log           92K — Othello
+      othello_player.ckpt       / .ckpt.log
+      hex_planner.ckpt          / .ckpt.log           92K — Hex
+      hex_player.ckpt           / .ckpt.log
+      sudoku_planner.ckpt       / .ckpt.log          160K — Sudoku
+      sudoku_player.ckpt        / .ckpt.log
+      lightsout_planner.ckpt    / .ckpt.log          160K — Lights Out
+      lightsout_player.ckpt     / .ckpt.log
+      klotski_planner.ckpt      / .ckpt.log           30K — Klotski
+      klotski_player.ckpt       / .ckpt.log
+      reddonkey_planner.ckpt    / .ckpt.log           30K — Red Donkey
+      reddonkey_player.ckpt     / .ckpt.log
+      lottery_analyser.ckpt     / .ckpt.log          163K — Lottery analyser
+      lottery_predictor.ckpt    / .ckpt.log          163K — Lottery predictor
 ```
 
 Each `.ckpt` file contains model weights (float32) + Adam optimizer state + training step counter.
@@ -61,20 +56,14 @@ Each `.ckpt.log` file contains the full training history (loss per step, timings
 
 | Model | Size | Params | Trained On | What It Does |
 |-------|------|--------|-----------|-------------|
-| `foundation/shakespeare.ckpt` | 9.6 MB | 841K | Complete works of Shakespeare | Character-level text generation (16K tok/s) |
-| `foundation/shakespeare_word.ckpt` | 5.8 MB | 510K | Complete works of Shakespeare | Word-level text generation (40K tok/s) |
-
-| `organelles/c_planner.ckpt` | 13.8 MB | 1.2M | Function composition plans | Planner for c_compose pipeline |
-| `organelles/c_judge.ckpt` | 13.8 MB | 1.2M | Plan validation pairs | Judge for c_compose pipeline |
-| `organelles/market_analyser.ckpt` | 7.1 MB | 615K | 18-instrument market data (10yr) | Cross-asset analysis → 5-char compact output |
-| `organelles/market_regime.ckpt` | 7.1 MB | 621K | Regime classification pairs | Regime classifier (R/O/I/D/T) |
-| `organelles/market_rotator.ckpt` | 7.1 MB | 618K | Sector rotation recommendations | Sector over/underweight (compact format) |
+| `foundation/character-level/shakespeare.ckpt` | 9.6 MB | 841K | Complete works of Shakespeare | Character-level text generation (16K tok/s) |
+| `foundation/character-level/shakespeare_word.ckpt` | 5.8 MB | 510K | Complete works of Shakespeare | Word-level text generation (40K tok/s) |
 
 ---
 
 ## Organelle Game Checkpoints
 
-**31 game checkpoints** across 11 games, plus **5 real-world data checkpoints** (2 lottery + 3 markets), using 5 parameter tiers:
+**31 game checkpoints** across 11 games, plus **2 lottery checkpoints** (negative control), using 4 parameter tiers:
 
 | Tier | Config (EMBD/HEAD/LAYER/MLP) | Params | Games |
 |------|------------------------------|--------|-------|
@@ -82,7 +71,6 @@ Each `.ckpt.log` file contains the full training history (loss per step, timings
 | Small | 48/4/3/192 | ~92K | Mastermind, Pentago, Othello, Hex |
 | Standard | 64/4/3/256 | ~160K | Lights Out, Sudoku, Lottery |
 | Legacy | 96/8/4/384 | ~460K | Connect-4, Tic-Tac-Toe, 8-Puzzle |
-| Markets | 128/8/3/512 | ~615K | Market regime detection (3 organelles) |
 
 ### Game Results
 
@@ -100,11 +88,10 @@ Each `.ckpt.log` file contains the full training history (loss per step, timings
 | **Lights Out** | `lightsout_planner/player.ckpt` | 160K | **10% solve** |
 | **Hex** | `hex_planner/player.ckpt` | 92K | **27% win** |
 
-### Real-World Data Results
+### Negative Control
 
 | Experiment | Checkpoints | Params | Result |
 |------------|-----------|-------:|-------:|
-| **Markets** | `market_analyser/regime/rotator.ckpt` | 615K | **57% holdout** (2.8× baseline) |
 | **Lottery** | `lottery_analyser/predictor.ckpt` | 163K | entropy floor ~0.50 (negative control) |
 
 ### Usage
@@ -112,7 +99,7 @@ Each `.ckpt.log` file contains the full training history (loss per step, timings
 Copy checkpoints to the build directory. The demos auto-detect and skip training:
 
 ```bash
-cp ../models/organelles/connect4_*.ckpt .
+cp ../models/organelles/character-level/connect4_*.ckpt .
 ./connect4_demo    # skips training, plays 100 games immediately
 ```
 
@@ -126,7 +113,7 @@ cp ../models/organelles/connect4_*.ckpt .
 cd build
 
 # Copy pretrained checkpoint from models/ to build/
-cp ../models/foundation/shakespeare.ckpt .
+cp ../models/foundation/character-level/shakespeare.ckpt .
 
 # Run — training is skipped, goes straight to generation
 ./shakespeare_demo
@@ -180,24 +167,21 @@ for (int i = 0; i < max_tokens; i++) {
 Each checkpoint requires matching compile-time architecture. The demos handle this automatically via `CMakeLists.txt`.
 
 | Checkpoint | N_EMBD | N_HEAD | N_LAYER | BLOCK_SIZE | MLP_DIM |
-|-----------|--------|--------|---------|------------|---------| 
+|-----------|--------|--------|---------|------------|---------|
 | `shakespeare.ckpt` | 128 | 8 | 4 | 256 | 512 |
 | `shakespeare_word.ckpt` | 48 | 4 | 1 | 64 | 192 |
-
-| `organelles/c_planner.ckpt` / `c_judge.ckpt` | 128 | 8 | 6 | 128 | 512 |
-| `organelles/connect4_*.ckpt` | 96 | 8 | 4 | 128 | 384 |
-| `organelles/tictactoe_*.ckpt` | 96 | 8 | 4 | 128 | 384 |
-| `organelles/puzzle8_*.ckpt` | 96 | 8 | 4 | 128 | 384 |
-| `organelles/mastermind_*.ckpt` | 48 | 4 | 3 | 128 | 192 |
-| `organelles/pentago_*.ckpt` | 48 | 4 | 3 | 128 | 192 |
-| `organelles/othello_*.ckpt` | 48 | 4 | 3 | 128 | 192 |
-| `organelles/hex_*.ckpt` | 48 | 4 | 3 | 128 | 192 |
-| `organelles/klotski_*.ckpt` | 32 | 4 | 2 | 128 | 128 |
-| `organelles/reddonkey_*.ckpt` | 32 | 4 | 2 | 128 | 128 |
-| `organelles/lightsout_*.ckpt` | 64 | 4 | 3 | 128 | 256 |
-| `organelles/sudoku_*.ckpt` | 64 | 4 | 3 | 128 | 256 |
-| `organelles/lottery_*.ckpt` | 64 | 4 | 3 | 128 | 256 |
-| `organelles/market_*.ckpt` | 128 | 8 | 3 | 128 | 512 |
+| `organelles/*/connect4_*.ckpt` | 96 | 8 | 4 | 128 | 384 |
+| `organelles/*/tictactoe_*.ckpt` | 96 | 8 | 4 | 128 | 384 |
+| `organelles/*/puzzle8_*.ckpt` | 96 | 8 | 4 | 128 | 384 |
+| `organelles/*/mastermind_*.ckpt` | 48 | 4 | 3 | 128 | 192 |
+| `organelles/*/pentago_*.ckpt` | 48 | 4 | 3 | 128 | 192 |
+| `organelles/*/othello_*.ckpt` | 48 | 4 | 3 | 128 | 192 |
+| `organelles/*/hex_*.ckpt` | 48 | 4 | 3 | 128 | 192 |
+| `organelles/*/klotski_*.ckpt` | 32 | 4 | 2 | 128 | 128 |
+| `organelles/*/reddonkey_*.ckpt` | 32 | 4 | 2 | 128 | 128 |
+| `organelles/*/lightsout_*.ckpt` | 64 | 4 | 3 | 128 | 256 |
+| `organelles/*/sudoku_*.ckpt` | 64 | 4 | 3 | 128 | 256 |
+| `organelles/*/lottery_*.ckpt` | 64 | 4 | 3 | 128 | 256 |
 
 ---
 

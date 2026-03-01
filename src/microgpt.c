@@ -1209,6 +1209,83 @@ void model_transfer_weights(const Model *src, Model *dst,
          bs, ne, nl, bs * ne + (size_t)nl * (4 * ne * ne + md * ne + ne * md));
 }
 
+/* ── Model Soup: element-wise weight averaging ──────────────────────────── */
+
+/* Helper: average one weight array across N sources into dst. */
+static void soup_average_buf_(scalar_t *dst, scalar_t **srcs, int n,
+                              size_t count) {
+  scalar_t inv_n = (scalar_t)1.0 / (scalar_t)n;
+  for (size_t i = 0; i < count; i++) {
+    scalar_t sum = 0;
+    for (int s = 0; s < n; s++)
+      sum += srcs[s][i];
+    dst[i] = sum * inv_n;
+  }
+}
+
+void model_soup_average(Model *dst, Model **sources, int n_sources) {
+  if (n_sources < 2)
+    return;
+
+  const MicrogptConfig *cfg = &dst->cfg;
+  const size_t vs = dst->vocab_size;
+  const size_t ne = (size_t)cfg->n_embd;
+  const size_t bs = (size_t)cfg->block_size;
+  const size_t md = (size_t)cfg->mlp_dim;
+  const int nl = cfg->n_layer;
+
+  /* Collect per-source pointers for the helper */
+  scalar_t **ptrs = (scalar_t **)malloc((size_t)n_sources * sizeof(scalar_t *));
+  if (!ptrs)
+    return;
+
+  /* Token embedding: [vocab_size × n_embd] */
+  for (int s = 0; s < n_sources; s++)
+    ptrs[s] = sources[s]->wte;
+  soup_average_buf_(dst->wte, ptrs, n_sources, vs * ne);
+
+  /* Position embedding: [block_size × n_embd] */
+  for (int s = 0; s < n_sources; s++)
+    ptrs[s] = sources[s]->wpe;
+  soup_average_buf_(dst->wpe, ptrs, n_sources, bs * ne);
+
+  /* Output head: [vocab_size × n_embd] */
+  for (int s = 0; s < n_sources; s++)
+    ptrs[s] = sources[s]->lm_head;
+  soup_average_buf_(dst->lm_head, ptrs, n_sources, vs * ne);
+
+  /* Per-layer weights */
+  for (int L = 0; L < nl; L++) {
+    for (int s = 0; s < n_sources; s++)
+      ptrs[s] = sources[s]->attn_wq[L];
+    soup_average_buf_(dst->attn_wq[L], ptrs, n_sources, ne * ne);
+
+    for (int s = 0; s < n_sources; s++)
+      ptrs[s] = sources[s]->attn_wk[L];
+    soup_average_buf_(dst->attn_wk[L], ptrs, n_sources, ne * ne);
+
+    for (int s = 0; s < n_sources; s++)
+      ptrs[s] = sources[s]->attn_wv[L];
+    soup_average_buf_(dst->attn_wv[L], ptrs, n_sources, ne * ne);
+
+    for (int s = 0; s < n_sources; s++)
+      ptrs[s] = sources[s]->attn_wo[L];
+    soup_average_buf_(dst->attn_wo[L], ptrs, n_sources, ne * ne);
+
+    for (int s = 0; s < n_sources; s++)
+      ptrs[s] = sources[s]->mlp_fc1[L];
+    soup_average_buf_(dst->mlp_fc1[L], ptrs, n_sources, md * ne);
+
+    for (int s = 0; s < n_sources; s++)
+      ptrs[s] = sources[s]->mlp_fc2[L];
+    soup_average_buf_(dst->mlp_fc2[L], ptrs, n_sources, ne * md);
+  }
+
+  free(ptrs);
+  printf("  Soup: averaged %d models (%zu params each)\n", n_sources,
+         model_num_params(dst));
+}
+
 /* ===================== Neural Network Primitives ========================= */
 /*
  * These are the two fundamental building blocks of neural networks:
@@ -1911,12 +1988,27 @@ scalar_t forward_backward_one(const Model *model, size_t token_id,
   for (size_t i = 0; i < vs; i++)
     logits[i] /= sum;
   scalar_t loss = -M_LOG(logits[target_id] > 1e-10 ? logits[target_id] : 1e-10);
+  if (LABEL_SMOOTH > 0) {
+    /* Label smoothing: mix in uniform distribution over vocab */
+    scalar_t log_sum = 0;
+    for (size_t i = 0; i < vs; i++)
+      log_sum += -M_LOG(logits[i] > 1e-10 ? logits[i] : 1e-10);
+    loss =
+        (1.0 - LABEL_SMOOTH) * loss + (LABEL_SMOOTH / (scalar_t)vs) * log_sum;
+  }
 
   /* =================== BACKWARD PASS =================== */
 
-  /* d_logits = probs - one_hot(target) */
-  for (size_t i = 0; i < vs; i++)
-    d_logits[i] = logits[i] - (i == target_id ? 1.0 : 0.0);
+  /* d_logits = probs - one_hot(target)  [+ label smoothing adjustment] */
+  for (size_t i = 0; i < vs; i++) {
+    if (LABEL_SMOOTH > 0) {
+      scalar_t target_prob = (i == target_id) ? (1.0 - LABEL_SMOOTH) : 0.0;
+      target_prob += LABEL_SMOOTH / (scalar_t)vs;
+      d_logits[i] = logits[i] - target_prob;
+    } else {
+      d_logits[i] = logits[i] - (i == target_id ? 1.0 : 0.0);
+    }
+  }
 
   /* Grad buffer layout offsets */
   size_t off_wte = 0;
@@ -2288,6 +2380,28 @@ void forward_inference(const Model *model, size_t token_id, size_t pos_id,
     cache_len[L]++;
 }
 
+/* ========================= Gradient Clipping ============================= */
+
+/*
+ * clip_gradients - Clip global gradient norm to GRAD_CLIP.
+ *   If the L2 norm of the gradient vector exceeds the threshold, all
+ *   gradients are scaled proportionally so the norm equals the threshold.
+ *   No-op if GRAD_CLIP <= 0.
+ */
+void clip_gradients(scalar_t *grads, size_t n) {
+  if (GRAD_CLIP <= 0)
+    return;
+  scalar_t norm_sq = 0;
+  for (size_t i = 0; i < n; i++)
+    norm_sq += grads[i] * grads[i];
+  scalar_t norm = M_SQRT(norm_sq);
+  if (norm > (scalar_t)GRAD_CLIP) {
+    scalar_t scale = (scalar_t)GRAD_CLIP / norm;
+    for (size_t i = 0; i < n; i++)
+      grads[i] *= scale;
+  }
+}
+
 /* ========================= Adam Optimiser ================================ */
 
 /*
@@ -2491,6 +2605,8 @@ void adam_step(Model *model, const scalar_t *grads, scalar_t *m, scalar_t *v,
     scalar_t mh = m[idx] / bc1;
     scalar_t vh = v[idx] / bc2;
     model->lm_head[i] -= lr * mh / (M_SQRT(vh) + eps);
+    if (WEIGHT_DECAY > 0)
+      model->lm_head[i] *= (1.0 - lr * WEIGHT_DECAY);
   }
   for (int L = 0; L < nl; L++) {
     for (size_t i = 0; i < ne * ne; i++, idx++) {
@@ -2500,6 +2616,8 @@ void adam_step(Model *model, const scalar_t *grads, scalar_t *m, scalar_t *v,
       scalar_t mh = m[idx] / bc1;
       scalar_t vh = v[idx] / bc2;
       model->attn_wq[L][i] -= lr * mh / (M_SQRT(vh) + eps);
+      if (WEIGHT_DECAY > 0)
+        model->attn_wq[L][i] *= (1.0 - lr * WEIGHT_DECAY);
     }
     for (size_t i = 0; i < ne * ne; i++, idx++) {
       scalar_t g = grads[idx];
@@ -2508,6 +2626,8 @@ void adam_step(Model *model, const scalar_t *grads, scalar_t *m, scalar_t *v,
       scalar_t mh = m[idx] / bc1;
       scalar_t vh = v[idx] / bc2;
       model->attn_wk[L][i] -= lr * mh / (M_SQRT(vh) + eps);
+      if (WEIGHT_DECAY > 0)
+        model->attn_wk[L][i] *= (1.0 - lr * WEIGHT_DECAY);
     }
     for (size_t i = 0; i < ne * ne; i++, idx++) {
       scalar_t g = grads[idx];
@@ -2516,6 +2636,8 @@ void adam_step(Model *model, const scalar_t *grads, scalar_t *m, scalar_t *v,
       scalar_t mh = m[idx] / bc1;
       scalar_t vh = v[idx] / bc2;
       model->attn_wv[L][i] -= lr * mh / (M_SQRT(vh) + eps);
+      if (WEIGHT_DECAY > 0)
+        model->attn_wv[L][i] *= (1.0 - lr * WEIGHT_DECAY);
     }
     for (size_t i = 0; i < ne * ne; i++, idx++) {
       scalar_t g = grads[idx];
@@ -2524,6 +2646,8 @@ void adam_step(Model *model, const scalar_t *grads, scalar_t *m, scalar_t *v,
       scalar_t mh = m[idx] / bc1;
       scalar_t vh = v[idx] / bc2;
       model->attn_wo[L][i] -= lr * mh / (M_SQRT(vh) + eps);
+      if (WEIGHT_DECAY > 0)
+        model->attn_wo[L][i] *= (1.0 - lr * WEIGHT_DECAY);
     }
     for (size_t i = 0; i < md * ne; i++, idx++) {
       scalar_t g = grads[idx];
@@ -2532,6 +2656,8 @@ void adam_step(Model *model, const scalar_t *grads, scalar_t *m, scalar_t *v,
       scalar_t mh = m[idx] / bc1;
       scalar_t vh = v[idx] / bc2;
       model->mlp_fc1[L][i] -= lr * mh / (M_SQRT(vh) + eps);
+      if (WEIGHT_DECAY > 0)
+        model->mlp_fc1[L][i] *= (1.0 - lr * WEIGHT_DECAY);
     }
     for (size_t i = 0; i < ne * md; i++, idx++) {
       scalar_t g = grads[idx];
@@ -2540,6 +2666,8 @@ void adam_step(Model *model, const scalar_t *grads, scalar_t *m, scalar_t *v,
       scalar_t mh = m[idx] / bc1;
       scalar_t vh = v[idx] / bc2;
       model->mlp_fc2[L][i] -= lr * mh / (M_SQRT(vh) + eps);
+      if (WEIGHT_DECAY > 0)
+        model->mlp_fc2[L][i] *= (1.0 - lr * WEIGHT_DECAY);
     }
   }
 #endif

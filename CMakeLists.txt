@@ -223,9 +223,9 @@ endfunction()
 # ==================================================================
 
 add_demo(
-  NAME   names_demo
+  NAME   c_names_demo
   SOURCE demos/character-level/names/main.c
-  COPY   demos/character-level/names/names.txt
+  COPY   demos/character-level/names/c_names.txt
 )
 
 # ==================================================================
@@ -233,25 +233,101 @@ add_demo(
 # ==================================================================
 
 add_demo(
-  NAME    shakespeare_demo
+  NAME    c_shakespeare_demo
   SOURCE  demos/character-level/shakespeare/main.c
   THREADS
-  COPY    demos/character-level/shakespeare/shakespeare.txt
+  COPY    demos/character-level/shakespeare/c_shakespeare.txt
   DEFINES N_EMBD=128 N_HEAD=8 N_LAYER=4 BLOCK_SIZE=256 MLP_DIM=512
           NUM_STEPS=30000 LEARNING_RATE=0.001 BATCH_SIZE=16
           MAX_VOCAB=200 MAX_DOCS=200000 MAX_DOC_LEN=512
+          GRAD_CLIP=1.0 LABEL_SMOOTH=0.1
 )
 
 add_demo(
-  NAME    shakespeare_word_demo
+  NAME    w_shakespeare_demo
   SOURCE  demos/word-level/shakespeare/main.c
   METAL BLAS
-  COPY    demos/character-level/shakespeare/shakespeare.txt
+  COPY    demos/word-level/shakespeare/w_shakespeare.txt
   DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=1 BLOCK_SIZE=64 MLP_DIM=192
           NUM_STEPS=10000 LEARNING_RATE=0.001 BATCH_SIZE=16
           MAX_VOCAB=5000 MAX_DOCS=200000 MAX_DOC_LEN=512
+          GRAD_CLIP=1.0 LABEL_SMOOTH=0.1
 )
 
+
+# Shakespeare char-level optimisation A/B benchmarks (2K steps, batch=4 for quick comparison)
+# Must match demo's hardcoded config: N_EMBD=128, N_LAYER=4 (~1M params)
+add_demo(
+  NAME    c_optim_shk_baseline
+  SOURCE  demos/character-level/shakespeare/main.c
+  THREADS
+  COPY    demos/character-level/shakespeare/c_shakespeare.txt
+  DEFINES N_EMBD=128 N_HEAD=8 N_LAYER=4 BLOCK_SIZE=256 MLP_DIM=512
+          NUM_STEPS=2000 LEARNING_RATE=0.001 BATCH_SIZE=4
+          MAX_VOCAB=200 MAX_DOCS=200000 MAX_DOC_LEN=512
+)
+add_demo(
+  NAME    c_optim_shk_labelsmooth
+  SOURCE  demos/character-level/shakespeare/main.c
+  THREADS
+  COPY    demos/character-level/shakespeare/c_shakespeare.txt
+  DEFINES N_EMBD=128 N_HEAD=8 N_LAYER=4 BLOCK_SIZE=256 MLP_DIM=512
+          NUM_STEPS=2000 LEARNING_RATE=0.001 BATCH_SIZE=4
+          MAX_VOCAB=200 MAX_DOCS=200000 MAX_DOC_LEN=512
+          LABEL_SMOOTH=0.1
+)
+add_demo(
+  NAME    c_optim_shk_weightdecay
+  SOURCE  demos/character-level/shakespeare/main.c
+  THREADS
+  COPY    demos/character-level/shakespeare/c_shakespeare.txt
+  DEFINES N_EMBD=128 N_HEAD=8 N_LAYER=4 BLOCK_SIZE=256 MLP_DIM=512
+          NUM_STEPS=2000 LEARNING_RATE=0.001 BATCH_SIZE=4
+          MAX_VOCAB=200 MAX_DOCS=200000 MAX_DOC_LEN=512
+          WEIGHT_DECAY=0.01
+)
+add_demo(
+  NAME    c_optim_shk_combined
+  SOURCE  demos/character-level/shakespeare/main.c
+  THREADS
+  COPY    demos/character-level/shakespeare/c_shakespeare.txt
+  DEFINES N_EMBD=128 N_HEAD=8 N_LAYER=4 BLOCK_SIZE=256 MLP_DIM=512
+          NUM_STEPS=2000 LEARNING_RATE=0.001 BATCH_SIZE=4
+          MAX_VOCAB=200 MAX_DOCS=200000 MAX_DOC_LEN=512
+          GRAD_CLIP=1.0 WEIGHT_DECAY=0.01 LABEL_SMOOTH=0.1
+)
+
+# Shakespeare word-level optimisation A/B benchmarks
+# Word-level: N_EMBD=48, N_LAYER=1, ~250K params — vocab dominates
+add_demo(
+  NAME    w_optim_shk_baseline
+  SOURCE  demos/word-level/shakespeare/main.c
+  THREADS
+  COPY    demos/word-level/shakespeare/w_shakespeare.txt
+  DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=1 BLOCK_SIZE=64 MLP_DIM=192
+          NUM_STEPS=5000 LEARNING_RATE=0.001 BATCH_SIZE=16
+          MAX_VOCAB=5000 MAX_DOCS=200000 MAX_DOC_LEN=512
+)
+add_demo(
+  NAME    w_optim_shk_labelsmooth
+  SOURCE  demos/word-level/shakespeare/main.c
+  THREADS
+  COPY    demos/word-level/shakespeare/w_shakespeare.txt
+  DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=1 BLOCK_SIZE=64 MLP_DIM=192
+          NUM_STEPS=5000 LEARNING_RATE=0.001 BATCH_SIZE=16
+          MAX_VOCAB=5000 MAX_DOCS=200000 MAX_DOC_LEN=512
+          LABEL_SMOOTH=0.1
+)
+add_demo(
+  NAME    w_optim_shk_weightdecay
+  SOURCE  demos/word-level/shakespeare/main.c
+  THREADS
+  COPY    demos/word-level/shakespeare/w_shakespeare.txt
+  DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=1 BLOCK_SIZE=64 MLP_DIM=192
+          NUM_STEPS=5000 LEARNING_RATE=0.001 BATCH_SIZE=16
+          MAX_VOCAB=5000 MAX_DOCS=200000 MAX_DOC_LEN=512
+          WEIGHT_DECAY=0.01
+)
 
 
 # ==================================================================
@@ -259,32 +335,64 @@ add_demo(
 # ==================================================================
 
 add_demo(
-  NAME    vm_codegen
-  SOURCE  experiments/organelles/vm_codegen/main.c
+  NAME    c_vm_codegen
+  SOURCE  demos/character-level/vm_codegen/main.c
   THREADS METAL BLAS
-  COPY    experiments/organelles/vm_codegen/vm_functions_combined.txt
+  COPY    demos/character-level/vm_codegen/c_vm_functions_combined.txt
   DEFINES N_EMBD=96 N_HEAD=4 N_LAYER=2 BLOCK_SIZE=256 MLP_DIM=384
           NUM_STEPS=15000 LEARNING_RATE=0.0005 BATCH_SIZE=16
           MAX_VOCAB=1200 MAX_DOCS=5000 MAX_DOC_LEN=512
+          GRAD_CLIP=1.0 LABEL_SMOOTH=0.1
 )
-target_link_libraries(vm_codegen PRIVATE microgpt_vm_lib)
+target_link_libraries(c_vm_codegen PRIVATE microgpt_vm_lib)
+
+# ==================================================================
+#  Organelle: VM codegen V2 (organelle word API refactor)
+# ==================================================================
+
+add_demo(
+  NAME    c_vm_codegen_v2
+  SOURCE  demos/character-level/vm_codegen/main.c
+  THREADS METAL BLAS
+  COPY    demos/character-level/vm_codegen/c_vm_functions_pretok.txt
+  DEFINES N_EMBD=96 N_HEAD=4 N_LAYER=2 BLOCK_SIZE=256 MLP_DIM=384
+          NUM_STEPS=5000 LEARNING_RATE=0.001 BATCH_SIZE=16
+          MAX_VOCAB=1200 MAX_DOCS=5000 MAX_DOC_LEN=512
+          WORD_VOCAB_SIZE=900
+)
+target_link_libraries(c_vm_codegen_v2 PRIVATE microgpt_vm_lib)
+
+# ==================================================================
+#  Organelle: VM codegen V2 word-level
+# ==================================================================
+add_demo(
+  NAME    w_vm_codegen_v2
+  SOURCE  demos/word-level/vm_codegen/main.c
+  THREADS METAL BLAS
+  COPY    demos/word-level/vm_codegen/w_vm_functions_pretok.txt
+  DEFINES N_EMBD=96 N_HEAD=4 N_LAYER=2 BLOCK_SIZE=256 MLP_DIM=384
+          NUM_STEPS=5000 LEARNING_RATE=0.001 BATCH_SIZE=16
+          MAX_VOCAB=1200 MAX_DOCS=5000 MAX_DOC_LEN=512
+          WORD_VOCAB_SIZE=900
+)
+target_link_libraries(w_vm_codegen_v2 PRIVATE microgpt_vm_lib)
 
 # ==================================================================
 #  Organelle: VM compose pipeline (generate → validate → retry)
 # ==================================================================
 
 add_demo(
-  NAME    vm_compose
-  SOURCE  experiments/organelles/vm_compose/main.c
+  NAME    c_vm_compose
+  SOURCE  demos/character-level/vm_compose/main.c
   METAL BLAS
-  COPY    experiments/organelles/vm_codegen/vm_functions_combined.txt
-          experiments/organelles/vm_compose/test_intents.txt
-          experiments/organelles/vm_compose/test_signatures.txt
+  COPY    demos/character-level/vm_codegen/c_vm_functions_combined.txt
+          demos/character-level/vm_compose/test_intents.txt
+          demos/character-level/vm_compose/test_signatures.txt
   DEFINES N_EMBD=96 N_HEAD=4 N_LAYER=2 BLOCK_SIZE=256 MLP_DIM=384
           NUM_STEPS=15000 LEARNING_RATE=0.0005 BATCH_SIZE=16
           MAX_VOCAB=1200 MAX_DOCS=5000 MAX_DOC_LEN=512
 )
-target_link_libraries(vm_compose PRIVATE microgpt_vm_lib)
+target_link_libraries(c_vm_compose PRIVATE microgpt_vm_lib)
 
 
 
@@ -297,32 +405,34 @@ target_link_libraries(vm_compose PRIVATE microgpt_vm_lib)
 # ==================================================================
 
 add_demo(
-  NAME    c_compose
-  SOURCE  experiments/organelles/c_compose/main.c
+  NAME    c99_compose
+  SOURCE  demos/character-level/c99_compose/main.c
   THREADS METAL BLAS
-  COPY    experiments/organelles/c_compose/c_planner.txt
-          experiments/organelles/c_compose/c_judge.txt
-          experiments/organelles/c_compose/c_registry.txt
-          experiments/organelles/c_compose/test_intents.txt
+  COPY    demos/character-level/c99_compose/c_planner.txt
+          demos/character-level/c99_compose/c_judge.txt
+          demos/character-level/c99_compose/c_registry.txt
+          demos/character-level/c99_compose/test_intents.txt
   DEFINES N_EMBD=128 N_HEAD=8 N_LAYER=6 BLOCK_SIZE=128 MLP_DIM=512
           NUM_STEPS=50000 LEARNING_RATE=0.0005 BATCH_SIZE=8 WARMUP_STEPS=2500
           MAX_VOCAB=200 MAX_DOCS=5000 MAX_DOC_LEN=256
+          GRAD_CLIP=1.0 LABEL_SMOOTH=0.1
 )
 
 
 
 add_demo(
-  NAME    puzzle8_demo
-  SOURCE  experiments/organelles/puzzle8/main.c
+  NAME    c_puzzle8_demo
+  SOURCE  demos/character-level/puzzle8/main.c
   THREADS
-  COPY    experiments/organelles/puzzle8/puzzle8_strategist.txt
-          experiments/organelles/puzzle8/puzzle8_mover.txt
-          experiments/organelles/puzzle8/puzzle8_detour_detector.txt
-          experiments/organelles/puzzle8/puzzle8_detour_mover.txt
-          experiments/organelles/puzzle8/puzzle8_judge.txt
+  COPY    demos/character-level/puzzle8/c_puzzle8_strategist.txt
+          demos/character-level/puzzle8/c_puzzle8_mover.txt
+          demos/character-level/puzzle8/c_puzzle8_detour_detector.txt
+          demos/character-level/puzzle8/c_puzzle8_detour_mover.txt
+          demos/character-level/puzzle8/c_puzzle8_judge.txt
   DEFINES N_EMBD=96 N_HEAD=8 N_LAYER=4 BLOCK_SIZE=128 MLP_DIM=384
           NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
           MAX_VOCAB=50 MAX_DOCS=60000 MAX_DOC_LEN=128
+          GRAD_CLIP=1.0 LABEL_SMOOTH=0.1 WEIGHT_DECAY=0.01
 )
 
 # ==================================================================
@@ -331,33 +441,35 @@ add_demo(
 
 # 460K Bare Model (Verify scaling removed the need for scaffolding)
 add_demo(
-  NAME    puzzle8_bare
-  SOURCE  experiments/organelles/puzzle8/main.c
+  NAME    c_puzzle8_bare
+  SOURCE  demos/character-level/puzzle8/main.c
   THREADS
-  COPY    experiments/organelles/puzzle8/puzzle8_strategist.txt
-          experiments/organelles/puzzle8/puzzle8_mover.txt
-          experiments/organelles/puzzle8/puzzle8_detour_detector.txt
-          experiments/organelles/puzzle8/puzzle8_detour_mover.txt
-          experiments/organelles/puzzle8/puzzle8_judge.txt
+  COPY    demos/character-level/puzzle8/c_puzzle8_strategist.txt
+          demos/character-level/puzzle8/c_puzzle8_mover.txt
+          demos/character-level/puzzle8/c_puzzle8_detour_detector.txt
+          demos/character-level/puzzle8/c_puzzle8_detour_mover.txt
+          demos/character-level/puzzle8/c_puzzle8_judge.txt
   DEFINES N_EMBD=96 N_HEAD=8 N_LAYER=4 BLOCK_SIZE=128 MLP_DIM=384
           NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
           MAX_VOCAB=50 MAX_DOCS=60000 MAX_DOC_LEN=128
+          GRAD_CLIP=1.0 LABEL_SMOOTH=0.1 WEIGHT_DECAY=0.01
           DISABLE_PIPELINE_ASSISTS=1
 )
 
 # 64K Assisted (Contrast: Scaffolding is a crutch for low capacity)
 add_demo(
-  NAME    puzzle8_64k_assisted
-  SOURCE  experiments/organelles/puzzle8/main.c
+  NAME    c_puzzle8_64k_assisted
+  SOURCE  demos/character-level/puzzle8/main.c
   THREADS
-  COPY    experiments/organelles/puzzle8/puzzle8_strategist.txt
-          experiments/organelles/puzzle8/puzzle8_mover.txt
-          experiments/organelles/puzzle8/puzzle8_detour_detector.txt
-          experiments/organelles/puzzle8/puzzle8_detour_mover.txt
-          experiments/organelles/puzzle8/puzzle8_judge.txt
+  COPY    demos/character-level/puzzle8/c_puzzle8_strategist.txt
+          demos/character-level/puzzle8/c_puzzle8_mover.txt
+          demos/character-level/puzzle8/c_puzzle8_detour_detector.txt
+          demos/character-level/puzzle8/c_puzzle8_detour_mover.txt
+          demos/character-level/puzzle8/c_puzzle8_judge.txt
   DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=2 BLOCK_SIZE=128 MLP_DIM=192
           NUM_STEPS=10000 LEARNING_RATE=0.001 BATCH_SIZE=8
           MAX_VOCAB=50 MAX_DOCS=60000 MAX_DOC_LEN=128
+          GRAD_CLIP=1.0 LABEL_SMOOTH=0.1 WEIGHT_DECAY=0.01
           STRATEGIST_CKPT="puzzle8_strategist_64k.ckpt"
           MOVER_CKPT="puzzle8_mover_64k.ckpt"
           DETECTOR_CKPT="puzzle8_detector_64k.ckpt"
@@ -367,17 +479,18 @@ add_demo(
 
 # 64K Bare (Contrast: 64K fails without crutch)
 add_demo(
-  NAME    puzzle8_64k_bare
-  SOURCE  experiments/organelles/puzzle8/main.c
+  NAME    c_puzzle8_64k_bare
+  SOURCE  demos/character-level/puzzle8/main.c
   THREADS
-  COPY    experiments/organelles/puzzle8/puzzle8_strategist.txt
-          experiments/organelles/puzzle8/puzzle8_mover.txt
-          experiments/organelles/puzzle8/puzzle8_detour_detector.txt
-          experiments/organelles/puzzle8/puzzle8_detour_mover.txt
-          experiments/organelles/puzzle8/puzzle8_judge.txt
+  COPY    demos/character-level/puzzle8/c_puzzle8_strategist.txt
+          demos/character-level/puzzle8/c_puzzle8_mover.txt
+          demos/character-level/puzzle8/c_puzzle8_detour_detector.txt
+          demos/character-level/puzzle8/c_puzzle8_detour_mover.txt
+          demos/character-level/puzzle8/c_puzzle8_judge.txt
   DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=2 BLOCK_SIZE=128 MLP_DIM=192
           NUM_STEPS=10000 LEARNING_RATE=0.001 BATCH_SIZE=8
           MAX_VOCAB=50 MAX_DOCS=60000 MAX_DOC_LEN=128
+          GRAD_CLIP=1.0 LABEL_SMOOTH=0.1 WEIGHT_DECAY=0.01
           DISABLE_PIPELINE_ASSISTS=1
           STRATEGIST_CKPT="puzzle8_strategist_64k.ckpt"
           MOVER_CKPT="puzzle8_mover_64k.ckpt"
@@ -391,15 +504,15 @@ add_demo(
 # ==================================================================
 
 add_demo(
-  NAME    puzzle8_reasoning_demo
-  SOURCE  experiments/organelles/puzzle8_reasoning/main.c
+  NAME    c_puzzle8_reasoning_demo
+  SOURCE  demos/character-level/puzzle8_reasoning/main.c
   THREADS
-  COPY    experiments/organelles/puzzle8_reasoning/puzzle8_strategist.txt
-          experiments/organelles/puzzle8_reasoning/puzzle8_mover.txt
-          experiments/organelles/puzzle8_reasoning/puzzle8_mover_enriched.txt
-          experiments/organelles/puzzle8_reasoning/puzzle8_detour_detector.txt
-          experiments/organelles/puzzle8_reasoning/puzzle8_detour_mover.txt
-          experiments/organelles/puzzle8_reasoning/puzzle8_judge.txt
+  COPY    demos/character-level/puzzle8_reasoning/c_puzzle8_strategist.txt
+          demos/character-level/puzzle8_reasoning/c_puzzle8_mover.txt
+          demos/character-level/puzzle8_reasoning/c_puzzle8_mover_enriched.txt
+          demos/character-level/puzzle8_reasoning/c_puzzle8_detour_detector.txt
+          demos/character-level/puzzle8_reasoning/c_puzzle8_detour_mover.txt
+          demos/character-level/puzzle8_reasoning/c_puzzle8_judge.txt
   DEFINES N_EMBD=96 N_HEAD=8 N_LAYER=4 BLOCK_SIZE=128 MLP_DIM=384
           NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
           MAX_VOCAB=50 MAX_DOCS=60000 MAX_DOC_LEN=128
@@ -410,18 +523,19 @@ add_demo(
 # ==================================================================
 
 add_demo(
-  NAME    puzzle8_reasoning_enriched_demo
-  SOURCE  experiments/organelles/puzzle8_reasoning/main.c
+  NAME    c_puzzle8_reasoning_enriched_demo
+  SOURCE  demos/character-level/puzzle8_reasoning/main.c
   THREADS
-  COPY    experiments/organelles/puzzle8_reasoning/puzzle8_strategist.txt
-          experiments/organelles/puzzle8_reasoning/puzzle8_mover.txt
-          experiments/organelles/puzzle8_reasoning/puzzle8_mover_enriched.txt
-          experiments/organelles/puzzle8_reasoning/puzzle8_detour_detector.txt
-          experiments/organelles/puzzle8_reasoning/puzzle8_detour_mover.txt
-          experiments/organelles/puzzle8_reasoning/puzzle8_judge.txt
+  COPY    demos/character-level/puzzle8_reasoning/c_puzzle8_strategist.txt
+          demos/character-level/puzzle8_reasoning/c_puzzle8_mover.txt
+          demos/character-level/puzzle8_reasoning/c_puzzle8_mover_enriched.txt
+          demos/character-level/puzzle8_reasoning/c_puzzle8_detour_detector.txt
+          demos/character-level/puzzle8_reasoning/c_puzzle8_detour_mover.txt
+          demos/character-level/puzzle8_reasoning/c_puzzle8_judge.txt
   DEFINES N_EMBD=96 N_HEAD=8 N_LAYER=4 BLOCK_SIZE=128 MLP_DIM=384
           NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
           MAX_VOCAB=50 MAX_DOCS=60000 MAX_DOC_LEN=128
+          GRAD_CLIP=1.0 LABEL_SMOOTH=0.1 WEIGHT_DECAY=0.01
           USE_ENRICHED_CORPUS=1
 )
 
@@ -430,19 +544,20 @@ add_demo(
 # ==================================================================
 
 add_demo(
-  NAME    puzzle8_reasoning_combined_demo
-  SOURCE  experiments/organelles/puzzle8_reasoning/main.c
+  NAME    c_puzzle8_reasoning_combined_demo
+  SOURCE  demos/character-level/puzzle8_reasoning/main.c
   THREADS
-  COPY    experiments/organelles/puzzle8_reasoning/puzzle8_strategist.txt
-          experiments/organelles/puzzle8_reasoning/puzzle8_mover.txt
-          experiments/organelles/puzzle8_reasoning/puzzle8_mover_enriched.txt
-          experiments/organelles/puzzle8_reasoning/puzzle8_mover_combined.txt
-          experiments/organelles/puzzle8_reasoning/puzzle8_detour_detector.txt
-          experiments/organelles/puzzle8_reasoning/puzzle8_detour_mover.txt
-          experiments/organelles/puzzle8_reasoning/puzzle8_judge.txt
+  COPY    demos/character-level/puzzle8_reasoning/c_puzzle8_strategist.txt
+          demos/character-level/puzzle8_reasoning/c_puzzle8_mover.txt
+          demos/character-level/puzzle8_reasoning/c_puzzle8_mover_enriched.txt
+          demos/character-level/puzzle8_reasoning/c_puzzle8_mover_combined.txt
+          demos/character-level/puzzle8_reasoning/c_puzzle8_detour_detector.txt
+          demos/character-level/puzzle8_reasoning/c_puzzle8_detour_mover.txt
+          demos/character-level/puzzle8_reasoning/c_puzzle8_judge.txt
   DEFINES N_EMBD=96 N_HEAD=8 N_LAYER=4 BLOCK_SIZE=192 MLP_DIM=384
           NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
           MAX_VOCAB=50 MAX_DOCS=60000 MAX_DOC_LEN=192
+          GRAD_CLIP=1.0 LABEL_SMOOTH=0.1 WEIGHT_DECAY=0.01
           USE_ENRICHED_CORPUS=2
 )
 
@@ -451,35 +566,37 @@ add_demo(
 # ==================================================================
 
 add_demo(
-  NAME    puzzle8_reasoning_standard_bare
-  SOURCE  experiments/organelles/puzzle8_reasoning/main.c
+  NAME    c_puzzle8_reasoning_standard_bare
+  SOURCE  demos/character-level/puzzle8_reasoning/main.c
   THREADS
-  COPY    experiments/organelles/puzzle8_reasoning/puzzle8_strategist.txt
-          experiments/organelles/puzzle8_reasoning/puzzle8_mover.txt
-          experiments/organelles/puzzle8_reasoning/puzzle8_mover_enriched.txt
-          experiments/organelles/puzzle8_reasoning/puzzle8_detour_detector.txt
-          experiments/organelles/puzzle8_reasoning/puzzle8_detour_mover.txt
-          experiments/organelles/puzzle8_reasoning/puzzle8_judge.txt
+  COPY    demos/character-level/puzzle8_reasoning/c_puzzle8_strategist.txt
+          demos/character-level/puzzle8_reasoning/c_puzzle8_mover.txt
+          demos/character-level/puzzle8_reasoning/c_puzzle8_mover_enriched.txt
+          demos/character-level/puzzle8_reasoning/c_puzzle8_detour_detector.txt
+          demos/character-level/puzzle8_reasoning/c_puzzle8_detour_mover.txt
+          demos/character-level/puzzle8_reasoning/c_puzzle8_judge.txt
   DEFINES N_EMBD=96 N_HEAD=8 N_LAYER=4 BLOCK_SIZE=128 MLP_DIM=384
           NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
           MAX_VOCAB=50 MAX_DOCS=60000 MAX_DOC_LEN=128
+          GRAD_CLIP=1.0 LABEL_SMOOTH=0.1 WEIGHT_DECAY=0.01
           DISABLE_PIPELINE_ASSISTS=1
 )
 
 add_demo(
-  NAME    puzzle8_reasoning_combined_bare
-  SOURCE  experiments/organelles/puzzle8_reasoning/main.c
+  NAME    c_puzzle8_reasoning_combined_bare
+  SOURCE  demos/character-level/puzzle8_reasoning/main.c
   THREADS
-  COPY    experiments/organelles/puzzle8_reasoning/puzzle8_strategist.txt
-          experiments/organelles/puzzle8_reasoning/puzzle8_mover.txt
-          experiments/organelles/puzzle8_reasoning/puzzle8_mover_enriched.txt
-          experiments/organelles/puzzle8_reasoning/puzzle8_mover_combined.txt
-          experiments/organelles/puzzle8_reasoning/puzzle8_detour_detector.txt
-          experiments/organelles/puzzle8_reasoning/puzzle8_detour_mover.txt
-          experiments/organelles/puzzle8_reasoning/puzzle8_judge.txt
+  COPY    demos/character-level/puzzle8_reasoning/c_puzzle8_strategist.txt
+          demos/character-level/puzzle8_reasoning/c_puzzle8_mover.txt
+          demos/character-level/puzzle8_reasoning/c_puzzle8_mover_enriched.txt
+          demos/character-level/puzzle8_reasoning/c_puzzle8_mover_combined.txt
+          demos/character-level/puzzle8_reasoning/c_puzzle8_detour_detector.txt
+          demos/character-level/puzzle8_reasoning/c_puzzle8_detour_mover.txt
+          demos/character-level/puzzle8_reasoning/c_puzzle8_judge.txt
   DEFINES N_EMBD=96 N_HEAD=8 N_LAYER=4 BLOCK_SIZE=192 MLP_DIM=384
           NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
           MAX_VOCAB=50 MAX_DOCS=60000 MAX_DOC_LEN=192
+          GRAD_CLIP=1.0 LABEL_SMOOTH=0.1 WEIGHT_DECAY=0.01
           USE_ENRICHED_CORPUS=2 DISABLE_PIPELINE_ASSISTS=1
 )
 
@@ -488,14 +605,15 @@ add_demo(
 # ==================================================================
 
 add_demo(
-  NAME    tictactoe_demo
-  SOURCE  experiments/organelles/tictactoe/main.c
+  NAME    c_tictactoe_demo
+  SOURCE  demos/character-level/tictactoe/main.c
   THREADS
-  COPY    experiments/organelles/tictactoe/tictactoe_planner.txt
-          experiments/organelles/tictactoe/tictactoe_player.txt
+  COPY    demos/character-level/tictactoe/c_tictactoe_planner.txt
+          demos/character-level/tictactoe/c_tictactoe_player.txt
   DEFINES N_EMBD=96 N_HEAD=8 N_LAYER=4 BLOCK_SIZE=128 MLP_DIM=384
           NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
           MAX_VOCAB=50 MAX_DOCS=5000 MAX_DOC_LEN=128
+          GRAD_CLIP=1.0 LABEL_SMOOTH=0.1 WEIGHT_DECAY=0.01
 )
 
 # ==================================================================
@@ -503,14 +621,15 @@ add_demo(
 # ==================================================================
 
 add_demo(
-  NAME    connect4_demo
-  SOURCE  experiments/organelles/connect4/main.c
+  NAME    c_connect4_demo
+  SOURCE  demos/character-level/connect4/main.c
   THREADS
-  COPY    experiments/organelles/connect4/connect4_planner.txt
-          experiments/organelles/connect4/connect4_player.txt
+  COPY    demos/character-level/connect4/c_connect4_planner.txt
+          demos/character-level/connect4/c_connect4_player.txt
   DEFINES N_EMBD=96 N_HEAD=8 N_LAYER=4 BLOCK_SIZE=128 MLP_DIM=384
           NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
           MAX_VOCAB=50 MAX_DOCS=5000 MAX_DOC_LEN=128
+          GRAD_CLIP=1.0 LABEL_SMOOTH=0.1 WEIGHT_DECAY=0.01
 )
 
 # ==================================================================
@@ -518,89 +637,80 @@ add_demo(
 # ==================================================================
 
 add_demo(
-  NAME    lightsout_demo
-  SOURCE  experiments/organelles/lightsout/main.c
+  NAME    c_lightsout_demo
+  SOURCE  demos/character-level/lightsout/main.c
   THREADS
-  COPY    experiments/organelles/lightsout/lightsout_planner.txt
-          experiments/organelles/lightsout/lightsout_player.txt
+  COPY    demos/character-level/lightsout/c_lightsout_planner.txt
+          demos/character-level/lightsout/c_lightsout_player.txt
   DEFINES N_EMBD=64 N_HEAD=4 N_LAYER=3 BLOCK_SIZE=128 MLP_DIM=256
           NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
           MAX_VOCAB=50 MAX_DOCS=20000 MAX_DOC_LEN=128
+          GRAD_CLIP=1.0 LABEL_SMOOTH=0.1 WEIGHT_DECAY=0.01
 )
-
-# ==================================================================
-#  Organelle: Mastermind multi-organelle pipeline
 # ==================================================================
 
 add_demo(
-  NAME    mastermind_demo
-  SOURCE  experiments/organelles/mastermind/main.c
+  NAME    c_mastermind_demo
+  SOURCE  demos/character-level/mastermind/main.c
   THREADS
-  COPY    experiments/organelles/mastermind/mastermind_planner.txt
-          experiments/organelles/mastermind/mastermind_player.txt
+  COPY    demos/character-level/mastermind/c_mastermind_planner.txt
+          demos/character-level/mastermind/c_mastermind_player.txt
   DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=3 BLOCK_SIZE=128 MLP_DIM=192
           NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
           MAX_VOCAB=50 MAX_DOCS=10000 MAX_DOC_LEN=128
+          GRAD_CLIP=1.0 LABEL_SMOOTH=0.1 WEIGHT_DECAY=0.01
 )
-
-# ==================================================================
-#  Organelle: Klotski simplified multi-organelle pipeline
 # ==================================================================
 
 add_demo(
-  NAME    klotski_demo
-  SOURCE  experiments/organelles/klotski/main.c
+  NAME    c_klotski_demo
+  SOURCE  demos/character-level/klotski/main.c
   THREADS
-  COPY    experiments/organelles/klotski/klotski_planner.txt
-          experiments/organelles/klotski/klotski_player.txt
+  COPY    demos/character-level/klotski/c_klotski_planner.txt
+          demos/character-level/klotski/c_klotski_player.txt
   DEFINES N_EMBD=32 N_HEAD=4 N_LAYER=2 BLOCK_SIZE=128 MLP_DIM=128
           NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
           MAX_VOCAB=50 MAX_DOCS=10000 MAX_DOC_LEN=128
+          GRAD_CLIP=1.0 LABEL_SMOOTH=0.1 WEIGHT_DECAY=0.01
 )
-
-# ==================================================================
-#  Organelle: Sudoku 4x4 multi-organelle pipeline
 # ==================================================================
 
 add_demo(
-  NAME    sudoku_demo
-  SOURCE  experiments/organelles/sudoku/main.c
+  NAME    c_sudoku_demo
+  SOURCE  demos/character-level/sudoku/main.c
   THREADS
-  COPY    experiments/organelles/sudoku/sudoku_planner.txt
-          experiments/organelles/sudoku/sudoku_player.txt
+  COPY    demos/character-level/sudoku/c_sudoku_planner.txt
+          demos/character-level/sudoku/c_sudoku_player.txt
   DEFINES N_EMBD=64 N_HEAD=4 N_LAYER=3 BLOCK_SIZE=128 MLP_DIM=256
           NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
           MAX_VOCAB=50 MAX_DOCS=20000 MAX_DOC_LEN=128
+          GRAD_CLIP=1.0 LABEL_SMOOTH=0.1 WEIGHT_DECAY=0.01
 )
-
-# ==================================================================
-#  Organelle: Othello 6x6 multi-organelle pipeline
 # ==================================================================
 
 add_demo(
-  NAME    othello_demo
-  SOURCE  experiments/organelles/othello/main.c
+  NAME    c_othello_demo
+  SOURCE  demos/character-level/othello/main.c
   THREADS
-  COPY    experiments/organelles/othello/othello_planner.txt
-          experiments/organelles/othello/othello_player.txt
+  COPY    demos/character-level/othello/c_othello_planner.txt
+          demos/character-level/othello/c_othello_player.txt
   DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=3 BLOCK_SIZE=128 MLP_DIM=192
           NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
           MAX_VOCAB=50 MAX_DOCS=10000 MAX_DOC_LEN=128
+          GRAD_CLIP=1.0 LABEL_SMOOTH=0.1 WEIGHT_DECAY=0.01
 )
-
-# ==================================================================
-#  Organelle: Hex 7x7 multi-organelle pipeline
 # ==================================================================
 
 add_demo(
-  NAME    hex_demo
-  SOURCE  experiments/organelles/hex/main.c
+  NAME    c_hex_demo
+  SOURCE  demos/character-level/hex/main.c
   THREADS
-  COPY    experiments/organelles/hex/hex_planner.txt
-          experiments/organelles/hex/hex_player.txt
+  COPY    demos/character-level/hex/c_hex_planner.txt
+          demos/character-level/hex/c_hex_player.txt
   DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=3 BLOCK_SIZE=128 MLP_DIM=192
           NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
           MAX_VOCAB=50 MAX_DOCS=10000 MAX_DOC_LEN=128
+          GRAD_CLIP=1.0 LABEL_SMOOTH=0.1 WEIGHT_DECAY=0.01
 )
 
 # ==================================================================
@@ -608,15 +718,33 @@ add_demo(
 # ==================================================================
 
 add_demo(
-  NAME    hex5_demo
-  SOURCE  experiments/organelles/hex/main.c
+  NAME    c_hex5_demo
+  SOURCE  demos/character-level/hex/main.c
   THREADS
-  COPY    experiments/organelles/hex/hex5_planner.txt
-          experiments/organelles/hex/hex5_player.txt
+  COPY    demos/character-level/hex/c_hex5_planner.txt
+          demos/character-level/hex/c_hex5_player.txt
   DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=3 BLOCK_SIZE=128 MLP_DIM=192
           NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
           MAX_VOCAB=50 MAX_DOCS=10000 MAX_DOC_LEN=128
           HEX_GRID=5
+          GRAD_CLIP=1.0 LABEL_SMOOTH=0.1 WEIGHT_DECAY=0.01
+)
+
+# ==================================================================
+#  Organelle: Hex 5x5 Word-Level (word tokenisation variant)
+# ==================================================================
+
+add_demo(
+  NAME    w_hex5_demo
+  SOURCE  demos/word-level/hex/main_word.c
+  THREADS
+  COPY    demos/word-level/hex/w_hex5_planner.txt
+          demos/word-level/hex/w_hex5_player.txt
+  DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=3 BLOCK_SIZE=128 MLP_DIM=192
+          NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
+          MAX_VOCAB=600 MAX_DOCS=10000 MAX_DOC_LEN=128
+          HEX_GRID=5 WORD_VOCAB_SIZE=512
+          GRAD_CLIP=1.0 LABEL_SMOOTH=0.1 WEIGHT_DECAY=0.01
 )
 
 # ==================================================================
@@ -624,14 +752,15 @@ add_demo(
 # ==================================================================
 
 add_demo(
-  NAME    pentago_demo
-  SOURCE  experiments/organelles/pentago/main.c
+  NAME    c_pentago_demo
+  SOURCE  demos/character-level/pentago/main.c
   THREADS
-  COPY    experiments/organelles/pentago/pentago_planner.txt
-          experiments/organelles/pentago/pentago_player.txt
+  COPY    demos/character-level/pentago/c_pentago_planner.txt
+          demos/character-level/pentago/c_pentago_player.txt
   DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=3 BLOCK_SIZE=128 MLP_DIM=192
           NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
           MAX_VOCAB=50 MAX_DOCS=10000 MAX_DOC_LEN=128
+          GRAD_CLIP=1.0 LABEL_SMOOTH=0.1 WEIGHT_DECAY=0.01
 )
 
 # ==================================================================
@@ -639,14 +768,15 @@ add_demo(
 # ==================================================================
 
 add_demo(
-  NAME    reddonkey_demo
-  SOURCE  experiments/organelles/reddonkey/main.c
+  NAME    c_reddonkey_demo
+  SOURCE  demos/character-level/reddonkey/main.c
   THREADS
-  COPY    experiments/organelles/reddonkey/reddonkey_planner.txt
-          experiments/organelles/reddonkey/reddonkey_player.txt
+  COPY    demos/character-level/reddonkey/c_reddonkey_planner.txt
+          demos/character-level/reddonkey/c_reddonkey_player.txt
   DEFINES N_EMBD=32 N_HEAD=4 N_LAYER=2 BLOCK_SIZE=128 MLP_DIM=128
           NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
           MAX_VOCAB=50 MAX_DOCS=10000 MAX_DOC_LEN=128
+          GRAD_CLIP=1.0 LABEL_SMOOTH=0.1 WEIGHT_DECAY=0.01
 )
 
 # ==================================================================
@@ -654,15 +784,16 @@ add_demo(
 # ==================================================================
 
 add_demo(
-  NAME    rd54_demo
-  SOURCE  experiments/organelles/reddonkey/main.c
+  NAME    c_rd54_demo
+  SOURCE  demos/character-level/reddonkey/main.c
   THREADS
-  COPY    experiments/organelles/reddonkey/rd54_planner.txt
-          experiments/organelles/reddonkey/rd54_player.txt
+  COPY    demos/character-level/reddonkey/c_rd54_planner.txt
+          demos/character-level/reddonkey/c_rd54_player.txt
   DEFINES N_EMBD=32 N_HEAD=4 N_LAYER=2 BLOCK_SIZE=128 MLP_DIM=128
           NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
           MAX_VOCAB=50 MAX_DOCS=10000 MAX_DOC_LEN=128
           RD_ROWS=5 RD_COLS=4
+          GRAD_CLIP=1.0 LABEL_SMOOTH=0.1 WEIGHT_DECAY=0.01
 )
 
 # ==================================================================
@@ -670,26 +801,179 @@ add_demo(
 # ==================================================================
 
 add_demo(
-  NAME    hex_256_demo
-  SOURCE  experiments/organelles/hex/main.c
+  NAME    c_hex_256_demo
+  SOURCE  demos/character-level/hex/main.c
   THREADS
-  COPY    experiments/organelles/hex/hex_planner.txt
-          experiments/organelles/hex/hex_player.txt
+  COPY    demos/character-level/hex/c_hex_planner.txt
+          demos/character-level/hex/c_hex_player.txt
   DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=3 BLOCK_SIZE=256 MLP_DIM=192
           NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
           MAX_VOCAB=50 MAX_DOCS=10000 MAX_DOC_LEN=256
+          GRAD_CLIP=1.0 LABEL_SMOOTH=0.1 WEIGHT_DECAY=0.01
 )
 
 add_demo(
-  NAME    rd54_256_demo
-  SOURCE  experiments/organelles/reddonkey/main.c
+  NAME    c_rd54_256_demo
+  SOURCE  demos/character-level/reddonkey/main.c
   THREADS
-  COPY    experiments/organelles/reddonkey/rd54_planner.txt
-          experiments/organelles/reddonkey/rd54_player.txt
+  COPY    demos/character-level/reddonkey/c_rd54_planner.txt
+          demos/character-level/reddonkey/c_rd54_player.txt
   DEFINES N_EMBD=32 N_HEAD=4 N_LAYER=2 BLOCK_SIZE=256 MLP_DIM=128
           NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
           MAX_VOCAB=50 MAX_DOCS=10000 MAX_DOC_LEN=256
           RD_ROWS=5 RD_COLS=4
+          GRAD_CLIP=1.0 LABEL_SMOOTH=0.1 WEIGHT_DECAY=0.01
+)
+# ==================================================================
+#
+#  Quick targets for comparing training optimisation techniques.
+#  Each trains a single organelle on the tictactoe corpus (game data)
+#  with 5000 steps — fast enough for iterative A/B testing.
+#
+
+# Baseline — no optimisations
+add_demo(
+  NAME    c_optim_bench_baseline
+  SOURCE  demos/character-level/optim_bench/main.c
+  THREADS
+  COPY    demos/character-level/tictactoe/c_tictactoe_player.txt
+  DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=2 BLOCK_SIZE=128 MLP_DIM=192
+          NUM_STEPS=5000 LEARNING_RATE=0.001 BATCH_SIZE=8
+          MAX_VOCAB=50 MAX_DOCS=5000 MAX_DOC_LEN=128
+)
+
+# Experiment 1: Gradient Clipping (||g|| <= 1.0)
+add_demo(
+  NAME    c_optim_bench_gradclip
+  SOURCE  demos/character-level/optim_bench/main.c
+  THREADS
+  COPY    demos/character-level/tictactoe/c_tictactoe_player.txt
+  DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=2 BLOCK_SIZE=128 MLP_DIM=192
+          NUM_STEPS=5000 LEARNING_RATE=0.001 BATCH_SIZE=8
+          MAX_VOCAB=50 MAX_DOCS=5000 MAX_DOC_LEN=128
+          GRAD_CLIP=1.0
+)
+
+# Experiment 2: Weight Decay (AdamW, wd=0.01)
+add_demo(
+  NAME    c_optim_bench_weightdecay
+  SOURCE  demos/character-level/optim_bench/main.c
+  THREADS
+  COPY    demos/character-level/tictactoe/c_tictactoe_player.txt
+  DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=2 BLOCK_SIZE=128 MLP_DIM=192
+          NUM_STEPS=5000 LEARNING_RATE=0.001 BATCH_SIZE=8
+          MAX_VOCAB=50 MAX_DOCS=5000 MAX_DOC_LEN=128
+          WEIGHT_DECAY=0.01
+)
+
+# Experiment 3: Tuned Adam Hyperparameters (standard values)
+add_demo(
+  NAME    c_optim_bench_adamtuned
+  SOURCE  demos/character-level/optim_bench/main.c
+  THREADS
+  COPY    demos/character-level/tictactoe/c_tictactoe_player.txt
+  DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=2 BLOCK_SIZE=128 MLP_DIM=192
+          NUM_STEPS=5000 LEARNING_RATE=0.0006 BATCH_SIZE=8
+          MAX_VOCAB=50 MAX_DOCS=5000 MAX_DOC_LEN=128
+          BETA1=0.9 BETA2=0.999
+)
+
+# Experiment 4: Label Smoothing (alpha=0.1)
+add_demo(
+  NAME    c_optim_bench_labelsmooth
+  SOURCE  demos/character-level/optim_bench/main.c
+  THREADS
+  COPY    demos/character-level/tictactoe/c_tictactoe_player.txt
+  DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=2 BLOCK_SIZE=128 MLP_DIM=192
+          NUM_STEPS=5000 LEARNING_RATE=0.001 BATCH_SIZE=8
+          MAX_VOCAB=50 MAX_DOCS=5000 MAX_DOC_LEN=128
+          LABEL_SMOOTH=0.1
+)
+
+# Experiment 5: Combined (grad clip + weight decay + label smoothing)
+add_demo(
+  NAME    c_optim_bench_combined
+  SOURCE  demos/character-level/optim_bench/main.c
+  THREADS
+  COPY    demos/character-level/tictactoe/c_tictactoe_player.txt
+  DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=2 BLOCK_SIZE=128 MLP_DIM=192
+          NUM_STEPS=5000 LEARNING_RATE=0.001 BATCH_SIZE=8
+          MAX_VOCAB=50 MAX_DOCS=5000 MAX_DOC_LEN=128
+          GRAD_CLIP=1.0 WEIGHT_DECAY=0.01 LABEL_SMOOTH=0.1
+)
+
+# Connect-4 benchmarks (larger board, more complex strategy)
+# Uses the same architecture as the real connect4_demo (N_EMBD=96, ~460K params)
+
+add_demo(
+  NAME    c_optim_c4_baseline
+  SOURCE  demos/character-level/optim_bench/main.c
+  THREADS
+  COPY    demos/character-level/connect4/c_connect4_player.txt
+  DEFINES N_EMBD=96 N_HEAD=8 N_LAYER=4 BLOCK_SIZE=128 MLP_DIM=384
+          NUM_STEPS=5000 LEARNING_RATE=0.001 BATCH_SIZE=8
+          MAX_VOCAB=50 MAX_DOCS=5000 MAX_DOC_LEN=128
+          BENCH_CORPUS=\"connect4_player.txt\"
+)
+
+add_demo(
+  NAME    c_optim_c4_gradclip
+  SOURCE  demos/character-level/optim_bench/main.c
+  THREADS
+  COPY    demos/character-level/connect4/c_connect4_player.txt
+  DEFINES N_EMBD=96 N_HEAD=8 N_LAYER=4 BLOCK_SIZE=128 MLP_DIM=384
+          NUM_STEPS=5000 LEARNING_RATE=0.001 BATCH_SIZE=8
+          MAX_VOCAB=50 MAX_DOCS=5000 MAX_DOC_LEN=128
+          BENCH_CORPUS=\"connect4_player.txt\"
+          GRAD_CLIP=1.0
+)
+
+add_demo(
+  NAME    c_optim_c4_weightdecay
+  SOURCE  demos/character-level/optim_bench/main.c
+  THREADS
+  COPY    demos/character-level/connect4/c_connect4_player.txt
+  DEFINES N_EMBD=96 N_HEAD=8 N_LAYER=4 BLOCK_SIZE=128 MLP_DIM=384
+          NUM_STEPS=5000 LEARNING_RATE=0.001 BATCH_SIZE=8
+          MAX_VOCAB=50 MAX_DOCS=5000 MAX_DOC_LEN=128
+          BENCH_CORPUS=\"connect4_player.txt\"
+          WEIGHT_DECAY=0.01
+)
+
+add_demo(
+  NAME    c_optim_c4_adamtuned
+  SOURCE  demos/character-level/optim_bench/main.c
+  THREADS
+  COPY    demos/character-level/connect4/c_connect4_player.txt
+  DEFINES N_EMBD=96 N_HEAD=8 N_LAYER=4 BLOCK_SIZE=128 MLP_DIM=384
+          NUM_STEPS=5000 LEARNING_RATE=0.0006 BATCH_SIZE=8
+          MAX_VOCAB=50 MAX_DOCS=5000 MAX_DOC_LEN=128
+          BENCH_CORPUS=\"connect4_player.txt\"
+          BETA1=0.9 BETA2=0.999
+)
+
+add_demo(
+  NAME    c_optim_c4_labelsmooth
+  SOURCE  demos/character-level/optim_bench/main.c
+  THREADS
+  COPY    demos/character-level/connect4/c_connect4_player.txt
+  DEFINES N_EMBD=96 N_HEAD=8 N_LAYER=4 BLOCK_SIZE=128 MLP_DIM=384
+          NUM_STEPS=5000 LEARNING_RATE=0.001 BATCH_SIZE=8
+          MAX_VOCAB=50 MAX_DOCS=5000 MAX_DOC_LEN=128
+          BENCH_CORPUS=\"connect4_player.txt\"
+          LABEL_SMOOTH=0.1
+)
+
+add_demo(
+  NAME    c_optim_c4_combined
+  SOURCE  demos/character-level/optim_bench/main.c
+  THREADS
+  COPY    demos/character-level/connect4/c_connect4_player.txt
+  DEFINES N_EMBD=96 N_HEAD=8 N_LAYER=4 BLOCK_SIZE=128 MLP_DIM=384
+          NUM_STEPS=5000 LEARNING_RATE=0.001 BATCH_SIZE=8
+          MAX_VOCAB=50 MAX_DOCS=5000 MAX_DOC_LEN=128
+          BENCH_CORPUS=\"connect4_player.txt\"
+          GRAD_CLIP=1.0 WEIGHT_DECAY=0.01 LABEL_SMOOTH=0.1
 )
 
 # ==================================================================
@@ -697,58 +981,50 @@ add_demo(
 # ==================================================================
 
 add_demo(
-  NAME    lottery_demo
-  SOURCE  experiments/organelles/lottery/main.c
+  NAME    c_lottery_demo
+  SOURCE  demos/character-level/lottery/main.c
   THREADS
-  COPY    experiments/organelles/lottery/lottery_analyser.txt
-          experiments/organelles/lottery/lottery_predictor.txt
-          experiments/organelles/lottery/euromillions-draw-history.csv
+  COPY    demos/character-level/lottery/c_lottery_analyser.txt
+          demos/character-level/lottery/c_lottery_predictor.txt
+          demos/character-level/lottery/c_euromillions-draw-history.csv
   DEFINES N_EMBD=64 N_HEAD=4 N_LAYER=3 BLOCK_SIZE=128 MLP_DIM=256
           NUM_STEPS=50000 LEARNING_RATE=0.001 BATCH_SIZE=8
           MAX_VOCAB=50 MAX_DOCS=8000 MAX_DOC_LEN=128
+          GRAD_CLIP=1.0 LABEL_SMOOTH=0.1
 )
+# ==================================================================
+
 
 # ==================================================================
-#  Organelle: Market Regime Detection pipeline
+#  Organelle: Transfer Learning — TTT → Othello (cross-game)
 # ==================================================================
 
 add_demo(
-  NAME    markets_demo
-  SOURCE  experiments/organelles/markets/main.c
+  NAME    c_tictactoe_transfer_othello
+  SOURCE  demos/character-level/tictactoe_transfer_othello/main.c
   THREADS
-  COPY    experiments/organelles/markets/market_analyser.txt
-          experiments/organelles/markets/market_regime.txt
-          experiments/organelles/markets/market_rotator.txt
-          experiments/organelles/markets/market_data.csv
-  DEFINES N_EMBD=128 N_HEAD=8 N_LAYER=3 BLOCK_SIZE=128 MLP_DIM=512
-          NUM_STEPS=50000 LEARNING_RATE=0.0003 BATCH_SIZE=8
-          MAX_VOCAB=80 MAX_DOCS=8000 MAX_DOC_LEN=128
-)
-
-# ==================================================================
-#  Organelle: Transfer Learning Experiment (TTT → Othello)
-# ==================================================================
-
-add_demo(
-  NAME    transfer_demo
-  SOURCE  experiments/organelles/transfer_demo/main.c
-  THREADS
-  COPY    experiments/organelles/tictactoe/tictactoe_player.txt
-          experiments/organelles/othello/othello_player.txt
+  COPY    demos/character-level/tictactoe/c_tictactoe_player.txt
+          demos/character-level/othello/c_othello_player.txt
   DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=3 BLOCK_SIZE=128 MLP_DIM=192
           NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
           MAX_VOCAB=50 MAX_DOCS=10000 MAX_DOC_LEN=128
+          GRAD_CLIP=1.0 LABEL_SMOOTH=0.1
 )
 
+# ==================================================================
+#  Organelle: Transfer Learning — Same-game (Planner → Player)
+# ==================================================================
+
 add_demo(
-  NAME    transfer_same_demo
-  SOURCE  experiments/organelles/transfer_same_demo/main.c
+  NAME    c_tictactoe_transfer_planner_to_player
+  SOURCE  demos/character-level/tictactoe_transfer_planner_to_player/main.c
   THREADS
-  COPY    experiments/organelles/tictactoe/tictactoe_planner.txt
-          experiments/organelles/tictactoe/tictactoe_player.txt
+  COPY    demos/character-level/tictactoe/c_tictactoe_planner.txt
+          demos/character-level/tictactoe/c_tictactoe_player.txt
   DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=3 BLOCK_SIZE=128 MLP_DIM=192
           NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
           MAX_VOCAB=50 MAX_DOCS=10000 MAX_DOC_LEN=128
+          GRAD_CLIP=1.0 LABEL_SMOOTH=0.1
 )
 
 # ==================================================================
@@ -784,11 +1060,7 @@ if(NOT MSVC)
 endif()
 add_test(NAME organelle_tests COMMAND test_microgpt_organelle WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
-add_executable(bench_microgpt_organelle tests/bench_microgpt_organelle.c)
-target_link_libraries(bench_microgpt_organelle PRIVATE microgpt_lib)
-if(NOT MSVC)
-  target_link_libraries(bench_microgpt_organelle PRIVATE m)
-endif()
+
 
 # ==================================================================
 #  Virtual Machine Engine

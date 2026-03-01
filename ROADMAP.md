@@ -10,7 +10,7 @@ A living roadmap for MicroGPT-C — a zero-dependency C99 GPT engine designed fo
 
 **Picture:** We've built the LEGO bricks and proved they snap together in 14 different configurations. The next step is the instruction manual and the box.
 
-**Proof:** Names (trains in < 1s), Shakespeare (840K params), 8-puzzle (**90% solve**, 5-organelle pipeline), Tic-Tac-Toe (**87% win+draw**), Connect-4 (**88% wins**), C code composition (**83% exact match**, 1.2M params with LR scheduling), plus 8 new game experiments — all validated. **Market regime detection** achieves **57% accuracy on unseen data** (2.8× baseline) while the **lottery experiment** proves OPA cannot learn from random data (entropy floor ~0.50). Shared organelle library (`microgpt_organelle.c|h`) eliminates 300–500 lines of boilerplate per demo. Ensemble voting + valid-move pre-filtering achieve **zero invalid moves** across all games.
+**Proof:** Names (trains in < 1s), Shakespeare (840K params), 8-puzzle (**90% solve**, 5-organelle pipeline), Tic-Tac-Toe (**87% win+draw**), Connect-4 (**88% wins**), C code composition (**83% exact match**, 1.2M params with LR scheduling), plus 8 new game experiments — all validated. **Continuous-domain exploration** revealed the "Discretisation Wall" — the text wire format’s 31-character vocabulary prevents temporal prediction, defining the boundary between OPA’s strengths (games, classification) and where architectural extensions are needed. The **lottery experiment** proves OPA cannot learn from random data (entropy floor ~0.50). Shared organelle library (`microgpt_organelle.c|h`) eliminates 300–500 lines of boilerplate per demo. Ensemble voting + valid-move pre-filtering achieve **zero invalid moves** across all games.
 
 **Push:** The Q2 2026 organelle toolkit is the critical next step — it turns sixteen separate `main.c` files into a single `microgpt create/train/infer` CLI.
 
@@ -42,8 +42,8 @@ A living roadmap for MicroGPT-C — a zero-dependency C99 GPT engine designed fo
 - [x] 44 unit tests covering all public API functions
 - [x] 15 performance benchmarks with measured throughput
 - [x] Comprehensive README with build instructions, examples, and benchmarks
-- [x] [Optimisation Strategies](docs/foundation/OPTIMISATION_STRATEGIES.md) technical white paper (9 strategies documented)
-- [x] [Training Strategies](docs/foundation/TRAINING_STRATEGIES.md) — LR scheduling guidelines, warmup ratio tuning, capacity scaling rules
+- [x] [Optimisation Strategies](docs/research/RESEARCH_OPTIMISATION.md) technical white paper (9 strategies documented)
+- [x] [Training Strategies](docs/research/RESEARCH_TRAINING_STRATEGIES.md) — LR scheduling guidelines, warmup ratio tuning, capacity scaling rules
 - [x] Character-level and word-level tokenisation guides
 
 ### Demos & Experiments
@@ -51,7 +51,7 @@ A living roadmap for MicroGPT-C — a zero-dependency C99 GPT engine designed fo
 - [x] **shakespeare** — character-level Shakespeare (840K params, multi-threaded, zero `<unk>`)
 - [x] **c_codegen** — C code generation from prompts (875K params, byte-perfect recall of 2,081 functions)
 - [x] **c_wiringgen** — C function composition grammar (875K params, training in progress)
-- [x] **c_compose** — C function composition pipeline: Planner → Judge (**98% parse**, **83% exact match**, 1.2M params with LR scheduling)
+- [x] **c99_compose** — C function composition pipeline: Planner → Judge (**98% parse**, **83% exact match**, 1.2M params with LR scheduling)
 - [x] **tic-tac-toe** — 2-organelle pipeline: Planner → Player (**87% win+draw** vs random, zero invalid moves, 460K params)
 - [x] **8-puzzle** — 5-organelle pipeline: Strategist → Mover → Judge → Detector → DetourMover with kanban + cycle breaking (**90% solve rate**: 100% easy, 100% med, 70% hard, 460K params)
 - [x] **Connect-4** — 2-organelle pipeline: Planner → Player (**88% wins**, zero invalid moves, 460K params)
@@ -64,11 +64,11 @@ A living roadmap for MicroGPT-C — a zero-dependency C99 GPT engine designed fo
 - [x] **Pentago** — rotation-based strategy with combined move+rotate actions (**91% win** vs random, 92K params)
 - [x] **Red Donkey** — sliding block variant with asymmetric piece constraints (**19% solve**, 30K params)
 - [x] **Lottery prediction** — EuroMillions 2-organelle pipeline: negative control proving OPA **cannot learn from random data** (loss floor ~0.50, matching theoretical entropy)
-- [x] **Market regime detection** — 3-organelle pipeline with APL-inspired compact encoding: **57% holdout accuracy** (2.8× random baseline, 615K params), proving OPA **learns genuine signal from real-world cross-asset data**
+- [x] **Continuous-domain exploration** — explored applying OPA to financial time-series, discovering the "Discretisation Wall" — the text wire format’s 31-character vocabulary destroys continuous gradients. Bridging categorical reasoning with numerical sensing is an active research direction.
 - [x] **Capacity scaling experiment** — 7× capacity increase (64K→460K) reduced parse errors by 32–100% across all games; fixed runtime config bug that prevented scaling
 - [x] **LR scheduling tuning** — Warmup ratio (5% of steps) + lr capacity scaling (lr ∝ 1/√params) stabilised 1.2M-parameter training
-- [x] Multi-organelle [experiment READMEs](experiments/organelles/) with Spear summaries
-- [x] [Design documents](docs/organelles/) — pipeline wire format, kanban planner, CLI vision
+- [x] Multi-organelle [experiment READMEs](demos/character-level/) with Spear summaries
+- [x] [Design documents](docs/research/) — pipeline wire format, kanban planner, CLI vision
 
 ---
 

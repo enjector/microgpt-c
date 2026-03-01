@@ -68,4 +68,4 @@ For VM scripting, also include:
 #include "microgpt_vm.h"
 ```
 
-See `demos/` for working examples and `experiments/organelles/` for the full experiment suite.
+See `demos/` for working examples and `demos/character-level/` for the full experiment suite.

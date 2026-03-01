@@ -28,8 +28,8 @@
 #define SHAKES_SAMPLES 5
 #define SHAKES_TEMP 0.7
 #define GEN_LEN 300 /* characters to generate per sample */
-#define CHECKPOINT_FILE "shakespeare.ckpt"
-#define TRAINING_LOG "shakespeare.ckpt.log"
+#define CHECKPOINT_FILE "c_shakespeare.ckpt"
+#define TRAINING_LOG "c_shakespeare.ckpt.log"
 
 /* Max threads (actual count is auto-detected at runtime) */
 #ifndef MAX_THREADS
@@ -42,26 +42,16 @@ int main(void) {
   srand(train_seed);
   seed_rng(train_seed);
 
-  /* Runtime configuration — Shakespeare-specific overrides */
+  /* Runtime configuration — uses compile-time defines from CMake.
+   * Override any of these via CMakeLists.txt DEFINES, e.g. NUM_STEPS=5000 */
   MicrogptConfig cfg = microgpt_default_config();
-  cfg.n_embd = 128;
-  cfg.n_head = 8;
-  cfg.mlp_dim = 512;
-  cfg.n_layer = 4;
-  cfg.block_size = 256;
-  cfg.batch_size = 16;
-  cfg.num_steps = 30000;
-  cfg.learning_rate = 0.001;
-  cfg.max_vocab = 200;
-  cfg.max_docs = 200000;
-  cfg.max_doc_len = 512;
   microgpt_print_config("MicroGPT-C - Shakespeare Demo", &cfg);
 
   const int nl = cfg.n_layer;
 
   /* ---- Load Shakespeare as line-per-doc ---- */
   Docs docs = {0};
-  if (load_docs("shakespeare.txt", &docs, cfg.max_docs) != 0) {
+  if (load_docs("c_shakespeare.txt", &docs, cfg.max_docs) != 0) {
     fprintf(stderr, "Cannot open shakespeare.txt\n");
     return 1;
   }
@@ -252,6 +242,7 @@ int main(void) {
       scalar_t mean_loss = batch_loss / (scalar_t)batch_positions;
       for (size_t i = 0; i < nparams; i++)
         grad_buffer[i] /= (scalar_t)batch_positions;
+      clip_gradients(grad_buffer, nparams);
       adam_step(model, grad_buffer, m_buf, v_buf, step);
 
       if ((step + 1) % 500 == 0 || step == 0) {

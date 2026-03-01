@@ -31,8 +31,10 @@
 
 typedef struct {
   Model *model;
-  Vocab vocab;
+  Vocab vocab;          /* character-level vocabulary */
+  WordVocab word_vocab; /* word-level vocabulary (populated if word_level=1) */
   Docs docs;
+  int word_level; /* 0 = char-level (default), 1 = word-level */
 } Organelle;
 
 /*
@@ -79,6 +81,58 @@ void organelle_free(Organelle *org);
 Organelle *organelle_train_transfer(const char *name, const char *corpus_path,
                                     const char *ckpt_path, MicrogptConfig *cfg,
                                     int num_steps, const Model *source_model);
+
+/*
+ * Train a Model Soup: train n_seeds independent models with different RNG
+ * seeds, then average their weights into a single model.  The resulting
+ * organelle runs at the same speed as a single model but often generalises
+ * better.  Returns NULL on failure.
+ */
+Organelle *organelle_train_soup(const char *name, const char *corpus_path,
+                                MicrogptConfig *cfg, int num_steps,
+                                int n_seeds);
+
+/* ======================== Word-Level Organelle =============================
+ */
+/*
+ * Word-level variants of the organelle train/generate API.
+ * Instead of character-level tokenisation, these use WordVocab from microgpt.h
+ * to tokenise at the word level.  This compresses sequences ~5× and frees
+ * model capacity from spelling patterns for higher-order reasoning.
+ *
+ * The returned Organelle has word_level=1 and word_vocab populated.
+ * Use organelle_generate_words() for inference.
+ */
+
+/*
+ * Train a word-level organelle from a corpus file.
+ * max_words = maximum vocabulary size (top-N by frequency).
+ * Training uses a single-threaded loop with tokenize_words().
+ */
+Organelle *organelle_train_words(const char *name, const char *corpus_path,
+                                 const char *ckpt_path, MicrogptConfig *cfg,
+                                 int num_steps, size_t max_words);
+
+/*
+ * Generate a response from a word-level organelle.
+ * Tokenises the prompt at word level, feeds word tokens, then samples
+ * word tokens and concatenates them with spaces.
+ * Output stops at newline token, BOS, or max_len characters.
+ */
+void organelle_generate_words(const Organelle *org, const MicrogptConfig *cfg,
+                              const char *prompt, char *output, int max_len,
+                              scalar_t temperature);
+
+/*
+ * Ensemble voting for word-level organelles.
+ * Same pattern as organelle_generate_ensemble() but uses word-level inference.
+ */
+void organelle_generate_words_ensemble(const Organelle *org,
+                                       const MicrogptConfig *cfg,
+                                       const char *prompt, char *output,
+                                       int max_len, int n_votes,
+                                       scalar_t base_temp,
+                                       scalar_t *confidence);
 
 /* ======================== Kanban State =================================== */
 /*

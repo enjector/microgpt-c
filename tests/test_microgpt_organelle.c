@@ -613,6 +613,106 @@ TEST(trace_pipeline_simulation) {
   ASSERT(strstr(buf, "replan") != NULL);
 }
 
+/* ======================== Word-Level Organelle =============================
+ */
+
+/* Verify a zeroed Organelle has word_level == 0 */
+TEST(word_organelle_struct_defaults) {
+  Organelle org;
+  memset(&org, 0, sizeof(org));
+  ASSERT_EQ(org.word_level, 0);
+  ASSERT(org.word_vocab.words == NULL);
+  ASSERT_EQ(org.word_vocab.vocab_size, (size_t)0);
+}
+
+/* organelle_free(NULL) is still safe (regression) */
+TEST(word_organelle_free_null_safe) { organelle_free(NULL); }
+
+/* Build a small word vocab and free via organelle_free without crash */
+TEST(word_organelle_free_word_level) {
+  const char *text = "hello world hello test world hello";
+  size_t text_len = strlen(text);
+
+  Organelle *org = (Organelle *)calloc(1, sizeof(Organelle));
+  ASSERT(org != NULL);
+  org->word_level = 1;
+  org->model = NULL; /* no model — just testing vocab cleanup */
+  org->docs.num_docs = 0;
+  org->docs.lines = NULL;
+
+  int rc = build_word_vocab(text, text_len, 10, &org->word_vocab);
+  ASSERT_EQ(rc, 0);
+  ASSERT_GT(org->word_vocab.vocab_size, (size_t)0);
+
+  /* This should free the WordVocab without crashing */
+  organelle_free(org);
+}
+
+/* Build a word vocab from test text and verify tokenize_words produces correct
+ * IDs */
+TEST(word_vocab_build_and_tokenize) {
+  const char *text = "the cat sat on the mat the cat";
+  size_t text_len = strlen(text);
+
+  WordVocab wv;
+  int rc = build_word_vocab(text, text_len, 10, &wv);
+  ASSERT_EQ(rc, 0);
+
+  /* Should have: "the"(most freq), "cat"(2nd), + others + 3 special */
+  ASSERT_GT(wv.vocab_size, (size_t)3); /* at least 3 special tokens */
+  ASSERT_EQ(wv.unk_id, wv.num_words);
+  ASSERT_EQ(wv.newline_id, wv.num_words + 1);
+  ASSERT_EQ(wv.bos_id, wv.num_words + 2);
+  ASSERT_EQ(wv.vocab_size, wv.num_words + 3);
+
+  /* "the" should be most frequent -> id 0 */
+  size_t the_id = word_to_id(&wv, "the");
+  ASSERT_EQ(the_id, (size_t)0);
+
+  /* "cat" should be id 1 */
+  size_t cat_id = word_to_id(&wv, "cat");
+  ASSERT_EQ(cat_id, (size_t)1);
+
+  /* Unknown word -> unk_id */
+  size_t unk = word_to_id(&wv, "xyzzy");
+  ASSERT_EQ(unk, wv.unk_id);
+
+  /* Tokenize a phrase */
+  size_t ids[16];
+  size_t n = tokenize_words("the cat", 7, &wv, ids, 16);
+  ASSERT_EQ(n, (size_t)2);
+  ASSERT_EQ(ids[0], the_id);
+  ASSERT_EQ(ids[1], cat_id);
+
+  free_word_vocab(&wv);
+}
+
+/* Verify special tokens are assigned correctly */
+TEST(word_vocab_special_tokens) {
+  const char *text = "alpha beta gamma alpha beta";
+  size_t text_len = strlen(text);
+
+  WordVocab wv;
+  int rc = build_word_vocab(text, text_len, 5, &wv);
+  ASSERT_EQ(rc, 0);
+
+  /* Special token strings */
+  ASSERT(wv.words[wv.unk_id] != NULL);
+  ASSERT(strcmp(wv.words[wv.unk_id], "<unk>") == 0);
+
+  ASSERT(wv.words[wv.newline_id] != NULL);
+  ASSERT(strcmp(wv.words[wv.newline_id], "\n") == 0);
+
+  ASSERT(wv.words[wv.bos_id] != NULL);
+  ASSERT(strcmp(wv.words[wv.bos_id], "<bos>") == 0);
+
+  /* unk_id < newline_id < bos_id (contiguous after real words) */
+  ASSERT_LT(wv.unk_id, wv.newline_id);
+  ASSERT_LT(wv.newline_id, wv.bos_id);
+
+  free_word_vocab(&wv);
+}
+
 /* ==================================================================== */
 /*                              MAIN                                     */
 /* ==================================================================== */
@@ -684,6 +784,13 @@ int main(void) {
   RUN(trace_to_corpus_empty);
   RUN(trace_write_file);
   RUN(trace_pipeline_simulation);
+
+  printf("\n[Word-Level Organelle]\n");
+  RUN(word_organelle_struct_defaults);
+  RUN(word_organelle_free_null_safe);
+  RUN(word_organelle_free_word_level);
+  RUN(word_vocab_build_and_tokenize);
+  RUN(word_vocab_special_tokens);
 
   /* Summary */
   printf("\n=== Results: %d/%d passed", g_tests_passed, g_tests_run);
