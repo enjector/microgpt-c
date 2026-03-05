@@ -104,9 +104,10 @@ Focus: make MicroGPT-C production-ready as a **differentiable LEGO block** for e
 
 ## 🔮 Medium-Term (Q3–Q4 2026): Composable Intelligence
 
-Focus: enable **organelle chaining** — multiple specialised blocks working together as autonomous pipelines.
+Focus: enable **organelle chaining** — multiple specialised blocks working together as autonomous pipelines. Builds on the **SSD-inspired foundation** (prefix KV cache sharing, speculative decoding) completed in Q1 2026.
 
 ### 1. Organelle Chaining Protocol
+- [x] Speculative decoding between draft/target organelle pairs (completed Q1 — `organelle_generate_speculative()`)
 - [ ] Lightweight IPC for composing blocks: output of one organelle feeds input of the next
 - [ ] Pipeline definition format: `validator → formatter → completer`
 - [ ] Confidence-gated routing: if block A's confidence drops below threshold, route to block B (fallback) or escalate to human

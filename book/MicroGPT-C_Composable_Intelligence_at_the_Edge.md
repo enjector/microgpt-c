@@ -21,7 +21,7 @@
     
     {\large \today\par}
     \vspace{0.3cm}
-    {\normalsize\texttt{Version 1.1.15}\par}
+    {\normalsize\texttt{Version 1.1.16}\par}
 \end{titlepage}
 
 % --- Copyright Page ---
@@ -32,7 +32,7 @@
 \noindent
 \textbf{MicroGPT-C: Composable Intelligence at the Edge}\\
 From Stem Cell Models to Real-World AI Pipelines \textendash{} Architecture, Implementation, and Research\\
-\textit{Version 1.1.15}\\[2em]
+\textit{Version 1.1.16}\\[2em]
 
 \noindent
 \textbf{Research Team}\\
@@ -3061,7 +3061,7 @@ Measured on Apple M2 Max, Float32, SIMD ON, single-threaded (default micro-model
 | Speculative decode (k=4) | 28.3 | — | 1.2% acceptance (random weights) |
 | Speculative decode (k=2) | 18.4 | — | 2.4% acceptance (random weights) |
 
-With a longer prompt (17 characters): old ensemble = 108.4 µs, new ensemble = 19.1 µs -> **5.7× speedup**.
+With a longer prompt (17 characters): old ensemble = 108.4 us, new ensemble = 19.1 us -- **5.7x speedup**.
 
 The scaling law is clear: **longer prompts yield proportionally larger speedups**, because the saved work (prompt processing) grows linearly with prompt length while the remaining work (decode phase) stays constant.
 
@@ -3105,14 +3105,87 @@ All three are always compiled into `microgpt_lib` — no feature flags or compil
 
 These optimisations reinforce the core OPA thesis from Chapter 5: **the pipeline is where the intelligence lives.** By accelerating the ensemble voting pattern that makes OPA reliable (Chapter 4), prefix KV cache sharing makes the "many weak models coordinated by a pipeline" approach not just more accurate than a single model, but **faster** than the naive multi-inference alternative.
 
-Speculative decoding opens a new design space: **asymmetric organelle pairs.** Instead of using identically-sized planners and players, a pipeline could use a tiny 6.5K-param "instinct" organelle for rapid first guesses, verified by a larger 460K-param "deliberation" organelle. This maps to Kahneman's dual-process theory (Chapter 16) — System 1 drafts, System 2 verifies.
+Speculative decoding opens a new design space: **asymmetric organelle pairs.** Instead of using identically-sized planners and players, a pipeline could use a tiny 6.5K-param "instinct" organelle for rapid first guesses, verified by a larger 460K-param "deliberation" organelle. This maps to Kahneman's dual-process theory (Chapter 16) -- System 1 drafts, System 2 verifies.
+
+## The Speculation Tree
+
+The SSD paper pre-computes continuations for all likely verification outcomes in a tree structure. While MicroGPT-C uses the simpler linear draft-verify loop, understanding the tree helps explain why acceptance rate dominates performance:
+
+![Speculation tree -- draft generates k candidates with probabilities, target verifies each branch, accepted path continues while rejected branches trigger KV rollback](speculation_tree_bw.png)
+
+The tree shows three key dynamics:
+
+1. **High-probability branches (Token A, 70%)** are most likely to be accepted by the target model, extending the accepted path deeper into the tree. Each accepted token saves one full `forward_inference()` call on the target.
+
+2. **Medium-probability branches (Token B, 20%)** represent the draft model's uncertainty. When the target rejects, its KV cache rolls back — but the draft's work on Token B is wasted. This is the overhead cost of speculation.
+
+3. **Low-probability branches (Token C, 10%)** can be pruned before verification if below a confidence threshold, saving target model compute. MicroGPT-C does not yet implement pruning, but the speculation tree shows where it would help most.
+
+The key insight: **the tree's shape depends entirely on how well the draft model approximates the target.** A well-trained draft produces narrow, deep trees (high acceptance). A random draft produces wide, shallow trees (low acceptance, high waste).
+
+## Draft Model Training Strategies
+
+The current benchmark uses random-weight models, yielding 1-2% acceptance rates. Achieving the 40-80% rates typical in the literature requires **deliberate draft model design**:
+
+### Strategy 1: Shared Corpus, Reduced Capacity
+
+Train both draft and target on the **same corpus**, but size the draft much smaller:
+
+| Role | Params | N_EMBD | N_LAYER | Training |
+|------|--------|--------|---------|----------|
+| **Target** | 460K | 96 | 4 | Full corpus, 50K steps |
+| **Draft** | 30K | 32 | 2 | Same corpus, 20K steps |
+
+The draft learns the same distribution but with lower fidelity. On high-confidence tokens (common moves, frequent patterns), draft and target agree. On ambiguous positions, the target's extra capacity provides the correct answer.
+
+**Expected acceptance rate:** 40-60%. The draft handles the "easy 50%" of tokens; the target handles nuance.
+
+### Strategy 2: Distillation
+
+Train the draft model to match the target's **output distribution** rather than the raw corpus:
+
+```
+for each example in corpus:
+    target_logits = forward_inference(target, example)
+    target_probs  = softmax(target_logits / temperature)
+    loss = KL_divergence(draft_logits, target_probs)
+    backward(draft, loss)
+```
+
+This directly optimises the draft to predict what the target would say -- the exact signal that maximises acceptance rate.
+
+**Expected acceptance rate:** 60-80%. Distillation aligns the draft to the target's learned biases, not just the raw data distribution.
+
+### Strategy 3: Self-Speculation
+
+Use the **same model** at different temperatures:
+
+- **Draft:** `temperature = 0.1` (greedy, fast, deterministic)
+- **Target:** `temperature = 0.8` (diverse, slower, stochastic)
+
+Since both run the same weights, the draft's greedy predictions often match the target's most likely token. When they diverge, the target's sample introduces diversity.
+
+**Expected acceptance rate:** 50-70% (depends on temperature gap). Zero extra training cost -- works with any existing checkpoint.
+
+### Choosing k (Speculation Depth)
+
+The optimal `k` depends on acceptance rate `a`:
+
+| Acceptance Rate | Optimal k | Expected Speedup |
+|:--------------:|:---------:|:----------------:|
+| 20% | 1-2 | 1.1-1.2x |
+| 40% | 2-3 | 1.4-1.6x |
+| 60% | 3-4 | 1.8-2.2x |
+| 80% | 4-6 | 2.5-3.5x |
+
+**Rule of thumb:** set `k` = 1/(1-a). At 50% acceptance, k=2; at 75%, k=4. Higher k increases the potential reward but also the wasted work on rejection.
 
 ## Summary
 
 | Concept | Key Finding |
 |---------|-------------|
-| **Prefix KV cache sharing** | Process prompt once, copy KV state per vote -> 1.9–5.7× ensemble speedup |
-| **Speculative decoding** | Draft-verify with KV rollback -> functional, awaiting trained model pairs for real speedups |
+| **Prefix KV cache sharing** | Process prompt once, copy KV state per vote -- 1.9-5.7x ensemble speedup |
+| **Speculative decoding** | Draft-verify with KV rollback -- functional, awaiting trained model pairs for real speedups |
 | **Scaling law** | Longer prompts = proportionally larger speedups (linear in prompt length) |
 | **Applicability** | Ensemble and multi-inference workflows only — single generation unaffected |
 | **Design implication** | Asymmetric organelle pairs (instinct + deliberation) enabled by speculative decoding |
