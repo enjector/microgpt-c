@@ -707,6 +707,15 @@ scalar_t *kv_cache_alloc(const MicrogptConfig *cfg);
 void kv_cache_free(scalar_t *kv);
 void kv_cache_reset(scalar_t *kv, const MicrogptConfig *cfg);
 
+/*
+ * kv_cache_copy - Copy the first 'positions' entries from src to dst.
+ *   Both src and dst must have been allocated via kv_cache_alloc().
+ *   Used for prefix KV cache sharing in ensemble voting: process the
+ *   prompt once, then copy the KV state to each vote's cache.
+ */
+void kv_cache_copy(const scalar_t *src, scalar_t *dst,
+                   const MicrogptConfig *cfg, size_t positions);
+
 /* ======================== Training (Forward + Backward) =================== */
 
 /*

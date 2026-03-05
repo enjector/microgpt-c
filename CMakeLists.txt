@@ -1060,6 +1060,12 @@ if(NOT MSVC)
 endif()
 add_test(NAME organelle_tests COMMAND test_microgpt_organelle WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
+add_executable(bench_ssd tests/bench_ssd.c)
+target_link_libraries(bench_ssd PRIVATE microgpt_lib)
+if(NOT MSVC)
+  target_link_libraries(bench_ssd PRIVATE m)
+endif()
+
 
 
 # ==================================================================

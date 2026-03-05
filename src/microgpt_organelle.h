@@ -67,6 +67,44 @@ void organelle_generate_multiline(const Organelle *org,
                                   scalar_t temperature);
 
 /*
+ * organelle_generate_from_cache — Generate a response using a pre-filled KV
+ * cache.  Skips prompt processing and starts autoregressive decoding directly.
+ * Used internally by ensemble voting to share prompt KV state across votes.
+ *
+ * The caller provides keys/values/cache_len arrays already populated with
+ * the prompt's KV entries (via a prior organelle_generate or forward_inference
+ * pass), plus the 'pos' at which to start decoding and the last logits
+ * produced by the prompt pass.
+ */
+void organelle_generate_from_cache(const Organelle *org,
+                                   const MicrogptConfig *cfg, scalar_t **keys,
+                                   scalar_t **values, size_t *cache_len,
+                                   int pos, const scalar_t *prompt_logits,
+                                   char *output, int max_len,
+                                   scalar_t temperature);
+
+/*
+ * organelle_generate_speculative — SSD-inspired speculative decoding.
+ *
+ * Uses a lightweight "draft" organelle to generate spec_k candidate tokens,
+ * then verifies them against the "target" organelle in a single pass.
+ * Accepted tokens are kept; on the first rejection, the target's sample is
+ * used as the recovery token and speculation resumes from there.
+ *
+ * Both organelles MUST share the same vocabulary (same corpus/charset).
+ * The draft model should be smaller/faster than the target for a speedup.
+ *
+ * spec_k: number of tokens to speculate ahead per round (e.g. 4-8)
+ * accepted_out: if non-NULL, receives total accepted draft tokens (for stats)
+ * drafted_out:  if non-NULL, receives total drafted tokens (for acceptance
+ * rate)
+ */
+void organelle_generate_speculative(
+    const Organelle *draft, const Organelle *target, const MicrogptConfig *cfg,
+    const char *prompt, char *output, int max_len, scalar_t temperature,
+    int spec_k, int *accepted_out, int *drafted_out);
+
+/*
  * Free all resources owned by an organelle (model, docs).
  * The Organelle pointer itself is also freed.
  */

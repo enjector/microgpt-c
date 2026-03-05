@@ -58,7 +58,7 @@ All weights, activations, and gradients use a compile-time configurable `scalar_
 
 #### C. Memory-Efficient KV Cache
 
-To live on microcontrollers (MCUs) or embedded Linux, memory is the primary constraint. MicroGPT-C provides both a flat (pre-allocated, cache-friendly) KV cache for maximum speed, and an optional **Paged KV Cache** for memory savings when context windows are large. Both modes share a single API (`kv_cache_alloc`/`kv_cache_free`/`kv_cache_reset`).
+To live on microcontrollers (MCUs) or embedded Linux, memory is the primary constraint. MicroGPT-C provides both a flat (pre-allocated, cache-friendly) KV cache for maximum speed, and an optional **Paged KV Cache** for memory savings when context windows are large. Both modes share a single API (`kv_cache_alloc`/`kv_cache_free`/`kv_cache_reset`). **Prefix KV cache sharing** (`kv_cache_copy`) enables ensemble voting without redundant prompt processing — the prompt is processed once and the KV state is copied per vote, delivering 1.9–5.7× speedup on ensemble inference ([details](docs/research/RESEARCH_SSD.md)).
 
 #### D. Metal & Threaded Acceleration
 

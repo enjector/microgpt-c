@@ -74,7 +74,9 @@ This appendix provides a comprehensive glossary of key terms used throughout the
 
 - **Kanban Architecture**: A coordination system using shared state (todo, blocked, history) to manage pipeline workflows and handle failures (see Chapter 5).
 
-- **KV Cache**: Stored keys and values from past attention computations, speeding up sequential inference (see Chapters 3 and 8).
+- **KV Cache**: Stored keys and values from past attention computations, speeding up sequential inference (see Chapters 3, 8, and 17).
+
+- **KV Cache Copy**: Duplicating a KV cache state from one inference context to another, enabling prefix sharing across ensemble votes without re-processing the prompt (see Chapter 17).
 
 - **Label Smoothing**: A regularisation technique that replaces hard targets with a soft mixture: $y_{\text{smooth}} = (1-\alpha) \cdot y_{\text{hard}} + \alpha/V$. Calibrates model confidence and raises the loss floor (see Chapter 3).
 
@@ -102,6 +104,8 @@ This appendix provides a comprehensive glossary of key terms used throughout the
 
 - **Paged KV Cache**: A memory-efficient cache that allocates in fixed pages, handling long sequences without fragmentation (see Chapter 7).
 
+- **Prefix KV Cache Sharing**: An inference optimisation where a common prompt is processed once and the resulting KV cache is copied to each ensemble vote, eliminating redundant computation. Delivers 1.9–5.7× speedup on ensemble inference (see Chapter 17).
+
 - **Paraphrase Blindness**: Model failure on reworded inputs due to literal matching; addressed by decomposition (see Chapter 10).
 
 - **Permutation Test**: A validation method that shuffles training labels to test whether a model's accuracy exceeds chance. Stratified variants isolate signal in specific subsets (see Chapter 6).
@@ -127,6 +131,10 @@ This appendix provides a comprehensive glossary of key terms used throughout the
 - **Softmax**: A function that converts raw scores into probabilities summing to 1 (see Chapter 2).
 
 - **Stem Cell Philosophy**: The idea of starting with generic models that differentiate into specialists (see Chapter 4).
+
+- **Speculative Decoding**: An inference acceleration technique where a fast draft model generates candidate tokens speculatively, which are then verified by a slower but more accurate target model. Accepted tokens advance both models; rejected tokens trigger KV cache rollback (see Chapters 13 and 17).
+
+- **Speculative Speculative Decoding (SSD)**: A variant introduced by Cui et al. (2026) that runs draft and verify asynchronously on separate hardware, pre-computing speculation trees for all likely verification outcomes. MicroGPT-C adapts the prefix sharing and draft-verify concepts for CPU-only inference (see Chapter 17).
 
 - **Structured Outputs**: Generating data in fixed formats like JSON, validated by judges (see Chapter 10).
 
@@ -173,6 +181,8 @@ Velickovic, P., et al. (2022). *The CLRS Algorithmic Reasoning Benchmark*. In Pr
 Wortsman, M., et al. (2022). *Model Soups: Averaging Weights of Multiple Fine-tuned Models Improves Accuracy without Increasing Inference Time*. In Proceedings of ICML.
 
 Baum, L. E., et al. (1970). *A Maximization Technique Occurring in the Statistical Analysis of Probabilistic Functions of Markov Chains*. Annals of Mathematical Statistics. (Baum-Welch / EM for HMMs.)
+
+Cui, G., et al. (2026). *Speculative Speculative Decoding*. In International Conference on Learning Representations (ICLR). arXiv preprint arXiv:2603.03251. (Async speculation, tree caching, and glue decode for LLM inference acceleration.)
 
 ## Appendix B: Full Code Listings
 
@@ -221,6 +231,7 @@ A version history of the book, reconstructed from the git commit log.
 | | | `d4e5c76` | Chapter content updates |
 | | | `2565c4a` | OPA biology analogy infographic added to Chapter 4 |
 | | | `17bc4eb` | Chapter links added to table of contents |
+| **1.4.0** | Mar 05, 2026 | — | Chapter 17 added: "SSD-Inspired Inference Acceleration" — prefix KV cache sharing, speculative decoding, benchmark results, two new diagrams |
 
 ## Appendix F: Validation Checklist
 

@@ -72,6 +72,7 @@ All benchmarks on Apple M2 Max (dev machine), single-threaded unless noted. Mode
 | **Word-level** (Shakespeare) | 510K | 12.5K tok/s | 40K tok/s | 2 min, 12 threads |
 | **VM engine** (dispatch) | — | — | 3.7–5.8M ops/s | Single-threaded |
 | **Micro-benchmark** (tiny model) | 6.5K | 642K tok/s | 1.55M infer/s | Float32, 1 thread |
+| **SSD ensemble** (5-vote, prefix cache) | 6.5K | — | **1.9× faster** | vs old ensemble ([arXiv:2603.03251](https://arxiv.org/pdf/2603.03251)) |
 
 vs. Karpathy's **microgpt.py**: ~1,000× faster training, ~700× faster inference (expected for C vs Python; the real contribution is the orchestration layer).
 
@@ -101,6 +102,23 @@ All games: trained organelle vs random opponent, 100 evaluation games each. Full
 
 ---
 
+## Innovations
+
+Key technical contributions shipped in this engine:
+
+| Innovation | Description | Evidence |
+|-----------|-------------|----------|
+| 🧬 **Organelle Pipeline Architecture** | Composable specialist micro-models coordinated by deterministic C scaffolding | 11 games, **91% win** (Pentago) to **90% solve** (8-Puzzle) |
+| 🗳️ **Ensemble Voting + Valid-Move Filtering** | Multi-vote consensus with hard constraint enforcement | **Zero invalid moves** across all 11 games |
+| ⚡ **Prefix KV Cache Sharing** | Prompt processed once, KV state copied per ensemble vote — eliminates redundant inference | **1.9–5.7× ensemble speedup** ([arXiv:2603.03251](https://arxiv.org/pdf/2603.03251)) |
+| 🔮 **Speculative Decoding** | Draft organelle generates candidates, target verifies with KV rollback on rejection | Functional with acceptance statistics tracking |
+| 🧠 **Neural Algorithmic Reasoning** | Deterministic scaffolding (Kanban, cycle detector, judge) frees model capacity for pattern matching | ~340 lines of C replaces what gradient descent handles poorly |
+| 📝 **Dual Tokenisation** | Character-level (zero `<unk>`) and word-level (O(1) hash, **2.5× faster** inference) | Shakespeare: 16K→40K tok/s |
+| 🔧 **Compile-Time Architecture** | `N_EMBD`, `N_LAYER`, `BLOCK_SIZE` etc. as CMake defines — zero runtime overhead | 30K–841K params, 360KB–5.4MB |
+| 🖥️ **Metal GPU + SIMD + BLAS** | Optional Apple Metal shaders, NEON auto-vectorisation, Accelerate BLAS | All opt-in, zero-dependency baseline |
+| 📦 **Paged KV Cache** | Memory-efficient attention for constrained deployments | Opt-in via `-DMICROGPT_PAGED_KV=ON` |
+| 🎯 **Negative Control Methodology** | Lottery experiment proves engine learns patterns, not artefacts | Entropy floor at 0.50 (theoretical maximum) |
+
 ## Explore Further
 
 | Topic | Link |
@@ -117,6 +135,7 @@ All games: trained organelle vs random opponent, 100 evaluation games each. Full
 | 🧠 **Reasoning conclusion** | [RESEARCH_ORGANELLE_REASONING](docs/research/RESEARCH_ORGANELLE_REASONING.md) |
 | 📚 **Using as a library** | [FUNCTIONAL_SPEC](docs/FUNCTIONAL_SPEC.md) |
 | ⚡ **Performance & benchmarks** | [PERFORMANCE](docs/testing/PERFORMANCE.md) |
+| 🚀 **SSD inference optimisations** | [RESEARCH_SSD](docs/research/RESEARCH_SSD.md) |
 | 🔧 **Build options** (Metal, BLAS, INT8, SIMD) | [BUILD_OPTIONS](docs/BUILD_OPTIONS.md) |
 | 🤝 **Contributing** | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | 📋 **Data licensing** | [DATA_LICENSE.md](DATA_LICENSE.md) |

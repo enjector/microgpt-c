@@ -409,6 +409,261 @@ void organelle_generate_multiline(const Organelle *org,
   free(logits_buf);
 }
 
+/* ── organelle_generate_from_cache ─────────────────────────────────────────
+ *
+ * Decode-only path: starts generation from a pre-filled KV cache.
+ * Used by ensemble voting after processing the prompt once.
+ *
+ * The caller passes:
+ *   - keys/values/cache_len: already populated with prompt KV state
+ *   - pos: the position index to start decoding at
+ *   - prompt_logits: the logits from the last prompt token (for first sample)
+ *
+ * IMPORTANT: This function does NOT free the KV caches — the caller owns them.
+ */
+void organelle_generate_from_cache(const Organelle *org,
+                                   const MicrogptConfig *cfg, scalar_t **keys,
+                                   scalar_t **values, size_t *cache_len,
+                                   int pos, const scalar_t *prompt_logits,
+                                   char *output, int max_len,
+                                   scalar_t temperature) {
+  const Vocab *vocab = &org->vocab;
+  scalar_t *logits_buf =
+      (scalar_t *)malloc((size_t)cfg->max_vocab * sizeof(scalar_t));
+
+  /* Copy the prompt logits so we can sample the first token */
+  memcpy(logits_buf, prompt_logits, vocab->vocab_size * sizeof(scalar_t));
+
+  int out_pos = 0;
+  for (int g = 0; g < max_len && pos < cfg->block_size; g++) {
+    size_t token = sample_token(logits_buf, vocab->vocab_size, temperature);
+
+    if (token == vocab->bos_id)
+      break;
+
+    char ch = (char)vocab->chars[token];
+    if (ch == '\n')
+      break;
+
+    output[out_pos++] = ch;
+
+    forward_inference(org->model, token, pos, keys, values, cache_len,
+                      logits_buf);
+    pos++;
+  }
+
+  output[out_pos] = '\0';
+  free(logits_buf);
+}
+
+/* ── organelle_generate_speculative ────────────────────────────────────────
+ *
+ * SSD-inspired speculative decoding with a draft+target organelle pair.
+ *
+ * Algorithm:
+ *   1. Process prompt through BOTH draft and target models
+ *   2. Repeat until output complete:
+ *      a. Draft model generates spec_k candidate tokens autoregressively
+ *      b. Target model processes all spec_k candidates to get target logits
+ *      c. Compare: accept tokens where argmax(draft) == argmax(target)
+ *      d. On first mismatch: use target's sample as recovery token
+ *      e. Roll back draft/target KV caches to rejection point
+ *   3. Report acceptance statistics
+ *
+ * Both organelles must share the same vocabulary.
+ */
+void organelle_generate_speculative(
+    const Organelle *draft, const Organelle *target, const MicrogptConfig *cfg,
+    const char *prompt, char *output, int max_len, scalar_t temperature,
+    int spec_k, int *accepted_out, int *drafted_out) {
+  const int nl = cfg->n_layer;
+  const Vocab *vocab = &draft->vocab;
+
+  /* Allocate KV caches for both draft and target */
+  scalar_t **dk = (scalar_t **)malloc((size_t)nl * sizeof(scalar_t *));
+  scalar_t **dv = (scalar_t **)malloc((size_t)nl * sizeof(scalar_t *));
+  size_t *dcl = (size_t *)calloc((size_t)nl, sizeof(size_t));
+  scalar_t **tk = (scalar_t **)malloc((size_t)nl * sizeof(scalar_t *));
+  scalar_t **tv = (scalar_t **)malloc((size_t)nl * sizeof(scalar_t *));
+  size_t *tcl = (size_t *)calloc((size_t)nl, sizeof(size_t));
+  for (int l = 0; l < nl; l++) {
+    dk[l] = kv_cache_alloc(cfg);
+    dv[l] = kv_cache_alloc(cfg);
+    tk[l] = kv_cache_alloc(cfg);
+    tv[l] = kv_cache_alloc(cfg);
+  }
+
+  scalar_t *draft_logits =
+      (scalar_t *)malloc((size_t)cfg->max_vocab * sizeof(scalar_t));
+  scalar_t *target_logits =
+      (scalar_t *)malloc((size_t)cfg->max_vocab * sizeof(scalar_t));
+
+  /* Buffers for speculated tokens */
+  size_t *spec_tokens = (size_t *)malloc((size_t)spec_k * sizeof(size_t));
+
+  int pos = 0;
+  int out_pos = 0;
+  int total_accepted = 0, total_drafted = 0;
+
+  /* ── Phase 1: Process prompt through both models ── */
+  size_t token = vocab->bos_id;
+  forward_inference(draft->model, token, pos, dk, dv, dcl, draft_logits);
+  forward_inference(target->model, token, pos, tk, tv, tcl, target_logits);
+  pos++;
+
+  for (int i = 0; prompt[i] && pos < cfg->block_size - 1; i++) {
+    token = 0;
+    for (size_t v = 0; v < vocab->vocab_size; v++) {
+      if (vocab->chars[v] == (unsigned char)prompt[i]) {
+        token = v;
+        break;
+      }
+    }
+    forward_inference(draft->model, token, pos, dk, dv, dcl, draft_logits);
+    forward_inference(target->model, token, pos, tk, tv, tcl, target_logits);
+    pos++;
+  }
+
+  /* Feed newline separator to both */
+  token = 0;
+  for (size_t v = 0; v < vocab->vocab_size; v++) {
+    if (vocab->chars[v] == '\n') {
+      token = v;
+      break;
+    }
+  }
+  forward_inference(draft->model, token, pos, dk, dv, dcl, draft_logits);
+  forward_inference(target->model, token, pos, tk, tv, tcl, target_logits);
+  pos++;
+
+  /* ── Phase 2: Speculative decode loop ── */
+  while (out_pos < max_len && pos < cfg->block_size - spec_k - 1) {
+
+    /* Step 2a: Draft generates spec_k candidates */
+    int k_actual = spec_k;
+    if (pos + spec_k >= cfg->block_size)
+      k_actual = cfg->block_size - pos - 1;
+    if (k_actual < 1)
+      break;
+
+    /* Save draft KV cache lengths for rollback */
+    size_t *dcl_save = (size_t *)malloc((size_t)nl * sizeof(size_t));
+    memcpy(dcl_save, dcl, (size_t)nl * sizeof(size_t));
+    int draft_pos_save = pos;
+
+    for (int k = 0; k < k_actual; k++) {
+      size_t draft_token =
+          sample_token(draft_logits, vocab->vocab_size, temperature);
+      spec_tokens[k] = draft_token;
+      if (k < k_actual - 1) {
+        forward_inference(draft->model, draft_token, pos + k, dk, dv, dcl,
+                          draft_logits);
+      }
+    }
+    total_drafted += k_actual;
+
+    /* Step 2b: Target verifies each candidate token */
+    /* Save target KV cache lengths for potential rollback */
+    size_t *tcl_save = (size_t *)malloc((size_t)nl * sizeof(size_t));
+    memcpy(tcl_save, tcl, (size_t)nl * sizeof(size_t));
+
+    int accepted = 0;
+    for (int k = 0; k < k_actual; k++) {
+      /* Get target's opinion on this position */
+      size_t target_token =
+          sample_token(target_logits, vocab->vocab_size, temperature);
+
+      if (target_token == spec_tokens[k]) {
+        /* Accept: draft and target agree */
+        char ch = (char)vocab->chars[target_token];
+        if (ch == '\n' || target_token == vocab->bos_id) {
+          /* Stop token — accepted but we're done */
+          goto done;
+        }
+        output[out_pos++] = ch;
+        accepted++;
+        total_accepted++;
+
+        /* Advance target KV cache */
+        forward_inference(target->model, target_token, pos, tk, tv, tcl,
+                          target_logits);
+        pos++;
+
+        if (out_pos >= max_len)
+          goto done;
+      } else {
+        /* Reject: use target's token as recovery */
+        char ch = (char)vocab->chars[target_token];
+        if (ch == '\n' || target_token == vocab->bos_id)
+          goto done;
+
+        output[out_pos++] = ch;
+
+        /* Advance target past the recovery token */
+        forward_inference(target->model, target_token, pos, tk, tv, tcl,
+                          target_logits);
+        pos++;
+
+        /* Roll back draft to match target state */
+        /* Reset draft KV by re-syncing from the last accepted position */
+        memcpy(dcl, tcl_save, (size_t)nl * sizeof(size_t));
+        /* Re-process accepted + recovery tokens through draft */
+        for (int j = 0; j < accepted; j++) {
+          forward_inference(draft->model, spec_tokens[j], draft_pos_save + j,
+                            dk, dv, dcl, draft_logits);
+        }
+        forward_inference(draft->model, target_token, draft_pos_save + accepted,
+                          dk, dv, dcl, draft_logits);
+
+        if (out_pos >= max_len) {
+          free(dcl_save);
+          free(tcl_save);
+          goto done;
+        }
+        break; /* restart speculation from new position */
+      }
+    }
+
+    /* If all k tokens accepted, advance draft KV cache to stay in sync */
+    if (accepted == k_actual) {
+      /* Draft already has tokens in KV; just reset to match pos */
+      memcpy(dcl, dcl_save, (size_t)nl * sizeof(size_t));
+      for (int k = 0; k < k_actual; k++) {
+        forward_inference(draft->model, spec_tokens[k], draft_pos_save + k, dk,
+                          dv, dcl, draft_logits);
+      }
+    }
+
+    free(dcl_save);
+    free(tcl_save);
+  }
+
+done:
+  output[out_pos] = '\0';
+
+  if (accepted_out)
+    *accepted_out = total_accepted;
+  if (drafted_out)
+    *drafted_out = total_drafted;
+
+  /* Cleanup */
+  for (int l = 0; l < nl; l++) {
+    kv_cache_free(dk[l]);
+    kv_cache_free(dv[l]);
+    kv_cache_free(tk[l]);
+    kv_cache_free(tv[l]);
+  }
+  free(dk);
+  free(dv);
+  free(dcl);
+  free(tk);
+  free(tv);
+  free(tcl);
+  free(draft_logits);
+  free(target_logits);
+  free(spec_tokens);
+}
+
 /* ======================== Organelle Training ===============================
  */
 
@@ -1899,22 +2154,94 @@ void organelle_generate_ensemble(const Organelle *org,
     return;
   }
 
-  /* Collect N candidate responses and tally votes */
+  const int nl = cfg->n_layer;
+  const Vocab *vocab = &org->vocab;
+
+  /* ── Step 1: Process prompt ONCE to build shared KV cache ── */
+  scalar_t **prefix_keys = (scalar_t **)malloc((size_t)nl * sizeof(scalar_t *));
+  scalar_t **prefix_values =
+      (scalar_t **)malloc((size_t)nl * sizeof(scalar_t *));
+  size_t *prefix_cache_len = (size_t *)calloc((size_t)nl, sizeof(size_t));
+  for (int l = 0; l < nl; l++) {
+    prefix_keys[l] = kv_cache_alloc(cfg);
+    prefix_values[l] = kv_cache_alloc(cfg);
+  }
+
+  scalar_t *prompt_logits =
+      (scalar_t *)malloc((size_t)cfg->max_vocab * sizeof(scalar_t));
+  int pos = 0;
+
+  /* Feed BOS */
+  size_t token = vocab->bos_id;
+  forward_inference(org->model, token, pos, prefix_keys, prefix_values,
+                    prefix_cache_len, prompt_logits);
+  pos++;
+
+  /* Feed prompt characters */
+  for (int i = 0; prompt[i] && pos < cfg->block_size - 1; i++) {
+    token = 0;
+    for (size_t v = 0; v < vocab->vocab_size; v++) {
+      if (vocab->chars[v] == (unsigned char)prompt[i]) {
+        token = v;
+        break;
+      }
+    }
+    forward_inference(org->model, token, pos, prefix_keys, prefix_values,
+                      prefix_cache_len, prompt_logits);
+    pos++;
+  }
+
+  /* Feed newline separator */
+  token = 0;
+  for (size_t v = 0; v < vocab->vocab_size; v++) {
+    if (vocab->chars[v] == '\n') {
+      token = v;
+      break;
+    }
+  }
+  forward_inference(org->model, token, pos, prefix_keys, prefix_values,
+                    prefix_cache_len, prompt_logits);
+  pos++;
+
+  /* ── Step 2: Run N decode-only passes with shared prefix cache ── */
   char candidates[OPA_MAX_VOTES][128];
   int vote_counts[OPA_MAX_VOTES];
   int unique = 0;
 
   for (int v = 0; v < n_votes; v++) {
-    /* Apply temperature jitter: evenly spread around base_temp */
     scalar_t jitter =
         OPA_TEMP_JITTER * ((scalar_t)v - (scalar_t)n_votes / (scalar_t)2.0);
     scalar_t temp = base_temp + jitter;
     if (temp < (scalar_t)0.01)
-      temp = (scalar_t)0.01; /* clamp to avoid division by zero in softmax */
+      temp = (scalar_t)0.01;
 
+    /* Copy prefix KV cache for this vote */
+    scalar_t **vote_keys = (scalar_t **)malloc((size_t)nl * sizeof(scalar_t *));
+    scalar_t **vote_values =
+        (scalar_t **)malloc((size_t)nl * sizeof(scalar_t *));
+    size_t *vote_cache_len = (size_t *)calloc((size_t)nl, sizeof(size_t));
+    for (int l = 0; l < nl; l++) {
+      vote_keys[l] = kv_cache_alloc(cfg);
+      vote_values[l] = kv_cache_alloc(cfg);
+      kv_cache_copy(prefix_keys[l], vote_keys[l], cfg, prefix_cache_len[l]);
+      vote_cache_len[l] = prefix_cache_len[l];
+    }
+
+    /* Decode from cached prefix (skips prompt re-processing) */
     char buf[128];
     int gen_len = max_len < 127 ? max_len : 127;
-    organelle_generate(org, cfg, prompt, buf, gen_len, temp);
+    organelle_generate_from_cache(org, cfg, vote_keys, vote_values,
+                                  vote_cache_len, pos, prompt_logits, buf,
+                                  gen_len, temp);
+
+    /* Free vote's KV caches */
+    for (int l = 0; l < nl; l++) {
+      kv_cache_free(vote_keys[l]);
+      kv_cache_free(vote_values[l]);
+    }
+    free(vote_keys);
+    free(vote_values);
+    free(vote_cache_len);
 
     /* Tally: find matching candidate or register a new one */
     int found = 0;
@@ -1933,6 +2260,16 @@ void organelle_generate_ensemble(const Organelle *org,
     }
   }
 
+  /* Free prefix KV caches */
+  for (int l = 0; l < nl; l++) {
+    kv_cache_free(prefix_keys[l]);
+    kv_cache_free(prefix_values[l]);
+  }
+  free(prefix_keys);
+  free(prefix_values);
+  free(prefix_cache_len);
+  free(prompt_logits);
+
   /* Find the mode: the candidate with the most votes */
   int best_idx = 0;
   for (int u = 1; u < unique; u++) {
@@ -1940,7 +2277,7 @@ void organelle_generate_ensemble(const Organelle *org,
       best_idx = u;
   }
 
-  /* Copy the winning candidate to input */
+  /* Copy the winning candidate to output */
   strncpy(output, candidates[best_idx], (size_t)max_len);
   output[max_len] = '\0';
 

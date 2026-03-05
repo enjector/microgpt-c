@@ -714,6 +714,205 @@ TEST(word_vocab_special_tokens) {
 }
 
 /* ==================================================================== */
+/*                   SSD-INSPIRED OPTIMISATION TESTS                       */
+/* ==================================================================== */
+
+/*
+ * Helper: create a tiny organelle with a random model for testing.
+ * Returns an Organelle with a valid model and character-level vocab.
+ * Caller must call organelle_free() when done.
+ */
+static Organelle *make_test_organelle(const MicrogptConfig *cfg) {
+  Organelle *org = (Organelle *)calloc(1, sizeof(Organelle));
+  if (!org)
+    return NULL;
+
+  /* Build a minimal vocab from a test string */
+  const char *corpus = "hello world";
+  Docs docs = {0};
+  docs.data = (char *)malloc(strlen(corpus) + 1);
+  strcpy(docs.data, corpus);
+  docs.lines = (char **)malloc(sizeof(char *));
+  docs.doc_lens = (size_t *)malloc(sizeof(size_t));
+  docs.lines[0] = docs.data;
+  docs.doc_lens[0] = strlen(corpus);
+  docs.num_docs = 1;
+
+  build_vocab(&docs, &org->vocab);
+  org->model = model_create(org->vocab.vocab_size, cfg);
+  org->docs = docs;
+  return org;
+}
+
+TEST(kv_cache_copy_basic) {
+  /* Allocate two KV caches, fill one via forward_inference, copy, verify */
+  MicrogptConfig cfg = microgpt_default_config();
+  Organelle *org = make_test_organelle(&cfg);
+  ASSERT(org != NULL);
+  ASSERT(org->model != NULL);
+
+  const int nl = cfg.n_layer;
+  scalar_t **keys1 = (scalar_t **)malloc((size_t)nl * sizeof(scalar_t *));
+  scalar_t **vals1 = (scalar_t **)malloc((size_t)nl * sizeof(scalar_t *));
+  size_t *cl1 = (size_t *)calloc((size_t)nl, sizeof(size_t));
+  scalar_t **keys2 = (scalar_t **)malloc((size_t)nl * sizeof(scalar_t *));
+  scalar_t **vals2 = (scalar_t **)malloc((size_t)nl * sizeof(scalar_t *));
+  for (int l = 0; l < nl; l++) {
+    keys1[l] = kv_cache_alloc(&cfg);
+    vals1[l] = kv_cache_alloc(&cfg);
+    keys2[l] = kv_cache_alloc(&cfg);
+    vals2[l] = kv_cache_alloc(&cfg);
+  }
+
+  /* Run a few forward inference steps to populate cache */
+  scalar_t *logits =
+      (scalar_t *)malloc((size_t)cfg.max_vocab * sizeof(scalar_t));
+  forward_inference(org->model, org->vocab.bos_id, 0, keys1, vals1, cl1,
+                    logits);
+  forward_inference(org->model, 0, 1, keys1, vals1, cl1, logits);
+  forward_inference(org->model, 1, 2, keys1, vals1, cl1, logits);
+
+  /* Copy and verify byte-equality */
+  for (int l = 0; l < nl; l++) {
+    kv_cache_copy(keys1[l], keys2[l], &cfg, cl1[l]);
+    kv_cache_copy(vals1[l], vals2[l], &cfg, cl1[l]);
+  }
+
+#ifndef MICROGPT_PAGED_KV
+  /* For flat KV, verify memcmp */
+  for (int l = 0; l < nl; l++) {
+    ASSERT(memcmp(keys1[l], keys2[l],
+                  cl1[l] * (size_t)cfg.n_embd * sizeof(scalar_t)) == 0);
+    ASSERT(memcmp(vals1[l], vals2[l],
+                  cl1[l] * (size_t)cfg.n_embd * sizeof(scalar_t)) == 0);
+  }
+#endif
+
+  /* Cleanup */
+  for (int l = 0; l < nl; l++) {
+    kv_cache_free(keys1[l]);
+    kv_cache_free(vals1[l]);
+    kv_cache_free(keys2[l]);
+    kv_cache_free(vals2[l]);
+  }
+  free(keys1);
+  free(vals1);
+  free(cl1);
+  free(keys2);
+  free(vals2);
+  free(logits);
+  organelle_free(org);
+}
+
+TEST(generate_from_cache_produces_output) {
+  /* Verify that organelle_generate_from_cache produces some output */
+  MicrogptConfig cfg = microgpt_default_config();
+  Organelle *org = make_test_organelle(&cfg);
+  ASSERT(org != NULL);
+
+  const int nl = cfg.n_layer;
+  const Vocab *vocab = &org->vocab;
+
+  /* Build prefix KV cache from a simple prompt */
+  scalar_t **keys = (scalar_t **)malloc((size_t)nl * sizeof(scalar_t *));
+  scalar_t **vals = (scalar_t **)malloc((size_t)nl * sizeof(scalar_t *));
+  size_t *cl = (size_t *)calloc((size_t)nl, sizeof(size_t));
+  for (int l = 0; l < nl; l++) {
+    keys[l] = kv_cache_alloc(&cfg);
+    vals[l] = kv_cache_alloc(&cfg);
+  }
+  scalar_t *logits =
+      (scalar_t *)malloc((size_t)cfg.max_vocab * sizeof(scalar_t));
+
+  /* Feed BOS + one character */
+  forward_inference(org->model, vocab->bos_id, 0, keys, vals, cl, logits);
+  forward_inference(org->model, 0, 1, keys, vals, cl, logits);
+  int pos = 2;
+
+  /* Generate from cache */
+  char output[64];
+  organelle_generate_from_cache(org, &cfg, keys, vals, cl, pos, logits, output,
+                                10, (scalar_t)0.5);
+
+  /* Output should be null-terminated (may be empty if model generates stop) */
+  ASSERT(strlen(output) <= 10);
+
+  for (int l = 0; l < nl; l++) {
+    kv_cache_free(keys[l]);
+    kv_cache_free(vals[l]);
+  }
+  free(keys);
+  free(vals);
+  free(cl);
+  free(logits);
+  organelle_free(org);
+}
+
+TEST(speculative_decode_produces_output) {
+  /* Verify that speculative decoding runs without crashing and produces output
+   */
+  MicrogptConfig cfg = microgpt_default_config();
+
+  /* Create two organelles with same vocab (same corpus) */
+  Organelle *draft = make_test_organelle(&cfg);
+  Organelle *target = make_test_organelle(&cfg);
+  ASSERT(draft != NULL);
+  ASSERT(target != NULL);
+
+  char output[64];
+  int accepted = 0, drafted = 0;
+  organelle_generate_speculative(draft, target, &cfg, "hel", output, 10,
+                                 (scalar_t)0.5, 3, &accepted, &drafted);
+
+  /* Output should be null-terminated */
+  ASSERT(strlen(output) <= 10);
+  /* drafted should be >= 0 */
+  ASSERT(drafted >= 0);
+  ASSERT(accepted >= 0);
+  ASSERT(accepted <= drafted ||
+         drafted == 0); /* can't accept more than drafted */
+
+  organelle_free(draft);
+  organelle_free(target);
+}
+
+TEST(ensemble_prefix_cache_runs) {
+  /* Verify the refactored ensemble with prefix cache sharing runs */
+  MicrogptConfig cfg = microgpt_default_config();
+  Organelle *org = make_test_organelle(&cfg);
+  ASSERT(org != NULL);
+
+  char output[64];
+  scalar_t conf = 0;
+  organelle_generate_ensemble(org, &cfg, "hel", output, 10, 3, (scalar_t)0.5,
+                              &conf);
+
+  /* Output should be null-terminated */
+  ASSERT(strlen(output) <= 10);
+  /* Confidence should be between 0 and 1 */
+  ASSERT(conf > 0.0 && conf <= 1.0);
+
+  organelle_free(org);
+}
+
+TEST(ensemble_single_vote_unchanged) {
+  /* With n_votes=1, ensemble should behave identically to organelle_generate */
+  MicrogptConfig cfg = microgpt_default_config();
+  Organelle *org = make_test_organelle(&cfg);
+  ASSERT(org != NULL);
+
+  char output[64];
+  scalar_t conf = 0;
+  organelle_generate_ensemble(org, &cfg, "hel", output, 10, 1, (scalar_t)0.5,
+                              &conf);
+
+  ASSERT(strlen(output) <= 10);
+  ASSERT_EQ(conf, (scalar_t)1.0);
+
+  organelle_free(org);
+}
+
+/* ==================================================================== */
 /*                              MAIN                                     */
 /* ==================================================================== */
 
@@ -791,6 +990,13 @@ int main(void) {
   RUN(word_organelle_free_word_level);
   RUN(word_vocab_build_and_tokenize);
   RUN(word_vocab_special_tokens);
+
+  printf("\n[SSD-Inspired Optimisations]\n");
+  RUN(kv_cache_copy_basic);
+  RUN(generate_from_cache_produces_output);
+  RUN(speculative_decode_produces_output);
+  RUN(ensemble_prefix_cache_runs);
+  RUN(ensemble_single_vote_unchanged);
 
   /* Summary */
   printf("\n=== Results: %d/%d passed", g_tests_passed, g_tests_run);

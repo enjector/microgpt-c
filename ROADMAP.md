@@ -39,8 +39,8 @@ A living roadmap for MicroGPT-C — a zero-dependency C99 GPT engine designed fo
 - [x] Common training helpers extracted to library (`TrainWorker`, `train_worker_run`, `shuffle_docs`)
 
 ### Testing & Documentation
-- [x] 44 unit tests covering all public API functions
-- [x] 15 performance benchmarks with measured throughput
+- [x] 59 unit tests covering all public API functions (including SSD optimisations)
+- [x] 22 performance benchmarks with measured throughput (+ `bench_ssd` for inference optimisations)
 - [x] Comprehensive README with build instructions, examples, and benchmarks
 - [x] [Optimisation Strategies](docs/research/RESEARCH_OPTIMISATION.md) technical white paper (9 strategies documented)
 - [x] [Training Strategies](docs/research/RESEARCH_TRAINING_STRATEGIES.md) — LR scheduling guidelines, warmup ratio tuning, capacity scaling rules
@@ -82,6 +82,10 @@ Focus: make MicroGPT-C production-ready as a **differentiable LEGO block** for e
 - [x] **`OpaCycleDetector`** — A↔B oscillation breaking for pipeline coordination
 - [ ] Built-in confidence scoring via softmax entropy (wraps existing `forward_inference` + softmax)
 - [ ] Organelle serialisation: save/load specialised blocks as compact `.bin` files with embedded vocab
+- [x] **Prefix KV cache sharing** — ensemble prompt processed once, KV state copied per vote (1.9–5.7× speedup, [arXiv:2603.03251](https://arxiv.org/pdf/2603.03251))
+- [x] **Speculative decoding** — draft organelle generates candidate tokens, target verifies with KV rollback on rejection
+- [x] **`organelle_generate_from_cache()`** — decode-only path from pre-filled KV cache
+- [x] **`kv_cache_copy()`** — efficient KV state duplication (flat + paged modes)
 
 ### 2. Replay Buffer for On-Device Learning
 - [ ] Ring buffer of representative training examples to prevent catastrophic forgetting during incremental updates
@@ -167,4 +171,4 @@ Focus: explore what happens when composable intelligence moves to **real edge ha
 
 ---
 
-*Roadmap updated February 2026. Priorities are flexible and driven by the [stem cell vision](VISION.md).*
+*Roadmap updated March 2026. Priorities are flexible and driven by the [stem cell vision](VISION.md).*

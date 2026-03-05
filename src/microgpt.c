@@ -655,6 +655,30 @@ void kv_cache_reset(scalar_t *kv, const MicrogptConfig *cfg) {
 #endif
 }
 
+/*
+ * kv_cache_copy — Copy the first 'positions' KV entries from src to dst.
+ *   For flat KV: memcpy of positions × N_EMBD scalars.
+ *   For paged KV: copy page-by-page.
+ *   Used for prefix KV cache sharing in ensemble voting.
+ */
+void kv_cache_copy(const scalar_t *src, scalar_t *dst,
+                   const MicrogptConfig *cfg, size_t positions) {
+  if (positions == 0)
+    return;
+#ifdef MICROGPT_PAGED_KV
+  const PagedKVCache *ps = (const PagedKVCache *)src;
+  PagedKVCache *pd = (PagedKVCache *)dst;
+  paged_kv_reset(pd);
+  for (size_t i = 0; i < positions; i++) {
+    const scalar_t *s = paged_kv_get(ps, i);
+    scalar_t *d = paged_kv_append(pd);
+    memcpy(d, s, (size_t)N_EMBD * sizeof(scalar_t));
+  }
+#else
+  memcpy(dst, src, positions * (size_t)N_EMBD * sizeof(scalar_t));
+#endif
+}
+
 /* Helper: allocate the per-layer pointer arrays for the Model struct. */
 static int alloc_layer_ptrs(Model *m, int n_layer) {
 #if defined(QUANTIZATION_INT8) || defined(QUANTISATION_INT8)

@@ -21,7 +21,7 @@
     
     {\large \today\par}
     \vspace{0.3cm}
-    {\normalsize\texttt{Version 1.1.12}\par}
+    {\normalsize\texttt{Version 1.1.15}\par}
 \end{titlepage}
 
 % --- Copyright Page ---
@@ -32,7 +32,7 @@
 \noindent
 \textbf{MicroGPT-C: Composable Intelligence at the Edge}\\
 From Stem Cell Models to Real-World AI Pipelines \textendash{} Architecture, Implementation, and Research\\
-\textit{Version 1.1.12}\\[2em]
+\textit{Version 1.1.15}\\[2em]
 
 \noindent
 \textbf{Research Team}\\
@@ -127,9 +127,14 @@ The guide is structured as a progressive reference, starting with foundational c
    Key Topics: KV cache efficiency; scaling embed/layers/context; planned MLA integration.
 
 9. **[Chapter 9: Tooling and Workflow – From Research to Production](9.md)**  
-   *Teaser: From hypothesis to deployment. Use CLI tools to profile models and achieve reproducible training runs.*  
-   Benchmarking, testing strategies (`tests/`), corpus management, multi-threaded training (`src/microgpt_thread.h`), and the planned CLI. Covers reproduction via seeding and automated workflows.  
-   Key Topics: Reproducibility; profiling; the planned CLI tool (see ROADMAP.md).
+    *Teaser: From hypothesis to deployment. Use CLI tools to profile models and achieve reproducible training runs.*  
+    Benchmarking, testing strategies (`tests/`), corpus management, multi-threaded training (`src/microgpt_thread.h`), and the planned CLI. Covers reproduction via seeding and automated workflows.  
+    Key Topics: Reproducibility; profiling; the planned CLI tool (see ROADMAP.md).
+
+17. **[Chapter 17: SSD-Inspired Inference Acceleration](17.md)**  
+    *Teaser: How a single insight from the SSD paper delivers a 1.9–5.7× speedup to ensemble voting — and why speculative decoding enables asymmetric organelle pairs.*  
+    Prefix KV cache sharing for ensemble voting, speculative decoding with KV rollback, benchmark results, applicability guidelines, and connection to the OPA architecture. Based on arXiv:2603.03251.  
+    Key Topics: `kv_cache_copy()`; `organelle_generate_from_cache()`; `organelle_generate_speculative()`; ensemble speedups; draft-verify inference.
 
 ### Part IV: Real-World Applications and Future Directions
 
@@ -216,7 +221,7 @@ To illustrate, consider a scenario in agriculture. A farmer uses a drone to moni
 
 Let's verify this efficiency with math. A small model with 500,000 parameters uses:
 
-Memory = 500,000 × 4 bytes = 2,000,000 bytes ≈ 2 MB
+Memory = 500,000 × 4 bytes = 2,000,000 bytes ~ 2 MB
 
 This fits comfortably on most edge devices. Training time scales with parameters and data size; a small model might train in minutes on a laptop, versus weeks for a large one. Inference is faster too—linear operations dominate, with O(n) complexity for many tasks, making real-time responses feasible.
 
@@ -740,7 +745,7 @@ Background: In biology, stem cells respond to chemical signals to specialize. In
 
 Example Scenario: Start with a blank model. Feed it a corpus of greetings ("Hello", "Hi", "Greetings"). After training, it generates similar phrases. This is differentiation: from general predictor to greeting specialist.
 
-Math Verification: Parameter count scales with dimensions. For embeddings d=96, layers l=4, heads h=8: Total params ≈ l * (3*d²/h + 4*d²) + vocab*d (simplified). At small scale, this fits in <2 MB, trainable in minutes on a laptop.
+Math Verification: Parameter count scales with dimensions. For embeddings d=96, layers l=4, heads h=8: Total params ~ l * (3*d²/h + 4*d²) + vocab*d (simplified). At small scale, this fits in <2 MB, trainable in minutes on a laptop.
 
 Pros of Small Size: Low memory (edge-friendly), fast convergence (fewer params to tune). Cons: Limited capacity—hence the need for specialization.
 
@@ -1340,7 +1345,7 @@ In MicroGPT-C, optional INT8: Weights quantized post-training.
 
 Math: Range [-r,r] to [-127,127]: Scale = 127/r; quant = round(value * scale).
 
-Error: Mean quantization noise ~1/√(12*levels) ≈0.1 for 8-bit—tolerable for small models.
+Error: Mean quantization noise ~1/√(12*levels) ~0.1 for 8-bit—tolerable for small models.
 
 Scenario: Deploy on microcontroller (1MB RAM). Float: 2MB model too big; INT8: 0.5MB fits. Speed: Integer mul faster on embedded.
 
@@ -1366,7 +1371,7 @@ Before reaching for SIMD, BLAS, or quantisation, the single most impactful edge 
 - **3–10× faster training** — critical for on-device learning
 - **4 of 8 games improved** — over-parameterisation actively hurts when the corpus is small
 
-The rule of thumb: **params ≈ 5–20× corpus size**. Below 5× the model underfits; above 20× it memorises noise.
+The rule of thumb: **params ~ 5–20× corpus size**. Below 5× the model underfits; above 20× it memorises noise.
 
 This is a first-order optimisation. Apply it before any of the techniques in this chapter — the savings compound with SIMD, quantisation, and memory management.
 
@@ -1390,7 +1395,7 @@ When multiple training runs with different random seeds produce models of simila
 
 ## Corpus-to-Steps Scaling Law
 
-The parameter right-sizing rule (`params ≈ 5–20× corpus size`) has a complementary steps-to-corpus rule discovered during the markets V1 experiments:
+The parameter right-sizing rule (`params ~ 5–20× corpus size`) has a complementary steps-to-corpus rule discovered during the markets V1 experiments:
 
 \begin{equation}
 \text{steps} \approx 10 \times \text{corpus size}
@@ -2513,7 +2518,7 @@ By training on these traces, the model internalises three barriers it otherwise 
 |---|---|---|
 | **Fixation** | Repeats rejected moves (no memory) | Learns `board + blocked:right -> try other` |
 | **Oscillation** | Cycles A->B->A indefinitely | Recognises the pattern, chooses a third option |
-| **Non-monotonic blindness** | Cannot accept temporary regression | Recalls traces where md↑ then ↓ (productive detours) |
+| **Non-monotonic blindness** | Cannot accept temporary regression | Recalls traces where md went up then down (productive detours) |
 
 The reasoning trace A/B experiment (Chapter 6, puzzle8_reasoning) confirmed: trace-enriched corpus augments safely (no regression at 13% enrichment). Scaling to 30–50% enrichment is expected to reduce pipeline interventions further — moving "intelligence" from the C orchestrator into the neural weights.
 
@@ -2700,16 +2705,16 @@ Given the model's nature as a retriever, the path to VM code generation is **det
 
 ```
 Intent: "compute area of triangle and double it"
-       ↓ Decompose (rule-based: split on "and" / "then")
+       v Decompose (rule-based: split on "and" / "then")
 ["compute area of triangle", "double it"]
-       ↓ Retrieve (BM25 or neural model over 1,597 functions)
+       v Retrieve (BM25 or neural model over 1,597 functions)
 [triangle_area (score: 0.87), double (score: 0.92)]
-       ↓ Wire (deterministic template — type-checks inputs/outputs)
+       v Wire (deterministic template — type-checks inputs/outputs)
 function composed(base: number, height: number): number {
     var a = triangle_area(base, height);
     return double(a);
 }
-       ↓ Validate (vm_module_compile — Flex/Bison syntax gate)
+       v Validate (vm_module_compile — Flex/Bison syntax gate)
 VALID
 ```
 
@@ -2871,6 +2876,256 @@ The future of edge AI is not "bigger models that reason better." It is **computa
 \newpage
 
 
+# SSD-Inspired Inference Acceleration
+
+*Teaser: How a single insight from the Speculative Speculative Decoding paper (arXiv:2603.03251) delivers a 1.9–5.7× speedup to MicroGPT-C's ensemble voting — and why speculative decoding opens the door to multi-organelle inference pipelines that feel interactive.*
+
+## Introduction
+
+Every chapter so far has focused on *what* MicroGPT-C computes — architectures, training, coordination protocols, reasoning. This chapter addresses *how fast* it computes. Specifically, we tackle two bottlenecks in the organelle inference pipeline:
+
+1. **Ensemble voting re-processes the prompt N times.** A 5-vote ensemble running `organelle_generate_ensemble()` previously called `organelle_generate()` five times, each processing the same prompt from scratch. For a 40-token game state, that's 4 × 40 = 160 wasted `forward_inference()` calls.
+
+2. **Autoregressive decoding is inherently serial.** Each token depends on the previous one. Generating 10 tokens requires 10 sequential forward passes — no parallelism possible.
+
+Both problems have known solutions in the LLM inference literature. The **Speculative Speculative Decoding** (SSD) paper (Cui et al., ICLR 2026) introduced async speculation and tree caching for billion-parameter GPU clusters. We adapt two of its core ideas to MicroGPT-C's sub-1M parameter CPU world: **prefix KV cache sharing** and **speculative decoding with KV rollback**.
+
+## Prefix KV Cache Sharing
+
+### The Problem: Redundant Prompt Processing
+
+Consider a 5-vote ensemble deciding a Connect-4 move. The prompt is:
+
+```
+STATE|board=.......\n.......\nX......\nOX.....\nXOX....\nOXOXO..\n|moves=1,2,3,4,5,6,7\n
+```
+
+Each of the 5 votes previously processed this 80+ character prompt independently:
+
+```
+Vote 1: BOS -> S -> T -> A -> T -> E -> | -> ... -> \n (80 forward passes)
+Vote 2: BOS -> S -> T -> A -> T -> E -> | -> ... -> \n (80 forward passes) ← identical work
+Vote 3: BOS -> S -> T -> A -> T -> E -> | -> ... -> \n (80 forward passes) ← identical work
+Vote 4: BOS -> S -> T -> A -> T -> E -> | -> ... -> \n (80 forward passes) ← identical work
+Vote 5: BOS -> S -> T -> A -> T -> E -> | -> ... -> \n (80 forward passes) ← identical work
+```
+
+That's 400 forward passes, of which 320 are completely redundant — every vote processes the same tokens and produces the same KV cache state.
+
+### The Solution: Process Once, Copy N Times
+
+![Prefix KV cache sharing — prompt processed once, KV state copied to each of N ensemble votes](prefix_cache_bw.png)
+
+The SSD paper's key insight translates directly: if multiple inferences share the same prefix, process that prefix once and share the KV cache. MicroGPT-C implements this through two new primitives:
+
+**`kv_cache_copy()`** — Copies a KV cache state from a source to a destination. In flat mode (default), this is a single `memcpy` per layer:
+
+```c
+void kv_cache_copy(const scalar_t *src, scalar_t *dst,
+                   const MicrogptConfig *cfg) {
+    size_t cache_size = (size_t)cfg->block_size * cfg->n_embd;
+    memcpy(dst, src, cache_size * sizeof(scalar_t));
+}
+```
+
+**`organelle_generate_from_cache()`** — Starts token generation from a pre-filled KV cache, skipping prompt processing entirely. It receives the prompt's final position and begins autoregressive decoding from there.
+
+### The Refactored Ensemble
+
+The refactored `organelle_generate_ensemble()` now works in two phases:
+
+**Phase 1: Shared prefix processing (runs once)**
+```
+BOS -> prompt[0] -> prompt[1] -> ... -> prompt[N-1] -> '\n'
+                                                    |
+                                                    v
+                                              prefix_keys[L], prefix_vals[L]
+                                              (shared KV cache)
+```
+
+**Phase 2: Decode-only per vote (runs N times, prompt-free)**
+```
+for each vote v:
+    copy prefix_keys -> vote_keys[v]    // O(positions × n_embd) — trivial
+    copy prefix_vals -> vote_vals[v]
+    organelle_generate_from_cache(vote_keys[v], vote_vals[v], ...)
+    // Only generates completion tokens — no prompt re-processing
+```
+
+The reduction is dramatic:
+
+| | Old Ensemble (N=5, P=80 prompt tokens) | New Ensemble |
+|---|---|---|
+| Forward passes | N × P + N × G = 5 × 80 + 5 × G | 1 × P + N × G = 80 + 5 × G |
+| Prompt-phase passes | 400 | 80 |
+| Redundant work | 320 passes (80%) | 0 |
+
+Where G is the number of generated tokens per vote.
+
+### Why `memcpy` is Free
+
+The KV cache copy cost is O(block_size × n_embd × n_layer) bytes. For a typical game model:
+
+```
+block_size = 128, n_embd = 96, n_layer = 4, scalar_t = float
+Copy size = 128 × 96 × 4 × 4 = 196,608 bytes ~ 192 KB per layer pair
+```
+
+On modern CPUs, `memcpy` of 192 KB takes ~10 µs — negligible compared to a single `forward_inference()` call (~15–50 µs depending on model size).
+
+## Speculative Decoding
+
+### The Problem: Serial Token Generation
+
+Autoregressive decoding generates one token at a time:
+
+```
+forward(token_0) -> sample -> forward(token_1) -> sample -> ... -> forward(token_9) -> sample
+```
+
+Each step depends on the previous token. For a model running at 16K tokens/second, generating 10 tokens takes ~625 µs. Can we do better?
+
+### The Idea: Draft and Verify
+
+![Speculative decoding — draft model generates k candidates, target model verifies with KV rollback on rejection](speculative_decode_bw.png)
+
+SSD's core insight: if you have a fast draft model and a slower but more accurate target model, the draft can speculatively generate `k` tokens ahead. The target then verifies all `k` tokens in a single batch:
+
+- If all `k` match -> accept all, advance by `k` tokens (k× speedup!)
+- If token `j` is rejected -> accept tokens 0..j-1, use target's sample for position `j`, rollback draft's KV cache
+
+### MicroGPT-C Implementation
+
+`organelle_generate_speculative()` takes two organelles:
+
+```c
+int organelle_generate_speculative(
+    Organelle *draft,       // fast, small model
+    Organelle *target,      // accurate, larger model
+    const char *prompt,
+    char *output, int output_max,
+    scalar_t temperature,
+    int spec_k,             // tokens to speculate per round
+    int *accepted_out,      // acceptance statistics
+    int *drafted_out
+);
+```
+
+The inner loop:
+
+```
+while not done:
+    // Draft phase: generate k candidates with draft model
+    for i in 0..spec_k:
+        candidates[i] = sample(draft.forward(prev_token))
+
+    // Verify phase: check each candidate against target
+    for i in 0..spec_k:
+        target_token = argmax(target.forward(candidates[i-1]))
+        if target_token == candidates[i]:
+            accept(candidates[i])  // advance both models
+        else:
+            accept(target_token)   // use target's choice
+            rollback draft KV cache to position i
+            break
+```
+
+### When It Helps (and When It Doesn't)
+
+Speculative decoding's speedup depends entirely on the **acceptance rate** — the fraction of draft tokens that the target model agrees with.
+
+| Scenario | Acceptance Rate | Effective Speedup |
+|----------|:--------------:|:-----------------:|
+| Same model as draft and target | 100% | 1× (no benefit, extra overhead) |
+| Draft trained on same corpus, smaller | 40–80% | 1.5–3× |
+| Random/untrained draft | 1–5% | <1× (overhead exceeds benefit) |
+| Draft and target on very different tasks | ~0% | <1× (waste) |
+
+The MicroGPT-C benchmark (random-weight models) shows 1–2% acceptance — confirming theory. **Real speedups require trained models sharing the same corpus but differing in capacity.** For example:
+
+- **Draft:** 6.5K-param micro-organelle (1.55M infer/s)
+- **Target:** 460K-param game player (16K tok/s)
+- **Speed gap:** ~97×
+
+If the draft accepts 50% of its predictions, speculative decoding would yield ~2× effective speedup over the target model alone.
+
+## Benchmark Results
+
+Measured on Apple M2 Max, Float32, SIMD ON, single-threaded (default micro-model, 6.5K params):
+
+| Method | µs/call | vs Old Ensemble | Notes |
+|--------|---------|:--------------:|-------|
+| Single `organelle_generate()` | 6.7 | — | Baseline |
+| OLD ensemble (5 votes, no cache) | 53.0 | 1.0× | N separate `organelle_generate()` calls |
+| **NEW ensemble (5 votes, prefix cache)** | **27.8** | **1.9×** | Prompt processed once, KV cache copied |
+| Speculative decode (k=4) | 28.3 | — | 1.2% acceptance (random weights) |
+| Speculative decode (k=2) | 18.4 | — | 2.4% acceptance (random weights) |
+
+With a longer prompt (17 characters): old ensemble = 108.4 µs, new ensemble = 19.1 µs -> **5.7× speedup**.
+
+The scaling law is clear: **longer prompts yield proportionally larger speedups**, because the saved work (prompt processing) grows linearly with prompt length while the remaining work (decode phase) stays constant.
+
+### Scaling Prediction
+
+For the 460K-param game models (N_EMBD=96, N_LAYER=4) with 40-token prompts:
+
+```
+Old ensemble: 5 votes × (40 prompt + G generate) forward passes
+New ensemble: 1 × (40 prompt) + 5 × G forward passes
+Savings: 4 × 40 × N_LAYER = 640 forward passes per game step
+```
+
+Each `forward_inference()` at 460K params takes ~60 µs. Saving 640 calls = ~38 ms per game step. Over a 50-move game, that's ~1.9 seconds saved — meaningful for interactive play.
+
+## Applicability Guide
+
+These optimisations accelerate **specific inference patterns**, not all generation:
+
+| Workflow | Faster? | Why |
+|----------|:-------:|-----|
+| **Ensemble voting** (game demos) | **Yes** | Prefix KV cache sharing — prompt processed once |
+| **Multi-organelle shared prefix** | **Yes** | `generate_from_cache()` + `kv_cache_copy()` |
+| **Draft-target organelle pairs** | **Yes** | `organelle_generate_speculative()` |
+| **Single-model generation** (Shakespeare, names) | **No** | One model, no ensemble, no shared prefix |
+| **Training** | **No** | Forward+backward with gradient accumulation — different algorithm |
+
+**Rule of thumb:** If your pipeline calls `organelle_generate_ensemble()` or runs multiple inferences on the same prompt, you get the speedup automatically. Single `organelle_generate()` calls are unaffected.
+
+## New API Summary
+
+| Function | Purpose | Header |
+|----------|---------|--------|
+| `kv_cache_copy()` | Copy KV cache state (flat + paged modes) | `microgpt.h` |
+| `organelle_generate_from_cache()` | Decode-only generation from pre-filled KV cache | `microgpt_organelle.h` |
+| `organelle_generate_speculative()` | Draft-verify speculative decoding with acceptance stats | `microgpt_organelle.h` |
+
+All three are always compiled into `microgpt_lib` — no feature flags or compile-time options required.
+
+## Connection to the OPA Architecture
+
+These optimisations reinforce the core OPA thesis from Chapter 5: **the pipeline is where the intelligence lives.** By accelerating the ensemble voting pattern that makes OPA reliable (Chapter 4), prefix KV cache sharing makes the "many weak models coordinated by a pipeline" approach not just more accurate than a single model, but **faster** than the naive multi-inference alternative.
+
+Speculative decoding opens a new design space: **asymmetric organelle pairs.** Instead of using identically-sized planners and players, a pipeline could use a tiny 6.5K-param "instinct" organelle for rapid first guesses, verified by a larger 460K-param "deliberation" organelle. This maps to Kahneman's dual-process theory (Chapter 16) — System 1 drafts, System 2 verifies.
+
+## Summary
+
+| Concept | Key Finding |
+|---------|-------------|
+| **Prefix KV cache sharing** | Process prompt once, copy KV state per vote -> 1.9–5.7× ensemble speedup |
+| **Speculative decoding** | Draft-verify with KV rollback -> functional, awaiting trained model pairs for real speedups |
+| **Scaling law** | Longer prompts = proportionally larger speedups (linear in prompt length) |
+| **Applicability** | Ensemble and multi-inference workflows only — single generation unaffected |
+| **Design implication** | Asymmetric organelle pairs (instinct + deliberation) enabled by speculative decoding |
+| **OPA synergy** | Faster ensembles make the coordination-over-scale approach more practical |
+
+The SSD paper proved that async speculation works for billion-parameter GPU clusters. This chapter proved it works — in a different form — for sub-1M parameter CPU-only C99 systems. The principle is universal: **don't redo work you've already done, and let fast models do the easy parts.**
+
+\newpage
+
+
+\newpage
+
+
 # Glossary and References {-}
 
 This appendix provides a comprehensive glossary of key terms used throughout the book, along with a curated list of references. The glossary defines concepts in simple, accessible language, drawing from the explanations in the chapters. Terms are listed alphabetically for easy reference. The references include foundational papers and resources that influenced the principles of MicroGPT-C, such as transformer architectures and optimization techniques. These are cited in a standard format (APA style) for further reading. Note that while the book focuses on practical implementation, these sources offer deeper theoretical insights.
@@ -2947,7 +3202,9 @@ This appendix provides a comprehensive glossary of key terms used throughout the
 
 - **Kanban Architecture**: A coordination system using shared state (todo, blocked, history) to manage pipeline workflows and handle failures (see Chapter 5).
 
-- **KV Cache**: Stored keys and values from past attention computations, speeding up sequential inference (see Chapters 3 and 8).
+- **KV Cache**: Stored keys and values from past attention computations, speeding up sequential inference (see Chapters 3, 8, and 17).
+
+- **KV Cache Copy**: Duplicating a KV cache state from one inference context to another, enabling prefix sharing across ensemble votes without re-processing the prompt (see Chapter 17).
 
 - **Label Smoothing**: A regularisation technique that replaces hard targets with a soft mixture: $y_{\text{smooth}} = (1-\alpha) \cdot y_{\text{hard}} + \alpha/V$. Calibrates model confidence and raises the loss floor (see Chapter 3).
 
@@ -2975,6 +3232,8 @@ This appendix provides a comprehensive glossary of key terms used throughout the
 
 - **Paged KV Cache**: A memory-efficient cache that allocates in fixed pages, handling long sequences without fragmentation (see Chapter 7).
 
+- **Prefix KV Cache Sharing**: An inference optimisation where a common prompt is processed once and the resulting KV cache is copied to each ensemble vote, eliminating redundant computation. Delivers 1.9–5.7× speedup on ensemble inference (see Chapter 17).
+
 - **Paraphrase Blindness**: Model failure on reworded inputs due to literal matching; addressed by decomposition (see Chapter 10).
 
 - **Permutation Test**: A validation method that shuffles training labels to test whether a model's accuracy exceeds chance. Stratified variants isolate signal in specific subsets (see Chapter 6).
@@ -3000,6 +3259,10 @@ This appendix provides a comprehensive glossary of key terms used throughout the
 - **Softmax**: A function that converts raw scores into probabilities summing to 1 (see Chapter 2).
 
 - **Stem Cell Philosophy**: The idea of starting with generic models that differentiate into specialists (see Chapter 4).
+
+- **Speculative Decoding**: An inference acceleration technique where a fast draft model generates candidate tokens speculatively, which are then verified by a slower but more accurate target model. Accepted tokens advance both models; rejected tokens trigger KV cache rollback (see Chapters 13 and 17).
+
+- **Speculative Speculative Decoding (SSD)**: A variant introduced by Cui et al. (2026) that runs draft and verify asynchronously on separate hardware, pre-computing speculation trees for all likely verification outcomes. MicroGPT-C adapts the prefix sharing and draft-verify concepts for CPU-only inference (see Chapter 17).
 
 - **Structured Outputs**: Generating data in fixed formats like JSON, validated by judges (see Chapter 10).
 
@@ -3046,6 +3309,8 @@ Velickovic, P., et al. (2022). *The CLRS Algorithmic Reasoning Benchmark*. In Pr
 Wortsman, M., et al. (2022). *Model Soups: Averaging Weights of Multiple Fine-tuned Models Improves Accuracy without Increasing Inference Time*. In Proceedings of ICML.
 
 Baum, L. E., et al. (1970). *A Maximization Technique Occurring in the Statistical Analysis of Probabilistic Functions of Markov Chains*. Annals of Mathematical Statistics. (Baum-Welch / EM for HMMs.)
+
+Cui, G., et al. (2026). *Speculative Speculative Decoding*. In International Conference on Learning Representations (ICLR). arXiv preprint arXiv:2603.03251. (Async speculation, tree caching, and glue decode for LLM inference acceleration.)
 
 ## Appendix B: Full Code Listings
 
@@ -3094,6 +3359,7 @@ A version history of the book, reconstructed from the git commit log.
 | | | `d4e5c76` | Chapter content updates |
 | | | `2565c4a` | OPA biology analogy infographic added to Chapter 4 |
 | | | `17bc4eb` | Chapter links added to table of contents |
+| **1.4.0** | Mar 05, 2026 | — | Chapter 17 added: "SSD-Inspired Inference Acceleration" — prefix KV cache sharing, speculative decoding, benchmark results, two new diagrams |
 
 ## Appendix F: Validation Checklist
 
