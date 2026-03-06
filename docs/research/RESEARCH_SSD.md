@@ -172,7 +172,9 @@ Both top-priority SSD-inspired optimisations have been implemented:
 **Observations:**
 - For a 5-vote ensemble with a 40-token prompt, this eliminates 4×40 = 160 redundant `forward_inference()` calls
 - The KV cache copy is O(positions × n_embd) — negligible compared to a forward pass
-- The refactored ensemble produces **functionally identical** results (same voting logic, only prompt processing is shared)
+- **WARNING: The refactored ensemble does NOT produce functionally identical results** -- see Regression Analysis below
+
+**Status: DISABLED BY DEFAULT (March 2026).** Compile with `-DENABLE_SSD=1` to opt in.
 
 #### 2. Speculative Decoding (`organelle_generate_speculative()`)
 
@@ -253,3 +255,69 @@ Run via `bench_ssd` (Apple M2 Max, Float32, SIMD ON, single-threaded):
 | Word-level (Shakespeare) | 510K | 40K tok/s |
 | Micro-benchmark | 6.5K | 1.55M infer/s |
 
+---
+
+### ⚠️ Regression Analysis — SSD Disabled by Default (March 2026)
+
+A controlled A/B test on Othello 6×6 revealed that prefix KV cache sharing in `organelle_generate_ensemble()` causes a **significant accuracy regression** on adversarial game demos.
+
+#### A/B Test: Othello 6×6 (Same Model, Same Checkpoints)
+
+| Variant | Win Rate | W+D Rate | Parse Errors | Pipeline Time |
+|---------|:--------:|:--------:|:------------:|:------------:|
+| **No SSD** (legacy N independent calls) | **68%** | **70%** | 1,158 | 4.41s |
+| **SSD** (prefix cache sharing) | **38%** | **44%** | 1,484 | 1.60s |
+| SSD run 2 (reproducibility check) | **38%** | **44%** | 1,484 | 1.60s |
+
+**Results are perfectly deterministic and reproducible.** Same model weights, same game seeds — only the ensemble method differs.
+
+#### Impact
+
+- **30 percentage point** win rate drop (68% → 38%)
+- **28% increase** in parse errors (1,158 → 1,484)
+- **2.75× faster** pipeline time (4.41s → 1.60s)
+
+The speed improvement is real, but the accuracy cost is unacceptable for adversarial games.
+
+#### Root Cause Hypotheses
+
+The SSD prefix cache path differs from the legacy path in ensemble diversity:
+
+1. **Vote diversity reduction:** All votes start from the same `prompt_logits`, differentiated only by temperature jitter (±0.05). The legacy path reprocesses the prompt independently N times, giving each vote a different RNG trajectory through `sample_token()` calls, producing naturally more diverse outputs
+2. **RNG state divergence:** In the legacy path, each `organelle_generate()` call consumes RNG state through N prompt-length forward passes worth of sampling. The SSD path starts all votes from the same RNG state offset, reducing the effective exploration of the output space
+3. **Ensemble voting quality:** With less diverse votes, the majority-vote mechanism converges on suboptimal moves more often, particularly for complex games with long board representations near the BLOCK_SIZE limit
+
+#### Resolution
+
+SSD prefix KV cache sharing is **disabled by default** as of March 2026. The `organelle_generate_ensemble()` function uses the legacy N-independent-calls path unless compiled with `-DENABLE_SSD=1`.
+
+**Compiler switch:**
+```c
+// In organelle_generate_ensemble():
+#ifndef ENABLE_SSD
+  // Legacy path: N independent organelle_generate() calls (default)
+#endif
+  // SSD path: process prompt once, copy KV cache for each vote
+```
+
+#### Games Affected
+
+Games with higher complexity and parse error rates are most affected:
+
+| Game | No-SSD | SSD | Delta | Parse Error Rate |
+|------|:------:|:---:|:-----:|:----------------:|
+| Othello | 68% | 38% | **−30pp** | High (1,158-1,484) |
+| Mastermind | ~79%* | 3% | **−76pp** | High (100% fallback) |
+
+*Mastermind baseline from documented results; fresh training variance also contributes.
+
+Games with simpler output formats (Tic-Tac-Toe, Puzzle-8) showed minimal deltas, suggesting the regression is proportional to output complexity and parse error susceptibility.
+
+#### Future Work
+
+To re-enable SSD without accuracy loss:
+
+1. **Add per-vote RNG seeding** — explicitly seed each vote's sampling to ensure diversity independent of the code path
+2. **Increase temperature jitter** — widen `OPA_TEMP_JITTER` from 0.05 to 0.10-0.15 for SSD path to compensate for reduced prompt-processing diversity
+3. **Hybrid approach** — use SSD for prompt processing but reseed the RNG before each vote's decode phase
+4. **Formal verification** — implement a token-level comparison test that checks both paths produce identical first-token logits from the same prompt

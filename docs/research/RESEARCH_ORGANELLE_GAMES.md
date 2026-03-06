@@ -106,3 +106,37 @@ By implementing the recommended list of puzzles (Lights Out, Mastermind, Klotski
 - **Improvements**: Add MD-delta (reports P1); hybrid search (MCTS Worker); geometry from PDFs (e.g., manifold evals for Hex voids). The topology experiments (Feb 2026) demonstrated that **BFS connectivity features + topological Judge + MCTS corpus generation** are effective zero-cost interventions.
 
 This list pushes OPA's boundaries—start with Lights Out for quick wins!
+
+---
+
+### 5. **SSD Revalidation (March 2026)**
+
+All 12 game demos were retrained from random initialization and re-evaluated to test the SSD prefix KV cache sharing optimization in `organelle_generate_ensemble()`.
+
+**⚠️ Key finding: SSD prefix KV cache sharing causes accuracy regression on adversarial games.** A controlled A/B test on Othello (same model, same checkpoints, only ensemble method differs) confirmed SSD reduces win rate from 68% to 38%. **SSD is now disabled by default** — compile with `-DENABLE_SSD=1` to opt in.
+
+| Game | Documented | Revalidation (SSD on) | Delta | Notes |
+|------|:----------:|:---------------------:|:-----:|-------|
+| **Tic-Tac-Toe** | 87% W+D | **87%** W+D | = | Exact match |
+| **Connect-4** | 88% W | **89%** W | +1% | Within variance |
+| **Puzzle-8** | 90% solve | **90%** solve | = | Exact match |
+| **Puzzle-8 Reasoning** | 90% solve | **90%** solve | = | Exact match |
+| **Lights Out** | 10% solve | **10%** solve (easy) | = | Exact match |
+| **Mastermind** | 79% solve | **3%** solve | **−76%** | SSD regression + training variance |
+| **Klotski** | 62% solve | **56%** solve | −6% | Training variance |
+| **Sudoku** | 78% solve | **75%** solve | −3% | Training variance |
+| **Othello** | 67% win | **48%** win | **−19%** | **SSD regression confirmed** |
+| **Hex 7×7** | 27% win | **25%** win | −2% | Training variance |
+| **Pentago** | 91% win | **94%** win | +3% | Within variance |
+| **Red Donkey** | 19% solve | **21%** solve | +2% | Within variance |
+
+**A/B Test — Othello 6×6 (same model, same checkpoints):**
+
+| Variant | Win Rate | Parse Errors | Pipeline Time |
+|---------|:--------:|:------------:|:------------:|
+| **Legacy (no SSD)** | **68%** | 1,158 | 4.41s |
+| **SSD (prefix cache)** | 38% | 1,484 | 1.60s |
+
+Results are perfectly deterministic and reproducible. SSD produces 28% more parse errors, likely due to reduced vote diversity when all votes start from the same cached prompt logits with only temperature jitter differentiation. See `RESEARCH_SSD.md` for full regression analysis.
+
+**Resolution:** SSD disabled by default via `#ifndef ENABLE_SSD` guard in `organelle_generate_ensemble()`. The legacy N-independent-calls path is now the default. Simple games (TicTacToe, Puzzle-8) are unaffected, but adversarial games with high parse error rates suffer significant accuracy loss with SSD enabled.

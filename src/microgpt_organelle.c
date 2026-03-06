@@ -2157,6 +2157,61 @@ void organelle_generate_ensemble(const Organelle *org,
   const int nl = cfg->n_layer;
   const Vocab *vocab = &org->vocab;
 
+#ifndef ENABLE_SSD
+  /* ── Legacy path (default): N independent organelle_generate() calls ──
+   *
+   * SSD prefix KV cache sharing is disabled by default due to a confirmed
+   * accuracy regression (Othello: 68% -> 38% same model, March 2026).
+   * To enable, compile with -DENABLE_SSD=1.
+   */
+  {
+    char candidates[OPA_MAX_VOTES][128];
+    int vote_counts[OPA_MAX_VOTES];
+    int unique = 0;
+
+    for (int v = 0; v < n_votes; v++) {
+      scalar_t jitter =
+          OPA_TEMP_JITTER * ((scalar_t)v - (scalar_t)n_votes / (scalar_t)2.0);
+      scalar_t temp = base_temp + jitter;
+      if (temp < (scalar_t)0.01)
+        temp = (scalar_t)0.01;
+
+      char buf[128];
+      int gen_len = max_len < 127 ? max_len : 127;
+      organelle_generate(org, cfg, prompt, buf, gen_len, temp);
+
+      int found = 0;
+      for (int u = 0; u < unique; u++) {
+        if (strcmp(candidates[u], buf) == 0) {
+          vote_counts[u]++;
+          found = 1;
+          break;
+        }
+      }
+      if (!found && unique < OPA_MAX_VOTES) {
+        strncpy(candidates[unique], buf, 127);
+        candidates[unique][127] = '\0';
+        vote_counts[unique] = 1;
+        unique++;
+      }
+    }
+
+    int best_idx = 0;
+    for (int u = 1; u < unique; u++) {
+      if (vote_counts[u] > vote_counts[best_idx])
+        best_idx = u;
+    }
+
+    strncpy(output, candidates[best_idx], (size_t)max_len);
+    output[max_len] = '\0';
+    if (confidence)
+      *confidence = (scalar_t)vote_counts[best_idx] / (scalar_t)n_votes;
+    (void)nl;
+    (void)vocab;
+    return;
+  }
+#endif /* !ENABLE_SSD */
+
   /* ── Step 1: Process prompt ONCE to build shared KV cache ── */
   scalar_t **prefix_keys = (scalar_t **)malloc((size_t)nl * sizeof(scalar_t *));
   scalar_t **prefix_values =
