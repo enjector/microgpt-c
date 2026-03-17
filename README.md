@@ -117,6 +117,7 @@ Key technical contributions shipped in this engine:
 | 🔧 **Compile-Time Architecture** | `N_EMBD`, `N_LAYER`, `BLOCK_SIZE` etc. as CMake defines — zero runtime overhead | 30K–841K params, 360KB–5.4MB |
 | 🖥️ **Metal GPU + SIMD + BLAS** | Optional Apple Metal shaders, NEON auto-vectorisation, Accelerate BLAS | All opt-in, zero-dependency baseline |
 | 📦 **Paged KV Cache** | Memory-efficient attention for constrained deployments | Opt-in via `-DMICROGPT_PAGED_KV=ON` |
+| 🔀 **Block Attention Residuals** | Learned depth-attention replaces additive residuals — preserves prompt signal through deep layers | Opt-in via `-DMICROGPT_ATTN_RES=ON` ([paper](https://github.com/MoonshotAI/Attention-Residuals)) |
 | 🎯 **Negative Control Methodology** | Lottery experiment proves engine learns patterns, not artefacts | Entropy floor at 0.50 (theoretical maximum) |
 
 ## Explore Further
@@ -136,6 +137,7 @@ Key technical contributions shipped in this engine:
 | 📚 **Using as a library** | [FUNCTIONAL_SPEC](docs/FUNCTIONAL_SPEC.md) |
 | ⚡ **Performance & benchmarks** | [PERFORMANCE](docs/testing/PERFORMANCE.md) |
 | 🚀 **SSD inference optimisations** | [RESEARCH_SSD](docs/research/RESEARCH_SSD.md) |
+| 🔀 **Attention Residuals research** | [RESEARCH_ATTN_RES](docs/research/RESEARCH_ATTN_RES.md) |
 | 🔧 **Build options** (Metal, BLAS, INT8, SIMD) | [BUILD_OPTIONS](docs/BUILD_OPTIONS.md) |
 | 🤝 **Contributing** | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | 📋 **Data licensing** | [DATA_LICENSE.md](DATA_LICENSE.md) |

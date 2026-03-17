@@ -341,6 +341,15 @@ typedef struct {
 #define LABEL_SMOOTH 0.0 /* Label smoothing coefficient; 0 = off */
 #endif
 
+/* ---- Block Attention Residuals (opt-in: -DMICROGPT_ATTN_RES) ---- */
+#ifdef MICROGPT_ATTN_RES
+#ifndef ATTN_RES_BLOCK_SIZE
+#define ATTN_RES_BLOCK_SIZE 2 /* Layers per block; attention is over blocks */
+#endif
+/* Max blocks = ceil(N_LAYER / ATTN_RES_BLOCK_SIZE) + 1 (for initial embed) */
+#define ATTN_RES_MAX_BLOCKS ((N_LAYER) / (ATTN_RES_BLOCK_SIZE) + 2)
+#endif
+
 /*
  * microgpt_default_config - Return a config populated with sensible defaults.
  *   These match the compile-time constants above.
@@ -440,6 +449,11 @@ static inline void microgpt_print_config(const char *demo_name,
   printf("    Head Parallel= ON\n");
 #else
   printf("    Head Parallel= OFF\n");
+#endif
+#ifdef MICROGPT_ATTN_RES
+  printf("    AttnRes      = ON (block=%d)\n", ATTN_RES_BLOCK_SIZE);
+#else
+  printf("    AttnRes      = OFF\n");
 #endif
   printf("\n");
   printf(

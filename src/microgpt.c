@@ -223,6 +223,10 @@ struct Model {
   scalar_t **attn_wo; /* output  weight       [n_embd × n_embd]      */
   scalar_t **mlp_fc1; /* MLP up-projection    [mlp_dim × n_embd]     */
   scalar_t **mlp_fc2; /* MLP down-projection  [n_embd × mlp_dim]     */
+#ifdef MICROGPT_ATTN_RES
+  scalar_t **attn_res_proj; /* AttnRes pseudo-query (pre-attn) [n_layer][n_embd] */
+  scalar_t **mlp_res_proj;  /* AttnRes pseudo-query (pre-MLP)  [n_layer][n_embd] */
+#endif
 };
 #endif
 
@@ -418,6 +422,10 @@ static size_t count_params(size_t vs, const MicrogptConfig *cfg) {
   /* Per-layer: 4 attention matrices (ne²) + 2 MLP matrices */
   for (int L = 0; L < N_LAYER; L++)
     n += ne * ne * 4 + md * ne + ne * md;
+#ifdef MICROGPT_ATTN_RES
+  /* Per-layer: 2 projection vectors (attn_res_proj + mlp_res_proj) */
+  n += (size_t)N_LAYER * ne * 2;
+#endif
   return n;
 }
 
@@ -697,6 +705,12 @@ static int alloc_layer_ptrs(Model *m, int n_layer) {
   m->mlp_fc1 = (scalar_t **)calloc((size_t)n_layer, sizeof(scalar_t *));
   m->mlp_fc2 = (scalar_t **)calloc((size_t)n_layer, sizeof(scalar_t *));
 #endif
+#ifdef MICROGPT_ATTN_RES
+  m->attn_res_proj = (scalar_t **)calloc((size_t)n_layer, sizeof(scalar_t *));
+  m->mlp_res_proj = (scalar_t **)calloc((size_t)n_layer, sizeof(scalar_t *));
+  if (!m->attn_res_proj || !m->mlp_res_proj)
+    return -1;
+#endif
   if (!m->attn_wq || !m->attn_wk || !m->attn_wv || !m->attn_wo || !m->mlp_fc1 ||
       !m->mlp_fc2)
     return -1;
@@ -902,6 +916,18 @@ err_i8:
     for (size_t i = 0; i < ne * md; i++)
       m->mlp_fc2[L][i] = rand_gauss() * std;
   }
+#ifdef MICROGPT_ATTN_RES
+  for (int L = 0; L < nl; L++) {
+    m->attn_res_proj[L] = (scalar_t *)malloc(ne * sizeof(scalar_t));
+    m->mlp_res_proj[L] = (scalar_t *)malloc(ne * sizeof(scalar_t));
+    if (!m->attn_res_proj[L] || !m->mlp_res_proj[L])
+      goto err;
+    for (size_t i = 0; i < ne; i++) {
+      m->attn_res_proj[L][i] = rand_gauss() * std;
+      m->mlp_res_proj[L][i] = rand_gauss() * std;
+    }
+  }
+#endif
   return m;
 err:
   model_free(m);
@@ -939,6 +965,16 @@ void model_free(Model *m) {
   free(m->attn_wo);
   free(m->mlp_fc1);
   free(m->mlp_fc2);
+#ifdef MICROGPT_ATTN_RES
+  for (int L = 0; L < m->cfg.n_layer; L++) {
+    if (m->attn_res_proj)
+      free(m->attn_res_proj[L]);
+    if (m->mlp_res_proj)
+      free(m->mlp_res_proj[L]);
+  }
+  free(m->attn_res_proj);
+  free(m->mlp_res_proj);
+#endif
 #if defined(QUANTIZATION_INT8) || defined(QUANTISATION_INT8)
   free(m->scale);
   free(m->master);
@@ -1002,6 +1038,15 @@ int model_save(const Model *m, const char *path) {
       return -1;
     }
   }
+#ifdef MICROGPT_ATTN_RES
+  for (int L = 0; L < nl; L++) {
+    if (write_doubles(f, m->attn_res_proj[L], ne) != 0 ||
+        write_doubles(f, m->mlp_res_proj[L], ne) != 0) {
+      fclose(f);
+      return -1;
+    }
+  }
+#endif
   fclose(f);
   return 0;
 }
@@ -1048,6 +1093,16 @@ Model *model_load(const char *path, size_t vocab_size,
       return NULL;
     }
   }
+#ifdef MICROGPT_ATTN_RES
+  for (int L = 0; L < nl; L++) {
+    if (read_doubles(f, m->attn_res_proj[L], ne) != 0 ||
+        read_doubles(f, m->mlp_res_proj[L], ne) != 0) {
+      model_free(m);
+      fclose(f);
+      return NULL;
+    }
+  }
+#endif
   fclose(f);
   return m;
 }
@@ -1097,6 +1152,15 @@ int checkpoint_save(const Model *model, const scalar_t *m_buf,
       return -1;
     }
   }
+#ifdef MICROGPT_ATTN_RES
+  for (int L = 0; L < nl; L++) {
+    if (write_doubles(f, model->attn_res_proj[L], ne) != 0 ||
+        write_doubles(f, model->mlp_res_proj[L], ne) != 0) {
+      fclose(f);
+      return -1;
+    }
+  }
+#endif
 
   /* Write optimizer state */
   size_t np = model_num_params(model);
@@ -1158,6 +1222,16 @@ Model *checkpoint_load(const char *path, size_t vocab_size,
       return NULL;
     }
   }
+#ifdef MICROGPT_ATTN_RES
+  for (int L = 0; L < nl; L++) {
+    if (read_doubles(f, model->attn_res_proj[L], ne) != 0 ||
+        read_doubles(f, model->mlp_res_proj[L], ne) != 0) {
+      model_free(model);
+      fclose(f);
+      return NULL;
+    }
+  }
+#endif
 
   /* Read optimizer state */
   size_t np = model_num_params(model);
@@ -1510,6 +1584,147 @@ static void rmsnorm_bwd(const scalar_t *restrict x, const scalar_t *restrict dy,
       for (size_t i = 0; i < d; i++) dx[i] += inv_rms * dy[i] - coeff * x[i];
 }
 
+/* ================== Block Attention Residuals ============================= */
+
+#ifdef MICROGPT_ATTN_RES
+/*
+ * attn_res_fwd — Block AttnRes forward pass.
+ *
+ *   Replaces the standard residual x = x + sublayer(x) with a learned,
+ *   content-aware aggregation over all previous block representations.
+ *
+ *   blocks[0..n_blocks-1] = completed block representations [each N_EMBD]
+ *   partial               = current intra-block partial sum [N_EMBD]
+ *   proj                  = learned pseudo-query vector     [N_EMBD]
+ *   n_blocks              = number of completed blocks (including initial embed)
+ *   ne                    = embedding dimension
+ *   out                   = output: weighted sum of all representations
+ *
+ *   Algorithm:
+ *     V = stack(blocks[0..n_blocks-1], partial)     → [N+1][ne]
+ *     K = RMSNorm(V, per-row)                        → [N+1][ne]
+ *     logits[i] = dot(proj, K[i])                    → [N+1]
+ *     alpha = softmax(logits)                        → [N+1]
+ *     out = sum_i alpha[i] * V[i]                    → [ne]
+ */
+static void attn_res_fwd(const scalar_t blocks[][N_EMBD], int n_blocks,
+                         const scalar_t *restrict partial,
+                         const scalar_t *restrict proj, size_t ne,
+                         scalar_t *restrict out,
+                         scalar_t *restrict sv_alpha, int *sv_n_entries) {
+  const int n_entries = n_blocks + 1; /* blocks + partial */
+  *sv_n_entries = n_entries;
+
+  /* Compute logits = dot(proj, RMSNorm(V[i])) for each entry */
+  scalar_t logits[ATTN_RES_MAX_BLOCKS];
+  for (int b = 0; b < n_entries; b++) {
+    const scalar_t *src = (b < n_blocks) ? blocks[b] : partial;
+    /* Inline RMSNorm + dot with proj */
+    scalar_t sum_sq = 0;
+    for (size_t i = 0; i < ne; i++)
+      sum_sq += src[i] * src[i];
+    scalar_t inv_rms = 1.0 / M_SQRT(sum_sq / (scalar_t)ne + 1e-5);
+    scalar_t dot = 0;
+    for (size_t i = 0; i < ne; i++)
+      dot += proj[i] * (src[i] * inv_rms);
+    logits[b] = dot;
+  }
+
+  /* Softmax over depth */
+  scalar_t max_l = logits[0];
+  for (int b = 1; b < n_entries; b++)
+    if (logits[b] > max_l)
+      max_l = logits[b];
+  scalar_t sum = 0;
+  for (int b = 0; b < n_entries; b++) {
+    sv_alpha[b] = M_EXP(logits[b] - max_l);
+    sum += sv_alpha[b];
+  }
+  for (int b = 0; b < n_entries; b++)
+    sv_alpha[b] /= sum;
+
+  /* Weighted sum: out = sum_i alpha[i] * V[i] */
+  memset(out, 0, ne * sizeof(scalar_t));
+  for (int b = 0; b < n_entries; b++) {
+    const scalar_t *src = (b < n_blocks) ? blocks[b] : partial;
+    scalar_t a = sv_alpha[b];
+    for (size_t i = 0; i < ne; i++)
+      out[i] += a * src[i];
+  }
+}
+
+/*
+ * attn_res_bwd — Block AttnRes backward pass.
+ *
+ *   Given d_out (upstream gradient through the AttnRes output):
+ *     1. d_alpha[b] = dot(d_out, V[b])
+ *     2. Softmax backward: d_logits = alpha * (d_alpha - dot(alpha, d_alpha))
+ *     3. d_proj += d_logits[b] * RMSNorm(V[b])
+ *     4. d_V[b] += alpha[b] * d_out  (from weighted sum)
+ *        d_V[b] += d_logits[b] * proj @ d_RMSNorm(V[b])  (from logit computation)
+ *
+ *   d_blocks/d_partial are accumulated (+=).
+ *   d_proj is accumulated (+=) into the gradient buffer.
+ */
+static void attn_res_bwd(const scalar_t blocks[][N_EMBD], int n_blocks,
+                         const scalar_t *restrict partial,
+                         const scalar_t *restrict proj,
+                         const scalar_t *restrict sv_alpha, int sv_n_entries,
+                         const scalar_t *restrict d_out, size_t ne,
+                         scalar_t d_blocks[][N_EMBD],
+                         scalar_t *restrict d_partial,
+                         scalar_t *restrict d_proj) {
+  /* Step 1: d_alpha[b] = dot(d_out, V[b]) */
+  scalar_t d_alpha[ATTN_RES_MAX_BLOCKS];
+  for (int b = 0; b < sv_n_entries; b++) {
+    const scalar_t *src = (b < n_blocks) ? blocks[b] : partial;
+    scalar_t s = 0;
+    for (size_t i = 0; i < ne; i++)
+      s += d_out[i] * src[i];
+    d_alpha[b] = s;
+  }
+
+  /* Step 2: Softmax backward → d_logits */
+  scalar_t dot_ad = 0;
+  for (int b = 0; b < sv_n_entries; b++)
+    dot_ad += sv_alpha[b] * d_alpha[b];
+  scalar_t d_logits[ATTN_RES_MAX_BLOCKS];
+  for (int b = 0; b < sv_n_entries; b++)
+    d_logits[b] = sv_alpha[b] * (d_alpha[b] - dot_ad);
+
+  /* Step 3 & 4: Accumulate gradients */
+  for (int b = 0; b < sv_n_entries; b++) {
+    const scalar_t *src = (b < n_blocks) ? blocks[b] : partial;
+    scalar_t *d_src = (b < n_blocks) ? d_blocks[b] : d_partial;
+    scalar_t a = sv_alpha[b];
+
+    /* From weighted sum: d_V[b] += alpha[b] * d_out */
+    for (size_t i = 0; i < ne; i++)
+      d_src[i] += a * d_out[i];
+
+    /* From logit computation: d_proj, d_V through RMSNorm */
+    scalar_t sum_sq = 0;
+    for (size_t i = 0; i < ne; i++)
+      sum_sq += src[i] * src[i];
+    scalar_t rms = M_SQRT(sum_sq / (scalar_t)ne + 1e-5);
+    scalar_t inv_rms = 1.0 / rms;
+
+    /* d_proj += d_logits[b] * RMSNorm(V[b]) */
+    for (size_t i = 0; i < ne; i++)
+      d_proj[i] += d_logits[b] * (src[i] * inv_rms);
+
+    /* d_V[b] += d_logits[b] * proj @ d_RMSNorm
+     * d_RMSNorm: same structure as rmsnorm_bwd but with dy = d_logits[b]*proj */
+    scalar_t dy_dot_x = 0;
+    for (size_t i = 0; i < ne; i++)
+      dy_dot_x += (d_logits[b] * proj[i]) * src[i];
+    scalar_t coeff = dy_dot_x / ((scalar_t)ne * rms * rms);
+    for (size_t i = 0; i < ne; i++)
+      d_src[i] += inv_rms * (d_logits[b] * proj[i]) - coeff * src[i];
+  }
+}
+#endif /* MICROGPT_ATTN_RES */
+
 /* ================== Per-Head Attention Parallelism ====================== */
 
 #ifdef MICROGPT_HEAD_PARALLEL
@@ -1754,6 +1969,13 @@ scalar_t forward_backward_one(const Model *model, size_t token_id,
   scalar_t sv_mlp_pre[N_LAYER][MLP_DIM];    /* fc1 output pre-ReLU */
   scalar_t sv_mlp_post[N_LAYER][MLP_DIM];   /* fc1 output post-ReLU */
   scalar_t sv_x_embed[N_EMBD];              /* embedding before initial norm */
+#ifdef MICROGPT_ATTN_RES
+  /* Block AttnRes saved state for backward (one AttnRes call per layer) */
+  scalar_t sv_ar_alpha[N_LAYER][ATTN_RES_MAX_BLOCKS]; /* softmax weights */
+  int sv_ar_n_blocks[N_LAYER]; /* n_blocks at each layer's AttnRes call */
+  int sv_ar_ne[N_LAYER];       /* n_entries saved from fwd */
+  scalar_t sv_ar_partial[N_LAYER][N_EMBD]; /* partial before AttnRes */
+#endif
 
   /* Single-position activation buffers */
   scalar_t x0[N_EMBD], x_norm1[N_EMBD], q[N_EMBD], k[N_EMBD], v[N_EMBD];
@@ -1788,6 +2010,16 @@ scalar_t forward_backward_one(const Model *model, size_t token_id,
   memcpy(sv_x_embed, x0, ne * sizeof(scalar_t));
   rmsnorm_fwd(x0, ne, x_norm1);
   memcpy(x0, x_norm1, ne * sizeof(scalar_t));
+
+#ifdef MICROGPT_ATTN_RES
+  /* AttnRes state: store full hidden states (complete layer outputs).
+   * Block 0 = initial embedding (post-norm).
+   * After each layer, the standard residual output is recorded and
+   * AttnRes selectively aggregates all recorded states. */
+  scalar_t ar_blocks[ATTN_RES_MAX_BLOCKS][N_EMBD];
+  int ar_n_blocks = 1;
+  memcpy(ar_blocks[0], x0, ne * sizeof(scalar_t));
+#endif
 
   for (int L = 0; L < nl; L++) {
     memcpy(sv_x_pre[L], x0, ne * sizeof(scalar_t));
@@ -1945,6 +2177,7 @@ scalar_t forward_backward_one(const Model *model, size_t token_id,
 #else
     lin_fwd(x_attn, model->attn_wo[L], ne, ne, x1);
 #endif
+    /* Standard additive residual for intra-layer attention */
     for (size_t i = 0; i < ne; i++)
       x1[i] += x0[i]; /* residual */
     memcpy(x0, x1, ne * sizeof(scalar_t));
@@ -1984,9 +2217,30 @@ scalar_t forward_backward_one(const Model *model, size_t token_id,
     memcpy(sv_mlp_post[L], mlp1, md * sizeof(scalar_t));
     lin_fwd(mlp1, model->mlp_fc2[L], md, ne, x2);
 #endif
+#ifdef MICROGPT_ATTN_RES
+    /* Standard MLP residual first */
+    for (size_t i = 0; i < ne; i++)
+      x2[i] += x0[i]; /* x2 = complete layer output (standard residual) */
+
+    /* Store at block boundaries (every ATTN_RES_BLOCK_SIZE layers) */
+    if ((L + 1) % ATTN_RES_BLOCK_SIZE == 0 && ar_n_blocks < ATTN_RES_MAX_BLOCKS - 1) {
+      memcpy(ar_blocks[ar_n_blocks], x2, ne * sizeof(scalar_t));
+      ar_n_blocks++;
+    }
+
+    /* Save state for backward */
+    sv_ar_n_blocks[L] = ar_n_blocks;
+    memcpy(sv_ar_partial[L], x2, ne * sizeof(scalar_t));
+
+    /* AttnRes: aggregate blocks + current layer output → next x0 */
+    attn_res_fwd((const scalar_t (*)[N_EMBD])ar_blocks, ar_n_blocks,
+                 x2, model->attn_res_proj[L], ne, x0,
+                 sv_ar_alpha[L], &sv_ar_ne[L]);
+#else
     for (size_t i = 0; i < ne; i++)
       x2[i] += x0[i];
     memcpy(x0, x2, ne * sizeof(scalar_t));
+#endif
   }
 
 #if defined(QUANTIZATION_INT8) || defined(QUANTISATION_INT8)
@@ -2040,6 +2294,15 @@ scalar_t forward_backward_one(const Model *model, size_t token_id,
   size_t off_lm = vs * ne + (size_t)bs * ne;
   size_t layer_stride = (size_t)ne * ne * 4 + (size_t)md * ne + (size_t)ne * md;
   size_t off_layers = off_lm + vs * ne;
+#ifdef MICROGPT_ATTN_RES
+  /* AttnRes gradient buffer offsets: stored after all standard layer params */
+  size_t off_ar = off_layers + (size_t)nl * layer_stride;
+  /* Layout: [attn_res_proj[0..nl-1]], each ne scalars */
+  scalar_t d_ar_blocks[ATTN_RES_MAX_BLOCKS][N_EMBD];
+  scalar_t d_ar_partial[N_EMBD];
+  memset(d_ar_blocks, 0, sizeof(d_ar_blocks));
+  memset(d_ar_partial, 0, sizeof(d_ar_partial));
+#endif
 
   /* Backward through lm_head: d_x = lm_head^T @ d_logits */
   lin_bwd(x0, get_W(model, model->lm_head, 2, vs * ne, W_tmp), d_logits, ne, vs,
@@ -2056,7 +2319,21 @@ scalar_t forward_backward_one(const Model *model, size_t token_id,
     size_t off_fc2 = off_L + ne * ne * 4 + (size_t)md * ne;
     size_t TL = sv_T[L];
 
-    /* --- MLP residual: d_x flows through addition --- */
+    /* --- MLP residual backward --- */
+#ifdef MICROGPT_ATTN_RES
+    /* Backprop d_x through the single per-layer AttnRes:
+     * d_x flows into attn_res_bwd → d_ar_blocks/d_ar_partial + d_proj */
+    attn_res_bwd((const scalar_t (*)[N_EMBD])ar_blocks,
+                 sv_ar_n_blocks[L], sv_ar_partial[L],
+                 model->attn_res_proj[L], sv_ar_alpha[L],
+                 sv_ar_ne[L], d_x, ne,
+                 d_ar_blocks, d_ar_partial,
+                 grad_buffer + off_ar + (size_t)L * ne);
+
+    /* d_ar_partial holds gradients on partial, which includes x1+x2.
+     * d_x for MLP backward = d_ar_partial (MLP contribution). */
+    memcpy(d_x, d_ar_partial, ne * sizeof(scalar_t));
+#endif
     /* d_x is the gradient of output of this layer (post-MLP-residual) */
 
     /* Backward through fc2 */
@@ -2083,10 +2360,19 @@ scalar_t forward_backward_one(const Model *model, size_t token_id,
     memset(d_x_post_attn, 0, sizeof(d_x_post_attn));
     rmsnorm_bwd(sv_x_post_attn[L], d_x_norm2, ne, d_x_post_attn);
 
+#ifdef MICROGPT_ATTN_RES
+    /* With single AttnRes, MLP residual backward: d_x1 = d_x (from
+     * d_ar_partial, which already includes gradients from both x1 and x2
+     * contributions) + d_x_post_attn (from MLP norm backward). */
+    scalar_t d_x1[N_EMBD];
+    for (size_t i = 0; i < ne; i++)
+      d_x1[i] = d_x[i] + d_x_post_attn[i];
+#else
     /* MLP residual: d_x1 = d_x (from residual skip) + d_x_post_attn */
     scalar_t d_x1[N_EMBD];
     for (size_t i = 0; i < ne; i++)
       d_x1[i] = d_x[i] + d_x_post_attn[i];
+#endif
 
     /* Backward through Wo */
     scalar_t d_x_attn[N_EMBD];
@@ -2182,12 +2468,26 @@ scalar_t forward_backward_one(const Model *model, size_t token_id,
     memset(d_x_pre, 0, sizeof(d_x_pre));
     rmsnorm_bwd(sv_x_pre[L], d_x_norm1, ne, d_x_pre);
 
+#ifdef MICROGPT_ATTN_RES
+    /* Standard additive attention residual backward:
+     * d_x_pre flows to x0 of this layer (same as standard). */
+    for (size_t i = 0; i < ne; i++)
+      d_x_pre[i] += d_x1[i];
+    memcpy(d_x, d_x_pre, ne * sizeof(scalar_t));
+    /* For L=0, d_x is used for embedding backward. The AttnRes also
+     * contributes gradients to ar_blocks[0] (the initial embedding). */
+    if (L == 0) {
+      for (size_t i = 0; i < ne; i++)
+        d_x[i] += d_ar_blocks[0][i];
+    }
+#else
     /* Attention residual: d_x_pre += d_x1 (residual skip) */
     for (size_t i = 0; i < ne; i++)
       d_x_pre[i] += d_x1[i];
 
     /* d_x for next layer down = d_x_pre */
     memcpy(d_x, d_x_pre, ne * sizeof(scalar_t));
+#endif
   }
 
   /* Backward through initial RMSNorm */
@@ -2248,6 +2548,13 @@ void forward_inference(const Model *model, size_t token_id, size_t pos_id,
   rmsnorm_fwd(x0, ne, x_norm1);
   memcpy(x0, x_norm1, ne * sizeof(scalar_t));
 
+#ifdef MICROGPT_ATTN_RES
+  scalar_t inf_ar_blocks[ATTN_RES_MAX_BLOCKS][N_EMBD];
+  scalar_t inf_ar_alpha[ATTN_RES_MAX_BLOCKS];
+  int inf_ar_ne;
+  int inf_ar_n_blocks = 1;
+  memcpy(inf_ar_blocks[0], x0, ne * sizeof(scalar_t));
+#endif
   for (int L = 0; L < nl; L++) {
     rmsnorm_fwd(x0, ne, x_norm1);
     /* Project normalised input \u2192 Q, K, V (same as training, no saved
@@ -2353,6 +2660,7 @@ void forward_inference(const Model *model, size_t token_id, size_t pos_id,
 #else
     lin_fwd(x_attn, model->attn_wo[L], ne, ne, x1);
 #endif
+    /* Standard additive residual for intra-layer attention */
     for (size_t i = 0; i < ne; i++)
       x1[i] += x0[i];
     memcpy(x0, x1, ne * sizeof(scalar_t));
@@ -2382,9 +2690,24 @@ void forward_inference(const Model *model, size_t token_id, size_t pos_id,
       mlp1[i] = mlp1[i] > 0 ? mlp1[i] : 0;
     lin_fwd(mlp1, model->mlp_fc2[L], md, ne, x2);
 #endif
+#ifdef MICROGPT_ATTN_RES
+    /* Standard MLP residual first */
+    for (size_t i = 0; i < ne; i++)
+      x2[i] += x0[i]; /* x2 = complete layer output */
+    /* Store at block boundaries */
+    if ((L + 1) % ATTN_RES_BLOCK_SIZE == 0 && inf_ar_n_blocks < ATTN_RES_MAX_BLOCKS - 1) {
+      memcpy(inf_ar_blocks[inf_ar_n_blocks], x2, ne * sizeof(scalar_t));
+      inf_ar_n_blocks++;
+    }
+    /* AttnRes: aggregate blocks + current layer output → next x0 */
+    attn_res_fwd((const scalar_t (*)[N_EMBD])inf_ar_blocks, inf_ar_n_blocks,
+                 x2, model->attn_res_proj[L], ne, x0,
+                 inf_ar_alpha, &inf_ar_ne);
+#else
     for (size_t i = 0; i < ne; i++)
       x2[i] += x0[i];
     memcpy(x0, x2, ne * sizeof(scalar_t));
+#endif
     T = cache_len[L] + 1;
   }
   /* ── LM head: project final hidden state to vocabulary logits ── */
@@ -2694,6 +3017,33 @@ void adam_step(Model *model, const scalar_t *grads, scalar_t *m, scalar_t *v,
         model->mlp_fc2[L][i] *= (1.0 - lr * WEIGHT_DECAY);
     }
   }
+#ifdef MICROGPT_ATTN_RES
+  /* AttnRes projection vectors: attn_res_proj[L] then mlp_res_proj[L] */
+  for (int L = 0; L < nl; L++) {
+    for (size_t i = 0; i < ne; i++, idx++) {
+      scalar_t g = grads[idx];
+      m[idx] = b1 * m[idx] + (1 - b1) * g;
+      v[idx] = b2 * v[idx] + (1 - b2) * g * g;
+      scalar_t mh = m[idx] / bc1;
+      scalar_t vh = v[idx] / bc2;
+      model->attn_res_proj[L][i] -= lr * mh / (M_SQRT(vh) + eps);
+      if (WEIGHT_DECAY > 0)
+        model->attn_res_proj[L][i] *= (1.0 - lr * WEIGHT_DECAY);
+    }
+  }
+  for (int L = 0; L < nl; L++) {
+    for (size_t i = 0; i < ne; i++, idx++) {
+      scalar_t g = grads[idx];
+      m[idx] = b1 * m[idx] + (1 - b1) * g;
+      v[idx] = b2 * v[idx] + (1 - b2) * g * g;
+      scalar_t mh = m[idx] / bc1;
+      scalar_t vh = v[idx] / bc2;
+      model->mlp_res_proj[L][i] -= lr * mh / (M_SQRT(vh) + eps);
+      if (WEIGHT_DECAY > 0)
+        model->mlp_res_proj[L][i] *= (1.0 - lr * WEIGHT_DECAY);
+    }
+  }
+#endif
 #endif
 }
 

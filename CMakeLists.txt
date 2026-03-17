@@ -26,6 +26,7 @@ option(MICROGPT_PAGED_KV       "Use demand-paged KV cache"                      
 option(QUANTIZATION_INT8       "Store weights as 8-bit integers with per-matrix scales" OFF)
 option(MICROGPT_BLAS           "Use BLAS (Accelerate / OpenBLAS / MKL)"             OFF)
 option(MICROGPT_METAL          "Use Metal GPU acceleration (macOS only)"            OFF)
+option(MICROGPT_ATTN_RES       "Block Attention Residuals (learned depth-attention)" OFF)
 
 # ==================================================================
 #  Core library  (single OBJECT library shared by all targets)
@@ -54,6 +55,9 @@ if(MICROGPT_PAGED_KV)
 endif()
 if(MICROGPT_HEAD_PARALLEL)
   target_compile_definitions(microgpt_lib PUBLIC MICROGPT_HEAD_PARALLEL=1)
+endif()
+if(MICROGPT_ATTN_RES)
+  target_compile_definitions(microgpt_lib PUBLIC MICROGPT_ATTN_RES=1)
 endif()
 
 # ==================================================================
@@ -297,6 +301,19 @@ add_demo(
           GRAD_CLIP=1.0 WEIGHT_DECAY=0.01 LABEL_SMOOTH=0.1
 )
 
+# AttnRes A/B benchmark: same config with Block Attention Residuals enabled
+add_demo(
+  NAME    c_optim_shk_attnres
+  SOURCE  demos/character-level/shakespeare/main.c
+  THREADS
+  COPY    demos/character-level/shakespeare/c_shakespeare.txt
+  DEFINES N_EMBD=128 N_HEAD=8 N_LAYER=4 BLOCK_SIZE=256 MLP_DIM=512
+          NUM_STEPS=2000 LEARNING_RATE=0.001 BATCH_SIZE=4
+          MAX_VOCAB=200 MAX_DOCS=200000 MAX_DOC_LEN=512
+          GRAD_CLIP=1.0 LABEL_SMOOTH=0.1
+          MICROGPT_ATTN_RES=1 ATTN_RES_BLOCK_SIZE=2
+)
+
 # Shakespeare word-level optimisation A/B benchmarks
 # Word-level: N_EMBD=48, N_LAYER=1, ~250K params — vocab dominates
 add_demo(
@@ -376,6 +393,33 @@ add_demo(
           WORD_VOCAB_SIZE=900
 )
 target_link_libraries(w_vm_codegen_v2 PRIVATE microgpt_vm_lib)
+
+# VM codegen A/B: N_LAYER=4 (deep — no AttnRes)
+add_demo(
+  NAME    w_vm_codegen_deep
+  SOURCE  demos/word-level/vm_codegen/main.c
+  THREADS METAL BLAS
+  COPY    demos/word-level/vm_codegen/w_vm_functions_pretok.txt
+  DEFINES N_EMBD=96 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=256 MLP_DIM=384
+          NUM_STEPS=5000 LEARNING_RATE=0.001 BATCH_SIZE=16
+          MAX_VOCAB=1200 MAX_DOCS=5000 MAX_DOC_LEN=512
+          WORD_VOCAB_SIZE=900
+)
+target_link_libraries(w_vm_codegen_deep PRIVATE microgpt_vm_lib)
+
+# VM codegen A/B: N_LAYER=4 + AttnRes (block=2)
+add_demo(
+  NAME    w_vm_codegen_attnres
+  SOURCE  demos/word-level/vm_codegen/main.c
+  THREADS METAL BLAS
+  COPY    demos/word-level/vm_codegen/w_vm_functions_pretok.txt
+  DEFINES N_EMBD=96 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=256 MLP_DIM=384
+          NUM_STEPS=5000 LEARNING_RATE=0.001 BATCH_SIZE=16
+          MAX_VOCAB=1200 MAX_DOCS=5000 MAX_DOC_LEN=512
+          WORD_VOCAB_SIZE=900
+          MICROGPT_ATTN_RES=1 ATTN_RES_BLOCK_SIZE=2
+)
+target_link_libraries(w_vm_codegen_attnres PRIVATE microgpt_vm_lib)
 
 # ==================================================================
 #  Organelle: VM compose pipeline (generate → validate → retry)
