@@ -32,7 +32,7 @@ option(MICROGPT_ATTN_RES       "Block Attention Residuals (learned depth-attenti
 #  Core library  (single OBJECT library shared by all targets)
 # ==================================================================
 
-add_library(microgpt_lib STATIC src/microgpt.c src/microgpt_organelle.c)
+add_library(microgpt_lib STATIC src/microgpt.c src/microgpt_organelle.c src/microgpt_msa.c)
 target_include_directories(microgpt_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 # --- Compile-time feature flags ---
@@ -139,7 +139,7 @@ function(_microgpt_lib_for_defines OUT_VAR)
   endif()
 
   # Create a new STATIC library with the same sources + features
-  add_library(${_tgt} STATIC src/microgpt.c src/microgpt_organelle.c)
+  add_library(${_tgt} STATIC src/microgpt.c src/microgpt_organelle.c src/microgpt_msa.c)
   target_include_directories(${_tgt} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
   # Propagate all feature flags from the base target
@@ -801,11 +801,76 @@ add_demo(
   THREADS
   COPY    demos/character-level/pentago/c_pentago_planner.txt
           demos/character-level/pentago/c_pentago_player.txt
-  DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=3 BLOCK_SIZE=128 MLP_DIM=192
+  DEFINES N_EMBD=48 N_HEAD=8 N_LAYER=4 BLOCK_SIZE=128 MLP_DIM=192
           NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
           MAX_VOCAB=50 MAX_DOCS=10000 MAX_DOC_LEN=128
           GRAD_CLIP=1.0 LABEL_SMOOTH=0.1 WEIGHT_DECAY=0.01
 )
+
+# ==================================================================
+#  Memory Sparse Attention (MSA) Integration Demos
+# ==================================================================
+
+add_demo(
+  NAME    msa_latent_handoff
+  SOURCE  demos/msa/latent_handoff/main.c
+  THREADS
+  DEFINES N_EMBD=96 N_HEAD=8 N_LAYER=4 BLOCK_SIZE=128 MLP_DIM=384
+          NUM_STEPS=1 LEARNING_RATE=0.001 BATCH_SIZE=8
+          MAX_VOCAB=50 MAX_DOCS=500 MAX_DOC_LEN=128
+)
+target_include_directories(msa_latent_handoff PRIVATE src)
+
+add_demo(
+  NAME    msa_fraud_guardian
+  SOURCE  demos/msa/fraud_guardian/main.c
+  THREADS
+  DEFINES N_EMBD=96 N_HEAD=8 N_LAYER=4 BLOCK_SIZE=128 MLP_DIM=384
+          NUM_STEPS=1 LEARNING_RATE=0.001 BATCH_SIZE=8
+          MAX_VOCAB=50 MAX_DOCS=500 MAX_DOC_LEN=128
+)
+target_include_directories(msa_fraud_guardian PRIVATE src)
+
+add_demo(
+  NAME    msa_semantic_companion
+  SOURCE  demos/msa/semantic_companion/main.c
+  THREADS
+  DEFINES N_EMBD=96 N_HEAD=8 N_LAYER=4 BLOCK_SIZE=128 MLP_DIM=384
+          NUM_STEPS=1 LEARNING_RATE=0.001 BATCH_SIZE=8
+          MAX_VOCAB=50 MAX_DOCS=500 MAX_DOC_LEN=128
+)
+target_include_directories(msa_semantic_companion PRIVATE src)
+
+add_demo(
+  NAME    msa_context_extender
+  SOURCE  demos/msa/context_extender/main.c
+  THREADS
+  DEFINES N_EMBD=96 N_HEAD=8 N_LAYER=4 BLOCK_SIZE=128 MLP_DIM=384
+          NUM_STEPS=1 LEARNING_RATE=0.001 BATCH_SIZE=8
+          MAX_VOCAB=50 MAX_DOCS=500 MAX_DOC_LEN=128
+)
+target_include_directories(msa_context_extender PRIVATE src)
+
+add_demo(
+  NAME    msa_pipeline_bench
+  SOURCE  demos/msa/pipeline_bench/main.c
+  THREADS
+  DEFINES N_EMBD=96 N_HEAD=8 N_LAYER=4 BLOCK_SIZE=128 MLP_DIM=384
+          NUM_STEPS=1 LEARNING_RATE=0.001 BATCH_SIZE=8
+          MAX_VOCAB=50 MAX_DOCS=500 MAX_DOC_LEN=128
+)
+target_include_directories(msa_pipeline_bench PRIVATE src)
+
+add_demo(
+  NAME    msa_infinite_shakespeare
+  SOURCE  demos/msa/infinite_shakespeare/main.c
+  THREADS
+  COPY    demos/msa/infinite_shakespeare/w_shakespeare.txt
+  DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=1 BLOCK_SIZE=64 MLP_DIM=192
+          NUM_STEPS=1 LEARNING_RATE=0.001 BATCH_SIZE=8
+          MAX_VOCAB=5000 MAX_DOCS=200000 MAX_DOC_LEN=512
+)
+target_include_directories(msa_infinite_shakespeare PRIVATE src)
 
 # ==================================================================
 #  Organelle: Red Donkey (Huarong Dao) multi-organelle pipeline
@@ -1083,6 +1148,14 @@ if(NOT MSVC)
 endif()
 add_test(NAME microgpt_tests COMMAND test_microgpt WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
+add_executable(test_microgpt_msa tests/test_microgpt_msa.c)
+target_link_libraries(test_microgpt_msa PRIVATE microgpt_lib)
+target_include_directories(test_microgpt_msa PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests ${CMAKE_CURRENT_SOURCE_DIR}/src)
+if(NOT MSVC)
+  target_link_libraries(test_microgpt_msa PRIVATE m)
+endif()
+add_test(NAME microgpt_msa_tests COMMAND test_microgpt_msa WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
 # ==================================================================
 #  Benchmarks
 # ==================================================================
@@ -1091,6 +1164,13 @@ add_executable(bench_microgpt tests/bench_microgpt.c)
 target_link_libraries(bench_microgpt PRIVATE microgpt_lib)
 if(NOT MSVC)
   target_link_libraries(bench_microgpt PRIVATE m)
+endif()
+
+add_executable(bench_microgpt_msa tests/bench_microgpt_msa.c)
+target_link_libraries(bench_microgpt_msa PRIVATE microgpt_lib)
+target_include_directories(bench_microgpt_msa PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests ${CMAKE_CURRENT_SOURCE_DIR}/src)
+if(NOT MSVC)
+  target_link_libraries(bench_microgpt_msa PRIVATE m)
 endif()
 
 # ==================================================================

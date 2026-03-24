@@ -18,15 +18,16 @@
 #define _CRT_SECURE_NO_WARNINGS 1
 
 #include "microgpt.h"
+#include "microgpt_msa.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
-#define SHAKES_SAMPLES 5
+#define SHAKES_SAMPLES 3
 #define SHAKES_TEMP 0.7
-#define GEN_LEN 500 /* words to generate per sample */
+#define GEN_LEN 500 /* 500 words using infinite MSA memory! */
 #define CHECKPOINT_FILE "w_shakespeare.ckpt"
 #define TRAINING_LOG "w_shakespeare.ckpt.log"
 
@@ -462,12 +463,11 @@ int main(void) {
     struct timespec inf_start, inf_end;
     clock_gettime(CLOCK_MONOTONIC, &inf_start);
 
-    /* Generate words */
+    /* Generate words using MSA to prevent context exhaustion */
     int gen_len = GEN_LEN;
-    /* Basic demo forces the sequence termination at the edge of the context window */
-    if (gen_len > cfg.block_size - 1)
-      gen_len = cfg.block_size - 1;
     int gen_count = 0;
+    
+    MsaPool *inf_pool = msa_pool_create(10000, nl, cfg.n_embd);
 
     /* Feed BOS then seed word */
     forward_inference(model, wv.bos_id, 0, inf_keys, inf_values, inf_cache_len,
@@ -476,7 +476,40 @@ int main(void) {
                       logits_buf);
     size_t pos = 2;
 
-    for (int g = 0; g < gen_len && pos < (size_t)cfg.block_size; g++) {
+    for (int g = 0; g < gen_len; g++) {
+      /* [MSA INFINITE CONTEXT EXTENSION] */
+      if (pos >= (size_t)cfg.block_size) {
+        size_t chunk_size = cfg.block_size / 2;
+        
+        /* 1. Pool the oldest half of our active context into O(1) latent memory */
+        msa_pool_chunk(inf_pool, inf_keys, inf_values, chunk_size);
+        
+        /* 2. Shift active window down, wiping out the chunked memory */
+        for (int L = 0; L < nl; L++) {
+            memmove(inf_keys[L], inf_keys[L] + (chunk_size * cfg.n_embd), (cfg.block_size - chunk_size) * cfg.n_embd * sizeof(scalar_t));
+            memmove(inf_values[L], inf_values[L] + (chunk_size * cfg.n_embd), (cfg.block_size - chunk_size) * cfg.n_embd * sizeof(scalar_t));
+            inf_cache_len[L] -= chunk_size;
+        }
+        pos -= chunk_size;
+        
+        /* 3. Query the entire multi-year latency history for relevance using Cosine */
+        scalar_t **query_keys = (scalar_t **)malloc((size_t)nl * sizeof(scalar_t *));
+        for (int L = 0; L < nl; L++) {
+            query_keys[L] = (scalar_t *)malloc(cfg.n_embd * sizeof(scalar_t));
+            /* Formulate query based on latest token state */
+            memcpy(query_keys[L], inf_keys[L] + ((pos-1) * cfg.n_embd), cfg.n_embd * sizeof(scalar_t)); 
+        }
+        
+        int best_chunk = msa_route_top_1(inf_pool, query_keys);
+        if (best_chunk >= 0) {
+            /* 4. Teleport the most relevant historical chunk into the pos=0 embedding */
+            msa_expand_context(inf_pool, best_chunk, inf_keys, inf_values, 0);
+        }
+        
+        for (int L = 0; L < nl; L++) free(query_keys[L]);
+        free(query_keys);
+      }
+
       token = sample_token(logits_buf, wv.vocab_size, SHAKES_TEMP);
       if (token == wv.bos_id)
         break;
@@ -519,6 +552,8 @@ int main(void) {
       fprintf(logf, "  sample %d: seed=\"%s\" | %d words | %.0f tok/s\n", s + 1,
               seeds[s], gen_count, tok_per_sec);
     }
+    
+    msa_pool_free(inf_pool);
   }
 
   /* ---- Inference summary ---- */

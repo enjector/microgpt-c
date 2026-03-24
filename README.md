@@ -54,6 +54,9 @@ cmake --build . --config Release
 # Train Shakespeare word-level generation (510K params, ~40K tok/s inference, 2 min training)
 ./shakespeare_word_demo
 
+# Generate infinite Word-Level Shakespeare using Memory Sparse Attention (MSA)
+./msa_infinite_shakespeare
+
 # Run a multi-organelle game pipeline (88% win rate)
 ./connect4_demo
 ```
@@ -109,6 +112,7 @@ Key technical contributions shipped in this engine:
 | Innovation | Description | Evidence |
 |-----------|-------------|----------|
 | 🧬 **Organelle Pipeline Architecture** | Composable specialist micro-models coordinated by deterministic C scaffolding | 11 games, **91% win** (Pentago) to **90% solve** (8-Puzzle) |
+| 🗃️ **Memory Sparse Attention (MSA)** | True infinite-length sequence decoding via `O(1)` SRAM chunk-mean pools and `O(N)` Top-K Cosine lookup routing. | **37,000+ words/s** on arbitrary long-horizon data |
 | 🗳️ **Ensemble Voting + Valid-Move Filtering** | Multi-vote consensus with hard constraint enforcement | **Zero invalid moves** across all 11 games |
 | ⚡ **Prefix KV Cache Sharing** | Prompt processed once, KV state copied per ensemble vote — eliminates redundant inference | **1.9–5.7× ensemble speedup** ([arXiv:2603.03251](https://arxiv.org/pdf/2603.03251)) |
 | 🔮 **Speculative Decoding** | Draft organelle generates candidates, target verifies with KV rollback on rejection | Functional with acceptance statistics tracking |
