@@ -13,7 +13,7 @@
 #include <stdint.h>
 
 #ifdef ENABLE_TURBOQUANT
-#include "turboquant.h"
+#include "microgpt_turboquant.h"
 extern TurboQuant g_tq;
 #endif
 

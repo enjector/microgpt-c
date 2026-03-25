@@ -1,4 +1,4 @@
-#include "turboquant.h"
+#include "microgpt_turboquant.h"
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>

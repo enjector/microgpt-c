@@ -33,7 +33,7 @@ option(ENABLE_TURBOQUANT       "Enable TurboQuant for memory compression (MSA)" 
 #  Core library  (single OBJECT library shared by all targets)
 # ==================================================================
 
-add_library(microgpt_lib STATIC src/microgpt.c src/microgpt_organelle.c src/microgpt_msa.c src/turboquant.c)
+add_library(microgpt_lib STATIC src/microgpt.c src/microgpt_organelle.c src/microgpt_msa.c src/microgpt_turboquant.c)
 target_include_directories(microgpt_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 # --- Compile-time feature flags ---
@@ -143,7 +143,7 @@ function(_microgpt_lib_for_defines OUT_VAR)
   endif()
 
   # Create a new STATIC library with the same sources + features
-  add_library(${_tgt} STATIC src/microgpt.c src/microgpt_organelle.c src/microgpt_msa.c src/turboquant.c)
+  add_library(${_tgt} STATIC src/microgpt.c src/microgpt_organelle.c src/microgpt_msa.c src/microgpt_turboquant.c)
   target_include_directories(${_tgt} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
   # Propagate all feature flags from the base target
@@ -1160,6 +1160,14 @@ if(NOT MSVC)
 endif()
 add_test(NAME microgpt_msa_tests COMMAND test_microgpt_msa WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
+add_executable(test_microgpt_turboquant tests/test_microgpt_turboquant.c)
+target_link_libraries(test_microgpt_turboquant PRIVATE microgpt_lib)
+target_include_directories(test_microgpt_turboquant PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests ${CMAKE_CURRENT_SOURCE_DIR}/src)
+if(NOT MSVC)
+  target_link_libraries(test_microgpt_turboquant PRIVATE m)
+endif()
+add_test(NAME microgpt_turboquant_tests COMMAND test_microgpt_turboquant WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
 # ==================================================================
 #  Benchmarks
 # ==================================================================
@@ -1175,6 +1183,13 @@ target_link_libraries(bench_microgpt_msa PRIVATE microgpt_lib)
 target_include_directories(bench_microgpt_msa PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests ${CMAKE_CURRENT_SOURCE_DIR}/src)
 if(NOT MSVC)
   target_link_libraries(bench_microgpt_msa PRIVATE m)
+endif()
+
+add_executable(bench_microgpt_turboquant tests/bench_microgpt_turboquant.c)
+target_link_libraries(bench_microgpt_turboquant PRIVATE microgpt_lib)
+target_include_directories(bench_microgpt_turboquant PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests ${CMAKE_CURRENT_SOURCE_DIR}/src)
+if(NOT MSVC)
+  target_link_libraries(bench_microgpt_turboquant PRIVATE m)
 endif()
 
 # ==================================================================

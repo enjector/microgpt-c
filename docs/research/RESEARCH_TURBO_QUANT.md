@@ -14,7 +14,7 @@
 
 **Proof:** Integrating TurboQuant natively into the MSA `MsaPool` yielded an unexpected result: **compression improved inference generation speeds**. On the word-level Shakespeare generation benchmarks, the baseline FP32 MSA model clocked ~28,000 tokens/sec. The TurboQuant-compressed model accelerated to **~36,000 tokens/sec**. The dramatic reduction in memory bandwidth constraints entirely offset the compute overhead of real-time centroid decompression.
 
-**Push:** Establish `turboquant.c` as a general-purpose, standalone C99 component within the MicroGPT-C framework, providing opt-in memory compression for all sub-1M parameter organelle pipelines and future generative tasks on edge hardware.
+**Push:** Establish `microgpt_turboquant.c` as a general-purpose, standalone C99 component within the MicroGPT-C framework, providing opt-in memory compression for all sub-1M parameter organelle pipelines and future generative tasks on edge hardware.
 
 ---
 
@@ -40,7 +40,7 @@ During reconstruction, the latent `float*` vector is seamlessly unrolled from th
 
 ## 2. Integration with Memory Sparse Attention (MSA)
 
-TurboQuant has been structured strictly into `microgpt-c` as an isolated zero-dependency C99 library (`src/turboquant.c`). However, its principal application scales immediately with the `MsaPool`. 
+TurboQuant has been structured strictly into `microgpt-c` as an isolated zero-dependency C99 library (`src/microgpt_turboquant.c`). However, its principal application scales immediately with the `MsaPool`. 
 
 **The Pipeline Shift:**
 1. A MicroGPT-C Transformer produces a series of raw FP32 Key and Value vectors for the active context window. 

@@ -1,6 +1,6 @@
 # TurboQuant Standalone Kernels
 
-This directory maintains the completely naked `turboquant.c` arithmetic validation logic. Unlike the parallel directories (`shakespeare` and `vm_codegen`) which test TurboQuant functionally inside the broader MicroGPT-C Transformer hierarchy, `simple/` assesses the pure matrix operations.
+This directory maintains the completely naked `microgpt_turboquant.c` arithmetic validation logic. Unlike the parallel directories (`shakespeare` and `vm_codegen`) which test TurboQuant functionally inside the broader MicroGPT-C Transformer hierarchy, `simple/` assesses the pure matrix operations.
 
 ## Purpose
 1. Check the MSE centroid clustering loop operations and alignment.

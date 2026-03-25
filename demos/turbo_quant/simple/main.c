@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include "../../src/turboquant.h"
+#include "../../src/microgpt_turboquant.h"
 
 int main() {
     printf("--- TurboQuant Standalone Benchmark ---\n");

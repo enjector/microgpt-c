@@ -21,7 +21,7 @@
 #include "microgpt_msa.h"
 
 #ifdef ENABLE_TURBOQUANT
-#include "turboquant.h"
+#include "microgpt_turboquant.h"
 TurboQuant g_tq;
 #endif
 
