@@ -8,11 +8,13 @@
 static uint64_t rng_state = 0x123456789ABCDEF0ULL;
 
 static inline float rand_gauss(void) {
-    // Box-Muller transform (one sample per call)
-    float u1 = (float)((rng_state >> 32) & 0xFFFFFFFF) / (float)0xFFFFFFFF;
-    float u2 = (float)(rng_state & 0xFFFFFFFF) / (float)0xFFFFFFFF;
-    rng_state = rng_state * 6364136223846793005ULL + 1;
-    return sqrtf(-2.0f * logf(u1 + 1e-10f)) * cosf(2.0f * (float)M_PI * u2);
+    // Box-Muller transform – advance state independently for u1 and u2
+    // so they are drawn from different LCG outputs (not correlated bit-halves)
+    rng_state = rng_state * 6364136223846793005ULL + 1442695040888963407ULL;
+    float u1 = (float)((rng_state >> 33) + 1u) / (float)(1u << 31); // in (0, ~2]
+    rng_state = rng_state * 6364136223846793005ULL + 1442695040888963407ULL;
+    float u2 = (float)(rng_state >> 33) / (float)(1u << 31);        // in [0, ~2)
+    return sqrtf(-2.0f * logf(u1)) * cosf(2.0f * (float)M_PI * u2);
 }
 
 // ------------------------------------------------------------------
@@ -25,11 +27,11 @@ static const float normal_centroids[5][16] = {
     {-0.79788456f, +0.79788456f},
     // b=2 (4 centroids)
     {-1.510f, -0.453f, +0.453f, +1.510f},
-    // b=3 (8 centroids) – from numerical Lloyd-Max
-    {-2.152f, -1.000f, -0.453f, -0.126f, +0.126f, +0.453f, +1.000f, +2.152f},
-    // b=4 (16 centroids) – approximate high-res values
-    {-2.732f,-1.800f,-1.300f,-0.900f,-0.550f,-0.250f,-0.080f,-0.020f,
-     +0.020f,+0.080f,+0.250f,+0.550f,+0.900f,+1.300f,+1.800f,+2.732f}
+    // b=3 (8 centroids) – N(0,1) Lloyd-Max (Max 1960)
+    {-2.1520f, -1.3439f, -0.7560f, -0.2451f, +0.2451f, +0.7560f, +1.3439f, +2.1520f},
+    // b=4 (16 centroids) – N(0,1) Lloyd-Max (Max 1960)
+    {-2.7326f,-2.0690f,-1.6180f,-1.2562f,-0.9423f,-0.6567f,-0.3880f,-0.1284f,
+     +0.1284f,+0.3880f,+0.6567f,+0.9423f,+1.2562f,+1.6180f,+2.0690f,+2.7326f}
 };
 
 static const int cb_sizes[5] = {0, 2, 4, 8, 16};
@@ -43,9 +45,14 @@ void turboquant_init(TurboQuant *tq, int d, int b, bool use_rotation) {
 
     float sigma = 1.0f / sqrtf((float)d);
 
-    // Precomputed codebooks (scaled for this d)
+    // Precomputed codebooks (scaled for this d).
+    // Index 0 is a trivial 1-centroid quantizer (centroid = 0): used internally
+    // by turboquant_quant_prod when the target bit-width is b=1, which calls the
+    // MSE sub-quantizer at b-1=0 bits.
     tq->codebook_mse = (float**)malloc((b+1) * sizeof(float*));
     tq->cb_sizes = (int*)malloc((b+1) * sizeof(int));
+    tq->cb_sizes[0] = 1;
+    tq->codebook_mse[0] = (float*)calloc(1, sizeof(float)); // single centroid at 0
     for (int bb = 1; bb <= b; ++bb) {
         tq->cb_sizes[bb] = cb_sizes[bb];
         tq->codebook_mse[bb] = (float*)malloc(cb_sizes[bb] * sizeof(float));
@@ -87,7 +94,7 @@ void turboquant_free(TurboQuant *tq) {
     if (tq->Pi) free(tq->Pi);
     if (tq->S)  free(tq->S);
     if (tq->codebook_mse) {
-        for (int i = 1; i <= tq->b; ++i) free(tq->codebook_mse[i]);
+        for (int i = 0; i <= tq->b; ++i) free(tq->codebook_mse[i]);
         free(tq->codebook_mse);
     }
     if (tq->cb_sizes) free(tq->cb_sizes);

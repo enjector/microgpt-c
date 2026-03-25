@@ -1319,3 +1319,11 @@ add_demo(
           ENABLE_TURBOQUANT=1
 )
 target_link_libraries(tq_vm_codegen_tq PRIVATE microgpt_vm_lib)
+
+# 5) Standalone KV-cache compression demo (no corpus needed)
+add_executable(tq_kv_cache_demo demos/turbo_quant/simple/main.c)
+target_link_libraries(tq_kv_cache_demo PRIVATE microgpt_lib)
+target_include_directories(tq_kv_cache_demo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+if(NOT MSVC)
+  target_link_libraries(tq_kv_cache_demo PRIVATE m)
+endif()
