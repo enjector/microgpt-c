@@ -10,14 +10,30 @@
 
 #include "microgpt.h"
 #include <stddef.h>
+#include <stdint.h>
+
+#ifdef ENABLE_TURBOQUANT
+#include "turboquant.h"
+extern TurboQuant g_tq;
+#endif
 
 /*
  * MsaPool — Tiered latent memory arena.
  * Stores compressed KV chunks as continuous float vectors.
  */
 typedef struct {
+#ifdef ENABLE_TURBOQUANT
+    uint32_t *tq_keys_idx;
+    int8_t *tq_keys_qjl;
+    float *tq_keys_rnorm;
+
+    uint32_t *tq_values_idx;
+    int8_t *tq_values_qjl;
+    float *tq_values_rnorm;
+#else
     scalar_t *keys;     /* shape: [capacity, n_layer, n_embd] */
     scalar_t *values;   /* shape: [capacity, n_layer, n_embd] */
+#endif
     size_t capacity;    /* Max number of pooled chunks */
     size_t length;      /* Current number of pooled chunks */
     int n_layer;

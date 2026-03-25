@@ -1,0 +1,80 @@
+================================================================
+  MicroGPT-C - Shakespeare Word-Level Demo
+================================================================
+
+  [Model Architecture]
+    n_embd      = 48
+    n_head       = 4
+    head_dim     = 12
+    mlp_dim      = 192
+    n_layer      = 1
+    block_size   = 64
+
+  [Training]
+    num_steps    = 0
+    learning_rate= 0.001000
+    batch_size   = 16
+    warmup_steps = 100
+    temperature  = 0.5000
+
+  [Data Limits]
+    max_vocab    = 5000
+    max_docs     = 200000
+    max_doc_len  = 512
+
+  [Feature Switches]
+    scalar_t     = float  (32-bit)
+    SIMD         = ON
+    INT8 quant   = OFF
+    Metal GPU    = OFF
+    BLAS         = OFF
+    Paged KV     = OFF
+    Head Parallel= OFF
+    AttnRes      = OFF
+
+================================================================
+
+loaded 114634 lines of Shakespeare
+total characters: 5312290 (5187.8 KB)
+normalised text: 5632993 chars (5501.0 KB)
+building word vocab from first 488 KB...
+word vocab: 5000 tokens (4997 words + 3 special)
+total word tokens: 1105657 (avg 9.6 per line)
+unknown tokens: 81481 (7.37%)
+
+--- example tokenisations ---
+line[0] (16 tokens): [john] [.] [i] [wonder] [that] [thou] [(] [being] [,] [as] [thou] [say'st] [thou] [art] [,] ...
+line[1] (10 tokens): [though] [he] [be] [merry] [,] [yet] [withal] [he's] [honest] [.] 
+line[2] (7 tokens): [marg] [.] [not] [a] [false] [gallop] [.] 
+
+N_EMBD=48 BLOCK_SIZE=64 N_LAYER=1 N_HEAD=4
+
+params: 510720
+loaded checkpoint 'w_shakespeare.ckpt' (trained 0 steps)
+
+
+--- generated Shakespeare (word-level) ---
+
+[sample 1 — seed: "the"]
+the trotting entreat wolves friday! or lartius shed rom grip'd grass madding through suffered scandaliz'd lines principal they lingers spongy rack hermione'o trust double jig affected persuade opens iachimo resolv'd tides wakes solemn lips looks craves spies patience linger itch silvius clouds aufidius tapers dismal'st gods resolution request distrain'd throwing something stabs swords rest treasons bid italian somerset envious far controversy
+  >> 62 words in 0.002s (34261 tok/s)
+
+[sample 2 — seed: "o"]
+o wretched prince o'erbearing sort knock note notes bianca thou't' dromio honours take't mourning project whore waking admit ceremony- noise discover vincentio inform'd citizens cicero parolles capable hid marquis everywhere nights audience born needful sick beast weighs images providence soldier writes paces liking papers horses fee drunkard pursu'd reg step greater worthily discord wise discover gates cope entertain pin shameful oldness woo'd
+  >> 62 words in 0.002s (36302 tok/s)
+
+[sample 3 — seed: "what"]
+what bastard relation jul into drunk aaron created either security banquet drowned puck th' fancy's time's note solemn idle flavio gentlemen ancestors isabella powers braving me- wages our welsh son image play'd foe court- nunnery endure days carries cassius greatness distrain'd tongue's blemishes accident absurd crept check angels snake unshorn pray calumny overtake nobles affright seize queen'but flat fresh you'll mate sum
+  >> 62 words in 0.002s (39240 tok/s)
+
+[sample 4 — seed: "my"]
+my laugh rouse end cheek parliament petty dismiss use ramm'd immediately fault lawful retir'd heed toby helena girdle truly promise discharge cherry wear mourning serpent's outlaws hills lepidus cross wretched nail'd subdu'd armour touch worships heads expedition pains cares laughter able meant inform'd disinherited stocks flowers commencement stabs herald grac'd parted ye exercise pless ugly waking pin surely point sunburnt pow'r whereof reserv'd
+  >> 62 words in 0.002s (39776 tok/s)
+
+[sample 5 — seed: "how"]
+how numb'ring helmet reveller too dark eloquence reading rotten meant heel manners swords where unshak'd zeal weather seeking sufficient baillez bushy prick nether parolles valour's enter glories nymph sorry both obedient occupation stars honor cold strangeness engrossest private suitors party wretch reputation labour night-walking entreat spacious sexton flood reprove midsummer funeral furnish'd innocent loyalty tricks unkindness breaks follow annoyance fortress breath'd stirring starve
+  >> 62 words in 0.002s (35996 tok/s)
+
+--- inference summary ---
+samples: 5 | total tokens: 320 | total time: 0.009s | avg: 36998 tok/s
+training log appended to 'w_shakespeare.ckpt.log'

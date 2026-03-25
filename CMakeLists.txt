@@ -27,12 +27,13 @@ option(QUANTIZATION_INT8       "Store weights as 8-bit integers with per-matrix 
 option(MICROGPT_BLAS           "Use BLAS (Accelerate / OpenBLAS / MKL)"             OFF)
 option(MICROGPT_METAL          "Use Metal GPU acceleration (macOS only)"            OFF)
 option(MICROGPT_ATTN_RES       "Block Attention Residuals (learned depth-attention)" OFF)
+option(ENABLE_TURBOQUANT       "Enable TurboQuant for memory compression (MSA)" OFF)
 
 # ==================================================================
 #  Core library  (single OBJECT library shared by all targets)
 # ==================================================================
 
-add_library(microgpt_lib STATIC src/microgpt.c src/microgpt_organelle.c src/microgpt_msa.c)
+add_library(microgpt_lib STATIC src/microgpt.c src/microgpt_organelle.c src/microgpt_msa.c src/turboquant.c)
 target_include_directories(microgpt_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 # --- Compile-time feature flags ---
@@ -58,6 +59,9 @@ if(MICROGPT_HEAD_PARALLEL)
 endif()
 if(MICROGPT_ATTN_RES)
   target_compile_definitions(microgpt_lib PUBLIC MICROGPT_ATTN_RES=1)
+endif()
+if(ENABLE_TURBOQUANT)
+  target_compile_definitions(microgpt_lib PUBLIC ENABLE_TURBOQUANT=1)
 endif()
 
 # ==================================================================
@@ -139,7 +143,7 @@ function(_microgpt_lib_for_defines OUT_VAR)
   endif()
 
   # Create a new STATIC library with the same sources + features
-  add_library(${_tgt} STATIC src/microgpt.c src/microgpt_organelle.c src/microgpt_msa.c)
+  add_library(${_tgt} STATIC src/microgpt.c src/microgpt_organelle.c src/microgpt_msa.c src/turboquant.c)
   target_include_directories(${_tgt} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
   # Propagate all feature flags from the base target
@@ -1249,3 +1253,54 @@ target_include_directories(bench_microgpt_vm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
 if(NOT MSVC)
   target_link_libraries(bench_microgpt_vm PRIVATE m)
 endif()
+# ==================================================================
+#  TurboQuant Integration Evaluation Targets
+# ==================================================================
+
+# 1) Shakespeare Word-Level + Infinite MSA (Baseline FP32)
+add_demo(
+  NAME    tq_shakespeare_base
+  SOURCE  demos/turbo_quant/shakespeare/main.c
+  THREADS
+  COPY    demos/turbo_quant/shakespeare/w_shakespeare.txt
+  DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=1 BLOCK_SIZE=64 MLP_DIM=192
+          NUM_STEPS=0 LEARNING_RATE=0.001 BATCH_SIZE=16
+          MAX_VOCAB=5000 MAX_DOCS=200000 MAX_DOC_LEN=512
+)
+
+# 2) Shakespeare Word-Level + Infinite MSA + TurboQuant (Compressed)
+add_demo(
+  NAME    tq_shakespeare_tq
+  SOURCE  demos/turbo_quant/shakespeare/main.c
+  THREADS
+  COPY    demos/turbo_quant/shakespeare/w_shakespeare.txt
+  DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=1 BLOCK_SIZE=64 MLP_DIM=192
+          NUM_STEPS=0 LEARNING_RATE=0.001 BATCH_SIZE=16
+          MAX_VOCAB=5000 MAX_DOCS=200000 MAX_DOC_LEN=512
+          ENABLE_TURBOQUANT=1
+)
+
+# 3) VM Codegen + Infinite MSA (Baseline FP32)
+add_demo(
+  NAME    tq_vm_codegen_base
+  SOURCE  demos/turbo_quant/vm_codegen/main.c
+  THREADS METAL BLAS
+  COPY    demos/turbo_quant/vm_codegen/c_vm_functions_combined.txt
+  DEFINES N_EMBD=96 N_HEAD=4 N_LAYER=2 BLOCK_SIZE=256 MLP_DIM=384
+          NUM_STEPS=0 LEARNING_RATE=0.0005 BATCH_SIZE=16
+          MAX_VOCAB=1200 MAX_DOCS=5000 MAX_DOC_LEN=512
+)
+target_link_libraries(tq_vm_codegen_base PRIVATE microgpt_vm_lib)
+
+# 4) VM Codegen + Infinite MSA + TurboQuant (Compressed)
+add_demo(
+  NAME    tq_vm_codegen_tq
+  SOURCE  demos/turbo_quant/vm_codegen/main.c
+  THREADS METAL BLAS
+  COPY    demos/turbo_quant/vm_codegen/c_vm_functions_combined.txt
+  DEFINES N_EMBD=96 N_HEAD=4 N_LAYER=2 BLOCK_SIZE=256 MLP_DIM=384
+          NUM_STEPS=0 LEARNING_RATE=0.0005 BATCH_SIZE=16
+          MAX_VOCAB=1200 MAX_DOCS=5000 MAX_DOC_LEN=512
+          ENABLE_TURBOQUANT=1
+)
+target_link_libraries(tq_vm_codegen_tq PRIVATE microgpt_vm_lib)

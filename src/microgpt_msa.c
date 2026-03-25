@@ -18,6 +18,20 @@ MsaPool *msa_pool_create(size_t capacity, int n_layer, int n_embd) {
     pool->length = 0;
     
     /* Allocate contiguous arrays for faster scanning */
+#ifdef ENABLE_TURBOQUANT
+    pool->tq_keys_idx   = (uint32_t *)calloc(capacity * n_layer * n_embd, sizeof(uint32_t));
+    pool->tq_keys_qjl   = (int8_t *)  calloc(capacity * n_layer * n_embd, sizeof(int8_t));
+    pool->tq_keys_rnorm = (float *)   calloc(capacity * n_layer, sizeof(float));
+
+    pool->tq_values_idx   = (uint32_t *)calloc(capacity * n_layer * n_embd, sizeof(uint32_t));
+    pool->tq_values_qjl   = (int8_t *)  calloc(capacity * n_layer * n_embd, sizeof(int8_t));
+    pool->tq_values_rnorm = (float *)   calloc(capacity * n_layer, sizeof(float));
+
+    if (!pool->tq_keys_idx || !pool->tq_values_idx) {
+        msa_pool_free(pool);
+        return NULL;
+    }
+#else
     pool->keys = (scalar_t *)calloc(capacity * n_layer * n_embd, sizeof(scalar_t));
     pool->values = (scalar_t *)calloc(capacity * n_layer * n_embd, sizeof(scalar_t));
     
@@ -25,14 +39,24 @@ MsaPool *msa_pool_create(size_t capacity, int n_layer, int n_embd) {
         msa_pool_free(pool);
         return NULL;
     }
+#endif
     
     return pool;
 }
 
 void msa_pool_free(MsaPool *pool) {
     if (!pool) return;
+#ifdef ENABLE_TURBOQUANT
+    if (pool->tq_keys_idx) free(pool->tq_keys_idx);
+    if (pool->tq_keys_qjl) free(pool->tq_keys_qjl);
+    if (pool->tq_keys_rnorm) free(pool->tq_keys_rnorm);
+    if (pool->tq_values_idx) free(pool->tq_values_idx);
+    if (pool->tq_values_qjl) free(pool->tq_values_qjl);
+    if (pool->tq_values_rnorm) free(pool->tq_values_rnorm);
+#else
     free(pool->keys);
     free(pool->values);
+#endif
     free(pool);
 }
 
@@ -44,6 +68,10 @@ int msa_pool_chunk(MsaPool *pool, scalar_t **active_keys, scalar_t **active_valu
     
     /* Mean pooling across the chunk window */
     for (int l = 0; l < pool->n_layer; l++) {
+#ifdef ENABLE_TURBOQUANT
+        float *chunk_mean_k = pool->n_embd > 0 ? (float*)malloc(pool->n_embd * sizeof(float)) : NULL;
+        float *chunk_mean_v = pool->n_embd > 0 ? (float*)malloc(pool->n_embd * sizeof(float)) : NULL;
+#endif
         for (int d = 0; d < pool->n_embd; d++) {
             scalar_t sum_k = 0.0f;
             scalar_t sum_v = 0.0f;
@@ -53,9 +81,30 @@ int msa_pool_chunk(MsaPool *pool, scalar_t **active_keys, scalar_t **active_valu
                 sum_v += active_values[l][t * pool->n_embd + d];
             }
             
-            pool->keys[offset + l * pool->n_embd + d] = sum_k / (scalar_t)chunk_len;
-            pool->values[offset + l * pool->n_embd + d] = sum_v / (scalar_t)chunk_len;
+            scalar_t tk = sum_k / (scalar_t)chunk_len;
+            scalar_t tv = sum_v / (scalar_t)chunk_len;
+#ifdef ENABLE_TURBOQUANT
+            if (chunk_mean_k) chunk_mean_k[d] = (float)tk;
+            if (chunk_mean_v) chunk_mean_v[d] = (float)tv;
+#else
+            pool->keys[offset + l * pool->n_embd + d] = tk;
+            pool->values[offset + l * pool->n_embd + d] = tv;
+#endif
         }
+#ifdef ENABLE_TURBOQUANT
+        uint32_t *k_idx = &pool->tq_keys_idx[offset + l * pool->n_embd];
+        int8_t *k_qjl = &pool->tq_keys_qjl[offset + l * pool->n_embd];
+        float *k_rnorm = &pool->tq_keys_rnorm[pool->length * pool->n_layer + l];
+        turboquant_quant_prod(&g_tq, chunk_mean_k, k_idx, k_qjl, k_rnorm);
+
+        uint32_t *v_idx = &pool->tq_values_idx[offset + l * pool->n_embd];
+        int8_t *v_qjl = &pool->tq_values_qjl[offset + l * pool->n_embd];
+        float *v_rnorm = &pool->tq_values_rnorm[pool->length * pool->n_layer + l];
+        turboquant_quant_prod(&g_tq, chunk_mean_v, v_idx, v_qjl, v_rnorm);
+
+        if (chunk_mean_k) free(chunk_mean_k);
+        if (chunk_mean_v) free(chunk_mean_v);
+#endif
     }
     
     pool->length++;
@@ -77,8 +126,22 @@ int msa_route_top_1(const MsaPool *pool, scalar_t **query_keys) {
         scalar_t dot = 0.0f, norm_q = 0.0f, norm_p = 0.0f;
         size_t p_offset = i * pool->n_layer * pool->n_embd + l * pool->n_embd;
         
+#ifdef ENABLE_TURBOQUANT
+        float *dequant_k = pool->n_embd > 0 ? (float*)malloc(pool->n_embd * sizeof(float)) : NULL;
+        if (dequant_k) {
+            uint32_t *idx = &pool->tq_keys_idx[p_offset];
+            int8_t *qjl = &pool->tq_keys_qjl[p_offset];
+            float rnorm = pool->tq_keys_rnorm[i * pool->n_layer + l];
+            turboquant_dequant_prod(&g_tq, idx, qjl, rnorm, dequant_k);
+        }
+#endif
+
         for (int d = 0; d < pool->n_embd; d++) {
+#ifdef ENABLE_TURBOQUANT
+            scalar_t p_val = dequant_k ? (scalar_t)dequant_k[d] : 0.0f;
+#else
             scalar_t p_val = pool->keys[p_offset + d];
+#endif
             scalar_t q_val = query_keys[l][d]; /* Assuming query is isolated at [d] */
             
             dot += p_val * q_val;
@@ -93,6 +156,10 @@ int msa_route_top_1(const MsaPool *pool, scalar_t **query_keys) {
             best_sim = sim;
             best_idx = (int)i;
         }
+
+#ifdef ENABLE_TURBOQUANT
+        if (dequant_k) free(dequant_k);
+#endif
     }
     
     return best_idx;
@@ -105,9 +172,35 @@ void msa_expand_context(const MsaPool *pool, int chunk_idx, scalar_t **active_ke
     
     /* Copy the static latent vectors into the specific position in the target KV arrays */
     for (int l = 0; l < pool->n_layer; l++) {
+#ifdef ENABLE_TURBOQUANT
+        float *dequant_k = pool->n_embd > 0 ? (float*)malloc(pool->n_embd * sizeof(float)) : NULL;
+        float *dequant_v = pool->n_embd > 0 ? (float*)malloc(pool->n_embd * sizeof(float)) : NULL;
+        if (dequant_k && dequant_v) {
+            uint32_t *k_idx = &pool->tq_keys_idx[offset + l * pool->n_embd];
+            int8_t *k_qjl = &pool->tq_keys_qjl[offset + l * pool->n_embd];
+            float k_rnorm = pool->tq_keys_rnorm[chunk_idx * pool->n_layer + l];
+            turboquant_dequant_prod(&g_tq, k_idx, k_qjl, k_rnorm, dequant_k);
+
+            uint32_t *v_idx = &pool->tq_values_idx[offset + l * pool->n_embd];
+            int8_t *v_qjl = &pool->tq_values_qjl[offset + l * pool->n_embd];
+            float v_rnorm = pool->tq_values_rnorm[chunk_idx * pool->n_layer + l];
+            turboquant_dequant_prod(&g_tq, v_idx, v_qjl, v_rnorm, dequant_v);
+        }
+#endif
+
         for (int d = 0; d < pool->n_embd; d++) {
+#ifdef ENABLE_TURBOQUANT
+            if (dequant_k) active_keys[l][pos * pool->n_embd + d] = (scalar_t)dequant_k[d];
+            if (dequant_v) active_values[l][pos * pool->n_embd + d] = (scalar_t)dequant_v[d];
+#else
             active_keys[l][pos * pool->n_embd + d] = pool->keys[offset + l * pool->n_embd + d];
             active_values[l][pos * pool->n_embd + d] = pool->values[offset + l * pool->n_embd + d];
+#endif
         }
+
+#ifdef ENABLE_TURBOQUANT
+        if (dequant_k) free(dequant_k);
+        if (dequant_v) free(dequant_v);
+#endif
     }
 }

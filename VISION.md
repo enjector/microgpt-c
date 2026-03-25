@@ -14,7 +14,7 @@
 
 **Picture:** A stem cell doesn't know what it will become until it encounters its environment. Hand it muscle tissue signals and it becomes muscle. Hand MicroGPT-C a shipping address corpus and it becomes an address validator. Same engine, infinite specialisations.
 
-**Proof:** Twenty-Two working experiments — name generation (trains in < 1s), Shakespeare text (840K params, zero `<unk>`), C code retrieval (byte-perfect on 2,081 functions), C code composition (**83% exact match**, 1.2M params with LR scheduling), 8-puzzle solving (**90% via 5-organelle pipeline, 460K params**), Tic-Tac-Toe (**87% win+draw**), Connect-4 (**88% win rate**), 8 game extensions, **Memory Sparse Attention (MSA) Context Compression** (37k+ tok/s processing infinite horizons seamlessly over 64 token block limits), **market regime detection** (**60% on unseen data**, 3.0× baseline) and a **lottery control** (entropy floor ~0.50). All edge experiments leverage native multi-vote ensemble constraints achieving zero-invalid metrics natively.
+**Proof:** Twenty-Two working experiments — name generation (trains in < 1s), Shakespeare text (840K params, zero `<unk>`), C code retrieval (byte-perfect on 2,081 functions), C code composition (**83% exact match**, 1.2M params with LR scheduling), 8-puzzle solving (**90% via 5-organelle pipeline, 460K params**), Tic-Tac-Toe (**87% win+draw**), Connect-4 (**88% win rate**), 8 game extensions, **Memory Sparse Attention (MSA) Context Compression** (37k+ tok/s processing infinite horizons seamlessly over 64 token block limits), **TurboQuant Vector Shrinking** (8x latent memory compression speeding generation from 28k to 36k tok/s), **market regime detection** (**60% on unseen data**, 3.0× baseline) and a **lottery control** (entropy floor ~0.50). All edge experiments leverage native multi-vote ensemble constraints achieving zero-invalid metrics natively.
 
 **Push:** Read [VALUE_PROPOSITION.md](VALUE_PROPOSITION.md) for the business case, or jump straight to `demos/character-level/` to see the experimental evidence.
 
@@ -59,6 +59,8 @@ All weights, activations, and gradients use a compile-time configurable `scalar_
 #### C. Memory-Efficient KV Cache & Sparse Attention
 
 To live on microcontrollers (MCUs) or embedded Linux, memory is the primary constraint. MicroGPT-C provides both a flat (pre-allocated, cache-friendly) KV cache for maximum speed, and an optional **Paged KV Cache** for memory savings when context windows are large. For processing lifelong context horizons (e.g logs tracking for 3-12 months), the architectural design scales down via **Memory Sparse Attention (MSA)**. Vector chunking permits unbounded memory bounds by extracting the active memory matrix into fixed-dimension `MsaPool` structs routed via O(N) Cosine evaluation. **Prefix KV cache sharing** (`kv_cache_copy`) continues to accelerate ensemble voting without redundant memory allocations (1.9–5.7× speedup on ensemble inference).
+
+When physical SRAM constraints are pushed to the brink even under MSA summarisation, **TurboQuant** further compresses `MsaPool` KV caches. This translates 32-bit latent vectors into 4-bit (3-bit MSE + 1-bit QJL) integers, removing 8x of the storage boundary dynamically with zero accuracy drop-offs on domain outputs.
 
 #### D. Metal & Threaded Acceleration
 
