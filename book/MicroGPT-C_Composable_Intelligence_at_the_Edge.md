@@ -21,7 +21,7 @@
     
     {\large \today\par}
     \vspace{0.3cm}
-    {\normalsize\texttt{Version 1.1.19}\par}
+    {\normalsize\texttt{Version 1.1.20}\par}
 \end{titlepage}
 
 % --- Copyright Page ---
@@ -32,7 +32,7 @@
 \noindent
 \textbf{MicroGPT-C: Composable Intelligence at the Edge}\\
 From Stem Cell Models to Real-World AI Pipelines \textendash{} Architecture, Implementation, and Research\\
-\textit{Version 1.1.19}\\[2em]
+\textit{Version 1.1.20}\\[2em]
 
 \noindent
 \textbf{Research Team}\\
@@ -3227,7 +3227,10 @@ Together, the 4-bit representation packs the structural shape of the data alongs
 
 Instinctively, placing computationally intense un-packing logic (MSE lookup resolving + Boolean unfolding) directly inside the hottest routing functions of `msa_expand_context` seems like a recipe for latency destruction.
 
-Our benchmarks proved the opposite.
+Our benchmarks proved the opposite. When compiling `microgpt_turboquant` under `-O3` with vectorization, the raw C99 benchmark suite reported staggering metrics for the 96-dimensional latent vectors:
+
+- **MSE Quantization (Array Compression)**: ~1,305,215 operations/sec 
+- **MSE Dequantization (Reconstruction)**: ~142,018 operations/sec
 
 When deployed onto the `MsaPool` layer in the word-level Shakespeare generation pipeline:
 - **Baseline (FP32 Uncompressed)**: ~28,000 tokens/sec

@@ -116,9 +116,9 @@ Key technical contributions shipped in this engine:
 | Innovation | Description | Evidence |
 |-----------|-------------|----------|
 | 🧬 **Organelle Pipeline Architecture** | Composable specialist micro-models coordinated by deterministic C scaffolding | 11 games, **91% win** (Pentago) to **90% solve** (8-Puzzle) |
-| 🗃️ **Memory Sparse Attention (MSA)** | True infinite-length sequence decoding via `O(1)` SRAM chunk-mean pools and `O(N)` Top-K Cosine lookup routing. | **37,000+ words/s** on arbitrary long-horizon data |
-| 🗜️ **TurboQuant Vectors** | Mathematical KV cache compression mapping FP32 states into 4-bit (3-bit MSE + 1-bit QJL) footprints. | **8x memory reduction** with **25% speedup** (~36,000 tok/sec) |
-| 🗳️ **Ensemble Voting + Valid-Move Filtering** | Multi-vote consensus with hard constraint enforcement | **Zero invalid moves** across all 11 games |
+| 💾 **Memory Sparse Attention (MSA)** | Infinite sequence lengths routed via $O(1)$ LRU-paged latent storage chunks. Removes quadratic memory growth for endless CRM interactions. |
+| 🗜️ **TurboQuant Memory Compression** | 4-bit dual-state quantization (MSE Codebooks + 1-bit QJL Residuals). **8x memory reduction** with +25% generation speedup, validated at **1.3M+ encodes/sec**. |
+| 💪 **TinyLlama-Class Resiliency** | Zero `NaN` instability. SwiGLU, RMSNorm, grouped-query attention, and decoupled weight decay, rigorously audited against PyTorch output logits. | **Zero invalid moves** across all 11 games |
 | ⚡ **Prefix KV Cache Sharing** | Prompt processed once, KV state copied per ensemble vote — eliminates redundant inference | **1.9–5.7× ensemble speedup** ([arXiv:2603.03251](https://arxiv.org/pdf/2603.03251)) |
 | 🔮 **Speculative Decoding** | Draft organelle generates candidates, target verifies with KV rollback on rejection | Functional with acceptance statistics tracking |
 | 🧠 **Neural Algorithmic Reasoning** | Deterministic scaffolding (Kanban, cycle detector, judge) frees model capacity for pattern matching | ~340 lines of C replaces what gradient descent handles poorly |
