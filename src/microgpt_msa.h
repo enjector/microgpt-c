@@ -15,6 +15,9 @@
 #ifdef ENABLE_TURBOQUANT
 #include "microgpt_turboquant.h"
 extern TurboQuant g_tq;
+#elif defined(ENABLE_ROTORQUANT)
+#include "microgpt_rotorquant.h"
+extern RotorQuant g_rq;
 #endif
 
 /*
@@ -22,7 +25,7 @@ extern TurboQuant g_tq;
  * Stores compressed KV chunks as continuous float vectors.
  */
 typedef struct {
-#ifdef ENABLE_TURBOQUANT
+#if defined(ENABLE_TURBOQUANT) || defined(ENABLE_ROTORQUANT)
     uint32_t *tq_keys_idx;
     int8_t *tq_keys_qjl;
     float *tq_keys_rnorm;

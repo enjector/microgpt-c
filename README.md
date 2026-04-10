@@ -1,4 +1,4 @@
-# MicroGPT-C
+ # MicroGPT-C
 
 [![Build](https://github.com/enjector/microgpt-c/actions/workflows/cmake-multi-platform.yml/badge.svg)](https://github.com/enjector/microgpt-c/actions/workflows/cmake-multi-platform.yml)
 [![CodeQL](https://github.com/enjector/microgpt-c/actions/workflows/codeql.yml/badge.svg)](https://github.com/enjector/microgpt-c/actions/workflows/codeql.yml)

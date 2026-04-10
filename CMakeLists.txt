@@ -28,12 +28,13 @@ option(MICROGPT_BLAS           "Use BLAS (Accelerate / OpenBLAS / MKL)"         
 option(MICROGPT_METAL          "Use Metal GPU acceleration (macOS only)"            OFF)
 option(MICROGPT_ATTN_RES       "Block Attention Residuals (learned depth-attention)" OFF)
 option(ENABLE_TURBOQUANT       "Enable TurboQuant for memory compression (MSA)" OFF)
+option(ENABLE_ROTORQUANT       "Enable RotorQuant for memory compression (MSA)" OFF)
 
 # ==================================================================
 #  Core library  (single OBJECT library shared by all targets)
 # ==================================================================
 
-add_library(microgpt_lib STATIC src/microgpt.c src/microgpt_organelle.c src/microgpt_msa.c src/microgpt_turboquant.c)
+add_library(microgpt_lib STATIC src/microgpt.c src/microgpt_organelle.c src/microgpt_msa.c src/microgpt_turboquant.c src/microgpt_rotorquant.c)
 target_include_directories(microgpt_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 # --- Compile-time feature flags ---
@@ -62,6 +63,9 @@ if(MICROGPT_ATTN_RES)
 endif()
 if(ENABLE_TURBOQUANT)
   target_compile_definitions(microgpt_lib PUBLIC ENABLE_TURBOQUANT=1)
+endif()
+if(ENABLE_ROTORQUANT)
+  target_compile_definitions(microgpt_lib PUBLIC ENABLE_ROTORQUANT=1)
 endif()
 
 # ==================================================================
@@ -143,7 +147,7 @@ function(_microgpt_lib_for_defines OUT_VAR)
   endif()
 
   # Create a new STATIC library with the same sources + features
-  add_library(${_tgt} STATIC src/microgpt.c src/microgpt_organelle.c src/microgpt_msa.c src/microgpt_turboquant.c)
+  add_library(${_tgt} STATIC src/microgpt.c src/microgpt_organelle.c src/microgpt_msa.c src/microgpt_turboquant.c src/microgpt_rotorquant.c)
   target_include_directories(${_tgt} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
   # Propagate all feature flags from the base target
@@ -1168,6 +1172,14 @@ if(NOT MSVC)
 endif()
 add_test(NAME microgpt_turboquant_tests COMMAND test_microgpt_turboquant WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
+add_executable(test_microgpt_rotorquant tests/test_microgpt_rotorquant.c)
+target_link_libraries(test_microgpt_rotorquant PRIVATE microgpt_lib)
+target_include_directories(test_microgpt_rotorquant PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests ${CMAKE_CURRENT_SOURCE_DIR}/src)
+if(NOT MSVC)
+  target_link_libraries(test_microgpt_rotorquant PRIVATE m)
+endif()
+add_test(NAME microgpt_rotorquant_tests COMMAND test_microgpt_rotorquant WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
 # ==================================================================
 #  Benchmarks
 # ==================================================================
@@ -1190,6 +1202,13 @@ target_link_libraries(bench_microgpt_turboquant PRIVATE microgpt_lib)
 target_include_directories(bench_microgpt_turboquant PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests ${CMAKE_CURRENT_SOURCE_DIR}/src)
 if(NOT MSVC)
   target_link_libraries(bench_microgpt_turboquant PRIVATE m)
+endif()
+
+add_executable(bench_microgpt_rotorquant tests/bench_microgpt_rotorquant.c)
+target_link_libraries(bench_microgpt_rotorquant PRIVATE microgpt_lib)
+target_include_directories(bench_microgpt_rotorquant PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests ${CMAKE_CURRENT_SOURCE_DIR}/src)
+if(NOT MSVC)
+  target_link_libraries(bench_microgpt_rotorquant PRIVATE m)
 endif()
 
 # ==================================================================
@@ -1326,4 +1345,64 @@ target_link_libraries(tq_kv_cache_demo PRIVATE microgpt_lib)
 target_include_directories(tq_kv_cache_demo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 if(NOT MSVC)
   target_link_libraries(tq_kv_cache_demo PRIVATE m)
+endif()
+
+# ==================================================================
+#  RotorQuant Integration Evaluation Targets
+# ==================================================================
+
+# 1) Shakespeare Word-Level + Infinite MSA (Baseline FP32)
+add_demo(
+  NAME    rq_shakespeare_base
+  SOURCE  demos/rotor_quant/shakespeare/main.c
+  THREADS
+  COPY    demos/turbo_quant/shakespeare/w_shakespeare.txt
+  DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=1 BLOCK_SIZE=64 MLP_DIM=192
+          NUM_STEPS=0 LEARNING_RATE=0.001 BATCH_SIZE=16
+          MAX_VOCAB=5000 MAX_DOCS=200000 MAX_DOC_LEN=512
+)
+
+# 2) Shakespeare Word-Level + Infinite MSA + RotorQuant (Compressed)
+add_demo(
+  NAME    rq_shakespeare_rq
+  SOURCE  demos/rotor_quant/shakespeare/main.c
+  THREADS
+  COPY    demos/turbo_quant/shakespeare/w_shakespeare.txt
+  DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=1 BLOCK_SIZE=64 MLP_DIM=192
+          NUM_STEPS=0 LEARNING_RATE=0.001 BATCH_SIZE=16
+          MAX_VOCAB=5000 MAX_DOCS=200000 MAX_DOC_LEN=512
+          ENABLE_ROTORQUANT=1
+)
+
+# 3) VM Codegen + Infinite MSA (Baseline FP32)
+add_demo(
+  NAME    rq_vm_codegen_base
+  SOURCE  demos/rotor_quant/vm_codegen/main.c
+  THREADS METAL BLAS
+  COPY    demos/turbo_quant/vm_codegen/c_vm_functions_combined.txt
+  DEFINES N_EMBD=96 N_HEAD=4 N_LAYER=2 BLOCK_SIZE=256 MLP_DIM=384
+          NUM_STEPS=0 LEARNING_RATE=0.0005 BATCH_SIZE=16
+          MAX_VOCAB=1200 MAX_DOCS=5000 MAX_DOC_LEN=512
+)
+target_link_libraries(rq_vm_codegen_base PRIVATE microgpt_vm_lib)
+
+# 4) VM Codegen + Infinite MSA + RotorQuant (Compressed)
+add_demo(
+  NAME    rq_vm_codegen_rq
+  SOURCE  demos/rotor_quant/vm_codegen/main.c
+  THREADS METAL BLAS
+  COPY    demos/turbo_quant/vm_codegen/c_vm_functions_combined.txt
+  DEFINES N_EMBD=96 N_HEAD=4 N_LAYER=2 BLOCK_SIZE=256 MLP_DIM=384
+          NUM_STEPS=0 LEARNING_RATE=0.0005 BATCH_SIZE=16
+          MAX_VOCAB=1200 MAX_DOCS=5000 MAX_DOC_LEN=512
+          ENABLE_ROTORQUANT=1
+)
+target_link_libraries(rq_vm_codegen_rq PRIVATE microgpt_vm_lib)
+
+# 5) Standalone KV-cache compression demo (no corpus needed)
+add_executable(rq_kv_cache_demo demos/rotor_quant/simple/main.c)
+target_link_libraries(rq_kv_cache_demo PRIVATE microgpt_lib)
+target_include_directories(rq_kv_cache_demo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+if(NOT MSVC)
+  target_link_libraries(rq_kv_cache_demo PRIVATE m)
 endif()

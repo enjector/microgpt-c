@@ -1,0 +1,74 @@
+═══════════════════════════════════════════════════════════════
+  arXiv Submission Metadata — Copy/paste into https://arxiv.org/submit
+═══════════════════════════════════════════════════════════════
+
+TITLE:
+RotorQuant: Clifford Algebra Vector Quantization for LLM KV Cache Compression
+
+AUTHORS:
+John D. Pope
+
+ABSTRACT:
+We present RotorQuant, a reimagining of TurboQuant (ICLR 2026) that replaces the d×d random orthogonal rotation matrix with Clifford rotors R = exp(B/2) in the geometric algebra Cl(3,0). Instead of a matrix multiply requiring d² multiply-adds, RotorQuant performs the rotor sandwich product RxR̃ using only ~100 multiply-adds per vector, exploiting rotor sparsity (4 of 8 multivector components are zero). Fused GPU kernels (CUDA for NVIDIA, Metal for Apple Silicon) implementing the full pipeline (embed, rotor sandwich, Lloyd-Max quantize, inverse sandwich, extract) achieve 10-19x speedup on NVIDIA and 9-31x speedup on Apple Silicon over TurboQuant's BLAS matmul, while using 44x fewer parameters (372 vs 16,399 for d=128). Validated on real KV cache data from Qwen2.5-3B-Instruct, RotorQuant matches TurboQuant's attention fidelity (cosine similarity 0.990 vs 0.991) and achieves higher top-1/top-5 retrieval accuracy at 4K context. Code and benchmarks: https://github.com/scrya-com/rotorquant
+
+PRIMARY CATEGORY:
+cs.LG (Machine Learning)
+
+SECONDARY CATEGORIES:
+cs.AR (Hardware Architecture)
+cs.CL (Computation and Language)
+
+COMMENTS:
+4 pages, 9 tables. Code: https://github.com/scrya-com/rotorquant. Project page: https://www.scrya.com/rotorquant/
+
+REPORT-NO:
+(leave blank)
+
+ACM-CLASS:
+I.2.7; G.1.2
+
+MSC-CLASS:
+(leave blank)
+
+JOURNAL-REF:
+(leave blank)
+
+DOI:
+(leave blank)
+
+LICENSE:
+CC BY 4.0  (closest to MIT that arXiv supports; code repo is MIT)
+
+═══════════════════════════════════════════════════════════════
+  Files to upload:
+═══════════════════════════════════════════════════════════════
+
+1. rotorquant.tex    (LaTeX source)
+2. rotorquant.pdf    (compiled PDF — arXiv will recompile from .tex)
+
+No figures to upload (all tables are inline LaTeX).
+
+═══════════════════════════════════════════════════════════════
+  Submission checklist:
+═══════════════════════════════════════════════════════════════
+
+[ ] Create account at https://arxiv.org/user/register (if needed)
+[ ] Go to https://arxiv.org/submit
+[ ] Select "New submission"
+[ ] Upload rotorquant.tex (arXiv compiles from source)
+[ ] Fill in metadata above
+[ ] Preview the compiled PDF
+[ ] Submit — paper goes live within ~24 hours
+[ ] Update the paper/website with the arXiv ID once assigned
+
+═══════════════════════════════════════════════════════════════
+  Post-submission:
+═══════════════════════════════════════════════════════════════
+
+After you get the arXiv ID (e.g., 2603.XXXXX):
+
+1. Update rotorquant.tex: add \texttt{arXiv:2603.XXXXX} to header
+2. Update scrya.com/rotorquant page: add arXiv link
+3. Update GitHub README: add citation block
+4. Tweet/post with the arXiv link
+5. Email TurboQuant authors: zandieh@google.com, daliri.majid@nyu.edu
