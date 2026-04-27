@@ -1096,6 +1096,166 @@ TEST(tolerant_parser_clean_graph_unchanged) {
 }
 
 /* ============================================================
+ *  Phase 5b — Graph repair (pipeline_repair)
+ * ============================================================ */
+
+/* Repair on a clean graph is a no-op and reports zero drops. */
+TEST(repair_clean_graph_no_op) {
+    Pipeline *p = pipeline_create("g");
+    {
+        const char *in_n[] = { "x" }; PipelineType *in_t[] = { pipeline_type_int() };
+        const char *out_n[] = { "out" }; PipelineType *out_t[] = { pipeline_type_int() };
+        pipeline_add_node(p, "n", "abs", 1, in_n, in_t, 1, out_n, out_t);
+    }
+    {
+        const char *sin[] = { "x" }; PipelineType *sit[] = { pipeline_type_int() };
+        const char *sout[] = { "y" }; PipelineType *sot[] = { pipeline_type_int() };
+        pipeline_set_signature(p, 1, sin, sit, 1, sout, sot);
+    }
+    pipeline_connect_signature_in(p, "x", "n", "x");
+    pipeline_connect_signature_out(p, "n", "out", "y");
+    ASSERT_EQ(pipeline_verify(p), PIPE_OK);
+
+    PipelineRepairReport rep = {0};
+    int rc = pipeline_repair(p, &rep);
+    ASSERT_EQ(rc, PIPE_OK);
+    ASSERT_EQ(rep.nodes_dropped, 0);
+    ASSERT_EQ(rep.edges_dropped, 0);
+    ASSERT_EQ(rep.sig_outs_disconnected, 0);
+    ASSERT_EQ(pipeline_verify(p), PIPE_OK);
+    pipeline_free(p);
+}
+
+/* A node whose input port has NO incoming edge (dangling) is dropped
+ * by repair, and the residual subgraph verifies. */
+TEST(repair_drops_node_with_dangling_input) {
+    Pipeline *p = pipeline_create("g");
+    /* Two nodes — n_good has its inputs connected; n_bad has a dangling
+     * input that the parser would have left when its source ref was
+     * undefined. */
+    {
+        const char *in_n[] = { "x" }; PipelineType *in_t[] = { pipeline_type_int() };
+        const char *out_n[] = { "out" }; PipelineType *out_t[] = { pipeline_type_int() };
+        pipeline_add_node(p, "n_good", "abs", 1, in_n, in_t, 1, out_n, out_t);
+    }
+    {
+        const char *in_n[] = { "x" }; PipelineType *in_t[] = { pipeline_type_int() };
+        const char *out_n[] = { "out" }; PipelineType *out_t[] = { pipeline_type_int() };
+        pipeline_add_node(p, "n_bad", "negate", 1, in_n, in_t, 1, out_n, out_t);
+    }
+    {
+        const char *sin[] = { "x" }; PipelineType *sit[] = { pipeline_type_int() };
+        const char *sout[] = { "y" }; PipelineType *sot[] = { pipeline_type_int() };
+        pipeline_set_signature(p, 1, sin, sit, 1, sout, sot);
+    }
+    pipeline_connect_signature_in(p, "x", "n_good", "x");
+    pipeline_connect_signature_out(p, "n_good", "out", "y");
+    /* n_bad is left dangling: its input port has no incoming edge. */
+    ASSERT(pipeline_verify(p) != PIPE_OK);  /* dangling port */
+
+    PipelineRepairReport rep = {0};
+    ASSERT_EQ(pipeline_repair(p, &rep), PIPE_OK);
+    ASSERT_EQ(rep.nodes_dropped, 1);
+    /* Now the residual subgraph (only n_good) should verify. */
+    ASSERT_EQ(pipeline_verify(p), PIPE_OK);
+    ASSERT_EQ((int)p->n_nodes, 1);
+    pipeline_free(p);
+}
+
+/* Cascading: a chain a → b → c where a's input dangles. Repair must
+ * drop a, b, AND c (since b lost its source, c lost its source). */
+TEST(repair_cascades_through_chain) {
+    Pipeline *p = pipeline_create("g");
+    {
+        const char *in_n[] = { "x" }; PipelineType *in_t[] = { pipeline_type_int() };
+        const char *out_n[] = { "out" }; PipelineType *out_t[] = { pipeline_type_int() };
+        pipeline_add_node(p, "a", "abs", 1, in_n, in_t, 1, out_n, out_t);
+        const char *in_n2[] = { "x" }; PipelineType *in_t2[] = { pipeline_type_int() };
+        const char *out_n2[] = { "out" }; PipelineType *out_t2[] = { pipeline_type_int() };
+        pipeline_add_node(p, "b", "negate", 1, in_n2, in_t2, 1, out_n2, out_t2);
+        const char *in_n3[] = { "x" }; PipelineType *in_t3[] = { pipeline_type_int() };
+        const char *out_n3[] = { "out" }; PipelineType *out_t3[] = { pipeline_type_int() };
+        pipeline_add_node(p, "c", "square", 1, in_n3, in_t3, 1, out_n3, out_t3);
+    }
+    {
+        const char *sin[] = { "x" }; PipelineType *sit[] = { pipeline_type_int() };
+        const char *sout[] = { "y" }; PipelineType *sot[] = { pipeline_type_int() };
+        pipeline_set_signature(p, 1, sin, sit, 1, sout, sot);
+    }
+    /* a's input dangles. b connects to a, c connects to b, y binds to c. */
+    pipeline_connect(p, "a", "out", "b", "x");
+    pipeline_connect(p, "b", "out", "c", "x");
+    pipeline_connect_signature_out(p, "c", "out", "y");
+
+    PipelineRepairReport rep = {0};
+    ASSERT_EQ(pipeline_repair(p, &rep), PIPE_OK);
+    ASSERT_EQ(rep.nodes_dropped, 3);  /* a, b, c all die */
+    ASSERT_EQ(rep.sig_outs_disconnected, 1);  /* y binding lost its source */
+    ASSERT_EQ((int)p->n_nodes, 0);
+    pipeline_free(p);
+}
+
+/* Repair preserves a sibling's good subgraph when its sibling is broken.
+ * a is good; b dangles. Repair drops b, keeps a. */
+TEST(repair_preserves_good_subgraph) {
+    Pipeline *p = pipeline_create("g");
+    {
+        const char *in_n[] = { "x" }; PipelineType *in_t[] = { pipeline_type_int() };
+        const char *out_n[] = { "out" }; PipelineType *out_t[] = { pipeline_type_int() };
+        pipeline_add_node(p, "a", "abs", 1, in_n, in_t, 1, out_n, out_t);
+        const char *in_n2[] = { "x" }; PipelineType *in_t2[] = { pipeline_type_int() };
+        const char *out_n2[] = { "out" }; PipelineType *out_t2[] = { pipeline_type_int() };
+        pipeline_add_node(p, "b", "negate", 1, in_n2, in_t2, 1, out_n2, out_t2);
+    }
+    {
+        const char *sin[] = { "x" }; PipelineType *sit[] = { pipeline_type_int() };
+        const char *sout[] = { "y" }; PipelineType *sot[] = { pipeline_type_int() };
+        pipeline_set_signature(p, 1, sin, sit, 1, sout, sot);
+    }
+    pipeline_connect_signature_in(p, "x", "a", "x");
+    pipeline_connect_signature_out(p, "a", "out", "y");
+    /* b is left dangling. */
+
+    PipelineRepairReport rep = {0};
+    ASSERT_EQ(pipeline_repair(p, &rep), PIPE_OK);
+    ASSERT_EQ(rep.nodes_dropped, 1);
+    ASSERT_EQ((int)p->n_nodes, 1);
+    /* The surviving node is "a" and the residual verifies. */
+    ASSERT(strcmp(p->nodes[0]->id, "a") == 0);
+    ASSERT_EQ(pipeline_verify(p), PIPE_OK);
+    pipeline_free(p);
+}
+
+/* Repair via parse: a graph emitted by an organelle that references
+ * an undefined node parses (strict) but verify-fails. After repair,
+ * the residual verifies. */
+TEST(repair_after_parse_recovers_residual) {
+    /* "n_bad" references an undeclared source "ghost.out". Parser will
+     * silently drop the edge, leaving n_bad with a dangling input.
+     * "n_good" is fine. Output binding y <- n_good.out. */
+    const char *src =
+        "@graph mixed\n"
+        "  : in x -> int\n"
+        "  : out y -> int\n"
+        "  | n_good = abs(x: <x>) :: x:int -> out:int\n"
+        "  | n_bad = negate(x: ghost.out) :: x:int -> out:int\n"
+        "  y <- n_good.out\n"
+        "@end\n";
+    Pipeline *p = pipeline_parse_text(src);
+    ASSERT(p != NULL);
+    /* Strict verify rejects dangling port on n_bad. */
+    ASSERT(pipeline_verify(p) != PIPE_OK);
+
+    PipelineRepairReport rep = {0};
+    ASSERT_EQ(pipeline_repair(p, &rep), PIPE_OK);
+    ASSERT_EQ(rep.nodes_dropped, 1);
+    ASSERT_EQ((int)p->n_nodes, 1);
+    /* Residual verifies. */
+    ASSERT_EQ(pipeline_verify(p), PIPE_OK);
+    pipeline_free(p);
+}
+
+/* ============================================================
  *  Last-error reporting
  * ============================================================ */
 
@@ -1180,6 +1340,13 @@ int main(void) {
     RUN(tolerant_parser_auto_promotes_undeclared_sig_input);
     RUN(tolerant_parser_auto_promotes_undeclared_sig_output);
     RUN(tolerant_parser_clean_graph_unchanged);
+
+    printf("\n[Pipeline IR — Phase 5b graph repair]\n");
+    RUN(repair_clean_graph_no_op);
+    RUN(repair_drops_node_with_dangling_input);
+    RUN(repair_cascades_through_chain);
+    RUN(repair_preserves_good_subgraph);
+    RUN(repair_after_parse_recovers_residual);
 
     printf("\n[Pipeline IR — Error reporting]\n");
     RUN(last_error_set_on_failure);

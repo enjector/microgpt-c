@@ -1263,6 +1263,105 @@ Phase 5a ships as the **right code, in the wrong place, useful next** — exactl
 
 ---
 
+## 19. Phase 5b — Graph repair (75% NL strict-verify, +10pp)
+
+> *Phase 5a documented the failure mode as graph-coherence, not parser-tolerance. Phase 5b acts on that.*
+
+### 19.1 The hypothesis
+
+Of the 5 held-out prompts that failed verify in Phase 4 (well-formed and parsed but verify-rejected), the failures were:
+
+- **Truncated generations** — `| n = percentage(part: taxed_total_0` mid-line cutoff, leaving `n`'s `part` port dangling.
+- **Hallucinated node references** — `y <- r1.out` where no `r1` node was declared. Parser silently dropped the edge, leaving the sig output unconnected.
+- **Hallucinated signature variables** — `<weight>`, `<height>` referenced in node args while the declared sig was `(a, lo, hi)`. Parser silently dropped the edge, leaving the consuming node's input port dangling.
+
+All three failures share a structural property: the *good* part of the graph is salvageable. Drop the internally-inconsistent fragments and the residual subgraph verifies cleanly.
+
+### 19.2 The implementation
+
+Added `pipeline_repair(p, &report)` (header + `src/microgpt_pipeline.c`). Algorithm:
+
+1. **Fixed-point fragment removal**. A node is "satisfied" iff every input port has at least one incoming edge whose source is the signature or a still-live node. Iterate: a node may become unsatisfied when one of its sources dies. Continue until no node changes state.
+2. **Drop dropped-node edges**. Any edge touching a dropped node is removed. Edges to/from the signature whose other endpoint dies are also removed.
+3. **Drop unused signature ports**. Sig inputs with no consumer edge and sig outputs with no producer edge are removed. (Without this, the residual is structurally valid but verify rejects with `BAD_SIGNATURE`.)
+4. **Re-index + invalidate**. The verified flag is reset; caller must call `pipeline_verify()` on the residual.
+
+The repair is purely subtractive — no nodes, edges, or sig ports are added. The repaired graph is a subgraph of the input.
+
+### 19.3 Five new unit tests
+
+- `repair_clean_graph_no_op` — repair on a verified graph drops nothing
+- `repair_drops_node_with_dangling_input` — single dropped node, residual verifies
+- `repair_cascades_through_chain` — a→b→c with a dangling, all three drop, sig-out disconnects reported
+- `repair_preserves_good_subgraph` — sibling node dies, sibling-good survives
+- `repair_after_parse_recovers_residual` — end-to-end via parse → repair → verify on a graph with a node referencing a non-existent source
+
+**51/51 tests pass** (5 new repair tests on top of Phase 5a's 4 tolerant-parser tests).
+
+### 19.4 Wiring
+
+Both the demo's eval loop and `tools/reeval_parser` now apply the repair fallback only when verify fails on the parsed graph. The demo requires `n_nodes > 0` after repair to count it as a successful verify (an empty graph trivially verifies but isn't useful).
+
+### 19.5 The headline
+
+Same Phase 4 corpus (302 examples), same checkpoint (540K params, loaded), same held-out 20 NL prompts:
+
+| Metric | Phase 4 (no repair) | **Phase 5b (with repair)** | Δ |
+|---|---|---|---|
+| Best-of-16 well-formed | 90% (18/20) | 90% (18/20) | — |
+| Best-of-16 parsed | 90% (18/20) | 90% (18/20) | — |
+| Best-of-16 strict-verified | 65% (13/20) | **75% (15/20)** ⭐ | **+10pp** |
+| Best-of-16 primitive-fidelity | 35% (7/20) | 35% (7/20) | — |
+
+Two held-out prompts moved from fail → pass:
+
+- **#6** *"take home pay from gross income at federal tax rate"* — repair dropped a partial node that referenced an undeclared source, leaving a verifiable residual.
+- **#17** *"fibonacci of n combined with factorial of n by adding"* — same pattern: a hallucinated node reference broke verify; repair dropped the bad fragment.
+
+Primitive-fidelity stays at 35% — the recovered residuals don't always contain the expected primitives (when repair drops a node, the residual may match the expected primitive set or not). Repair recovers *verifiability* but doesn't add semantic correctness.
+
+### 19.6 Why the gain is +10pp and not larger
+
+The other 5 held-out failures (#1, #7, #14, #15, #20) fall into two categories repair can't address:
+
+| Failure mode | Count | Repair handles? | Why not |
+|---|---|---|---|
+| Mode collapse (well-formed=N) | 2 (#1, #14) | No | Output isn't even parseable; nothing to repair |
+| Hallucinated graph (no salvageable subgraph) | 3 (#7, #15, #20) | No | Repair drops everything; residual is empty (n_nodes==0); demo requires non-empty residual |
+
+The 75% headline is the realistic ceiling for this corpus + this organelle. Beating it requires Phase 5c (larger model + more training to reduce mode-collapse) or Phase 5d (constrained decoding to prevent hallucination).
+
+### 19.7 Defensive value
+
+Even when repair doesn't move the headline, it provides a robustness guarantee: **any output the demo accepts is a verified, executable Pipeline IR graph**. Truncated generations, hallucinated refs, and dup signatures no longer leak through to verify with malformed structure. Downstream code receives only valid graphs.
+
+### 19.8 The series so far
+
+| Phase | Headline |
+|---|---|
+| 1 | IR + verifier + text round-trip + DOT |
+| 2 | VM-backed execute |
+| 3a | Canonical Kahn topo |
+| 3b | 85-example templated corpus |
+| 3c | Organelle trained, 75% well-formed |
+| 3d | 50% strict-verified single-shot (parser hardened, fuzz suite) |
+| 3e/f/g | Best-of-16 + verify-as-judge: **100% strict-verified on synthetic templates** |
+| 4 | Real-primitive corpus: **65% strict-verified on natural-English transfer** |
+| 5a | Tolerant parser shipped (4 unit tests); 0pp on headline (negative result) |
+| **5b** | **Graph repair: 75% strict-verified on NL transfer (+10pp), 5 unit tests, 51/51 total** ⭐ |
+
+### 19.9 What's next
+
+Phase 5b ships defensible infrastructure with a real headline gain. Two prompts still need work to push 75% → 85%+:
+
+1. **Constrained decoding** — prevent the organelle from emitting node references to identifiers that haven't been declared. Hard at the small-model scale.
+2. **Larger organelle** — 1M+ params should reduce mode-collapse and hallucination.
+3. **Self-correction** — feed verifier error messages into the next vote. Could turn vote 16's failure into vote 1's success.
+
+Recommend Phase 6 next: wire `pipeline_execute_vm()` to the 60+ `w_vm_functions.txt` primitives so the verified graphs *actually run* end-to-end. That's the bridge from "this graph passes verify" to "this graph computes the answer."
+
+---
+
 ## 16. Closing Remark
 
 The IR ships. 24 tests pass. The header has detailed doc-comments. The DOT renderer makes graphs human-readable. The text format is small enough for a tiny model to emit.

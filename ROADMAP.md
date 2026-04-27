@@ -51,7 +51,7 @@ A living roadmap for MicroGPT-C — a zero-dependency C99 GPT engine designed fo
 - [x] **shakespeare** — character-level Shakespeare (840K params, multi-threaded, zero `<unk>`)
 - [x] **c_codegen** — C code generation from prompts (875K params, byte-perfect recall of 2,081 functions)
 - [x] **c_wiringgen** — C function composition grammar (875K params, training in progress)
-- [x] **Wiring Organelle (Pipeline IR)** — graph-based tool composition (540K params, **65% strict-verify on natural-English transfer** to real `w_vm_functions.txt` primitives, 100% on synthetic templates). Best-of-16 + verify-as-judge. See [RESEARCH_PIPELINE_IR](docs/research/RESEARCH_PIPELINE_IR.md).
+- [x] **Wiring Organelle (Pipeline IR)** — graph-based tool composition (540K params, **75% strict-verify on natural-English transfer** to real `w_vm_functions.txt` primitives via Phase 5b graph repair, 100% on synthetic templates). Best-of-16 + verify-as-judge + tolerant parser + post-parse `pipeline_repair()`. See [RESEARCH_PIPELINE_IR](docs/research/RESEARCH_PIPELINE_IR.md).
 - [x] **c99_compose** — C function composition pipeline: Planner → Judge (**98% parse**, **83% exact match**, 1.2M params with LR scheduling)
 - [x] **tic-tac-toe** — 2-organelle pipeline: Planner → Player (**87% win+draw** vs random, zero invalid moves, 460K params)
 - [x] **8-puzzle** — 5-organelle pipeline: Strategist → Mover → Judge → Detector → DetourMover with kanban + cycle breaking (**90% solve rate**: 100% easy, 100% med, 70% hard, 460K params)

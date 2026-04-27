@@ -732,6 +732,270 @@ int pipeline_verify(Pipeline *p) {
 }
 
 /* ============================================================
+ *  Phase 5b — pipeline_repair: fixed-point fragment removal
+ * ============================================================ */
+
+int pipeline_repair(Pipeline *p, PipelineRepairReport *report) {
+    if (report) {
+        report->nodes_dropped = 0;
+        report->edges_dropped = 0;
+        report->sig_outs_disconnected = 0;
+        report->sig_ins_dropped = 0;
+        report->sig_outs_dropped = 0;
+    }
+    if (!p) return PIPE_OK;
+    if (p->n_nodes == 0 && p->n_sig_in == 0 && p->n_sig_out == 0) return PIPE_OK;
+
+    int *alive = (int *)calloc(p->n_nodes, sizeof(int));
+    if (!alive) { set_err("pipeline_repair: OOM"); return PIPE_ERR_OOM; }
+    for (size_t i = 0; i < p->n_nodes; i++) alive[i] = 1;
+
+    /* Fixed-point: a node is satisfied iff every input port has at
+     * least one incoming edge whose source is the signature or a
+     * still-live node. Otherwise the node dies and may invalidate
+     * downstream consumers — iterate until no change. */
+    int changed = 1;
+    int iter = 0;
+    while (changed && iter < 64) {  /* bound iterations to avoid pathological cases */
+        changed = 0; iter++;
+        for (size_t i = 0; i < p->n_nodes; i++) {
+            if (!alive[i]) continue;
+            PipelineNode *n = p->nodes[i];
+            for (int k = 0; k < n->n_inputs; k++) {
+                int has_live_source = 0;
+                for (size_t e = 0; e < p->n_edges; e++) {
+                    PipelineEdge *edge = p->edges[e];
+                    if (edge->dst_node_idx != (int)i) continue;
+                    if (edge->dst_port_idx != k) continue;
+                    if (edge->src_node_idx == SIG_IN_NODE) { has_live_source = 1; break; }
+                    if (edge->src_node_idx >= 0 && edge->src_node_idx < (int)p->n_nodes
+                        && alive[edge->src_node_idx]) { has_live_source = 1; break; }
+                }
+                if (!has_live_source) {
+                    alive[i] = 0;
+                    changed = 1;
+                    break;
+                }
+            }
+        }
+    }
+
+    /* Count drops. */
+    int n_dropped = 0;
+    for (size_t i = 0; i < p->n_nodes; i++) if (!alive[i]) n_dropped++;
+    if (n_dropped == 0 && report == NULL) {
+        free(alive);
+        return PIPE_OK;
+    }
+
+    /* Build old_idx → new_idx map for kept nodes. */
+    int *new_idx = (int *)calloc(p->n_nodes, sizeof(int));
+    if (!new_idx) { free(alive); set_err("pipeline_repair: OOM"); return PIPE_ERR_OOM; }
+    int next = 0;
+    for (size_t i = 0; i < p->n_nodes; i++) new_idx[i] = alive[i] ? next++ : -1;
+
+    /* Filter + re-index edges. An edge survives iff:
+     *   - its src is SIG_IN_NODE, OR a kept node
+     *   - its dst is SIG_OUT_NODE, OR a kept node
+     * We also report sig_outs_disconnected: edges with dst==SIG_OUT_NODE
+     * whose src node was dropped. */
+    size_t edges_kept = 0;
+    int edges_dropped_count = 0;
+    int sig_outs_disconnected = 0;
+    for (size_t e = 0; e < p->n_edges; e++) {
+        PipelineEdge *edge = p->edges[e];
+        int src_ok = (edge->src_node_idx == SIG_IN_NODE) ||
+                     (edge->src_node_idx >= 0 && edge->src_node_idx < (int)p->n_nodes && alive[edge->src_node_idx]);
+        int dst_ok = (edge->dst_node_idx == SIG_OUT_NODE) ||
+                     (edge->dst_node_idx >= 0 && edge->dst_node_idx < (int)p->n_nodes && alive[edge->dst_node_idx]);
+        if (!src_ok || !dst_ok) {
+            if (edge->dst_node_idx == SIG_OUT_NODE && !src_ok) sig_outs_disconnected++;
+            free(edge);
+            edges_dropped_count++;
+            continue;
+        }
+        /* Re-index endpoints. */
+        if (edge->src_node_idx >= 0) edge->src_node_idx = new_idx[edge->src_node_idx];
+        if (edge->dst_node_idx >= 0) edge->dst_node_idx = new_idx[edge->dst_node_idx];
+        p->edges[edges_kept++] = edge;
+    }
+    p->n_edges = edges_kept;
+
+    /* Rebuild node->port edge backrefs after compaction. The edges[]
+     * array on each port stores PipelineEdge* — we'll clear those and
+     * the verifier will repopulate. (verify_impl rebuilds backrefs.) */
+    for (size_t i = 0; i < p->n_nodes; i++) {
+        if (!alive[i]) continue;
+        PipelineNode *n = p->nodes[i];
+        for (int k = 0; k < n->n_inputs; k++) {
+            if (n->inputs[k].edges) { free(n->inputs[k].edges); n->inputs[k].edges = NULL; }
+            n->inputs[k].n_edges = 0; n->inputs[k].edges_cap = 0;
+        }
+        for (int k = 0; k < n->n_outputs; k++) {
+            if (n->outputs[k].edges) { free(n->outputs[k].edges); n->outputs[k].edges = NULL; }
+            n->outputs[k].n_edges = 0; n->outputs[k].edges_cap = 0;
+        }
+    }
+    /* Same for signature ports. */
+    for (int i = 0; i < p->n_sig_in; i++) {
+        if (p->signature_in[i].edges) { free(p->signature_in[i].edges); p->signature_in[i].edges = NULL; }
+        p->signature_in[i].n_edges = 0; p->signature_in[i].edges_cap = 0;
+    }
+    for (int i = 0; i < p->n_sig_out; i++) {
+        if (p->signature_out[i].edges) { free(p->signature_out[i].edges); p->signature_out[i].edges = NULL; }
+        p->signature_out[i].n_edges = 0; p->signature_out[i].edges_cap = 0;
+    }
+
+    /* Compact node array — free dropped nodes, shift live ones. */
+    size_t kept = 0;
+    for (size_t i = 0; i < p->n_nodes; i++) {
+        if (!alive[i]) {
+            node_free(p->nodes[i]);
+            p->nodes[i] = NULL;
+        } else {
+            p->nodes[kept++] = p->nodes[i];
+        }
+    }
+    p->n_nodes = kept;
+
+    /* Repopulate port back-refs by re-walking edges. */
+    for (size_t e = 0; e < p->n_edges; e++) {
+        PipelineEdge *edge = p->edges[e];
+        PipelinePort *src_port;
+        PipelinePort *dst_port;
+        if (edge->src_node_idx == SIG_IN_NODE) src_port = &p->signature_in[edge->src_port_idx];
+        else src_port = &p->nodes[edge->src_node_idx]->outputs[edge->src_port_idx];
+        if (edge->dst_node_idx == SIG_OUT_NODE) dst_port = &p->signature_out[edge->dst_port_idx];
+        else dst_port = &p->nodes[edge->dst_node_idx]->inputs[edge->dst_port_idx];
+        /* Append to each port's edges[] array. */
+        if (src_port->n_edges + 1 > src_port->edges_cap) {
+            int newcap = src_port->edges_cap ? src_port->edges_cap * 2 : 4;
+            src_port->edges = (PipelineEdge **)realloc(src_port->edges, sizeof(PipelineEdge *) * (size_t)newcap);
+            src_port->edges_cap = newcap;
+        }
+        src_port->edges[src_port->n_edges++] = edge;
+        if (dst_port->n_edges + 1 > dst_port->edges_cap) {
+            int newcap = dst_port->edges_cap ? dst_port->edges_cap * 2 : 4;
+            dst_port->edges = (PipelineEdge **)realloc(dst_port->edges, sizeof(PipelineEdge *) * (size_t)newcap);
+            dst_port->edges_cap = newcap;
+        }
+        dst_port->edges[dst_port->n_edges++] = edge;
+    }
+
+    free(alive);
+    free(new_idx);
+
+    /* Final pass: drop signature ports that have no live counterpart.
+     * - A sig input with no consumer edge is a declared-but-unused param.
+     * - A sig output with no producer edge is an unconnected output binding.
+     * Verify rejects both as PIPE_ERR_BAD_SIGNATURE; here we drop them so
+     * the residual subgraph (whatever survived the fix-point) can verify
+     * cleanly. Edges to/from dropped sig ports are themselves dropped,
+     * and remaining sig-touching edges are re-indexed. */
+    int sig_ins_dropped_count = 0;
+    int sig_outs_dropped_count = 0;
+    {
+        /* Determine which sig inputs/outputs have at least one edge. */
+        int *in_keep  = (int *)calloc((size_t)(p->n_sig_in  > 0 ? p->n_sig_in  : 1), sizeof(int));
+        int *out_keep = (int *)calloc((size_t)(p->n_sig_out > 0 ? p->n_sig_out : 1), sizeof(int));
+        if (!in_keep || !out_keep) {
+            if (in_keep)  free(in_keep);
+            if (out_keep) free(out_keep);
+            invalidate(p);
+            if (report) {
+                report->nodes_dropped = n_dropped;
+                report->edges_dropped = edges_dropped_count;
+                report->sig_outs_disconnected = sig_outs_disconnected;
+            }
+            return PIPE_OK;
+        }
+        for (size_t e = 0; e < p->n_edges; e++) {
+            PipelineEdge *edge = p->edges[e];
+            if (edge->src_node_idx == SIG_IN_NODE && edge->src_port_idx >= 0
+                && edge->src_port_idx < p->n_sig_in) {
+                in_keep[edge->src_port_idx] = 1;
+            }
+            if (edge->dst_node_idx == SIG_OUT_NODE && edge->dst_port_idx >= 0
+                && edge->dst_port_idx < p->n_sig_out) {
+                out_keep[edge->dst_port_idx] = 1;
+            }
+        }
+        /* Build new_in_idx / new_out_idx maps. */
+        int *new_in_idx  = (int *)calloc((size_t)(p->n_sig_in  > 0 ? p->n_sig_in  : 1), sizeof(int));
+        int *new_out_idx = (int *)calloc((size_t)(p->n_sig_out > 0 ? p->n_sig_out : 1), sizeof(int));
+        if (!new_in_idx || !new_out_idx) {
+            free(in_keep); free(out_keep);
+            if (new_in_idx)  free(new_in_idx);
+            if (new_out_idx) free(new_out_idx);
+            invalidate(p);
+            if (report) {
+                report->nodes_dropped = n_dropped;
+                report->edges_dropped = edges_dropped_count;
+                report->sig_outs_disconnected = sig_outs_disconnected;
+            }
+            return PIPE_OK;
+        }
+        int next_in = 0, next_out = 0;
+        for (int i = 0; i < p->n_sig_in;  i++) new_in_idx[i]  = in_keep[i]  ? next_in++  : -1;
+        for (int i = 0; i < p->n_sig_out; i++) new_out_idx[i] = out_keep[i] ? next_out++ : -1;
+
+        /* Free dropped sig ports + re-index edges that reference sig ports. */
+        for (int i = 0; i < p->n_sig_in; i++) {
+            if (!in_keep[i]) {
+                port_free_internal(&p->signature_in[i]);
+                sig_ins_dropped_count++;
+            }
+        }
+        for (int i = 0; i < p->n_sig_out; i++) {
+            if (!out_keep[i]) {
+                port_free_internal(&p->signature_out[i]);
+                sig_outs_dropped_count++;
+            }
+        }
+        /* Compact sig arrays. */
+        if (sig_ins_dropped_count > 0) {
+            int kept_in = 0;
+            for (int i = 0; i < p->n_sig_in; i++) {
+                if (in_keep[i]) p->signature_in[kept_in++] = p->signature_in[i];
+            }
+            p->n_sig_in = kept_in;
+        }
+        if (sig_outs_dropped_count > 0) {
+            int kept_out = 0;
+            for (int i = 0; i < p->n_sig_out; i++) {
+                if (out_keep[i]) p->signature_out[kept_out++] = p->signature_out[i];
+            }
+            p->n_sig_out = kept_out;
+        }
+        /* Re-index edges. (in_keep/out_keep guarantee both endpoints
+         * point to surviving sig ports for any sig-touching edge.) */
+        if (sig_ins_dropped_count > 0 || sig_outs_dropped_count > 0) {
+            for (size_t e = 0; e < p->n_edges; e++) {
+                PipelineEdge *edge = p->edges[e];
+                if (edge->src_node_idx == SIG_IN_NODE) edge->src_port_idx = new_in_idx[edge->src_port_idx];
+                if (edge->dst_node_idx == SIG_OUT_NODE) edge->dst_port_idx = new_out_idx[edge->dst_port_idx];
+            }
+        }
+
+        free(in_keep); free(out_keep);
+        free(new_in_idx); free(new_out_idx);
+    }
+
+    /* Repair always invalidates the verified flag — caller must verify
+     * the residual graph anew. */
+    invalidate(p);
+
+    if (report) {
+        report->nodes_dropped = n_dropped;
+        report->edges_dropped = edges_dropped_count;
+        report->sig_outs_disconnected = sig_outs_disconnected;
+        report->sig_ins_dropped = sig_ins_dropped_count;
+        report->sig_outs_dropped = sig_outs_dropped_count;
+    }
+    return PIPE_OK;
+}
+
+/* ============================================================
  *  Execution
  * ============================================================ */
 

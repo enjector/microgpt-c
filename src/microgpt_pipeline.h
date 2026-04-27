@@ -331,6 +331,51 @@ int pipeline_verify(Pipeline *p);
  */
 int pipeline_verify_partial(Pipeline *p, int *missing_out);
 
+/* ============================================================
+ *  Phase 5b — Graph repair (post-parse, pre-verify cleanup)
+ * ============================================================
+ *
+ * pipeline_repair() drops fragments of an internally inconsistent graph
+ * so the residual subgraph can verify cleanly. Called after
+ * pipeline_parse_text(_tolerant) on Wiring Organelle output: the model
+ * sometimes generates a graph that parses (the syntax is well-formed)
+ * but fails verify (the structure references undefined nodes, leaves
+ * sig outputs dangling, or contains nodes whose input ports were
+ * silently dropped at parse time because their source nodes don't
+ * exist).
+ *
+ * Repair semantics — fixed-point fragment removal:
+ *
+ *   1. A node is "satisfied" if every input port has at least one
+ *      incoming edge whose source is the signature or a still-live
+ *      node. A node with any unsatisfied port becomes "dead".
+ *   2. Iterate: a node may become unsatisfied because one of its
+ *      sources was killed in a prior round. Continue until no node
+ *      changes state.
+ *   3. Drop all dead nodes and any edges touching them.
+ *   4. Drop signature-output bindings whose source is now dead.
+ *
+ * Repair NEVER adds nodes, edges, or signature ports. It is a pure
+ * subtraction pass: the repaired graph is a subgraph of the input.
+ *
+ * Returns 0 on success and writes the count of nodes/edges/sig-out
+ * bindings dropped into *report (may be NULL). After repair, calling
+ * pipeline_verify() may now succeed if the residual subgraph is
+ * complete. If even the residual is unrecoverable (e.g. all nodes
+ * dropped, or remaining sig outputs still unconnected) verify will
+ * fail with the underlying reason; repair reports what it dropped
+ * either way.
+ */
+typedef struct {
+    int nodes_dropped;
+    int edges_dropped;
+    int sig_outs_disconnected;
+    int sig_ins_dropped;        /* unused sig inputs removed (no consumers) */
+    int sig_outs_dropped;       /* unconnected sig outputs removed (no source) */
+} PipelineRepairReport;
+
+int pipeline_repair(Pipeline *p, PipelineRepairReport *report);
+
 /* Returns a pointer to a static buffer holding the most recent error
  * message produced by any pipeline_* function in this thread. Buffer
  * is overwritten by subsequent calls. Never returns NULL. */

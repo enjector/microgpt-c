@@ -67,6 +67,7 @@ int main(int argc, char **argv) {
     int n = 0;
     int strict_parse = 0, strict_verify = 0, strict_fidelity = 0;
     int tol_parse = 0, tol_verify = 0, tol_fidelity = 0;
+    int rep_parse = 0, rep_verify = 0, rep_fidelity = 0;
 
     while (fgets(line, sizeof(line), f)) {
         size_t l = strlen(line);
@@ -100,12 +101,15 @@ int main(int argc, char **argv) {
             while (*trim == ' ' || *trim == '\t') trim++;
             if (strcmp(trim, "---") == 0) {
                 /* Process accumulated block. */
-                int s_p = 0, s_v = 0, s_f = 0, t_p = 0, t_v = 0, t_f = 0;
+                int s_p = 0, s_v = 0, s_f = 0, t_p = 0, t_v = 0, t_f = 0, r_p = 0, r_v = 0, r_f = 0;
                 if (blen > 0) {
+                    /* All three columns require n_nodes > 0 for a verify to
+                     * count as useful (an empty-but-vacuously-verifying graph
+                     * is structurally valid but produces nothing). */
                     Pipeline *p1 = pipeline_parse_text(block);
                     if (p1) {
                         s_p = 1;
-                        if (pipeline_verify(p1) == PIPE_OK) {
+                        if (pipeline_verify(p1) == PIPE_OK && p1->n_nodes > 0) {
                             s_v = 1;
                             s_f = graph_uses_all(p1, expected);
                         }
@@ -115,19 +119,43 @@ int main(int argc, char **argv) {
                     if (!p2) p2 = pipeline_parse_text_tolerant(block);
                     if (p2) {
                         t_p = 1;
-                        if (pipeline_verify(p2) == PIPE_OK) {
+                        if (pipeline_verify(p2) == PIPE_OK && p2->n_nodes > 0) {
                             t_v = 1;
                             t_f = graph_uses_all(p2, expected);
                         }
                         pipeline_free(p2);
                     }
+                    /* Phase 5b: tolerant + repair. Requires n_nodes > 0
+                     * after repair — an empty residual verifies vacuously
+                     * but isn't useful, so we don't count it. */
+                    Pipeline *p3 = pipeline_parse_text(block);
+                    if (!p3) p3 = pipeline_parse_text_tolerant(block);
+                    if (p3) {
+                        r_p = 1;
+                        int v0 = (pipeline_verify(p3) == PIPE_OK) && p3->n_nodes > 0;
+                        if (!v0) {
+                            PipelineRepairReport rep = {0};
+                            if (pipeline_repair(p3, &rep) == PIPE_OK
+                                && p3->n_nodes > 0
+                                && pipeline_verify(p3) == PIPE_OK) {
+                                v0 = 1;
+                            }
+                        }
+                        if (v0) {
+                            r_v = 1;
+                            r_f = graph_uses_all(p3, expected);
+                        }
+                        pipeline_free(p3);
+                    }
                 }
                 strict_parse += s_p; strict_verify += s_v; strict_fidelity += s_f;
                 tol_parse    += t_p; tol_verify    += t_v; tol_fidelity    += t_f;
-                printf("[%2d] strict=%c%c%c  tolerant=%c%c%c  %s\n",
+                rep_parse    += r_p; rep_verify    += r_v; rep_fidelity    += r_f;
+                printf("[%2d] strict=%c%c%c  tolerant=%c%c%c  repair=%c%c%c  %s\n",
                        n + 1,
                        s_p ? 'P' : '.', s_v ? 'V' : '.', s_f ? 'F' : '.',
                        t_p ? 'P' : '.', t_v ? 'V' : '.', t_f ? 'F' : '.',
+                       r_p ? 'P' : '.', r_v ? 'V' : '.', r_f ? 'F' : '.',
                        prompt);
                 n++;
                 in_block = 0;
@@ -147,18 +175,18 @@ int main(int argc, char **argv) {
     fclose(f);
 
     printf("\n=== Re-eval summary on %d held-out examples ===\n", n);
-    printf("                      strict   tolerant\n");
-    printf("  parsed      :       %2d/%2d   %2d/%2d\n", strict_parse, n, tol_parse, n);
-    printf("  verified    :       %2d/%2d   %2d/%2d\n", strict_verify, n, tol_verify, n);
-    printf("  fidelity    :       %2d/%2d   %2d/%2d\n", strict_fidelity, n, tol_fidelity, n);
+    printf("                      strict   tolerant   repair\n");
+    printf("  parsed      :       %2d/%2d    %2d/%2d     %2d/%2d\n", strict_parse, n, tol_parse, n, rep_parse, n);
+    printf("  verified    :       %2d/%2d    %2d/%2d     %2d/%2d\n", strict_verify, n, tol_verify, n, rep_verify, n);
+    printf("  fidelity    :       %2d/%2d    %2d/%2d     %2d/%2d\n", strict_fidelity, n, tol_fidelity, n, rep_fidelity, n);
     printf("\n");
     if (n > 0) {
-        printf("  verify pct  :       %3.0f%%     %3.0f%%   (delta %+.0fpp)\n",
-               100.0 * strict_verify / n, 100.0 * tol_verify / n,
-               100.0 * (tol_verify - strict_verify) / n);
-        printf("  fidelity pct:       %3.0f%%     %3.0f%%   (delta %+.0fpp)\n",
-               100.0 * strict_fidelity / n, 100.0 * tol_fidelity / n,
-               100.0 * (tol_fidelity - strict_fidelity) / n);
+        printf("  verify pct  :       %3.0f%%      %3.0f%%      %3.0f%%   (repair delta vs strict %+.0fpp)\n",
+               100.0 * strict_verify / n, 100.0 * tol_verify / n, 100.0 * rep_verify / n,
+               100.0 * (rep_verify - strict_verify) / n);
+        printf("  fidelity pct:       %3.0f%%      %3.0f%%      %3.0f%%   (repair delta vs strict %+.0fpp)\n",
+               100.0 * strict_fidelity / n, 100.0 * tol_fidelity / n, 100.0 * rep_fidelity / n,
+               100.0 * (rep_fidelity - strict_fidelity) / n);
     }
     return 0;
 }
