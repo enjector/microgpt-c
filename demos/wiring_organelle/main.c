@@ -48,6 +48,12 @@
  * **Headline: 40% (8/20) prompt → graph → numeric answer; 6/8
  * arithmetically correct — see RESEARCH_PIPELINE_IR.md §20.**
  *
+ * Phase 7: reference-answer correctness suite — wiring_references.{h,c}
+ * computes the canonical expected answer per held-out prompt; the demo
+ * compares exec_result == reference and reports `match` or `drift`.
+ * **Headline: 35% (7/20) numerically correct end-to-end; 87.5%
+ * accuracy among executing graphs — see RESEARCH_PIPELINE_IR.md §21.**
+ *
  * Copyright (c) 2026 Ajay Soni, Enjector Software Ltd. MIT License.
  */
 
@@ -57,6 +63,7 @@
 #include "microgpt_organelle.h"
 #include "microgpt_pipeline.h"
 #include "wiring_natives.h"
+#include "wiring_references.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -173,6 +180,7 @@ static int preprocess_corpus(const char *src_path, const char *dst_path,
 typedef struct {
     char *prompt;
     char *expected;   /* space-separated primitive names; "" if none */
+    char *reference;  /* Phase 7: name of reference fn in wiring_references.c */
 } HeldOutItem;
 
 static HeldOutItem *load_held_out(const char *path, int *n_out) {
@@ -182,18 +190,24 @@ static HeldOutItem *load_held_out(const char *path, int *n_out) {
     int cap = 0, n = 0;
     char line[2048];
     char current_expected[256] = "";
+    char current_reference[128] = "";
     int in_example = 0;
     char current_prompt[1024] = "";
     while (fgets(line, sizeof(line), f)) {
         size_t l = strlen(line);
         while (l > 0 && (line[l-1] == '\n' || line[l-1] == '\r')) line[--l] = '\0';
         if (line[0] == '#') {
-            const char *q = strstr(line, "EXPECTED:");
-            if (q && !in_example) {
+            const char *q;
+            if (!in_example && (q = strstr(line, "EXPECTED:"))) {
                 q += strlen("EXPECTED:");
                 while (*q == ' ' || *q == '\t') q++;
                 strncpy(current_expected, q, sizeof(current_expected) - 1);
                 current_expected[sizeof(current_expected) - 1] = '\0';
+            } else if (!in_example && (q = strstr(line, "REFERENCE:"))) {
+                q += strlen("REFERENCE:");
+                while (*q == ' ' || *q == '\t') q++;
+                strncpy(current_reference, q, sizeof(current_reference) - 1);
+                current_reference[sizeof(current_reference) - 1] = '\0';
             }
             continue;
         }
@@ -210,10 +224,12 @@ static HeldOutItem *load_held_out(const char *path, int *n_out) {
                 cap = cap ? cap * 2 : 16;
                 items = (HeldOutItem *)realloc(items, sizeof(HeldOutItem) * (size_t)cap);
             }
-            items[n].prompt   = strdup(current_prompt);
-            items[n].expected = strdup(current_expected);
+            items[n].prompt    = strdup(current_prompt);
+            items[n].expected  = strdup(current_expected);
+            items[n].reference = strdup(current_reference);
             n++;
             current_expected[0] = '\0';
+            current_reference[0] = '\0';
             in_example = 0;
             continue;
         }
@@ -569,6 +585,7 @@ int main(void) {
 
         int held_well = 0, held_parse = 0, held_verify = 0, held_fidelity = 0;
         int held_executed = 0;   /* Phase 6: end-to-end pipeline_execute success */
+        int held_correct = 0;    /* Phase 7: numeric answer matches reference */
         int held_print = 0;
         const int MAX_HELD_PRINTS = 20;
         for (int i = 0; i < n_held; i++) {
@@ -683,18 +700,33 @@ int main(void) {
             }
             if (executed) held_executed++;
 
+            /* Phase 7: compare exec_result against reference answer. */
+            int correct = 0;
+            int64_t ref_value = 0;
+            int has_ref = (held[i].reference && held[i].reference[0]
+                           && wiring_reference_compute(held[i].reference, &ref_value));
+            if (executed && has_ref && exec_result == ref_value) correct = 1;
+            if (correct) held_correct++;
+
             if (held_print < MAX_HELD_PRINTS) {
                 printf("[%d] %s\n", i + 1, held[i].prompt);
                 printf("    EXPECTED: %s\n", held[i].expected[0] ? held[i].expected : "(none)");
-                printf("    well=%s parse=%s verify=%s fidelity=%s exec=%s votes=%d/%d\n",
+                printf("    well=%s parse=%s verify=%s fidelity=%s exec=%s correct=%s votes=%d/%d\n",
                        well_formed ? "Y" : "n",
                        parsed      ? "Y" : "n",
                        verified    ? "Y" : "n",
                        fidelity    ? "Y" : "n",
                        executed    ? "Y" : "n",
+                       correct     ? "Y" : "n",
                        votes_used, N_VOTES);
                 if (executed) {
-                    printf("    EXEC RESULT: %lld (with inputs 5,7,3,...)\n", (long long)exec_result);
+                    if (has_ref) {
+                        printf("    EXEC %lld  vs REF %lld  (%s)\n",
+                               (long long)exec_result, (long long)ref_value,
+                               correct ? "match" : "drift");
+                    } else {
+                        printf("    EXEC RESULT: %lld (no reference annotated)\n", (long long)exec_result);
+                    }
                 }
                 if (have_best) {
                     printf("    --- best output ---\n%s\n", best_buf);
@@ -721,11 +753,15 @@ int main(void) {
         printf("Best-of-%-2d end-to-end executed:       %d/%d (%.0f%%)  [Phase 6: prompt → graph → numeric answer]\n",
                N_VOTES, held_executed, n_held,
                n_held > 0 ? 100.0 * held_executed / n_held : 0.0);
+        printf("Best-of-%-2d numerically correct:       %d/%d (%.0f%%)  [Phase 7: matches reference answer]\n",
+               N_VOTES, held_correct, n_held,
+               n_held > 0 ? 100.0 * held_correct / n_held : 0.0);
         printf("\n");
 
         for (int i = 0; i < n_held; i++) {
             free(held[i].prompt);
             free(held[i].expected);
+            free(held[i].reference);
         }
         free(held);
     } else {

@@ -1829,7 +1829,10 @@ add_demo(
 )
 # Phase 6 — register wiring native primitives (~40 C functions matching
 # w_vm_functions.txt) as the dispatch backend for pipeline_execute().
-target_sources(wiring_organelle_demo PRIVATE demos/wiring_organelle/wiring_natives.c)
+# Phase 7 — reference-answer correctness suite for held-out NL prompts.
+target_sources(wiring_organelle_demo PRIVATE
+  demos/wiring_organelle/wiring_natives.c
+  demos/wiring_organelle/wiring_references.c)
 # Generate the corpus next to the binary as a POST_BUILD step.
 add_custom_command(TARGET wiring_organelle_demo POST_BUILD
   COMMAND pipeline_corpus_gen

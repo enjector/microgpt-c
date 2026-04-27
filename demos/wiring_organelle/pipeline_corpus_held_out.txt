@@ -6,83 +6,107 @@
 # Format: '# EXPECTED: <primitives>' annotation lines are skipped by
 # the preprocessor (lines starting with '#'). The '// prompt' line
 # becomes the eval prompt; each example terminates with '---'.
+#
+# Phase 7: '# REFERENCE: <name>' annotation names a C function in
+# wiring_references.c that computes the canonical expected output
+# given the demo's fixed test input sequence.
 
 # EXPECTED: bmi clamp
+# REFERENCE: bmi_clamped
 // compute the body mass index from weight and height and limit it inside lo and hi bounds
 ---
 
 # EXPECTED: compound subtract
+# REFERENCE: compound_interest
 // interest gained on an investment when principal compounds at rate r over n years
 ---
 
 # EXPECTED: multiply add percentage
+# REFERENCE: weighted_three
 // weighted combination of three measurements each scaled by its own weight
 ---
 
 # EXPECTED: sigmoid clamp
+# REFERENCE: clamped_sigmoid
 // limit the output of a sigmoid neuron to a low high range
 ---
 
 # EXPECTED: gcd multiply
+# REFERENCE: gcd_scaled
 // greatest common divisor of two numbers scaled by a coefficient k
 ---
 
 # EXPECTED: apply_tax
+# REFERENCE: apply_tax
 // take home pay from gross income at federal tax rate
 ---
 
 # EXPECTED: fibonacci factorial multiply
+# REFERENCE: fib_fact_mul
 // fibonacci of n multiplied by factorial of n
 ---
 
 # EXPECTED: multiply tax_amount add
+# REFERENCE: invoice_total
 // invoice total of price times quantity plus tax due at rate
 ---
 
 # EXPECTED: average_two clamp
+# REFERENCE: clamped_average
 // average of a and b bounded between minimum and maximum
 ---
 
 # EXPECTED: subtract abs_val
+# REFERENCE: abs_diff
 // magnitude of difference between two forecasts
 ---
 
 # EXPECTED: relu multiply
+# REFERENCE: scaled_relu
 // rectified output of x scaled by a gain factor
 ---
 
 # EXPECTED: discount tax_amount
+# REFERENCE: discounted_tax
 // tax due on a price after a discount has been applied
 ---
 
 # EXPECTED: subtract percentage
+# REFERENCE: savings_rate
 // fraction of income saved after subtracting expenses
 ---
 
 # EXPECTED: distance_1d add square
+# REFERENCE: distance_metrics
 // total of distances across two coordinate axes squared
 ---
 
 # EXPECTED: distance_1d midpoint add
+# REFERENCE: distance_midpoint
 // distance between two readings combined with their midpoint
 ---
 
 # EXPECTED: future_value present_value
+# REFERENCE: pv_of_fv
 // future cashflow discounted back to its present worth
 ---
 
 # EXPECTED: fibonacci factorial add
+# REFERENCE: fib_fact_add
 // fibonacci of n combined with factorial of n by adding
 ---
 
 # EXPECTED: tax_amount subtract
+# REFERENCE: gross_minus_tax
 // gross income reduced by tax liability
 ---
 
 # EXPECTED: compound subtract
+# REFERENCE: compound_minus_p
 // final balance after compound growth minus the original principal
 ---
 
 # EXPECTED: sigmoid clamp
+# REFERENCE: sigmoid_clamped
 // sigmoid of x normalised by clamping into a bounded range
 ---
