@@ -34,7 +34,7 @@ option(ENABLE_ROTORQUANT       "Enable RotorQuant for memory compression (MSA)" 
 #  Core library  (single OBJECT library shared by all targets)
 # ==================================================================
 
-add_library(microgpt_lib STATIC src/microgpt.c src/microgpt_organelle.c src/microgpt_msa.c src/microgpt_turboquant.c src/microgpt_rotorquant.c)
+add_library(microgpt_lib STATIC src/microgpt.c src/microgpt_organelle.c src/microgpt_msa.c src/microgpt_turboquant.c src/microgpt_rotorquant.c src/microgpt_pipeline.c)
 target_include_directories(microgpt_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 # --- Compile-time feature flags ---
@@ -147,7 +147,7 @@ function(_microgpt_lib_for_defines OUT_VAR)
   endif()
 
   # Create a new STATIC library with the same sources + features
-  add_library(${_tgt} STATIC src/microgpt.c src/microgpt_organelle.c src/microgpt_msa.c src/microgpt_turboquant.c src/microgpt_rotorquant.c)
+  add_library(${_tgt} STATIC src/microgpt.c src/microgpt_organelle.c src/microgpt_msa.c src/microgpt_turboquant.c src/microgpt_rotorquant.c src/microgpt_pipeline.c)
   target_include_directories(${_tgt} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
   # Propagate all feature flags from the base target
@@ -1777,6 +1777,15 @@ if(NOT MSVC)
   target_link_libraries(test_microgpt_msa PRIVATE m)
 endif()
 add_test(NAME microgpt_msa_tests COMMAND test_microgpt_msa WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+# Graph Pipeline IR — Phase 1 (RESEARCH_PIPELINE_IR.md).
+add_executable(test_microgpt_pipeline tests/test_microgpt_pipeline.c)
+target_link_libraries(test_microgpt_pipeline PRIVATE microgpt_lib)
+target_include_directories(test_microgpt_pipeline PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests ${CMAKE_CURRENT_SOURCE_DIR}/src)
+if(NOT MSVC)
+  target_link_libraries(test_microgpt_pipeline PRIVATE m)
+endif()
+add_test(NAME microgpt_pipeline_tests COMMAND test_microgpt_pipeline WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
 add_executable(test_microgpt_turboquant tests/test_microgpt_turboquant.c)
 target_link_libraries(test_microgpt_turboquant PRIVATE microgpt_lib)
