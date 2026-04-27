@@ -202,6 +202,7 @@ void msa_expand_context(const MsaPool *pool, int chunk_idx, scalar_t **active_ke
 typedef struct {
     scalar_t *keys;     /* shape: [capacity, n_layer, n_embd] */
     scalar_t *values;   /* shape: [capacity, n_layer, n_embd] */
+    size_t *positions;  /* shape: [capacity] absolute pos_id at push time */
     size_t capacity;    /* n_win = max number of recency tokens retained */
     size_t length;      /* current number of valid entries (<= capacity) */
     size_t head;        /* ring head: index of OLDEST entry when full */
@@ -218,19 +219,39 @@ void msa_recency_free(MsaRecency *rec);
 /* Reset to empty (does not free memory). */
 void msa_recency_reset(MsaRecency *rec);
 
-/* Push one token's K/V across all layers into the ring buffer.
+/* Push one token's K/V across all layers into the ring buffer along with
+ * its absolute pos_id (the position used when RoPE-rotating its K).
  * If full, the oldest entry is evicted. */
 void msa_recency_push(MsaRecency *rec,
                       scalar_t **token_keys,
-                      scalar_t **token_values);
+                      scalar_t **token_values,
+                      size_t pos);
 
 /* Copy the entire recency window into active_keys/active_values at positions
  * [start_pos, start_pos + length). Tokens are written in chronological order
  * (oldest → newest) so the model sees a properly-ordered local context.
- * Returns the number of positions written. */
+ * Returns the number of positions written.
+ *
+ * No rotation compensation. Use msa_recency_inject_rope() when MICROGPT_PARTIAL_ROPE
+ * is enabled and the cached K vectors carry stale rotation angles. */
 size_t msa_recency_inject(const MsaRecency *rec,
                           scalar_t **active_keys,
                           scalar_t **active_values,
                           size_t start_pos);
+
+/* RoPE-aware injection: same as msa_recency_inject(), but for each cached
+ * K vector at original position p_orig that gets re-injected at new slot
+ * start_pos+i, rotates the K's last ROPE_DIMS dimensions by the angle
+ * difference (start_pos+i − p_orig) per head. This makes each re-injected
+ * K's rotation angle consistent with its new physical slot, restoring
+ * relative-position attention semantics across MSA chunking events.
+ *
+ * Requires MICROGPT_PARTIAL_ROPE to be #define'd in the build. n_head is
+ * needed because RoPE rotates per-head. Returns positions written. */
+size_t msa_recency_inject_rope(const MsaRecency *rec,
+                               scalar_t **active_keys,
+                               scalar_t **active_values,
+                               size_t start_pos,
+                               int n_head);
 
 #endif /* MICROGPT_MSA_H */

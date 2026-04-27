@@ -646,6 +646,36 @@ add_demo(
           MICROGPT_PARTIAL_ROPE=1
 )
 
+# ==================================================================
+#  Sliding-window MSA with RoPE re-rotation on injection
+#  Unblock-fix experiment from RESEARCH_DEEPSEEK_V4_PARTIAL_ROPE.md §6.4.
+#  See docs/research/RESEARCH_DEEPSEEK_V4_MSA_ROPE_REROTATE.md
+# ==================================================================
+# Same target, same flags, same MSA_WIN — but the bench now calls
+# msa_recency_inject_rope() which re-rotates each cached K by the
+# delta (new_pos − orig_pos) to restore relative-position semantics.
+# This target shares its compile config with bench_rope_msa_sliding_on
+# above; the change is *purely in the .c file* (already merged via
+# the Edit above), so we add a separately-named copy here just so the
+# binary is independently identifiable in the test results, and so a
+# build with the prior bench_rope_msa_sliding_on still measures the
+# pre-fix behaviour for direct comparison.
+#
+# (Note: because the Edit makes the new behaviour the default when
+# both MICROGPT_PARTIAL_ROPE and BENCH_MSA_SLIDING_WINDOW are on, the
+# existing bench_rope_msa_sliding_on target now ALSO uses the rope-
+# aware injection. That binary's binary-name is preserved but its
+# semantics have changed.)
+add_demo(
+  NAME    bench_rope_msa_sliding_rerotate
+  SOURCE  tests/bench_microgpt_msa_sliding.c
+  COPY    demos/character-level/names/c_names.txt
+  DEFINES N_EMBD=64 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=64 MLP_DIM=128
+          BENCH_NUM_STEPS=1500 BENCH_BATCH_SIZE=16 BENCH_LONG_SEQ_LEN=2048
+          BENCH_MSA_SLIDING_WINDOW=1 MSA_WIN=32
+          MICROGPT_PARTIAL_ROPE=1
+)
+
 # Full unit-test suite with PARTIAL_ROPE=1 to validate the RoPE backward.
 add_executable(test_microgpt_rope tests/test_microgpt.c)
 target_compile_definitions(test_microgpt_rope PRIVATE MICROGPT_PARTIAL_ROPE=1)

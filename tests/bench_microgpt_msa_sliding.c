@@ -184,8 +184,16 @@ static int msa_step_sliding(MsaPool *pool, MsaRecency *rec,
   }
   for (int L = 0; L < cfg->n_layer; L++) free(q[L]);
   free(q);
-  /* 2) Lay down the entire recency window starting at inject_pos. */
-  size_t injected = msa_recency_inject(rec, inf_keys, inf_values, inject_pos);
+  /* 2) Lay down the entire recency window starting at inject_pos.
+   *    With RoPE on, use the rope-aware injection that re-rotates each
+   *    cached K by (new_pos − orig_pos). Without RoPE, plain inject. */
+  size_t injected;
+#ifdef MICROGPT_PARTIAL_ROPE
+  injected = msa_recency_inject_rope(rec, inf_keys, inf_values,
+                                     inject_pos, cfg->n_head);
+#else
+  injected = msa_recency_inject(rec, inf_keys, inf_values, inject_pos);
+#endif
   size_t total = inject_pos + injected;
   for (int L = 0; L < cfg->n_layer; L++) inf_cache_len[L] = total;
   *pos = total;
@@ -340,7 +348,7 @@ int main(void) {
         tk[L] = keys[L]   + slot * (size_t)cfg.n_embd;
         tv[L] = values[L] + slot * (size_t)cfg.n_embd;
       }
-      msa_recency_push(rec, tk, tv);
+      msa_recency_push(rec, tk, tv, pos);
       free(tk); free(tv);
     }
 #endif

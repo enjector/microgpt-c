@@ -386,9 +386,10 @@ MsaRecency *msa_recency_create(size_t capacity, int n_layer, int n_embd) {
     rec->n_embd = n_embd;
     rec->length = 0;
     rec->head = 0;
-    rec->keys   = (scalar_t *)calloc(capacity * (size_t)n_layer * (size_t)n_embd, sizeof(scalar_t));
-    rec->values = (scalar_t *)calloc(capacity * (size_t)n_layer * (size_t)n_embd, sizeof(scalar_t));
-    if (!rec->keys || !rec->values) {
+    rec->keys      = (scalar_t *)calloc(capacity * (size_t)n_layer * (size_t)n_embd, sizeof(scalar_t));
+    rec->values    = (scalar_t *)calloc(capacity * (size_t)n_layer * (size_t)n_embd, sizeof(scalar_t));
+    rec->positions = (size_t *)  calloc(capacity, sizeof(size_t));
+    if (!rec->keys || !rec->values || !rec->positions) {
         msa_recency_free(rec);
         return NULL;
     }
@@ -399,6 +400,7 @@ void msa_recency_free(MsaRecency *rec) {
     if (!rec) return;
     free(rec->keys);
     free(rec->values);
+    free(rec->positions);
     free(rec);
 }
 
@@ -427,18 +429,120 @@ static void _msa_recency_write_slot(MsaRecency *rec, size_t slot,
 
 void msa_recency_push(MsaRecency *rec,
                       scalar_t **token_keys,
-                      scalar_t **token_values) {
+                      scalar_t **token_values,
+                      size_t pos) {
     if (!rec || !token_keys || !token_values) return;
+    size_t slot;
     if (rec->length < rec->capacity) {
         /* Not yet full — append at end of the chronological sequence. */
-        size_t slot = rec->length; /* head still 0 while filling */
-        _msa_recency_write_slot(rec, slot, token_keys, token_values);
+        slot = rec->length; /* head still 0 while filling */
         rec->length++;
     } else {
         /* Full — overwrite oldest entry (at head), advance head. */
-        _msa_recency_write_slot(rec, rec->head, token_keys, token_values);
+        slot = rec->head;
         rec->head = (rec->head + 1) % rec->capacity;
     }
+    _msa_recency_write_slot(rec, slot, token_keys, token_values);
+    rec->positions[slot] = pos;
+}
+
+#ifdef MICROGPT_PARTIAL_ROPE
+/* Local cos/sin tables for re-rotation on injection. Same constants as
+ * microgpt.c (BLOCK_SIZE, ROPE_DIMS, ROPE_BASE) so the angles match
+ * exactly. Lazily populated on first call. */
+static scalar_t g_msa_rope_cos[BLOCK_SIZE][ROPE_DIMS / 2];
+static scalar_t g_msa_rope_sin[BLOCK_SIZE][ROPE_DIMS / 2];
+static int      g_msa_rope_ready = 0;
+
+static void _msa_rope_tables_init(void) {
+    if (g_msa_rope_ready) return;
+    for (int p = 0; p < ROPE_DIMS / 2; p++) {
+        double freq = 1.0 / pow((double)ROPE_BASE,
+                                (double)(2 * p) / (double)ROPE_DIMS);
+        for (int pos = 0; pos < BLOCK_SIZE; pos++) {
+            double theta = (double)pos * freq;
+            g_msa_rope_cos[pos][p] = (scalar_t)cos(theta);
+            g_msa_rope_sin[pos][p] = (scalar_t)sin(theta);
+        }
+    }
+    g_msa_rope_ready = 1;
+}
+
+/* Apply rotation by angle (cos_d, sin_d) to one head-dim slice in place.
+ * Used to compose two rotations: rotate the K stored at p_orig forward
+ * to p_new by applying the difference. We compute cos(delta), sin(delta)
+ * via sum-of-angles identities to avoid precomputing every (p_new − p_orig). */
+static void _msa_rope_rotate_inplace(scalar_t *x, size_t head_dim,
+                                     size_t p_orig, size_t p_new) {
+    if (p_orig >= (size_t)BLOCK_SIZE) p_orig = (size_t)BLOCK_SIZE - 1;
+    if (p_new  >= (size_t)BLOCK_SIZE) p_new  = (size_t)BLOCK_SIZE - 1;
+    size_t r = (head_dim < (size_t)ROPE_DIMS) ? head_dim : (size_t)ROPE_DIMS;
+    size_t base = head_dim - r;
+    /* For each pair p, the cached K was rotated by R(p_orig·θ_p);
+     * we want it rotated by R(p_new·θ_p). Composition:
+     *   R(p_new·θ_p) · R(-p_orig·θ_p) = R((p_new − p_orig)·θ_p)
+     * Using cos/sin tables: cos(Δθ_p) = cos(p_new)cos(p_orig)+sin(p_new)sin(p_orig)
+     *                       sin(Δθ_p) = sin(p_new)cos(p_orig)-cos(p_new)sin(p_orig) */
+    for (size_t p = 0; p < r / 2; p++) {
+        scalar_t c_new = g_msa_rope_cos[p_new][p];
+        scalar_t s_new = g_msa_rope_sin[p_new][p];
+        scalar_t c_old = g_msa_rope_cos[p_orig][p];
+        scalar_t s_old = g_msa_rope_sin[p_orig][p];
+        scalar_t cd = c_new * c_old + s_new * s_old;
+        scalar_t sd = s_new * c_old - c_new * s_old;
+        scalar_t a = x[base + 2 * p];
+        scalar_t b = x[base + 2 * p + 1];
+        x[base + 2 * p]     = a * cd - b * sd;
+        x[base + 2 * p + 1] = a * sd + b * cd;
+    }
+}
+#endif /* MICROGPT_PARTIAL_ROPE */
+
+size_t msa_recency_inject_rope(const MsaRecency *rec,
+                               scalar_t **active_keys,
+                               scalar_t **active_values,
+                               size_t start_pos,
+                               int n_head) {
+#ifndef MICROGPT_PARTIAL_ROPE
+    /* When RoPE isn't enabled in the build, fall back to plain inject —
+     * the cached K vectors carry no rotation, so the delta is irrelevant. */
+    (void)n_head;
+    return msa_recency_inject(rec, active_keys, active_values, start_pos);
+#else
+    if (!rec || rec->length == 0) return 0;
+    if (n_head <= 0) {
+        /* Caller didn't supply head info — fall back to plain inject. */
+        return msa_recency_inject(rec, active_keys, active_values, start_pos);
+    }
+    _msa_rope_tables_init();
+    size_t head_dim = (size_t)(rec->n_embd / n_head);
+    const size_t stride_layer = (size_t)rec->n_embd;
+    const size_t stride_token = (size_t)rec->n_layer * stride_layer;
+
+    size_t start = (rec->length < rec->capacity) ? 0 : rec->head;
+    for (size_t i = 0; i < rec->length; i++) {
+        size_t ring = (start + i) % rec->capacity;
+        size_t p_orig = rec->positions[ring];
+        size_t p_new  = start_pos + i;
+        for (int l = 0; l < rec->n_layer; l++) {
+            const scalar_t *src_k = rec->keys   + ring * stride_token + (size_t)l * stride_layer;
+            const scalar_t *src_v = rec->values + ring * stride_token + (size_t)l * stride_layer;
+            scalar_t *dst_k = active_keys[l]   + p_new * stride_layer;
+            scalar_t *dst_v = active_values[l] + p_new * stride_layer;
+            /* Copy V unchanged — RoPE doesn't touch V. */
+            for (int d = 0; d < rec->n_embd; d++) {
+                dst_k[d] = src_k[d];
+                dst_v[d] = src_v[d];
+            }
+            /* Re-rotate K per head by the delta (p_new − p_orig). */
+            for (int h = 0; h < n_head; h++) {
+                _msa_rope_rotate_inplace(dst_k + (size_t)h * head_dim,
+                                         head_dim, p_orig, p_new);
+            }
+        }
+    }
+    return rec->length;
+#endif
 }
 
 size_t msa_recency_inject(const MsaRecency *rec,
