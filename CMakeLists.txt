@@ -424,6 +424,51 @@ add_demo(
           BENCH_NUM_STEPS=1500 BENCH_BATCH_SIZE=16 BENCH_LONG_SEQ_LEN=2048
 )
 
+# ==================================================================
+#  MSA CSA-style learnable pooling A/B sweep (DeepSeek-V4 §2.3.1 port)
+#  Reuses the same long-context benchmark as the sliding-window paper.
+#  See docs/research/RESEARCH_DEEPSEEK_V4_MSA_CSA_LEARNABLE_POOL.md
+# ==================================================================
+# Mode 0: uniform mean pool (baseline, existing behaviour)
+add_demo(
+  NAME    bench_msa_csa_mean
+  SOURCE  tests/bench_microgpt_msa_sliding.c
+  COPY    demos/character-level/names/c_names.txt
+  DEFINES N_EMBD=64 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=64 MLP_DIM=128
+          BENCH_NUM_STEPS=1500 BENCH_BATCH_SIZE=16 BENCH_LONG_SEQ_LEN=2048
+          MSA_POOL_MODE=0
+)
+
+# Mode 1: linear ramp (newest token weighted ~2× oldest)
+add_demo(
+  NAME    bench_msa_csa_linear
+  SOURCE  tests/bench_microgpt_msa_sliding.c
+  COPY    demos/character-level/names/c_names.txt
+  DEFINES N_EMBD=64 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=64 MLP_DIM=128
+          BENCH_NUM_STEPS=1500 BENCH_BATCH_SIZE=16 BENCH_LONG_SEQ_LEN=2048
+          MSA_POOL_MODE=1
+)
+
+# Mode 2: exponential recency (last few tokens dominate the pool)
+add_demo(
+  NAME    bench_msa_csa_exp
+  SOURCE  tests/bench_microgpt_msa_sliding.c
+  COPY    demos/character-level/names/c_names.txt
+  DEFINES N_EMBD=64 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=64 MLP_DIM=128
+          BENCH_NUM_STEPS=1500 BENCH_BATCH_SIZE=16 BENCH_LONG_SEQ_LEN=2048
+          MSA_POOL_MODE=2
+)
+
+# Mode 3: content-aware (softmax of cosine-to-anchor)
+add_demo(
+  NAME    bench_msa_csa_content
+  SOURCE  tests/bench_microgpt_msa_sliding.c
+  COPY    demos/character-level/names/c_names.txt
+  DEFINES N_EMBD=64 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=64 MLP_DIM=128
+          BENCH_NUM_STEPS=1500 BENCH_BATCH_SIZE=16 BENCH_LONG_SEQ_LEN=2048
+          MSA_POOL_MODE=3
+)
+
 add_demo(
   NAME    bench_msa_sliding_long_on
   SOURCE  tests/bench_microgpt_msa_sliding.c

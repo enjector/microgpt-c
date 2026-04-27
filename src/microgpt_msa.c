@@ -82,11 +82,84 @@ void msa_pool_free(MsaPool *pool) {
 
 int msa_pool_chunk(MsaPool *pool, scalar_t **active_keys, scalar_t **active_values, size_t chunk_len) {
     if (pool->length >= pool->capacity || chunk_len == 0) return -1;
-    
+
     /* Find offset for the new chunk */
     size_t offset = pool->length * pool->n_layer * pool->n_embd;
-    
-    /* Mean pooling across the chunk window */
+
+    /* ------------------------------------------------------------
+     * Compute pooling weights[chunk_len] once; weights sum to 1.
+     * Selected at compile time via MSA_POOL_MODE. The weighted-sum
+     * is then applied identically across every layer/embedding dim.
+     * Bounded by BLOCK_SIZE (chunk_len <= BLOCK_SIZE always).
+     * ------------------------------------------------------------ */
+    scalar_t weights[BLOCK_SIZE];
+#if MSA_POOL_MODE == 1
+    /* Linear ramp recency: oldest token weight 1.0, newest 2.0,
+     * normalised so weights sum to 1. */
+    {
+        scalar_t w_sum = 0;
+        for (size_t t = 0; t < chunk_len; t++) {
+            weights[t] = 1.0f
+                + (chunk_len > 1 ? (scalar_t)t / (scalar_t)(chunk_len - 1)
+                                 : 0.0f);
+            w_sum += weights[t];
+        }
+        for (size_t t = 0; t < chunk_len; t++) weights[t] /= w_sum;
+    }
+#elif MSA_POOL_MODE == 2
+    /* Exponential recency: weight[t] ∝ exp(t/tau), tau = chunk_len/4.
+     * Last few tokens dominate the pool. */
+    {
+        scalar_t tau = (scalar_t)chunk_len / 4.0f;
+        if (tau < 1.0f) tau = 1.0f;
+        scalar_t max_logit = (scalar_t)(chunk_len > 0 ? chunk_len - 1 : 0) / tau;
+        scalar_t w_sum = 0;
+        for (size_t t = 0; t < chunk_len; t++) {
+            weights[t] = (scalar_t)exp((double)((scalar_t)t / tau - max_logit));
+            w_sum += weights[t];
+        }
+        for (size_t t = 0; t < chunk_len; t++) weights[t] /= w_sum;
+    }
+#elif MSA_POOL_MODE == 3
+    /* Content-aware via softmax of cosine-to-anchor. Anchor = K of the
+     * most-recent token at the LAST layer (most semantically rich, per
+     * msa_route_top_1 convention). Score = K[t] · K_last / sqrt(n_embd).
+     * Weights = softmax(scores), so an empty/zero anchor degenerates to
+     * uniform pooling. */
+    {
+        int last_layer = pool->n_layer - 1;
+        if (last_layer < 0) last_layer = 0;
+        scalar_t scale = 1.0f / (scalar_t)sqrt((double)(pool->n_embd > 0
+                                                        ? pool->n_embd : 1));
+        const scalar_t *anchor =
+            active_keys[last_layer] + (chunk_len - 1) * (size_t)pool->n_embd;
+        scalar_t scores[BLOCK_SIZE];
+        for (size_t t = 0; t < chunk_len; t++) {
+            const scalar_t *K_t =
+                active_keys[last_layer] + t * (size_t)pool->n_embd;
+            scalar_t dot = 0;
+            for (int d = 0; d < pool->n_embd; d++) dot += K_t[d] * anchor[d];
+            scores[t] = dot * scale;
+        }
+        scalar_t max_s = scores[0];
+        for (size_t t = 1; t < chunk_len; t++)
+            if (scores[t] > max_s) max_s = scores[t];
+        scalar_t z_sum = 0;
+        for (size_t t = 0; t < chunk_len; t++) {
+            weights[t] = (scalar_t)exp((double)(scores[t] - max_s));
+            z_sum += weights[t];
+        }
+        for (size_t t = 0; t < chunk_len; t++) weights[t] /= z_sum;
+    }
+#else
+    /* Default: uniform mean pool (existing behaviour). */
+    {
+        scalar_t w = 1.0f / (scalar_t)chunk_len;
+        for (size_t t = 0; t < chunk_len; t++) weights[t] = w;
+    }
+#endif
+
+    /* Weighted pooling across the chunk window */
     for (int l = 0; l < pool->n_layer; l++) {
 #ifdef ENABLE_TURBOQUANT
         float *chunk_mean_k = pool->n_embd > 0 ? (float*)malloc(pool->n_embd * sizeof(float)) : NULL;
@@ -98,14 +171,15 @@ int msa_pool_chunk(MsaPool *pool, scalar_t **active_keys, scalar_t **active_valu
         for (int d = 0; d < pool->n_embd; d++) {
             scalar_t sum_k = 0.0f;
             scalar_t sum_v = 0.0f;
-            
+
             for (size_t t = 0; t < chunk_len; t++) {
-                sum_k += active_keys[l][t * pool->n_embd + d];
-                sum_v += active_values[l][t * pool->n_embd + d];
+                sum_k += weights[t] * active_keys[l][t * pool->n_embd + d];
+                sum_v += weights[t] * active_values[l][t * pool->n_embd + d];
             }
-            
-            scalar_t tk = sum_k / (scalar_t)chunk_len;
-            scalar_t tv = sum_v / (scalar_t)chunk_len;
+
+            /* Weights sum to 1 — no /chunk_len needed. */
+            scalar_t tk = sum_k;
+            scalar_t tv = sum_v;
 #ifdef ENABLE_TURBOQUANT
             if (chunk_mean_k) chunk_mean_k[d] = (float)tk;
             if (chunk_mean_v) chunk_mean_v[d] = (float)tv;

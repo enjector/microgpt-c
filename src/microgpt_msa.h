@@ -86,6 +86,42 @@ int msa_route_top_1(const MsaPool *pool, scalar_t **query_keys);
 void msa_expand_context(const MsaPool *pool, int chunk_idx, scalar_t **active_keys, scalar_t **active_values, size_t pos);
 
 /* ============================================================
+ *  CSA-style Learnable Pooling (DeepSeek-V4 §2.3.1 port)
+ * ============================================================
+ *
+ * Replaces the existing uniform mean pool in msa_pool_chunk with
+ * weighted pooling of the form:
+ *
+ *   chunk_K[d] = sum_t  w[t] * active_K[t][d]
+ *   chunk_V[d] = sum_t  w[t] * active_V[t][d]
+ *   sum_t w[t] = 1
+ *
+ * V4's CSA (eqs. 9-12) computes w[t] via softmax of a learned
+ * content-projection plus learned positional bias. We provide three
+ * fixed-form alternatives that capture the same priors *without*
+ * adding trainable parameters or backprop through the pool, so the
+ * port can be measured against mean pool on identical training:
+ *
+ *   MSA_POOL_MODE = 0  (default) Uniform mean   — w[t] = 1/chunk_len
+ *   MSA_POOL_MODE = 1  Linear ramp recency       — w[t] ∝ 1 + t/(L-1)
+ *   MSA_POOL_MODE = 2  Exponential recency       — w[t] ∝ exp(t/tau)
+ *   MSA_POOL_MODE = 3  Content-aware (softmax    — w[t] = softmax_t(
+ *                      of cosine-to-anchor)        K[t]·K_last/√n_embd)
+ *
+ * Why fixed-form rather than learnable: MSA pooling happens *outside*
+ * the model's training graph in MicroGPT-C — it's an inference-time
+ * compression operation. Making it truly learnable requires
+ * integrating MSA into the forward/backward training loop, which is a
+ * much larger refactor. Fixed-form lets us measure whether *any*
+ * non-uniform weighting helps before committing to that refactor.
+ *
+ * See RESEARCH_DEEPSEEK_V4_MSA_CSA_LEARNABLE_POOL.md for measurements.
+ */
+#ifndef MSA_POOL_MODE
+#define MSA_POOL_MODE 0
+#endif
+
+/* ============================================================
  *  Sliding-Window Recency (DeepSeek-V4 §2.3.3 port)
  * ============================================================
  *
