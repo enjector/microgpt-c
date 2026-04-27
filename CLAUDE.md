@@ -24,6 +24,13 @@ Binaries land in `build/` on Linux/macOS, `build/Release/` on Windows. Each demo
 - `MICROGPT_BLAS=ON` — Apple Accelerate / OpenBLAS / MKL. Single-threaded only (Accelerate's internal threading conflicts with our pthread training).
 - `MICROGPT_METAL=ON` — Apple Metal GPU. Worth it only for `N_EMBD ≥ 512`; for small models, dispatch overhead exceeds compute.
 - `MICROGPT_PAGED_KV=ON`, `MICROGPT_HEAD_PARALLEL=ON`, `MICROGPT_ATTN_RES=ON`, `QUANTIZATION_INT8=ON`, `ENABLE_TURBOQUANT=ON`, `ENABLE_ROTORQUANT=ON` — opt-in features.
+- **DeepSeek-V4 port stack** (default OFF, all four orthogonal):
+  - `MICROGPT_PARTIAL_ROPE=ON` — rotates last `ROPE_DIMS` (default `min(head_dim, 32)`) of every per-head Q/K. Adds a closed-form rotation backward (no new params). Standalone −1.6% PPL on deep configs.
+  - `MICROGPT_ATTN_SINK=ON` — adds `exp(ATTN_SINK_LOGIT)` (default −1.0) to softmax denominator per head. Standalone −3.1% PPL on deep configs.
+  - `MICROGPT_QK_NORM=ON` — per-head RMSNorm of Q/K before dot product. Real value is high-LR stability; super-additive with sink.
+  - `MSA_POOL_MODE=0..3` — pool weighting: 0 mean (default), 1 linear ramp, 2 exp recency, 3 content-aware (recommended).
+  - **Recommended stack** for any model with `N_LAYER ≥ 2`, `BLOCK_SIZE ≥ 64`: enable all four — combined effect **−8.7% held-out PPL**, 0 new params, ~1% runtime overhead. Tests `test_microgpt_qk_norm` and `test_microgpt_rope` validate the new backward paths under each flag. See `docs/BUILD_OPTIONS.md` § "DeepSeek-V4 Port Stack" and the `RESEARCH_DEEPSEEK_V4_*.md` paper series in `docs/research/` for measurements.
+- **Rope-aware MSA helpers** (when integrating MSA in a demo with `MICROGPT_PARTIAL_ROPE=ON`): replace `msa_pool_chunk` → `msa_pool_chunk_rope`, `msa_expand_context` → `msa_expand_context_rope`, `msa_recency_inject` → `msa_recency_inject_rope`. The rope-aware versions take `start_pos` and `n_head` so they can un-rotate K to position 0 before averaging and re-rotate at injection time. Track an `abs_pos_at_slot0` counter that bumps by `chunk_size` per chunking event. See `msa_infinite_shakespeare_v4` and `bench_microgpt_msa_sliding.c` for worked examples.
 
 ## Tests & benchmarks
 

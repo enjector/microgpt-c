@@ -128,6 +128,7 @@ Key technical contributions shipped in this engine:
 | 📦 **Paged KV Cache** | Memory-efficient attention for constrained deployments | Opt-in via `-DMICROGPT_PAGED_KV=ON` |
 | 🔀 **Block Attention Residuals** | Learned depth-attention replaces additive residuals — preserves prompt signal through deep layers | Opt-in via `-DMICROGPT_ATTN_RES=ON` ([paper](https://github.com/MoonshotAI/Attention-Residuals)) |
 | 🎯 **Negative Control Methodology** | Lottery experiment proves engine learns patterns, not artefacts | Entropy floor at 0.50 (theoretical maximum) |
+| 🧭 **DeepSeek-V4 Port Stack** | Active-attention triumvirate (Partial RoPE + Attention Sink + Q/K RMSNorm) ported from DeepSeek-V4 §2.3.3 onto a CPU-first C99 engine. Rope-aware MSA pool/recency injection makes long-context inference relative-position-correct. All four flags off by default; combined stack opt-in. | **−8.7% held-out PPL** on deep config (4-layer 138K-param), 0 new params, ~1% extra runtime. See [V4 port roadmap](docs/research/RESEARCH_DEEPSEEK_V4_PORTING.md). |
 
 ## Explore Further
 

@@ -289,4 +289,46 @@ All ports must respect MicroGPT-C's design principles:
 
 ---
 
-*This document is a research roadmap, not a commitment. Each port should be re-justified at implementation time against the latest engine state.*
+## 9. Status — Roadmap Closed
+
+This document was originally written as a **scoping roadmap** before any port had been implemented. All six recommended ports have now been measured. The series produced **eight research papers** (six per-port plus two follow-up rotation-fix papers); seven landed positive results, one ([Lightning Indexer](RESEARCH_DEEPSEEK_V4_LIGHTNING_INDEXER_TOPK.md)) ships infrastructure but is not the recommended default.
+
+| # | Port | Status | Best result | Paper |
+|---|---|---|---|---|
+| 1 | Attention sink | ✅ Shipped | **−3.1% PPL** | [RESEARCH_DEEPSEEK_V4_PORTING_ATTENTION_SINK.md](RESEARCH_DEEPSEEK_V4_PORTING_ATTENTION_SINK.md) |
+| 2 | Q/K RMSNorm pre-dot | ✅ Shipped | super-additive with sink, 3.6× recovery from divergence at high LR | [RESEARCH_DEEPSEEK_V4_QK_RMSNORM_PREDOT.md](RESEARCH_DEEPSEEK_V4_QK_RMSNORM_PREDOT.md) |
+| 3 | **Partial RoPE** | ✅ Shipped | **−1.6% solo, capstone of −8.7% full stack** | [RESEARCH_DEEPSEEK_V4_PARTIAL_ROPE.md](RESEARCH_DEEPSEEK_V4_PARTIAL_ROPE.md) |
+| 4 | Sliding-window MSA recency | ✅ Shipped (after rotation fixes) | **−3.0% within RoPE regime** | [RESEARCH_DEEPSEEK_V4_MSA_SLIDING_WINDOW_RECENCY.md](RESEARCH_DEEPSEEK_V4_MSA_SLIDING_WINDOW_RECENCY.md) → [RESEARCH_DEEPSEEK_V4_MSA_ROPE_REROTATE.md](RESEARCH_DEEPSEEK_V4_MSA_ROPE_REROTATE.md) → [RESEARCH_DEEPSEEK_V4_MSA_POOL_ROPE_REROTATE.md](RESEARCH_DEEPSEEK_V4_MSA_POOL_ROPE_REROTATE.md) |
+| 5 | CSA-style pool (`MSA_POOL_MODE=3`) | ✅ Shipped | −0.32% PPL | [RESEARCH_DEEPSEEK_V4_MSA_CSA_LEARNABLE_POOL.md](RESEARCH_DEEPSEEK_V4_MSA_CSA_LEARNABLE_POOL.md) |
+| 6 | Lightning Indexer + top-K | ✅ Infrastructure shipped, not recommended default | −0.32% at K=8, doesn't compose with #5 | [RESEARCH_DEEPSEEK_V4_LIGHTNING_INDEXER_TOPK.md](RESEARCH_DEEPSEEK_V4_LIGHTNING_INDEXER_TOPK.md) |
+
+### Recommended default V4 stack
+
+```cmake
+MICROGPT_PARTIAL_ROPE=1
+MICROGPT_ATTN_SINK=1   ATTN_SINK_LOGIT=-1.0
+MICROGPT_QK_NORM=1
+MSA_POOL_MODE=3
+```
+
+Combined: **−8.7% held-out PPL on the deep config (4-layer 138K-param char model)**, zero new parameters, ~1% extra training runtime, all 61 core unit tests pass under each flag combination tested. Demos that integrate MSA directly should additionally use the rope-aware wrappers (`msa_pool_chunk_rope`, `msa_expand_context_rope`, `msa_recency_inject_rope`) — see `msa_infinite_shakespeare_v4` for a worked example.
+
+### Answering the open questions from §7
+
+1. **Does Lightning Indexer recover information that LRU MSA loses?** Partially. Top-K=8 captures −0.32% PPL improvement. Smaller K (1, 2, 4) is within noise or slightly regresses. Not the recommended default; see paper #6.
+2. **Does Q/K RMSNorm let us safely remove gradient clipping?** Inferable: Q/K RMSNorm at LR=0.02 (20× normal) keeps the model bounded where the un-normed baseline diverges. We didn't formally remove `GRAD_CLIP=1.0` from existing demos as part of this work, but the safety margin is now measured.
+3. **Does partial RoPE let us shrink `wpe` to zero?** Untested — we deliberately kept both for backward compatibility. Future work.
+4. **Is CSA pooling worth the parameters at our scale?** No — fixed-form pooling (the parameter-free port we shipped) caps at −0.32% PPL. The learnable variant V4 uses likely doesn't unlock more at our scale; backprop-through-pool refactor is not justified by the upside. See paper #5.
+5. **Attention sink + partial RoPE interaction.** Compose super-additively: sink alone −3.1%, RoPE alone −1.6%, combined −3.8%. The full stack with Q/K RMSNorm reaches −8.7%. See paper #3 §5.3.
+
+### What's still open
+
+- Removing `wpe` cleanly under RoPE (item 3 above) — checkpoint-format-breaking, deferred.
+- Closing the residual ~+5.5% cross-regime gap in MSA-with-RoPE evaluation. Three named items in [RESEARCH_DEEPSEEK_V4_MSA_POOL_ROPE_REROTATE.md](RESEARCH_DEEPSEEK_V4_MSA_POOL_ROPE_REROTATE.md) §5.5: routing-query rotation alignment, Q-rotation continuity at injected slots, and RoPE-from-scratch retraining.
+- High-LR stability ablations across the full stack (V4 cites Muon optimiser as a partner; we used AdamW).
+
+The series is otherwise complete.
+
+---
+
+*This document was a research roadmap, not a commitment. The roadmap is now closed: each port was re-justified at implementation time, measured, documented, and shipped (or explicitly not shipped, with reasoning). See the eight per-port papers for full results.*

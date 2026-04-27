@@ -56,6 +56,81 @@ cmake -DMICROGPT_USE_FLOAT=ON ..
 
 ---
 
+## DeepSeek-V4 Port Stack
+
+Four flags port architectural ideas from DeepSeek-V4 §2.3 onto MicroGPT-C's CPU-first engine. Each is independently opt-in; they compose. Default OFF — the engine is bit-identical to its pre-port behaviour without any flag set. Combined, they deliver −8.7% held-out PPL on the deep config (4-layer 138K-param) at zero parameter cost. Full measurements in `docs/research/RESEARCH_DEEPSEEK_V4_PORTING.md` and the per-port papers it indexes.
+
+### Attention Sink (`MICROGPT_ATTN_SINK`)
+
+Adds `exp(ATTN_SINK_LOGIT)` to the softmax denominator in every attention head, so heads can route mass to "attend to nothing":
+
+```bash
+cmake -DMICROGPT_ATTN_SINK=ON ..
+cmake -DMICROGPT_ATTN_SINK=ON -DATTN_SINK_LOGIT=-1.0 ..   # explicit magnitude (default)
+```
+
+> **Standalone effect:** −3.1% PPL on deep configs. No effect on 1-layer toys. See `RESEARCH_DEEPSEEK_V4_PORTING_ATTENTION_SINK.md`.
+
+### Q/K RMSNorm Pre-Dot (`MICROGPT_QK_NORM`)
+
+Per-head RMSNorm on Q and K immediately before the attention dot product, with a closed-form gradient through the norm:
+
+```bash
+cmake -DMICROGPT_QK_NORM=ON ..
+```
+
+> **Standalone effect:** mild regression (+1.4%) at safe LR — its real value is **stability under aggressive LR**. At LR=0.02 the un-normed baseline diverges to PPL 731; with the flag, PPL stays at 205 (3.6× recovery). Composes super-additively with attention sink. See `RESEARCH_DEEPSEEK_V4_QK_RMSNORM_PREDOT.md`.
+
+### Partial RoPE (`MICROGPT_PARTIAL_ROPE`)
+
+Rotates the last `ROPE_DIMS` of every per-head Q and K by a position-dependent angle, restoring relative-position attention:
+
+```bash
+cmake -DMICROGPT_PARTIAL_ROPE=ON ..
+cmake -DMICROGPT_PARTIAL_ROPE=ON -DROPE_DIMS=16 ..        # rotate fewer dims
+cmake -DMICROGPT_PARTIAL_ROPE=ON -DROPE_BASE=10000.0 ..   # default base
+```
+
+| Macro | Default | Description |
+|---|---|---|
+| `ROPE_DIMS` | `min(head_dim, 32)` | Number of trailing dims rotated per head |
+| `ROPE_BASE` | `10000.0` | Standard RoPE frequency base |
+
+> **Standalone effect:** −1.6% PPL on deep configs, −0.7% even on Tiny — the only V4 port that registers at 1-layer scale. The closed-form rotation backward (rotate by −θ) reuses the same cos/sin tables as the forward, no new parameters, no Adam state. See `RESEARCH_DEEPSEEK_V4_PARTIAL_ROPE.md`.
+
+### MSA Pool Weighting (`MSA_POOL_MODE`)
+
+Selects how `msa_pool_chunk` weights the tokens it averages into a chunk summary:
+
+| Value | Mode | Notes |
+|---|---|---|
+| `0` (default) | Uniform mean | Existing pre-port behaviour |
+| `1` | Linear ramp recency | Newest token weighted ~2× oldest |
+| `2` | Exponential recency | Last few tokens dominate |
+| `3` | **Content-aware** (softmax of cosine-to-anchor) | **Recommended** |
+
+```bash
+cmake -DMSA_POOL_MODE=3 ..   # recommended
+```
+
+> **Effect:** mode 3 gives −0.32% PPL on long-context MSA evaluation; modes 1 and 2 are within noise of mode 0. See `RESEARCH_DEEPSEEK_V4_MSA_CSA_LEARNABLE_POOL.md`.
+
+### Recommended V4 stack
+
+For any model with `N_LAYER ≥ 2` and `BLOCK_SIZE ≥ 64`, enable the active-attention triumvirate plus content-aware pool:
+
+```bash
+cmake -S . -B build \
+      -DMICROGPT_PARTIAL_ROPE=ON \
+      -DMICROGPT_ATTN_SINK=ON   -DATTN_SINK_LOGIT=-1.0 \
+      -DMICROGPT_QK_NORM=ON \
+      -DMSA_POOL_MODE=3 ..
+```
+
+Combined effect: −8.7% held-out PPL on the deep benchmark, zero new parameters, ~1% extra runtime. For demos that integrate MSA directly, also opt in to the rope-aware injection by replacing `msa_pool_chunk` → `msa_pool_chunk_rope`, `msa_expand_context` → `msa_expand_context_rope`, `msa_recency_inject` → `msa_recency_inject_rope`. See `msa_infinite_shakespeare_v4` in `CMakeLists.txt` for a worked example.
+
+---
+
 ## Custom Architecture
 
 Each demo uses the `DEFINES` parameter in CMakeLists.txt to set its architecture. For ad-hoc overrides:
