@@ -374,6 +374,33 @@ typedef struct {
 #endif
 #endif
 
+/* ---- Q/K RMSNorm pre-dot (opt-in: -DMICROGPT_QK_NORM) ----
+ *
+ * Apply RMSNorm to each head of the query and key vectors immediately
+ * before the Q·K^T dot product. From DeepSeek-V4 §2.3.3
+ * "Query and Key-Value Entry Normalization":
+ *
+ *   q_h_normed = q_h / sqrt(mean(q_h^2) + eps)
+ *   k_h_normed = k_h / sqrt(mean(k_h^2) + eps)
+ *   score = q_h_normed · k_h_normed / sqrt(head_dim)
+ *
+ * V4 motivation: "avoids exploding attention logits and may improve
+ * training stability." Bounds the magnitude of attention scores
+ * regardless of how large Q or K projections drift during training,
+ * removing the need for QK-clip.
+ *
+ * Implementation notes:
+ *   - No learnable scale (V4 uses one; we keep it simple — no extra params).
+ *   - Cache stores post-norm K (so all positions are consistent).
+ *   - Backward: d_q and d_k of current position are converted from
+ *     post-norm to pre-norm via per-head rmsnorm_bwd before lin_bwd.
+ *   - Composes cleanly with MICROGPT_ATTN_SINK (sink in denominator,
+ *     QK norm in dot-product input).
+ *
+ * See RESEARCH_DEEPSEEK_V4_QK_RMSNORM_PREDOT.md for measurements.
+ */
+/* MICROGPT_QK_NORM has no extra magnitude knob — it's on or off. */
+
 /*
  * microgpt_default_config - Return a config populated with sensible defaults.
  *   These match the compile-time constants above.
@@ -483,6 +510,11 @@ static inline void microgpt_print_config(const char *demo_name,
   printf("    AttnSink     = ON (logit=%.3f)\n", (double)ATTN_SINK_LOGIT);
 #else
   printf("    AttnSink     = OFF\n");
+#endif
+#ifdef MICROGPT_QK_NORM
+  printf("    QK RMSNorm   = ON (per-head, pre-dot)\n");
+#else
+  printf("    QK RMSNorm   = OFF\n");
 #endif
   printf("\n");
   printf(

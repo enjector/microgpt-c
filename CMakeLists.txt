@@ -299,6 +299,92 @@ add_demo(
 )
 
 # ==================================================================
+#  Q/K RMSNorm pre-dot A/B benchmark (DeepSeek-V4 §2.3.3 port)
+#  Reuses the same A/B harness as the attention-sink benchmark.
+#  See docs/research/RESEARCH_DEEPSEEK_V4_QK_RMSNORM_PREDOT.md
+# ==================================================================
+
+# Tiny config (negative control)
+add_demo(
+  NAME    bench_qk_norm_baseline
+  SOURCE  tests/bench_microgpt_attn_sink.c
+  COPY    demos/character-level/names/c_names.txt
+  DEFINES BENCH_NUM_STEPS=600 BENCH_BATCH_SIZE=8
+)
+
+add_demo(
+  NAME    bench_qk_norm_on
+  SOURCE  tests/bench_microgpt_attn_sink.c
+  COPY    demos/character-level/names/c_names.txt
+  DEFINES BENCH_NUM_STEPS=600 BENCH_BATCH_SIZE=8
+          MICROGPT_QK_NORM=1
+)
+
+# Deep config (where QK norm should matter most)
+add_demo(
+  NAME    bench_qk_norm_deep_baseline
+  SOURCE  tests/bench_microgpt_attn_sink.c
+  COPY    demos/character-level/names/c_names.txt
+  DEFINES N_EMBD=64 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=64 MLP_DIM=128
+          BENCH_NUM_STEPS=1500 BENCH_BATCH_SIZE=16 BENCH_PROBE_LEN=64
+)
+
+add_demo(
+  NAME    bench_qk_norm_deep_on
+  SOURCE  tests/bench_microgpt_attn_sink.c
+  COPY    demos/character-level/names/c_names.txt
+  DEFINES N_EMBD=64 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=64 MLP_DIM=128
+          BENCH_NUM_STEPS=1500 BENCH_BATCH_SIZE=16 BENCH_PROBE_LEN=64
+          MICROGPT_QK_NORM=1
+)
+
+# Stress: high learning rate to surface attention-logit blow-up — the
+# regime V4 cites as the main motivation. Without QK norm we expect the
+# baseline to either NaN or train to a worse loss; with QK norm it should
+# remain stable.
+add_demo(
+  NAME    bench_qk_norm_stress_baseline
+  SOURCE  tests/bench_microgpt_attn_sink.c
+  COPY    demos/character-level/names/c_names.txt
+  DEFINES N_EMBD=64 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=64 MLP_DIM=128
+          BENCH_NUM_STEPS=800 BENCH_BATCH_SIZE=16 BENCH_PROBE_LEN=64
+          LEARNING_RATE=0.02
+)
+
+add_demo(
+  NAME    bench_qk_norm_stress_on
+  SOURCE  tests/bench_microgpt_attn_sink.c
+  COPY    demos/character-level/names/c_names.txt
+  DEFINES N_EMBD=64 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=64 MLP_DIM=128
+          BENCH_NUM_STEPS=800 BENCH_BATCH_SIZE=16 BENCH_PROBE_LEN=64
+          LEARNING_RATE=0.02
+          MICROGPT_QK_NORM=1
+)
+
+# Combined: QK norm + attention sink. The two should compose cleanly.
+add_demo(
+  NAME    bench_qk_norm_deep_with_sink
+  SOURCE  tests/bench_microgpt_attn_sink.c
+  COPY    demos/character-level/names/c_names.txt
+  DEFINES N_EMBD=64 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=64 MLP_DIM=128
+          BENCH_NUM_STEPS=1500 BENCH_BATCH_SIZE=16 BENCH_PROBE_LEN=64
+          MICROGPT_QK_NORM=1 MICROGPT_ATTN_SINK=1 ATTN_SINK_LOGIT=-1.0
+)
+
+# Run the full unit-test suite with QK_NORM=1 to verify the backward.
+# The gradient_direction_reduces_loss and training_reduces_loss tests
+# in test_microgpt.c are sensitive to a broken Q/K backward.
+add_executable(test_microgpt_qk_norm tests/test_microgpt.c)
+target_compile_definitions(test_microgpt_qk_norm PRIVATE MICROGPT_QK_NORM=1)
+_microgpt_lib_for_defines(_QK_NORM_LIB MICROGPT_QK_NORM=1)
+target_link_libraries(test_microgpt_qk_norm PRIVATE ${_QK_NORM_LIB})
+if(NOT MSVC)
+  target_link_libraries(test_microgpt_qk_norm PRIVATE m)
+endif()
+add_test(NAME microgpt_qk_norm_tests COMMAND test_microgpt_qk_norm
+         WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+# ==================================================================
 #  Foundation: Character-level Shakespeare generation
 # ==================================================================
 

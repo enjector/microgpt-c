@@ -1971,6 +1971,13 @@ scalar_t forward_backward_one(const Model *model, size_t token_id,
   scalar_t sv_attn_w[N_LAYER]
                     [N_HEAD * BLOCK_SIZE]; /* per-head attention weights */
   scalar_t sv_q[N_LAYER][N_EMBD]; /* saved projected queries for backward */
+#ifdef MICROGPT_QK_NORM
+  /* Pre-RMSNorm Q and K of current position; needed by per-head rmsnorm_bwd
+   * to convert d_q (post-norm) and d_k_cur (post-norm) back to pre-norm
+   * gradients before lin_bwd through Wq/Wk. */
+  scalar_t sv_q_pre[N_LAYER][N_EMBD];
+  scalar_t sv_k_pre[N_LAYER][N_EMBD];
+#endif
   size_t sv_T[N_LAYER];           /* T at each layer */
   scalar_t sv_x_attn[N_LAYER][N_EMBD];      /* attention output (pre-Wo) */
   scalar_t sv_x_post_attn[N_LAYER][N_EMBD]; /* after attention residual */
@@ -2068,6 +2075,15 @@ scalar_t forward_backward_one(const Model *model, size_t token_id,
     lin_fwd(x_norm1, model->attn_wq[L], ne, ne, q);
     lin_fwd(x_norm1, model->attn_wk[L], ne, ne, k);
     lin_fwd(x_norm1, model->attn_wv[L], ne, ne, v);
+#endif
+#ifdef MICROGPT_QK_NORM
+    /* Save pre-norm copies for backward, then per-head RMSNorm in place. */
+    memcpy(sv_q_pre[L], q, ne * sizeof(scalar_t));
+    memcpy(sv_k_pre[L], k, ne * sizeof(scalar_t));
+    for (int h = 0; h < nh; h++) {
+      rmsnorm_fwd(sv_q_pre[L] + (size_t)h * hd, hd, q + (size_t)h * hd);
+      rmsnorm_fwd(sv_k_pre[L] + (size_t)h * hd, hd, k + (size_t)h * hd);
+    }
 #endif
     memcpy(sv_q[L], q, ne * sizeof(scalar_t));
     /* Append to cache (caller owns keys[L], values[L]; we write current at
@@ -2464,6 +2480,25 @@ scalar_t forward_backward_one(const Model *model, size_t token_id,
     }
 #endif
 
+#ifdef MICROGPT_QK_NORM
+    /* Convert d_q and d_k_cur from post-norm gradients to pre-norm gradients
+     * via per-head rmsnorm_bwd, using the saved pre-norm Q and K. The V
+     * vector is not normed, so d_v_cur is unchanged. */
+    {
+      scalar_t d_q_pre[N_EMBD], d_k_cur_pre[N_EMBD];
+      memset(d_q_pre, 0, sizeof(d_q_pre));
+      memset(d_k_cur_pre, 0, sizeof(d_k_cur_pre));
+      for (int h = 0; h < nh; h++) {
+        rmsnorm_bwd(sv_q_pre[L] + (size_t)h * hd, d_q + (size_t)h * hd, hd,
+                    d_q_pre + (size_t)h * hd);
+        rmsnorm_bwd(sv_k_pre[L] + (size_t)h * hd, d_k_cur + (size_t)h * hd, hd,
+                    d_k_cur_pre + (size_t)h * hd);
+      }
+      memcpy(d_q, d_q_pre, sizeof(d_q_pre));
+      memcpy(d_k_cur, d_k_cur_pre, sizeof(d_k_cur_pre));
+    }
+#endif
+
     /* Backward through Q = Wq @ x_norm1 */
     scalar_t d_x_norm1[N_EMBD];
     memset(d_x_norm1, 0, sizeof(d_x_norm1));
@@ -2601,6 +2636,18 @@ void forward_inference(const Model *model, size_t token_id, size_t pos_id,
     lin_fwd(x_norm1, model->attn_wq[L], ne, ne, q);
     lin_fwd(x_norm1, model->attn_wk[L], ne, ne, k);
     lin_fwd(x_norm1, model->attn_wv[L], ne, ne, v);
+#endif
+#ifdef MICROGPT_QK_NORM
+    /* Per-head RMSNorm of Q and K before the dot product (V4 §2.3.3). */
+    {
+      scalar_t q_pre_local[N_EMBD], k_pre_local[N_EMBD];
+      memcpy(q_pre_local, q, ne * sizeof(scalar_t));
+      memcpy(k_pre_local, k, ne * sizeof(scalar_t));
+      for (int h = 0; h < nh; h++) {
+        rmsnorm_fwd(q_pre_local + (size_t)h * hd, hd, q + (size_t)h * hd);
+        rmsnorm_fwd(k_pre_local + (size_t)h * hd, hd, k + (size_t)h * hd);
+      }
+    }
 #endif
     memcpy(KV_WRITE(keys, L, cache_len, ne), k, ne * sizeof(scalar_t));
     memcpy(KV_WRITE(values, L, cache_len, ne), v, ne * sizeof(scalar_t));
