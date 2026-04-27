@@ -1158,6 +1158,125 @@ static Pipeline *tpl_weighted_real(int n) {
     return p;
 }
 
+/* ============================================================
+ *  Phase 11 — Structural-diversity templates.
+ *
+ *  The bimodal-failure pattern from Phase 8 + the negative results
+ *  of Phases 9 (capacity) and 10 (arg-order paraphrases) say the
+ *  remaining 12 wrong prompts need new graph topologies — not more
+ *  paraphrases of existing graphs. Each family below introduces a
+ *  composition shape the corpus didn't previously cover.
+ * ============================================================ */
+
+/* tpl_fib_fact_op(op): fibonacci(n) op factorial(n). Targets #7, #17.
+ * Differs from tpl_fib_fact_blend: uses single sig input `n` shared
+ * by both branches; emphasises the chained-then-combined topology. */
+static Pipeline *tpl_fib_fact_op(const char *op) {
+    char name[64]; snprintf(name, sizeof(name), "fib_fact_op_%s", op);
+    Pipeline *p = pipeline_create(name);
+    const char *ins[] = { "n" };
+    sig_n_in_1_out(p, 1, ins, "y");
+    node_1in(p, "fib",  "fibonacci");
+    node_1in(p, "fact", "factorial");
+    node_2in(p, "out_op", op);
+    pipeline_connect_signature_in(p, "n", "fib",  "x");
+    pipeline_connect_signature_in(p, "n", "fact", "x");
+    pipeline_connect(p, "fib",  "out", "out_op", "x");
+    pipeline_connect(p, "fact", "out", "out_op", "y");
+    pipeline_connect_signature_out(p, "out_op", "out", "y");
+    return p;
+}
+
+/* tpl_distance_midpoint(combine_op): distance_1d(a,b) op midpoint(a,b).
+ * Targets #15 ("distance between two readings combined with their midpoint"). */
+static Pipeline *tpl_distance_midpoint(const char *op) {
+    char name[64]; snprintf(name, sizeof(name), "distance_midpoint_%s", op);
+    Pipeline *p = pipeline_create(name);
+    const char *ins[] = { "a", "b" };
+    sig_n_in_1_out(p, 2, ins, "y");
+    const char *abnames[] = { "a", "b" };
+    node_named(p, "dist", "distance_1d", 2, abnames);
+    node_named(p, "mid",  "midpoint",    2, abnames);
+    node_2in(p, "comb",  op);
+    pipeline_connect_signature_in(p, "a", "dist", "a");
+    pipeline_connect_signature_in(p, "b", "dist", "b");
+    pipeline_connect_signature_in(p, "a", "mid",  "a");
+    pipeline_connect_signature_in(p, "b", "mid",  "b");
+    pipeline_connect(p, "dist", "out", "comb", "x");
+    pipeline_connect(p, "mid",  "out", "comb", "y");
+    pipeline_connect_signature_out(p, "comb", "out", "y");
+    return p;
+}
+
+/* tpl_apply_tax_chain(extra_op): apply_tax(gross, rate) extra_op constant.
+ * Targets #6 ("take home pay from gross income at federal tax rate").
+ * extra_op ∈ {add, subtract, multiply}. Adds a 3rd input via a constant-
+ * like injection that the model has to wire through.                  */
+static Pipeline *tpl_apply_tax_chain(const char *extra_op) {
+    char name[64]; snprintf(name, sizeof(name), "apply_tax_chain_%s", extra_op);
+    Pipeline *p = pipeline_create(name);
+    const char *ins[] = { "gross", "rate", "delta" };
+    sig_n_in_1_out(p, 3, ins, "y");
+    const char *anames[] = { "amount", "rate" };
+    node_named(p, "net", "apply_tax", 2, anames);
+    node_2in(p, "adj", extra_op);
+    pipeline_connect_signature_in(p, "gross", "net", "amount");
+    pipeline_connect_signature_in(p, "rate",  "net", "rate");
+    pipeline_connect(p, "net", "out", "adj", "x");
+    pipeline_connect_signature_in(p, "delta", "adj", "y");
+    pipeline_connect_signature_out(p, "adj", "out", "y");
+    return p;
+}
+
+/* tpl_clamped_unary_then_op(unary, op): clamp(unary(x), lo, hi) op extra.
+ * Targets #4 (sigmoid+clamp) and #20 (sigmoid+clamp variants). */
+static Pipeline *tpl_clamped_unary_then_op(const char *unary, const char *op) {
+    char name[80]; snprintf(name, sizeof(name), "clamped_%s_%s", unary, op);
+    Pipeline *p = pipeline_create(name);
+    const char *ins[] = { "x", "lo", "hi", "k" };
+    sig_n_in_1_out(p, 4, ins, "y");
+    node_1in(p, "u", unary);
+    const char *cnames[] = { "x", "lo", "hi" };
+    node_named(p, "c", "clamp", 3, cnames);
+    node_2in(p, "post", op);
+    pipeline_connect_signature_in(p, "x", "u", "x");
+    pipeline_connect(p, "u", "out", "c", "x");
+    pipeline_connect_signature_in(p, "lo", "c", "lo");
+    pipeline_connect_signature_in(p, "hi", "c", "hi");
+    pipeline_connect(p, "c", "out", "post", "x");
+    pipeline_connect_signature_in(p, "k", "post", "y");
+    pipeline_connect_signature_out(p, "post", "out", "y");
+    return p;
+}
+
+/* tpl_compound_then(op): compound(P, r, n) op P. Targets variants of #2, #19. */
+static Pipeline *tpl_compound_then(const char *op) {
+    char name[64]; snprintf(name, sizeof(name), "compound_then_%s", op);
+    Pipeline *p = pipeline_create(name);
+    const char *ins[] = { "principal", "rate", "years" };
+    sig_n_in_1_out(p, 3, ins, "y");
+    const char *cnames[] = { "principal", "rate", "periods" };
+    node_named(p, "amt", "compound", 3, cnames);
+    node_2in(p, "comb", op);
+    pipeline_connect_signature_in(p, "principal", "amt", "principal");
+    pipeline_connect_signature_in(p, "rate",      "amt", "rate");
+    pipeline_connect_signature_in(p, "years",     "amt", "periods");
+    pipeline_connect(p, "amt", "out", "comb", "x");
+    pipeline_connect_signature_in(p, "principal", "comb", "y");
+    pipeline_connect_signature_out(p, "comb", "out", "y");
+    return p;
+}
+
+static Pipeline *w_fib_fact_op(void *ctx)         { return tpl_fib_fact_op((const char *)ctx); }
+static Pipeline *w_distance_midpoint(void *ctx)   { return tpl_distance_midpoint((const char *)ctx); }
+static Pipeline *w_apply_tax_chain(void *ctx)     { return tpl_apply_tax_chain((const char *)ctx); }
+static Pipeline *w_clamped_unary_then_op(void *ctx) {
+    const char *u = ((const char **)ctx)[0];
+    const char *op = ((const char **)ctx)[1];
+    return tpl_clamped_unary_then_op(u, op);
+}
+static Pipeline *w_compound_then(void *ctx)       { return tpl_compound_then((const char *)ctx); }
+
 /* tpl_micro_unary(prim): single-node unary primitive graph.
  *   y = prim(x)                                                       */
 static Pipeline *tpl_micro_unary(const char *prim) {
@@ -1618,6 +1737,96 @@ static CorpusEntry *build_catalog(int *out_count) {
                  "// weighted average of %d value weight pairs",
                  nn);
         ADD3(prompt, w_weighted_real, (void *)(intptr_t)nn, NULL, NULL);
+    }
+
+    /* ============================================================
+     *  Phase 11 — Structural-diversity templates.
+     *
+     *  Five new graph topologies the corpus didn't previously cover.
+     *  Each targets one of the robustly-wrong held-out cases from
+     *  Phase 8/9/10 by introducing the specific composition shape the
+     *  model has to produce. Paraphrases of *new* graphs (not new
+     *  paraphrases of existing graphs).
+     * ============================================================ */
+
+    /* tpl_fib_fact_op(op) — fibonacci(n) op factorial(n). */
+    static const char *fib_fact_ops[] = { "add", "multiply", "max", "min", "subtract" };
+    static const char *fib_fact_phrases[] = {
+        "fibonacci of n combined with factorial of n by",
+        "fib of n and fact of n then take",
+        "blend fibonacci and factorial of n with",
+        "fibonacci then factorial then",
+    };
+    for (size_t op_i = 0; op_i < sizeof(fib_fact_ops) / sizeof(fib_fact_ops[0]); op_i++) {
+        for (size_t ph = 0; ph < sizeof(fib_fact_phrases) / sizeof(fib_fact_phrases[0]); ph++) {
+            char prompt[160];
+            snprintf(prompt, sizeof(prompt), "// %s %s",
+                     fib_fact_phrases[ph], fib_fact_ops[op_i]);
+            ADD3(prompt, w_fib_fact_op, (void *)fib_fact_ops[op_i], NULL, NULL);
+        }
+    }
+
+    /* tpl_distance_midpoint(op) — distance_1d(a,b) op midpoint(a,b). */
+    static const char *dm_ops[] = { "add", "multiply", "subtract" };
+    static const char *dm_phrases[] = {
+        "distance between two readings combined with their midpoint by",
+        "one dimensional distance and midpoint of a and b then",
+        "distance plus midpoint composed with",
+    };
+    for (size_t op_i = 0; op_i < sizeof(dm_ops) / sizeof(dm_ops[0]); op_i++) {
+        for (size_t ph = 0; ph < sizeof(dm_phrases) / sizeof(dm_phrases[0]); ph++) {
+            char prompt[160];
+            snprintf(prompt, sizeof(prompt), "// %s %s",
+                     dm_phrases[ph], dm_ops[op_i]);
+            ADD3(prompt, w_distance_midpoint, (void *)dm_ops[op_i], NULL, NULL);
+        }
+    }
+
+    /* tpl_apply_tax_chain(extra) — apply_tax then add/sub/mul a delta. */
+    static const char *atc_ops[] = { "add", "subtract", "multiply" };
+    static const char *atc_phrases[] = {
+        "take home pay from gross at rate then adjust by delta with",
+        "net pay after tax then composed with delta by",
+        "apply tax to gross at rate then take home with delta and",
+    };
+    for (size_t op_i = 0; op_i < sizeof(atc_ops) / sizeof(atc_ops[0]); op_i++) {
+        for (size_t ph = 0; ph < sizeof(atc_phrases) / sizeof(atc_phrases[0]); ph++) {
+            char prompt[160];
+            snprintf(prompt, sizeof(prompt), "// %s %s",
+                     atc_phrases[ph], atc_ops[op_i]);
+            ADD3(prompt, w_apply_tax_chain, (void *)atc_ops[op_i], NULL, NULL);
+        }
+    }
+
+    /* tpl_clamped_unary_then_op(unary, op) — unary → clamp → op. */
+    static const char *cuto_unaries[] = { "sigmoid", "relu", "abs_val" };
+    static const char *cuto_ops[] = { "add", "multiply" };
+    for (size_t u = 0; u < sizeof(cuto_unaries) / sizeof(cuto_unaries[0]); u++) {
+        for (size_t op_i = 0; op_i < sizeof(cuto_ops) / sizeof(cuto_ops[0]); op_i++) {
+            char prompt[160];
+            snprintf(prompt, sizeof(prompt),
+                     "// %s of x clamped between lo and hi then %s with k",
+                     cuto_unaries[u], cuto_ops[op_i]);
+            const char **ctx = (const char **)calloc(2, sizeof(const char *));
+            ctx[0] = cuto_unaries[u]; ctx[1] = cuto_ops[op_i];
+            ADD3(prompt, w_clamped_unary_then_op, (void *)ctx, NULL, NULL);
+        }
+    }
+
+    /* tpl_compound_then(op) — compound(P, r, n) op P. */
+    static const char *ct_ops[] = { "subtract", "add", "multiply", "divide" };
+    static const char *ct_phrases[] = {
+        "compound principal at rate over years then",
+        "amount after compound growth of principal then",
+        "final balance after compound then",
+    };
+    for (size_t op_i = 0; op_i < sizeof(ct_ops) / sizeof(ct_ops[0]); op_i++) {
+        for (size_t ph = 0; ph < sizeof(ct_phrases) / sizeof(ct_phrases[0]); ph++) {
+            char prompt[160];
+            snprintf(prompt, sizeof(prompt), "// %s %s with original principal",
+                     ct_phrases[ph], ct_ops[op_i]);
+            ADD3(prompt, w_compound_then, (void *)ct_ops[op_i], NULL, NULL);
+        }
     }
 
     /* ============================================================

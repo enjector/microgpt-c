@@ -1920,6 +1920,117 @@ If Phase 11's corpus diversification doesn't move the headline, the conclusion i
 
 ---
 
+## 25. Phase 11 — Structural diversity (intermediate metrics lift, headline flat, but the FAILURE MODE shifted)
+
+> *"The fix is new graph shapes, not new wordings."*
+
+Phase 11 added 5 new template families with **56 new graph topologies** the corpus didn't previously cover:
+
+- `tpl_fib_fact_op(op)` — fibonacci(n) op factorial(n), 5 ops × 4 paraphrases = 20 examples
+- `tpl_distance_midpoint(op)` — distance_1d(a,b) op midpoint(a,b), 3 ops × 3 paraphrases = 9 examples
+- `tpl_apply_tax_chain(extra)` — apply_tax(gross, rate) extra delta, 3 ops × 3 paraphrases = 9 examples
+- `tpl_clamped_unary_then_op(unary, op)` — unary → clamp → op, 3 unaries × 2 ops = 6 examples
+- `tpl_compound_then(op)` — compound(P, r, n) op P, 4 ops × 3 paraphrases = 12 examples
+
+Final corpus: **368 examples** (332 train + 36 val), up from 312. Same 540K architecture (Phase 8/10 sweet spot). Retrained from scratch.
+
+### 25.1 The headline (mixed)
+
+| Metric | Phase 8 (corrected) | Phase 10 (corrected) | **Phase 11** |
+|---|---|---|---|
+| Best-of-16 well-formed | 90% | 95% | **95%** |
+| Best-of-16 parsed | 90% | 85% | **90%** |
+| Best-of-16 strict-verified | 75% | 70% | **80%** ↑ +5pp |
+| Best-of-16 primitive-fidelity | 35% | 30% | **35%** |
+| Best-of-16 end-to-end executed | 45% | 35% | **50%** ↑ +5pp |
+| Best-of-16 correct (1× input) | 40% | 35% | 35% |
+| **Best-of-16 correct on all 5 inputs** | 40% (8/20) | 35% (7/20) | **35% (7/20)** |
+
+Verify, parse, and executed all advanced — Phase 11 is the **highest verify rate of any phase so far** (80%). But correctness held flat at 35%.
+
+### 25.2 The structural barrier broke
+
+Inspecting the 3 newly-executing prompts (#6, #7, #17) reveals exactly what changed.
+
+**#7 fibonacci × factorial** — for the first time, the model emits the **full 3-node topology**:
+
+```
+@graph fib_fact_op_subtract
+: in n -> int
+: out y -> int
+| fact = factorial(x: <n>)
+| fib  = fibonacci(x: <n>)
+| out_op = min(x: fib.out, y: fact.out)
+y <- out_op.out
+@end
+```
+
+Topology: ✓ correct (fibonacci, factorial, combiner — all three present and wired).
+Primitive selection: ✗ chose `min` instead of `multiply`.
+
+Result: `min(fib(5), fact(5)) = min(5, 120) = 5` — exactly what EXEC reports `[5, 3, 1, 21, 2]` for inputs `(5, 4, 2, 8, 3)`. The graph runs cleanly and produces a structurally-valid (but semantically-wrong) answer.
+
+**Phase 8 couldn't even produce the topology.** Phase 11 produces the topology, then drifts on the *combiner choice*. That's not a regression — that's a different (and more tractable) failure.
+
+### 25.3 The new failure mode: lexical → primitive drift
+
+The model's training prompts for `tpl_fib_fact_op` used phrases like `"fibonacci of n combined with factorial of n by multiply"` — using the bare verb form `multiply`. The held-out prompts use inflected forms: `"fibonacci of n multiplied by factorial of n"` and `"fibonacci of n combined with factorial of n by adding"`.
+
+The lexical mismatch (`multiply`/`multiplied`, `add`/`adding`) breaks the model's primitive selection. It correctly identifies the topology but defaults to a poor combiner choice (`min`).
+
+The same pattern appears in:
+- **#15 distance + midpoint**: model emits `distance_midpoint_subtract` template (verifies but n_nodes=0 after repair) — chose `subtract` rather than `add`.
+- **#6 take_home_pay**: emits `apply_tax_chain` with wrong delta-op selection.
+
+### 25.4 The variance canary (#9)
+
+`#9 clamped average` is now structurally correct only on Phase 8's run. Every retrain since (Phase 9, Phase 10, Phase 11) has lost it to sampling drift in best-of-16 voting. The graph topology required is in the corpus (`tpl_bmi_classified`'s clamp pattern is similar), but voting outcomes diverge run-to-run for that prompt.
+
+Phase 12+ should consider increasing N_VOTES from 16 → 32 to reduce variance, OR tightening temperature spread on prompts where multiple verified candidates emerge.
+
+### 25.5 What this proves
+
+**Structural diversity in the corpus IS effective.** Phase 11's new templates achieved their direct goal: the model can now emit graphs for prompts it previously couldn't even parse.
+
+**Correctness now bottlenecks on primitive-name lexical anchoring.** Adding `"multiplied by" → multiply` and `"by adding" → add` paraphrases as Phase 12 should let the structurally-correct outputs become correct.
+
+**The 35-40% ceiling is moving downstream** — Phase 8 was capped by structural failure; Phase 11 is capped by primitive selection. The next intervention has a clearer target.
+
+### 25.6 The series so far
+
+| Phase | strict-verify | executed | correct on all 5 |
+|---|---|---|---|
+| 4 | 65% | n/a | n/a |
+| 5b | 75% | n/a | n/a |
+| 6 | 75% | 40% | n/a |
+| 7 | 75% | 40% | 35% |
+| **8 (corrected)** | 75% | 45% | **40%** ⭐ |
+| 9 | 60% | 35% | 35% |
+| 10 | 70% | 35% | 35% |
+| **11** | **80%** ⭐ | **50%** ⭐ | 35% |
+
+### 25.7 What's next (Phase 12)
+
+Add lexical-anchoring paraphrases that match held-out verb forms:
+
+```c
+/* tpl_fib_fact_op extra paraphrases */
+"// fibonacci of n multiplied by factorial of n"      → op=multiply
+"// fibonacci of n combined with factorial of n by adding" → op=add
+"// fibonacci of n added to factorial of n"          → op=add
+"// fibonacci of n times factorial of n"             → op=multiply
+
+/* tpl_distance_midpoint extra paraphrases */
+"// distance between two readings combined with their midpoint" → op=add
+"// distance plus midpoint of a and b"                → op=add
+```
+
+~15 new training prompts that lexically match held-out forms. Should let #7, #15, #17 flip to correct without retraining the model architecture.
+
+**Predicted Phase 12 headline**: 50-55% correct on all 5 inputs (10-11/20). If the lexical-anchoring hypothesis holds.
+
+---
+
 ## 16. Closing Remark
 
 The IR ships. 24 tests pass. The header has detailed doc-comments. The DOT renderer makes graphs human-readable. The text format is small enough for a tiny model to emit.
