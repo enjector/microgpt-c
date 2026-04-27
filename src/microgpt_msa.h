@@ -75,7 +75,7 @@ int msa_route_top_1(const MsaPool *pool, scalar_t **query_keys);
 
 /*
  * msa_expand_context: Loads the semantic essence of a chosen compressed chunk
- * back into a single token position in the active KV cache. 
+ * back into a single token position in the active KV cache.
  *
  * pool: the MsaPool instance
  * chunk_idx: The index returned from msa_route_top_1
@@ -84,5 +84,64 @@ int msa_route_top_1(const MsaPool *pool, scalar_t **query_keys);
  * pos: The offset inside the active arrays to inject the summary token
  */
 void msa_expand_context(const MsaPool *pool, int chunk_idx, scalar_t **active_keys, scalar_t **active_values, size_t pos);
+
+/* ============================================================
+ *  Sliding-Window Recency (DeepSeek-V4 §2.3.3 port)
+ * ============================================================
+ *
+ * MsaRecency — a ring buffer of the most-recent n_win uncompressed K/V
+ * tokens, surviving across chunking events. Ports the V4 idea of a
+ * "supplementary attention branch in a sliding window manner ... for
+ * better modelling of local dependencies."
+ *
+ * Why it matters for MicroGPT-C MSA. The default MSA flow chunks
+ * block_size/2 oldest tokens at every overflow event. After chunking,
+ * the model's only access to those tokens is via the (single) selected
+ * compressed chunk that gets re-injected at position 0. Local detail
+ * that was just-recent gets blurred into the chunk's mean-pool
+ * summary. A sliding-window recency tail preserves the last n_win
+ * tokens at FULL fidelity, independent of routing decisions, so the
+ * attention has a guaranteed local-coherence signal even when the
+ * pool's best-chunk routing is wrong.
+ *
+ * The recency buffer is intentionally a separate struct from MsaPool
+ * — it composes orthogonally and doesn't break existing MSA users.
+ *
+ * See RESEARCH_DEEPSEEK_V4_MSA_SLIDING_WINDOW_RECENCY.md for the
+ * benchmark and measured impact.
+ */
+typedef struct {
+    scalar_t *keys;     /* shape: [capacity, n_layer, n_embd] */
+    scalar_t *values;   /* shape: [capacity, n_layer, n_embd] */
+    size_t capacity;    /* n_win = max number of recency tokens retained */
+    size_t length;      /* current number of valid entries (<= capacity) */
+    size_t head;        /* ring head: index of OLDEST entry when full */
+    int n_layer;
+    int n_embd;
+} MsaRecency;
+
+/* Allocate a sliding-window recency buffer holding capacity tokens. */
+MsaRecency *msa_recency_create(size_t capacity, int n_layer, int n_embd);
+
+/* Free buffer. */
+void msa_recency_free(MsaRecency *rec);
+
+/* Reset to empty (does not free memory). */
+void msa_recency_reset(MsaRecency *rec);
+
+/* Push one token's K/V across all layers into the ring buffer.
+ * If full, the oldest entry is evicted. */
+void msa_recency_push(MsaRecency *rec,
+                      scalar_t **token_keys,
+                      scalar_t **token_values);
+
+/* Copy the entire recency window into active_keys/active_values at positions
+ * [start_pos, start_pos + length). Tokens are written in chronological order
+ * (oldest → newest) so the model sees a properly-ordered local context.
+ * Returns the number of positions written. */
+size_t msa_recency_inject(const MsaRecency *rec,
+                          scalar_t **active_keys,
+                          scalar_t **active_values,
+                          size_t start_pos);
 
 #endif /* MICROGPT_MSA_H */

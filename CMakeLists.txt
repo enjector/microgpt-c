@@ -371,6 +371,68 @@ add_demo(
           MICROGPT_QK_NORM=1 MICROGPT_ATTN_SINK=1 ATTN_SINK_LOGIT=-1.0
 )
 
+# ==================================================================
+#  MSA Sliding-Window Recency A/B benchmark (DeepSeek-V4 §2.3.3 port)
+#  See docs/research/RESEARCH_DEEPSEEK_V4_MSA_SLIDING_WINDOW_RECENCY.md
+# ==================================================================
+
+# Deep config — block_size=64, long held-out sequence = 512 tokens,
+# so the model crosses 8× the active-cache size and triggers many
+# MSA chunking events.
+add_demo(
+  NAME    bench_msa_sliding_baseline
+  SOURCE  tests/bench_microgpt_msa_sliding.c
+  COPY    demos/character-level/names/c_names.txt
+  DEFINES N_EMBD=64 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=64 MLP_DIM=128
+          BENCH_NUM_STEPS=1500 BENCH_BATCH_SIZE=16 BENCH_LONG_SEQ_LEN=512
+)
+
+add_demo(
+  NAME    bench_msa_sliding_on
+  SOURCE  tests/bench_microgpt_msa_sliding.c
+  COPY    demos/character-level/names/c_names.txt
+  DEFINES N_EMBD=64 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=64 MLP_DIM=128
+          BENCH_NUM_STEPS=1500 BENCH_BATCH_SIZE=16 BENCH_LONG_SEQ_LEN=512
+          BENCH_MSA_SLIDING_WINDOW=1 MSA_WIN=16
+)
+
+# Window-size sensitivity sweep
+add_demo(
+  NAME    bench_msa_sliding_on_w8
+  SOURCE  tests/bench_microgpt_msa_sliding.c
+  COPY    demos/character-level/names/c_names.txt
+  DEFINES N_EMBD=64 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=64 MLP_DIM=128
+          BENCH_NUM_STEPS=1500 BENCH_BATCH_SIZE=16 BENCH_LONG_SEQ_LEN=512
+          BENCH_MSA_SLIDING_WINDOW=1 MSA_WIN=8
+)
+
+add_demo(
+  NAME    bench_msa_sliding_on_w32
+  SOURCE  tests/bench_microgpt_msa_sliding.c
+  COPY    demos/character-level/names/c_names.txt
+  DEFINES N_EMBD=64 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=64 MLP_DIM=128
+          BENCH_NUM_STEPS=1500 BENCH_BATCH_SIZE=16 BENCH_LONG_SEQ_LEN=512
+          BENCH_MSA_SLIDING_WINDOW=1 MSA_WIN=32
+)
+
+# Longer-context scaling test: 2048-token held-out sequence (32× block_size)
+add_demo(
+  NAME    bench_msa_sliding_long_baseline
+  SOURCE  tests/bench_microgpt_msa_sliding.c
+  COPY    demos/character-level/names/c_names.txt
+  DEFINES N_EMBD=64 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=64 MLP_DIM=128
+          BENCH_NUM_STEPS=1500 BENCH_BATCH_SIZE=16 BENCH_LONG_SEQ_LEN=2048
+)
+
+add_demo(
+  NAME    bench_msa_sliding_long_on
+  SOURCE  tests/bench_microgpt_msa_sliding.c
+  COPY    demos/character-level/names/c_names.txt
+  DEFINES N_EMBD=64 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=64 MLP_DIM=128
+          BENCH_NUM_STEPS=1500 BENCH_BATCH_SIZE=16 BENCH_LONG_SEQ_LEN=2048
+          BENCH_MSA_SLIDING_WINDOW=1 MSA_WIN=32
+)
+
 # Run the full unit-test suite with QK_NORM=1 to verify the backward.
 # The gradient_direction_reduces_loss and training_reduces_loss tests
 # in test_microgpt.c are sensitive to a broken Q/K backward.

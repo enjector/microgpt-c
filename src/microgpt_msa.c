@@ -212,6 +212,99 @@ int msa_route_top_1(const MsaPool *pool, scalar_t **query_keys) {
     return best_idx;
 }
 
+/* ============================================================
+ *  Sliding-Window Recency implementation
+ * ============================================================ */
+
+MsaRecency *msa_recency_create(size_t capacity, int n_layer, int n_embd) {
+    if (capacity == 0 || n_layer <= 0 || n_embd <= 0) return NULL;
+    MsaRecency *rec = (MsaRecency *)calloc(1, sizeof(MsaRecency));
+    if (!rec) return NULL;
+    rec->capacity = capacity;
+    rec->n_layer = n_layer;
+    rec->n_embd = n_embd;
+    rec->length = 0;
+    rec->head = 0;
+    rec->keys   = (scalar_t *)calloc(capacity * (size_t)n_layer * (size_t)n_embd, sizeof(scalar_t));
+    rec->values = (scalar_t *)calloc(capacity * (size_t)n_layer * (size_t)n_embd, sizeof(scalar_t));
+    if (!rec->keys || !rec->values) {
+        msa_recency_free(rec);
+        return NULL;
+    }
+    return rec;
+}
+
+void msa_recency_free(MsaRecency *rec) {
+    if (!rec) return;
+    free(rec->keys);
+    free(rec->values);
+    free(rec);
+}
+
+void msa_recency_reset(MsaRecency *rec) {
+    if (!rec) return;
+    rec->length = 0;
+    rec->head = 0;
+}
+
+/* Internal: write one token's K/V (across all layers) into the ring slot at
+ * absolute index `slot`. Slot must be < capacity. */
+static void _msa_recency_write_slot(MsaRecency *rec, size_t slot,
+                                    scalar_t **token_keys,
+                                    scalar_t **token_values) {
+    const size_t stride_layer = (size_t)rec->n_embd;
+    const size_t stride_token = (size_t)rec->n_layer * stride_layer;
+    for (int l = 0; l < rec->n_layer; l++) {
+        scalar_t *dst_k = rec->keys   + slot * stride_token + (size_t)l * stride_layer;
+        scalar_t *dst_v = rec->values + slot * stride_token + (size_t)l * stride_layer;
+        for (int d = 0; d < rec->n_embd; d++) {
+            dst_k[d] = token_keys[l][d];
+            dst_v[d] = token_values[l][d];
+        }
+    }
+}
+
+void msa_recency_push(MsaRecency *rec,
+                      scalar_t **token_keys,
+                      scalar_t **token_values) {
+    if (!rec || !token_keys || !token_values) return;
+    if (rec->length < rec->capacity) {
+        /* Not yet full — append at end of the chronological sequence. */
+        size_t slot = rec->length; /* head still 0 while filling */
+        _msa_recency_write_slot(rec, slot, token_keys, token_values);
+        rec->length++;
+    } else {
+        /* Full — overwrite oldest entry (at head), advance head. */
+        _msa_recency_write_slot(rec, rec->head, token_keys, token_values);
+        rec->head = (rec->head + 1) % rec->capacity;
+    }
+}
+
+size_t msa_recency_inject(const MsaRecency *rec,
+                          scalar_t **active_keys,
+                          scalar_t **active_values,
+                          size_t start_pos) {
+    if (!rec || rec->length == 0) return 0;
+    const size_t stride_layer = (size_t)rec->n_embd;
+    const size_t stride_token = (size_t)rec->n_layer * stride_layer;
+    /* Walk the ring chronologically: oldest = head when full, else 0. */
+    size_t start = (rec->length < rec->capacity) ? 0 : rec->head;
+    for (size_t i = 0; i < rec->length; i++) {
+        size_t ring = (start + i) % rec->capacity;
+        for (int l = 0; l < rec->n_layer; l++) {
+            const scalar_t *src_k = rec->keys   + ring * stride_token + (size_t)l * stride_layer;
+            const scalar_t *src_v = rec->values + ring * stride_token + (size_t)l * stride_layer;
+            scalar_t *dst_k = active_keys[l]   + (start_pos + i) * stride_layer;
+            scalar_t *dst_v = active_values[l] + (start_pos + i) * stride_layer;
+            for (int d = 0; d < rec->n_embd; d++) {
+                dst_k[d] = src_k[d];
+                dst_v[d] = src_v[d];
+            }
+        }
+    }
+    return rec->length;
+}
+
 void msa_expand_context(const MsaPool *pool, int chunk_idx, scalar_t **active_keys, scalar_t **active_values, size_t pos) {
     if (chunk_idx < 0 || (size_t)chunk_idx >= pool->length) return;
     
