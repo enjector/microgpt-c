@@ -882,6 +882,128 @@ TEST(corpus_round_trip_byte_equal_iterated) {
 }
 
 /* ============================================================
+ *  Phase 3d — Parser robustness (fuzz)
+ *
+ * The Phase 3c demo surfaced a parser segfault when the model emitted
+ * structurally-plausible but malformed text. Phase 3d hardens the
+ * parser against arbitrary token streams. These fuzz tests exercise
+ * pathological inputs and assert the parser never crashes — either
+ * returns NULL or returns a Pipeline that frees cleanly.
+ * ============================================================ */
+
+/* Tiny xorshift PRNG (deterministic across runs given the same seed). */
+static uint32_t fuzz_state = 0xC0FFEE42u;
+static uint32_t fuzz_rand(void) {
+    uint32_t x = fuzz_state;
+    x ^= x << 13; x ^= x >> 17; x ^= x << 5;
+    return (fuzz_state = x);
+}
+
+TEST(parser_fuzz_empty_string) {
+    Pipeline *p = pipeline_parse_text("");
+    /* Either NULL or a valid empty graph. Either is fine — must not crash. */
+    if (p) pipeline_free(p);
+}
+
+TEST(parser_fuzz_garbage) {
+    const char *garbage[] = {
+        "not a graph",
+        "@graph",
+        "@graph foo",
+        "@graph foo @end",
+        "@graph foo : in",
+        "@graph foo : in x ->",
+        "@graph foo : in x -> int : out y -> int |",
+        "@graph foo : in x -> int : out y -> int | n =",
+        "@graph foo : in x -> int : out y -> int | n = add(",
+        "@graph foo : in x -> int : out y -> int | n = add(x:",
+        "@graph foo : in x -> int : out y -> int | n = add(x: <",
+        "@graph foo : in x -> int : out y -> int | n = add(x: <a",
+        "@graph foo : in x -> int : out y -> int | n = add(x: <a>) y <-",
+        "@graph foo : in x -> int : out y -> int | n = add(x: <a>) y <- n",
+        "@graph foo : in x -> int : out y -> int | n = add(x: <a>) y <- n.",
+        /* Pathologically truncated mid-token: */
+        "@graph foo : in x -> int : out y -> int | n = add(x: <a>, y: <a>) :: x:int, y:int -> out:int\ny <- n",
+    };
+    for (size_t i = 0; i < sizeof(garbage) / sizeof(garbage[0]); i++) {
+        Pipeline *p = pipeline_parse_text(garbage[i]);
+        if (p) pipeline_free(p);
+    }
+}
+
+TEST(parser_fuzz_random_truncation) {
+    /* Build a known-good graph, render it, then fuzz: try every prefix
+     * of the rendered text and assert no crash. */
+    Pipeline *src = build_add_graph();
+    pipeline_verify(src);
+    char *txt = pipeline_render_text(src);
+    ASSERT(txt != NULL);
+    size_t txt_len = strlen(txt);
+    char *prefix = (char *)malloc(txt_len + 1);
+    for (size_t cut = 0; cut <= txt_len; cut++) {
+        memcpy(prefix, txt, cut);
+        prefix[cut] = '\0';
+        Pipeline *p = pipeline_parse_text(prefix);
+        if (p) pipeline_free(p);
+    }
+    free(prefix);
+    free(txt);
+    pipeline_free(src);
+}
+
+TEST(parser_fuzz_random_byte_mutation) {
+    /* Build a known-good graph, render, then mutate single random bytes
+     * and assert no crash on parse. 200 iterations, deterministic seed. */
+    Pipeline *src = build_add_graph();
+    pipeline_verify(src);
+    char *txt = pipeline_render_text(src);
+    size_t txt_len = strlen(txt);
+    char *mutated = (char *)malloc(txt_len + 1);
+    fuzz_state = 0xC0FFEE42u;
+    for (int iter = 0; iter < 200; iter++) {
+        memcpy(mutated, txt, txt_len + 1);
+        size_t pos = fuzz_rand() % txt_len;
+        char new_ch = (char)(32 + (fuzz_rand() % 95));   /* printable ASCII */
+        mutated[pos] = new_ch;
+        Pipeline *p = pipeline_parse_text(mutated);
+        if (p) pipeline_free(p);
+    }
+    free(mutated);
+    free(txt);
+    pipeline_free(src);
+}
+
+TEST(parser_fuzz_random_bytes) {
+    /* Pure random bytes — must not crash. */
+    char buf[256];
+    fuzz_state = 0xDEADBEEFu;
+    for (int iter = 0; iter < 100; iter++) {
+        size_t len = (size_t)(fuzz_rand() % (sizeof(buf) - 1));
+        for (size_t i = 0; i < len; i++) {
+            buf[i] = (char)(32 + (fuzz_rand() % 95));   /* printable */
+        }
+        buf[len] = '\0';
+        Pipeline *p = pipeline_parse_text(buf);
+        if (p) pipeline_free(p);
+    }
+}
+
+/* The original Phase 3c-crashing input, lightly redacted.
+ * If this passes without crashing, Phase 3d's primary goal is met. */
+TEST(parser_fuzz_phase3c_crash_input) {
+    const char *malformed =
+        "@graph distance_squared_4d\n"
+        ": in a1 -> int\n"
+        ": in b1 -> int\n"
+        ": out y -> int\n"
+        "| d1 = subtract(x: <a1>, y: <b1>) :: x:int, y:int -> out:int\n"
+        "| sq2 = multiply(x: d2.out, y: d2.out) :: x:int, y:int\n"   /* mid-line cut */
+        "  ---\n";
+    Pipeline *p = pipeline_parse_text(malformed);
+    if (p) pipeline_free(p);
+}
+
+/* ============================================================
  *  Last-error reporting
  * ============================================================ */
 
@@ -952,6 +1074,14 @@ int main(void) {
     RUN(corpus_ex_multi_node_tree);
     RUN(corpus_ex_5_nodes);
     RUN(corpus_round_trip_byte_equal_iterated);
+
+    printf("\n[Pipeline IR — Phase 3d parser fuzz]\n");
+    RUN(parser_fuzz_empty_string);
+    RUN(parser_fuzz_garbage);
+    RUN(parser_fuzz_random_truncation);
+    RUN(parser_fuzz_random_byte_mutation);
+    RUN(parser_fuzz_random_bytes);
+    RUN(parser_fuzz_phase3c_crash_input);
 
     printf("\n[Pipeline IR — Error reporting]\n");
     RUN(last_error_set_on_failure);

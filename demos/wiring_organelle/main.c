@@ -303,6 +303,13 @@ int main(void) {
     for (int i = 0; i < n_val; i++) {
         wiring_generate(org, &cfg, val_prompts[i], output_buf, sizeof(output_buf),
                         /*temperature=*/0.4f, /*max_words=*/200);
+        /* Phase 3d: dump each output to disk before parsing — lets us
+         * reproduce any remaining crash with pipeline_parse_text on a
+         * specific saved file. */
+        char dump_path[64]; snprintf(dump_path, sizeof(dump_path),
+                                     "wiring_out_%02d.txt", i + 1);
+        FILE *df = fopen(dump_path, "w");
+        if (df) { fwrite(output_buf, 1, strlen(output_buf), df); fclose(df); }
 
         /* Defensive: only attempt to parse output that has all required
          * structural markers. The parser was designed for canonical
@@ -316,12 +323,18 @@ int main(void) {
             strstr(output_buf, ": out") &&
             strstr(output_buf, "|") &&
             strstr(output_buf, "<-");
-        /* Parse-and-verify is currently disabled because pipeline_parse_text
-         * has malformed-input crash bugs (Phase 3d work to harden it). For
-         * Phase 3c we report structural well-formedness as the headline
-         * metric, which is a meaningful — if narrower — signal that the
-         * model has learned the graph grammar. */
+        /* Phase 3d: parser hardened against malformed input (fuzz tests
+         * cover empty/garbage/truncation/byte-mutation/random-bytes).
+         * Re-enabled the parse + verify path. */
         int parsed = 0, verified = 0;
+        if (well_formed) {
+            Pipeline *p = pipeline_parse_text(output_buf);
+            parsed = (p != NULL);
+            if (parsed) {
+                verified = (pipeline_verify(p) == PIPE_OK);
+                pipeline_free(p);
+            }
+        }
         if (well_formed) well_formed_count++;
         if (parsed) parse_count++;
         if (verified) verify_count++;

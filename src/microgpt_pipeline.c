@@ -1222,12 +1222,18 @@ Pipeline *pipeline_parse_text(const char *src) {
     while (*ps.cur && ps_match_kw(&ps, ":")) {
         ps_skip_ws(&ps);
         char *kind = ps_read_ident(&ps);
-        if (!kind) { set_err("parse: signature kind"); goto fail; }
+        if (!kind) {
+            /* Could be malformed input or just end-of-signature. Stop
+             * gracefully rather than goto fail, which leaks the signature
+             * name/type arrays. */
+            set_err("parse: signature kind expected");
+            break;
+        }
         char *port_name = ps_read_ident(&ps);
-        if (!port_name) { free(kind); set_err("parse: signature port name"); goto fail; }
-        if (!ps_match_kw(&ps, "->")) { free(kind); free(port_name); set_err("parse: signature '->' expected"); goto fail; }
+        if (!port_name) { free(kind); set_err("parse: signature port name"); break; }
+        if (!ps_match_kw(&ps, "->")) { free(kind); free(port_name); set_err("parse: signature '->' expected"); break; }
         PipelineType *t = ps_read_type(&ps);
-        if (!t) { free(kind); free(port_name); goto fail; }
+        if (!t) { free(kind); free(port_name); break; }
         if (strcmp(kind, "in") == 0) {
             if (n_sig_in >= 64) { free(kind); free(port_name); pipeline_type_free(t); set_err("parse: too many sig inputs"); goto fail; }
             sig_in_names[n_sig_in] = port_name;
@@ -1301,7 +1307,7 @@ Pipeline *pipeline_parse_text(const char *src) {
                 if (!pname) break;
                 if (!ps_eat(&ps, ':')) { free(pname); break; }
                 ps_skip_ws(&ps);
-                char *src_node, *src_port;
+                char *src_node = NULL, *src_port = NULL;
                 if (*ps.cur == '<') {
                     ps_advance(&ps, 1);
                     src_node = strdup("<sig>");
@@ -1312,6 +1318,13 @@ Pipeline *pipeline_parse_text(const char *src) {
                     if (!src_node) { free(pname); break; }
                     ps_eat(&ps, '.');
                     src_port = ps_read_ident(&ps);
+                }
+                /* Defensive: if src_port is NULL (malformed input — e.g.
+                 * `<` followed by non-ident, or `node.` followed by non-
+                 * ident), bail out of the arg loop cleanly. */
+                if (!src_port) {
+                    free(pname); free(src_node);
+                    break;
                 }
                 if (cur->n_in >= cap_in) {
                     cap_in *= 2;
@@ -1404,6 +1417,15 @@ Pipeline *pipeline_parse_text(const char *src) {
         char *src_node = ps_read_ident(&ps);
         ps_eat(&ps, '.');
         char *src_port = ps_read_ident(&ps);
+        /* Defensive: malformed binding line. Skip this entry rather than
+         * stash NULL pointers into the wiring loop's arrays. */
+        if (!src_node || !src_port) {
+            free(bind_name);
+            if (src_node) free(src_node);
+            if (src_port) free(src_port);
+            ps_skip_ws_nl(&ps);
+            continue;
+        }
         /* Defer wiring until after nodes exist. We'll re-find bind_name in signature_out. */
         /* Add a parsed-node-style entry for the binding so we can wire after. */
         int sig_idx = find_signature_port(p, bind_name, 1);
@@ -1466,21 +1488,26 @@ Pipeline *pipeline_parse_text(const char *src) {
             out_types_arr[0] = pipeline_type_any();
             n_out = 1;
         }
-        if (pipeline_add_node(p, cur->id, cur->prim,
-                              cur->n_in, in_names, in_types,
-                              n_out, out_names_arr, out_types_arr) < 0) {
-            free((void *)in_names); free(in_types);
-            free((void *)out_names_arr); free(out_types_arr);
-            goto fail2;
-        }
+        int add_rc = pipeline_add_node(p, cur->id, cur->prim,
+                                       cur->n_in, in_names, in_types,
+                                       n_out, out_names_arr, out_types_arr);
         free((void *)in_names); free(in_types);
         free((void *)out_names_arr); free(out_types_arr);
-        /* Mark types as transferred to avoid double-free in cleanup. */
+        /* In BOTH cases (success and failure), pipeline_add_node has either
+         * taken ownership of the type pointers OR has freed them itself
+         * (on duplicate-id / OOM). Either way, the parser must NOT free
+         * them again in the cleanup path — null them out unconditionally. */
         if (cur->in_types) {
             for (int k = 0; k < cur->n_in; k++) cur->in_types[k] = NULL;
         }
         if (cur->out_types) {
             for (int k = 0; k < cur->n_out; k++) cur->out_types[k] = NULL;
+        }
+        if (add_rc < 0) {
+            /* Soft-fail: skip this node, continue parsing remaining ones.
+             * The model may have emitted duplicate node ids — well-formed
+             * but invalid. Verification will report the underlying issue. */
+            continue;
         }
     }
 
