@@ -297,7 +297,8 @@ This paper documents **Phase 1**. The full plan:
 | **1** | **IR + verifier + text round-trip + DOT + callback executor + tests** | **✅ Shipped** |
 | **2** | **Typed round-trip + partial verify + VM dispatch surface + parser bug fixes** | **✅ Shipped (see §10)** |
 | **3a** | **Hand-curated corpus generator + canonical topo sort + corpus integrity tests** | **✅ Shipped (see §11)** |
-| 3b | Wiring Organelle: train on (prompt, graph-text) pairs, incrementally verify partial graphs | Pending |
+| **3b** | **Templated corpus generator — 85 examples / 10 families / train+val split / 459-token vocab** | **✅ Shipped (see §12)** |
+| 3c | Wiring Organelle: train on (prompt, graph-text) pairs, incrementally verify partial graphs | Pending |
 | 4 | SysML multi-view rendering (block, internal block, activity, parametric) + headline benchmark | Pending |
 
 Phase 1 is genuinely useful on its own — an embeddable graph IR with type-checked composition, a deterministic Judge, and visualisation support. Even if Phase 3's wiring-organelle hypothesis fails empirically, Phase 1 is reusable infrastructure: any future organelle that wants to emit verifiable compositions can target this IR.
@@ -553,7 +554,145 @@ The active-attention V4 stack (RoPE + sink + Q/K RMSNorm) **should not be enable
 
 ---
 
-## 12. Closing Remark
+## 12. Phase 3b — Templated corpus generator
+
+Phase 3a shipped 10 hand-curated examples. The Wiring Organelle won't generalise from 10 examples — small Transformers need at least an order of magnitude more. Phase 3b lifts the corpus to 85 examples via 10 parametric template families, all programmatic, all verifying, all round-tripping byte-stably.
+
+### 13.1 Why templates rather than more hand-curation
+
+Each hand-curated example costs ~10–25 LOC of builder code. To get 200+ examples by hand-curation would be ~3–5 KLOC of repetitive C. A template family is parameterised over a small dimension (`n`, `degree`, `prim`, etc.) and produces O(parameters) variants for the cost of writing one builder. The 10 families in this PR collectively produce 85 examples from ~600 LOC.
+
+Templates also give the model **systematic variation**: it sees the same `chain` shape with `add`, `multiply`, `max`, `min` — encoding "primitive-as-a-parameter" structurally. Hand-curated examples are arbitrary; templates expose grammar.
+
+### 13.2 The 10 template families
+
+| # | Family | Parameters | # examples |
+|---|---|---|---:|
+| 1 | `chain(prim, n)` — left-folded binary chain | prim ∈ {add, multiply, max, min}, n ∈ {2..8} | 28 |
+| 2 | `fanout_combine(unary, binary, n)` — per-input unary then binary fold | u ∈ {negate, abs}, b ∈ {add, multiply}, n ∈ {2..4} | 12 |
+| 3 | `polynomial(d)` — `a_0 + a_1·x + ... + a_d·x^d` | d ∈ {1..7} | 7 |
+| 4 | `distance_squared_nd(dim)` — `Σᵢ (aᵢ-bᵢ)²` | dim ∈ {1..6} | 6 |
+| 5 | `dot_product_nd(dim)` — `Σᵢ aᵢ·bᵢ` | dim ∈ {2..8} | 7 |
+| 6 | `mean_n(n)` — sum then `divide_by_const` config | n ∈ {2..8} | 7 |
+| 7 | `weighted_combine(n)` — `Σᵢ wᵢ·xᵢ` | n ∈ {2..6} | 5 |
+| 8 | `axpy_then_op(post, depth)` — stacked axpy then unary | post ∈ {negate, abs}, depth ∈ {1..3} | 6 |
+| 9 | `lerp_n(n)` — chained linear interpolation across n waypoints | n ∈ {2..4} | 3 |
+| 10 | `range_n(n)` — `max(x) - min(x)` over n inputs | n ∈ {2..5} | 4 |
+| | **Total** | | **85** |
+
+Each builder uses the standard arithmetic primitive set: `add`, `multiply`, `subtract`, `negate`, `abs`, `max`, `min`, `divide_by_const`. Inputs and outputs are `int`-typed; the future Wiring Organelle's task is grammar-rigid generation, so we keep types simple. Tensor and float types are Phase 4 work.
+
+### 13.3 Corpus statistics
+
+```
+$ ./pipeline_corpus_gen /tmp/corpus_full.txt
+Generated 85 / 85 examples
+Unique whitespace-tokens: 459  |  Total characters: 21944
+```
+
+- **85 examples**, 0 build failures, 0 verify failures.
+- **459 unique whitespace-separated tokens** — comfortably small enough for word-level training (existing `vm_codegen` works at 1200-token vocab).
+- **21,944 total characters** — typical example is ~15 lines; longest ~25 lines.
+- **Deterministic** across runs (verified by MD5):
+
+```
+$ md5 /tmp/corpus_v1.txt /tmp/corpus_v2.txt
+7ccecc9d66e43a04e323bd4d43e87aa4  /tmp/corpus_v1.txt
+7ccecc9d66e43a04e323bd4d43e87aa4  /tmp/corpus_v2.txt
+```
+
+### 13.4 Train/val split
+
+Two-arg invocation produces a 90/10 deterministic split (every 10th example reserved for validation):
+
+```
+$ ./pipeline_corpus_gen /tmp/train.txt /tmp/val.txt
+Generated 85 / 85 examples | train=77, val=8
+Unique whitespace-tokens: 459  |  Total characters: 21944
+```
+
+- **77 train**, **8 validation**.
+- The split is deterministic by index — every example with index `i % 10 == 9` goes to validation.
+- 8 validation examples is small but representative; the families are denser than the partition is sparse.
+
+### 13.5 Sample output
+
+```
+// polynomial of degree 3 evaluated at x
+@graph polynomial_d3
+  : in a0 -> int
+  : in a1 -> int
+  : in a2 -> int
+  : in a3 -> int
+  : in x -> int
+  : out y -> int
+  | term1 = multiply(x: <a1>, y: <x>) :: x:int, y:int -> out:int
+  | xp2 = multiply(x: <x>, y: <x>) :: x:int, y:int -> out:int
+  | sum1 = add(x: <a0>, y: term1.out) :: x:int, y:int -> out:int
+  | term2 = multiply(x: <a2>, y: xp2.out) :: x:int, y:int -> out:int
+  | xp3 = multiply(x: xp2.out, y: <x>) :: x:int, y:int -> out:int
+  | sum2 = add(x: sum1.out, y: term2.out) :: x:int, y:int -> out:int
+  | term3 = multiply(x: <a3>, y: xp3.out) :: x:int, y:int -> out:int
+  | sum3 = add(x: sum2.out, y: term3.out) :: x:int, y:int -> out:int
+  y <- sum3.out
+@end
+---
+```
+
+8 nodes, 5 inputs, 8 internal edges, deterministic Kahn-canonical topological order. Every annotation parses; every type round-trips; verifying the parsed graph re-produces a byte-identical render.
+
+### 13.6 Testing
+
+A new CTest entry runs the generator end-to-end as a smoke test:
+
+```cmake
+add_test(NAME pipeline_corpus_smoke
+         COMMAND pipeline_corpus_gen ${CMAKE_BINARY_DIR}/_corpus_smoke.txt
+         WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+```
+
+Asserts the executable returns 0 (which means **all 85 examples built, verified, and rendered cleanly**). The Phase 3a corpus integrity tests in `test_microgpt_pipeline.c` (`corpus_ex_*`) still pass, ensuring the Phase 3b changes didn't break the round-trip semantics for hand-curated examples either.
+
+### 13.7 What Phase 3c needs
+
+Phase 3c trains the actual Wiring Organelle. Prerequisites are now met:
+1. ✅ Corpus large enough to plausibly train (85 examples, 459 vocab tokens).
+2. ✅ Train/val split deterministic and reproducible.
+3. ✅ Round-trip byte-stable so model output can be parsed and verified.
+4. ✅ Partial verification (`pipeline_verify_partial`) so incremental construction can be judged.
+
+Next concrete step:
+
+```c
+/* Phase 3c sketch */
+WordVocab wv;
+build_word_vocab(corpus_train_text, train_len, /*max_words=*/600, &wv);
+/* expect wv.vocab_size ≈ 459 + special tokens */
+
+MicrogptConfig cfg = microgpt_default_config();
+cfg.n_embd = 96;  cfg.n_layer = 4;  cfg.block_size = 256;
+cfg.num_steps = 5000;
+
+Organelle *org = organelle_train_words(
+    "wiring_organelle",
+    "pipeline_corpus_train.txt",
+    "wiring_organelle.ckpt",
+    &cfg, cfg.num_steps, /*max_words=*/600);
+
+/* Inference: emit graph-text token-by-token, partial-verify after
+ * each `|` line, reject and resample on hard errors. Compare to
+ * vm_compose 15%/5% baseline. */
+```
+
+Caveat from prior series: **do not** enable the V4 active-attention stack (`MICROGPT_PARTIAL_ROPE`, `MICROGPT_ATTN_SINK`, `MICROGPT_QK_NORM`) for this organelle. The codegen ablation showed −30pp pass-rate regression on grammar-rigid generation, and dataflow-graph synthesis is grammar-rigid by definition.
+
+If Phase 3c lands and the organelle reaches even 30% novel-prompt pass rate, that would already double the `vm_compose` 15%-in-vocab baseline. The headline benchmark is "given a held-out prompt, fraction of attempts that produce a graph that verifies and computes the correct output for sample inputs."
+
+If Phase 3c plateaus below baseline, the next investigation is corpus scale (Phase 3d): scale to 500-2000 examples by adding more template families (statistical pipelines, signal processing chains, conditional/control-flow extensions to the IR itself, etc.). The infrastructure in this PR is the base camp; further scale-ups are templating exercises.
+
+---
+
+## 13. Closing Remark
 
 The IR ships. 24 tests pass. The header has detailed doc-comments. The DOT renderer makes graphs human-readable. The text format is small enough for a tiny model to emit.
 

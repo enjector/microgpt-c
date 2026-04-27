@@ -1797,6 +1797,10 @@ target_include_directories(pipeline_corpus_gen PRIVATE ${CMAKE_CURRENT_SOURCE_DI
 if(NOT MSVC)
   target_link_libraries(pipeline_corpus_gen PRIVATE m)
 endif()
+# Smoke test — generator runs end-to-end with zero failures.
+add_test(NAME pipeline_corpus_smoke
+         COMMAND pipeline_corpus_gen ${CMAKE_BINARY_DIR}/_corpus_smoke.txt
+         WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
 add_executable(test_microgpt_turboquant tests/test_microgpt_turboquant.c)
 target_link_libraries(test_microgpt_turboquant PRIVATE microgpt_lib)
