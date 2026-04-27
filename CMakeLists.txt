@@ -1827,6 +1827,9 @@ add_demo(
           NUM_STEPS=5000 LEARNING_RATE=0.001 BATCH_SIZE=16
           MAX_VOCAB=1200 MAX_DOCS=5000 MAX_DOC_LEN=4096
 )
+# Phase 6 — register wiring native primitives (~40 C functions matching
+# w_vm_functions.txt) as the dispatch backend for pipeline_execute().
+target_sources(wiring_organelle_demo PRIVATE demos/wiring_organelle/wiring_natives.c)
 # Generate the corpus next to the binary as a POST_BUILD step.
 add_custom_command(TARGET wiring_organelle_demo POST_BUILD
   COMMAND pipeline_corpus_gen

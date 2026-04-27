@@ -41,6 +41,13 @@
  * from partially-broken organelle outputs. **Headline lift: 65% → 75%
  * strict-verify (+10pp) — see RESEARCH_PIPELINE_IR.md §19.**
  *
+ * Phase 6: end-to-end execution via wiring_natives_dispatch() — 40
+ * C-implemented primitives (add, multiply, sigmoid, compound, bmi, gcd,
+ * factorial, fibonacci, …) plug into pipeline_execute(). Verified
+ * graphs run on test inputs and produce numeric answers.
+ * **Headline: 40% (8/20) prompt → graph → numeric answer; 6/8
+ * arithmetically correct — see RESEARCH_PIPELINE_IR.md §20.**
+ *
  * Copyright (c) 2026 Ajay Soni, Enjector Software Ltd. MIT License.
  */
 
@@ -49,6 +56,7 @@
 #include "microgpt.h"
 #include "microgpt_organelle.h"
 #include "microgpt_pipeline.h"
+#include "wiring_natives.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -560,6 +568,7 @@ int main(void) {
         printf("================================================================\n\n");
 
         int held_well = 0, held_parse = 0, held_verify = 0, held_fidelity = 0;
+        int held_executed = 0;   /* Phase 6: end-to-end pipeline_execute success */
         int held_print = 0;
         const int MAX_HELD_PRINTS = 20;
         for (int i = 0; i < n_held; i++) {
@@ -635,15 +644,58 @@ int main(void) {
             if (verified)    held_verify++;
             if (fidelity)    held_fidelity++;
 
+            /* Phase 6: end-to-end execution. Re-parse the verified
+             * best output, supply small int test inputs (cycle 5,7,3,11,2),
+             * dispatch to wiring_natives_dispatch, capture the result. */
+            int executed = 0;
+            int64_t exec_result = 0;
+            if (verified && have_best) {
+                Pipeline *exec_p = pipeline_parse_text(best_buf);
+                if (!exec_p) exec_p = pipeline_parse_text_tolerant(best_buf);
+                if (exec_p) {
+                    if (pipeline_verify(exec_p) != PIPE_OK) {
+                        PipelineRepairReport rep = {0};
+                        pipeline_repair(exec_p, &rep);
+                    }
+                    if (exec_p->n_nodes > 0 && pipeline_verify(exec_p) == PIPE_OK) {
+                        /* Build inputs: cycle through small ints. */
+                        int n_in = exec_p->n_sig_in;
+                        int n_out = exec_p->n_sig_out;
+                        if (n_in <= 16 && n_out >= 1) {
+                            static const int64_t test_seq[] = {5, 7, 3, 11, 2, 13, 4, 9, 6, 8, 1, 10, 12, 15, 14, 16};
+                            PipelineValue *ins  = (PipelineValue *)calloc((size_t)(n_in  > 0 ? n_in  : 1), sizeof(PipelineValue));
+                            PipelineValue *outs = (PipelineValue *)calloc((size_t)(n_out > 0 ? n_out : 1), sizeof(PipelineValue));
+                            for (int k = 0; k < n_in; k++) {
+                                ins[k].type = exec_p->signature_in[k].type;
+                                ins[k].v.i  = test_seq[k];
+                            }
+                            int rc = pipeline_execute(exec_p, ins, outs,
+                                                      wiring_natives_dispatch, NULL);
+                            if (rc == 0) {
+                                executed = 1;
+                                exec_result = outs[0].v.i;
+                            }
+                            free(ins); free(outs);
+                        }
+                    }
+                    pipeline_free(exec_p);
+                }
+            }
+            if (executed) held_executed++;
+
             if (held_print < MAX_HELD_PRINTS) {
                 printf("[%d] %s\n", i + 1, held[i].prompt);
                 printf("    EXPECTED: %s\n", held[i].expected[0] ? held[i].expected : "(none)");
-                printf("    well=%s parse=%s verify=%s fidelity=%s votes=%d/%d\n",
+                printf("    well=%s parse=%s verify=%s fidelity=%s exec=%s votes=%d/%d\n",
                        well_formed ? "Y" : "n",
                        parsed      ? "Y" : "n",
                        verified    ? "Y" : "n",
                        fidelity    ? "Y" : "n",
+                       executed    ? "Y" : "n",
                        votes_used, N_VOTES);
+                if (executed) {
+                    printf("    EXEC RESULT: %lld (with inputs 5,7,3,...)\n", (long long)exec_result);
+                }
                 if (have_best) {
                     printf("    --- best output ---\n%s\n", best_buf);
                 }
@@ -666,6 +718,9 @@ int main(void) {
         printf("Best-of-%-2d primitive-fidelity:        %d/%d (%.0f%%)  [verified graph uses expected primitives]\n",
                N_VOTES, held_fidelity, n_held,
                n_held > 0 ? 100.0 * held_fidelity / n_held : 0.0);
+        printf("Best-of-%-2d end-to-end executed:       %d/%d (%.0f%%)  [Phase 6: prompt → graph → numeric answer]\n",
+               N_VOTES, held_executed, n_held,
+               n_held > 0 ? 100.0 * held_executed / n_held : 0.0);
         printf("\n");
 
         for (int i = 0; i < n_held; i++) {
