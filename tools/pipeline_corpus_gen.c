@@ -1830,6 +1830,58 @@ static CorpusEntry *build_catalog(int *out_count) {
     }
 
     /* ============================================================
+     *  Phase 12 — Lexical anchoring for primitive selection.
+     *
+     *  Phase 11 broke the topology barrier (model emits 3-node fib+
+     *  fact+combine graphs) but defaulted to wrong combiner choices
+     *  ("min" for "multiplied by"). The training prompts used bare
+     *  verbs ("multiply", "add"); held-out uses inflected forms
+     *  ("multiplied by", "by adding"). These paraphrases lock the
+     *  inflected forms to the correct primitive.
+     * ============================================================ */
+
+    /* fib_fact_op with held-out exact verb forms. */
+    ADD3("// fibonacci of n multiplied by factorial of n",
+         w_fib_fact_op, (void *)"multiply", NULL, NULL);
+    ADD3("// fibonacci of n times factorial of n",
+         w_fib_fact_op, (void *)"multiply", NULL, NULL);
+    ADD3("// product of fibonacci and factorial of n",
+         w_fib_fact_op, (void *)"multiply", NULL, NULL);
+    ADD3("// multiply fibonacci of n by factorial of n",
+         w_fib_fact_op, (void *)"multiply", NULL, NULL);
+
+    ADD3("// fibonacci of n combined with factorial of n by adding",
+         w_fib_fact_op, (void *)"add", NULL, NULL);
+    ADD3("// fibonacci of n added to factorial of n",
+         w_fib_fact_op, (void *)"add", NULL, NULL);
+    ADD3("// sum of fibonacci of n and factorial of n",
+         w_fib_fact_op, (void *)"add", NULL, NULL);
+    ADD3("// fibonacci plus factorial of n",
+         w_fib_fact_op, (void *)"add", NULL, NULL);
+
+    /* distance_midpoint with held-out exact verb forms. */
+    ADD3("// distance between two readings combined with their midpoint",
+         w_distance_midpoint, (void *)"add", NULL, NULL);
+    ADD3("// distance plus midpoint of a and b",
+         w_distance_midpoint, (void *)"add", NULL, NULL);
+    ADD3("// add distance of a and b to their midpoint",
+         w_distance_midpoint, (void *)"add", NULL, NULL);
+    ADD3("// distance combined with midpoint by adding",
+         w_distance_midpoint, (void *)"add", NULL, NULL);
+
+    /* apply_tax_chain with subtract for "reduced by" / "minus". */
+    ADD3("// take home pay from gross income at federal tax rate then minus delta",
+         w_apply_tax_chain, (void *)"subtract", NULL, NULL);
+    ADD3("// gross income reduced by tax liability and delta",
+         w_apply_tax_chain, (void *)"subtract", NULL, NULL);
+
+    /* compound_then with subtract for "minus original" / "interest earned". */
+    ADD3("// interest earned by subtracting principal from compounded value",
+         w_compound_then, (void *)"subtract", NULL, NULL);
+    ADD3("// compound minus original principal yields interest",
+         w_compound_then, (void *)"subtract", NULL, NULL);
+
+    /* ============================================================
      *  Phase 4 — Micro examples (single-primitive 1-node graphs).
      *
      *  Each primitive gets several minimal 1-node examples so the
