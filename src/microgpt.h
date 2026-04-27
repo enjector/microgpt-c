@@ -401,6 +401,57 @@ typedef struct {
  */
 /* MICROGPT_QK_NORM has no extra magnitude knob — it's on or off. */
 
+/* ---- Partial RoPE on Q/K tail dims (opt-in: -DMICROGPT_PARTIAL_ROPE) ----
+ *
+ * Applies Rotary Positional Embedding (Su et al., RoFormer 2021) to the
+ * LAST ROPE_DIMS dimensions of every per-head Q and K vector, immediately
+ * before the Q·K^T dot product. From DeepSeek-V4 §2.3.3 "Partial Rotary
+ * Positional Embedding."
+ *
+ * Why partial (last 64 dims of each head, not all of head_dim): the
+ * remaining dims keep absolute-position information via the existing
+ * learned wpe table, which gives the model a bridge while RoPE injects
+ * relative-position structure into the tail. V4's recipe.
+ *
+ * Why this matters for MicroGPT-C:
+ *   1. Self-contained quality: relative-position attention generalises
+ *      better to long contexts than absolute wpe alone.
+ *   2. Unblocks the sliding-window-recency port (§3.4 of roadmap), whose
+ *      current regression is rooted in wpe-alignment breakage when K
+ *      vectors are re-injected at fresh slots. RoPE makes K invariant
+ *      to which physical slot it sits in.
+ *   3. May raise the ~0.32% PPL ceiling that the MSA-internal CSA pool
+ *      and Lightning Indexer ports both bottomed out at.
+ *
+ * Implementation detail. Rotation pairs adjacent dims: for each
+ * pair (d, d+1) with theta_d = pos / 10000^(d / ROPE_DIMS):
+ *   x[d]   ←  x[d] cos(theta_d) - x[d+1] sin(theta_d)
+ *   x[d+1] ←  x[d] sin(theta_d) + x[d+1] cos(theta_d)
+ * Backward is simply rotation by -theta_d (rotation is orthogonal, so
+ * its transpose-inverse-conjugate are all the same operation with a
+ * negated angle).
+ *
+ * Cos/sin tables are precomputed at model creation time, sized
+ * BLOCK_SIZE × ROPE_DIMS/2. They live in the Model struct (added under
+ * #ifdef) and are NOT learnable parameters — pure math.
+ *
+ * See RESEARCH_DEEPSEEK_V4_PARTIAL_ROPE.md for measurements.
+ */
+#ifdef MICROGPT_PARTIAL_ROPE
+#ifndef ROPE_DIMS
+/* Default: rotate the last 32 dims, or all of head_dim if smaller. */
+#  define _MGPT_HEAD_DIM_DEFAULT ((N_EMBD) / (N_HEAD))
+#  if _MGPT_HEAD_DIM_DEFAULT < 32
+#    define ROPE_DIMS (_MGPT_HEAD_DIM_DEFAULT)
+#  else
+#    define ROPE_DIMS 32
+#  endif
+#endif
+#ifndef ROPE_BASE
+#define ROPE_BASE 10000.0
+#endif
+#endif
+
 /*
  * microgpt_default_config - Return a config populated with sensible defaults.
  *   These match the compile-time constants above.
@@ -515,6 +566,12 @@ static inline void microgpt_print_config(const char *demo_name,
   printf("    QK RMSNorm   = ON (per-head, pre-dot)\n");
 #else
   printf("    QK RMSNorm   = OFF\n");
+#endif
+#ifdef MICROGPT_PARTIAL_ROPE
+  printf("    Partial RoPE = ON (last %d dims, base=%.0f)\n",
+         ROPE_DIMS, (double)ROPE_BASE);
+#else
+  printf("    Partial RoPE = OFF\n");
 #endif
   printf("\n");
   printf(

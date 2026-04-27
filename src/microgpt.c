@@ -1540,6 +1540,88 @@ static void lin_bwd(const scalar_t *restrict x, const scalar_t *restrict W,
  *
  *   eps (1e-5) prevents division by zero when all x values are near 0.
  */
+#ifdef MICROGPT_PARTIAL_ROPE
+/*
+ * Partial RoPE — cos/sin tables and per-head rotation primitives.
+ *
+ * Tables are populated once on the first call (the engine has no
+ * model_init hook, so we use a guard flag). They're pure functions of
+ * (BLOCK_SIZE, ROPE_DIMS, ROPE_BASE) — no model state required.
+ *
+ * Rotation operates on adjacent-pair dimensions (d, d+1). For each pos
+ * and each pair index p (= d/2), the rotation matrix is
+ *   [ cos(theta)  -sin(theta) ]
+ *   [ sin(theta)   cos(theta) ]
+ * where theta = pos / ROPE_BASE^(2p / ROPE_DIMS).
+ *
+ * Backward is rotation by -theta (orthogonal matrix transpose).
+ */
+static scalar_t g_rope_cos[BLOCK_SIZE][ROPE_DIMS / 2];
+static scalar_t g_rope_sin[BLOCK_SIZE][ROPE_DIMS / 2];
+static int      g_rope_tables_ready = 0;
+
+static void rope_tables_init(void) {
+  if (g_rope_tables_ready) return;
+  for (int p = 0; p < ROPE_DIMS / 2; p++) {
+    /* freq = 1 / ROPE_BASE^(2p / ROPE_DIMS) */
+    double freq = 1.0 / pow((double)ROPE_BASE,
+                            (double)(2 * p) / (double)ROPE_DIMS);
+    for (int pos = 0; pos < BLOCK_SIZE; pos++) {
+      double theta = (double)pos * freq;
+      g_rope_cos[pos][p] = (scalar_t)cos(theta);
+      g_rope_sin[pos][p] = (scalar_t)sin(theta);
+    }
+  }
+  g_rope_tables_ready = 1;
+}
+
+/*
+ * rope_rotate_fwd — rotate the last ROPE_DIMS of one head-dim slice in place.
+ *   x          : pointer to a head-dim slice of length head_dim.
+ *   head_dim   : full size of the slice.
+ *   pos        : token position (used to look up cos/sin).
+ * Only the last min(head_dim, ROPE_DIMS) dims are touched; leading
+ * dims are passed through unchanged so the existing wpe-bearing dims
+ * keep their absolute-position information.
+ */
+static void rope_rotate_fwd(scalar_t *x, size_t head_dim, size_t pos) {
+  if (pos >= (size_t)BLOCK_SIZE) pos = (size_t)BLOCK_SIZE - 1;
+  size_t r = (head_dim < (size_t)ROPE_DIMS) ? head_dim : (size_t)ROPE_DIMS;
+  size_t base = head_dim - r;
+  for (size_t p = 0; p < r / 2; p++) {
+    scalar_t c = g_rope_cos[pos][p];
+    scalar_t s = g_rope_sin[pos][p];
+    scalar_t a = x[base + 2 * p];
+    scalar_t b = x[base + 2 * p + 1];
+    x[base + 2 * p]     = a * c - b * s;
+    x[base + 2 * p + 1] = a * s + b * c;
+  }
+}
+
+/*
+ * rope_rotate_bwd — given a gradient w.r.t. the rotated output, produce
+ * a gradient w.r.t. the pre-rotation input by rotating with -theta.
+ * In-place on dx.
+ */
+static void rope_rotate_bwd(scalar_t *dx, size_t head_dim, size_t pos) {
+  if (pos >= (size_t)BLOCK_SIZE) pos = (size_t)BLOCK_SIZE - 1;
+  size_t r = (head_dim < (size_t)ROPE_DIMS) ? head_dim : (size_t)ROPE_DIMS;
+  size_t base = head_dim - r;
+  for (size_t p = 0; p < r / 2; p++) {
+    scalar_t c = g_rope_cos[pos][p];
+    scalar_t s = g_rope_sin[pos][p];
+    /* Inverse rotation = rotation by -theta:
+     *   da = dout_a * c + dout_b * s
+     *   db = -dout_a * s + dout_b * c
+     */
+    scalar_t da = dx[base + 2 * p];
+    scalar_t db = dx[base + 2 * p + 1];
+    dx[base + 2 * p]     =  da * c + db * s;
+    dx[base + 2 * p + 1] = -da * s + db * c;
+  }
+}
+#endif /* MICROGPT_PARTIAL_ROPE */
+
 static void rmsnorm_fwd(const scalar_t *restrict x, size_t d,
                         scalar_t *restrict out) {
   scalar_t sum = 0;
@@ -2085,6 +2167,18 @@ scalar_t forward_backward_one(const Model *model, size_t token_id,
       rmsnorm_fwd(sv_k_pre[L] + (size_t)h * hd, hd, k + (size_t)h * hd);
     }
 #endif
+#ifdef MICROGPT_PARTIAL_ROPE
+    /* Per-head RoPE rotation on the last ROPE_DIMS of Q and K.
+     * Q rotation uses pos_id; K rotation uses pos_id (the position of
+     * the current token whose K we are projecting). The cache stores
+     * post-rotation K so each cached entry's K already encodes its
+     * original position via the rotation, not via wpe alone. */
+    rope_tables_init();
+    for (int h = 0; h < nh; h++) {
+      rope_rotate_fwd(q + (size_t)h * hd, hd, pos_id);
+      rope_rotate_fwd(k + (size_t)h * hd, hd, pos_id);
+    }
+#endif
     memcpy(sv_q[L], q, ne * sizeof(scalar_t));
     /* Append to cache (caller owns keys[L], values[L]; we write current at
      * cache_len[L]) */
@@ -2480,6 +2574,17 @@ scalar_t forward_backward_one(const Model *model, size_t token_id,
     }
 #endif
 
+#ifdef MICROGPT_PARTIAL_ROPE
+    /* RoPE was the OUTERMOST transform in forward (applied after QK norm,
+     * just before the dot product). So its backward runs FIRST on the
+     * gradient flowing back: rotate d_q and d_k_cur by -theta_pos.
+     * Per-head, in-place. */
+    for (int h = 0; h < nh; h++) {
+      rope_rotate_bwd(d_q + (size_t)h * hd, hd, pos_id);
+      rope_rotate_bwd(d_k_cur + (size_t)h * hd, hd, pos_id);
+    }
+#endif
+
 #ifdef MICROGPT_QK_NORM
     /* Convert d_q and d_k_cur from post-norm gradients to pre-norm gradients
      * via per-head rmsnorm_bwd, using the saved pre-norm Q and K. The V
@@ -2647,6 +2752,14 @@ void forward_inference(const Model *model, size_t token_id, size_t pos_id,
         rmsnorm_fwd(q_pre_local + (size_t)h * hd, hd, q + (size_t)h * hd);
         rmsnorm_fwd(k_pre_local + (size_t)h * hd, hd, k + (size_t)h * hd);
       }
+    }
+#endif
+#ifdef MICROGPT_PARTIAL_ROPE
+    /* RoPE rotation at pos_id (inference; no backward needed). */
+    rope_tables_init();
+    for (int h = 0; h < nh; h++) {
+      rope_rotate_fwd(q + (size_t)h * hd, hd, pos_id);
+      rope_rotate_fwd(k + (size_t)h * hd, hd, pos_id);
     }
 #endif
     memcpy(KV_WRITE(keys, L, cache_len, ne), k, ne * sizeof(scalar_t));

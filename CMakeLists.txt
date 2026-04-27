@@ -557,6 +557,107 @@ add_test(NAME microgpt_qk_norm_tests COMMAND test_microgpt_qk_norm
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
 # ==================================================================
+#  Partial RoPE A/B benchmark (DeepSeek-V4 §2.3.3 port)
+#  See docs/research/RESEARCH_DEEPSEEK_V4_PARTIAL_ROPE.md
+# ==================================================================
+# Tiny config (negative control)
+add_demo(
+  NAME    bench_rope_baseline
+  SOURCE  tests/bench_microgpt_attn_sink.c
+  COPY    demos/character-level/names/c_names.txt
+  DEFINES BENCH_NUM_STEPS=600 BENCH_BATCH_SIZE=8
+)
+
+add_demo(
+  NAME    bench_rope_on
+  SOURCE  tests/bench_microgpt_attn_sink.c
+  COPY    demos/character-level/names/c_names.txt
+  DEFINES BENCH_NUM_STEPS=600 BENCH_BATCH_SIZE=8
+          MICROGPT_PARTIAL_ROPE=1
+)
+
+# Deep config — main standalone result.
+add_demo(
+  NAME    bench_rope_deep_baseline
+  SOURCE  tests/bench_microgpt_attn_sink.c
+  COPY    demos/character-level/names/c_names.txt
+  DEFINES N_EMBD=64 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=64 MLP_DIM=128
+          BENCH_NUM_STEPS=1500 BENCH_BATCH_SIZE=16 BENCH_PROBE_LEN=64
+)
+
+add_demo(
+  NAME    bench_rope_deep_on
+  SOURCE  tests/bench_microgpt_attn_sink.c
+  COPY    demos/character-level/names/c_names.txt
+  DEFINES N_EMBD=64 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=64 MLP_DIM=128
+          BENCH_NUM_STEPS=1500 BENCH_BATCH_SIZE=16 BENCH_PROBE_LEN=64
+          MICROGPT_PARTIAL_ROPE=1
+)
+
+# RoPE + attention sink — composition test
+add_demo(
+  NAME    bench_rope_deep_with_sink
+  SOURCE  tests/bench_microgpt_attn_sink.c
+  COPY    demos/character-level/names/c_names.txt
+  DEFINES N_EMBD=64 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=64 MLP_DIM=128
+          BENCH_NUM_STEPS=1500 BENCH_BATCH_SIZE=16 BENCH_PROBE_LEN=64
+          MICROGPT_PARTIAL_ROPE=1 MICROGPT_ATTN_SINK=1 ATTN_SINK_LOGIT=-1.0
+)
+
+# RoPE + Q/K RMSNorm
+add_demo(
+  NAME    bench_rope_deep_with_qknorm
+  SOURCE  tests/bench_microgpt_attn_sink.c
+  COPY    demos/character-level/names/c_names.txt
+  DEFINES N_EMBD=64 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=64 MLP_DIM=128
+          BENCH_NUM_STEPS=1500 BENCH_BATCH_SIZE=16 BENCH_PROBE_LEN=64
+          MICROGPT_PARTIAL_ROPE=1 MICROGPT_QK_NORM=1
+)
+
+# Full V4-stack: RoPE + sink + Q/K RMSNorm — best expected combination
+add_demo(
+  NAME    bench_rope_deep_full_stack
+  SOURCE  tests/bench_microgpt_attn_sink.c
+  COPY    demos/character-level/names/c_names.txt
+  DEFINES N_EMBD=64 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=64 MLP_DIM=128
+          BENCH_NUM_STEPS=1500 BENCH_BATCH_SIZE=16 BENCH_PROBE_LEN=64
+          MICROGPT_PARTIAL_ROPE=1 MICROGPT_QK_NORM=1
+          MICROGPT_ATTN_SINK=1 ATTN_SINK_LOGIT=-1.0
+)
+
+# Sliding-window MSA benchmark with RoPE on (the unblock-test from
+# the sliding-window paper). Uses the long 2048-token harness.
+add_demo(
+  NAME    bench_rope_msa_sliding_baseline
+  SOURCE  tests/bench_microgpt_msa_sliding.c
+  COPY    demos/character-level/names/c_names.txt
+  DEFINES N_EMBD=64 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=64 MLP_DIM=128
+          BENCH_NUM_STEPS=1500 BENCH_BATCH_SIZE=16 BENCH_LONG_SEQ_LEN=2048
+          MICROGPT_PARTIAL_ROPE=1
+)
+
+add_demo(
+  NAME    bench_rope_msa_sliding_on
+  SOURCE  tests/bench_microgpt_msa_sliding.c
+  COPY    demos/character-level/names/c_names.txt
+  DEFINES N_EMBD=64 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=64 MLP_DIM=128
+          BENCH_NUM_STEPS=1500 BENCH_BATCH_SIZE=16 BENCH_LONG_SEQ_LEN=2048
+          BENCH_MSA_SLIDING_WINDOW=1 MSA_WIN=32
+          MICROGPT_PARTIAL_ROPE=1
+)
+
+# Full unit-test suite with PARTIAL_ROPE=1 to validate the RoPE backward.
+add_executable(test_microgpt_rope tests/test_microgpt.c)
+target_compile_definitions(test_microgpt_rope PRIVATE MICROGPT_PARTIAL_ROPE=1)
+_microgpt_lib_for_defines(_ROPE_LIB MICROGPT_PARTIAL_ROPE=1)
+target_link_libraries(test_microgpt_rope PRIVATE ${_ROPE_LIB})
+if(NOT MSVC)
+  target_link_libraries(test_microgpt_rope PRIVATE m)
+endif()
+add_test(NAME microgpt_rope_tests COMMAND test_microgpt_rope
+         WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+# ==================================================================
 #  Foundation: Character-level Shakespeare generation
 # ==================================================================
 
