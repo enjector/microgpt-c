@@ -1787,6 +1787,17 @@ if(NOT MSVC)
 endif()
 add_test(NAME microgpt_pipeline_tests COMMAND test_microgpt_pipeline WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
+# Pipeline IR corpus generator (Phase 3a) — produces hand-curated
+# (prompt, graph) training pairs by building Pipeline IR objects
+# programmatically and rendering to text. See
+# docs/research/RESEARCH_PIPELINE_IR.md §12.
+add_executable(pipeline_corpus_gen tools/pipeline_corpus_gen.c)
+target_link_libraries(pipeline_corpus_gen PRIVATE microgpt_lib)
+target_include_directories(pipeline_corpus_gen PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+if(NOT MSVC)
+  target_link_libraries(pipeline_corpus_gen PRIVATE m)
+endif()
+
 add_executable(test_microgpt_turboquant tests/test_microgpt_turboquant.c)
 target_link_libraries(test_microgpt_turboquant PRIVATE microgpt_lib)
 target_include_directories(test_microgpt_turboquant PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests ${CMAKE_CURRENT_SOURCE_DIR}/src)

@@ -686,6 +686,202 @@ TEST(execute_vm_null_args_rejected) {
 }
 
 /* ============================================================
+ *  Phase 3a — Corpus integrity
+ *
+ * Each test builds a graph that mirrors a hand-curated example from
+ * tools/pipeline_corpus_gen.c, then asserts the full corpus round-trip:
+ *   build → verify → render → parse → strict-verify → re-render
+ *   → byte-equal first render.
+ *
+ * Catches regressions in any of: builder API, verifier, renderer,
+ * parser, type round-trip, or topological sort determinism.
+ * ============================================================ */
+
+/* Helper: assert the full render→parse→re-render→byte-equal cycle. */
+static int corpus_round_trip_check(Pipeline *p, char **first_render_out) {
+    if (!p) return 0;
+    if (pipeline_verify(p) != PIPE_OK) {
+        printf("\n    verify err: %s ", pipeline_last_error());
+        return 0;
+    }
+    char *r1 = pipeline_render_text(p);
+    if (!r1) return 0;
+    Pipeline *p2 = pipeline_parse_text(r1);
+    if (!p2) { printf("\n    parse err: %s ", pipeline_last_error()); free(r1); return 0; }
+    if (pipeline_verify(p2) != PIPE_OK) {
+        printf("\n    re-verify err: %s ", pipeline_last_error());
+        free(r1); pipeline_free(p2); return 0;
+    }
+    char *r2 = pipeline_render_text(p2);
+    if (!r2) { free(r1); pipeline_free(p2); return 0; }
+    int eq = strcmp(r1, r2) == 0;
+    if (!eq) {
+        printf("\n    --- first render ---\n%s", r1);
+        printf("    --- second render ---\n%s", r2);
+    }
+    if (first_render_out) *first_render_out = r1; else free(r1);
+    free(r2);
+    pipeline_free(p2);
+    return eq;
+}
+
+/* Helper: 1-input 1-output int signature. */
+static void csig_int(Pipeline *p, const char *in_name, const char *out_name) {
+    const char *in_names[]  = { in_name };
+    PipelineType *in_types[] = { pipeline_type_int() };
+    const char *out_names[] = { out_name };
+    PipelineType *out_types[] = { pipeline_type_int() };
+    pipeline_set_signature(p, 1, in_names, in_types, 1, out_names, out_types);
+}
+static void csig_int2(Pipeline *p, const char *a, const char *b, const char *o) {
+    const char *in_names[]  = { a, b };
+    PipelineType *in_types[] = { pipeline_type_int(), pipeline_type_int() };
+    const char *out_names[] = { o };
+    PipelineType *out_types[] = { pipeline_type_int() };
+    pipeline_set_signature(p, 2, in_names, in_types, 1, out_names, out_types);
+}
+static void cnode_2in(Pipeline *p, const char *id, const char *prim) {
+    const char *in_names[]  = { "x", "y" };
+    PipelineType *in_types[] = { pipeline_type_int(), pipeline_type_int() };
+    const char *out_names[] = { "out" };
+    PipelineType *out_types[] = { pipeline_type_int() };
+    pipeline_add_node(p, id, prim, 2, in_names, in_types, 1, out_names, out_types);
+}
+static void cnode_1in(Pipeline *p, const char *id, const char *prim) {
+    const char *in_names[]  = { "x" };
+    PipelineType *in_types[] = { pipeline_type_int() };
+    const char *out_names[] = { "out" };
+    PipelineType *out_types[] = { pipeline_type_int() };
+    pipeline_add_node(p, id, prim, 1, in_names, in_types, 1, out_names, out_types);
+}
+
+TEST(corpus_ex_add) {
+    Pipeline *p = pipeline_create("ex_add");
+    csig_int2(p, "a", "b", "y");
+    cnode_2in(p, "n", "add");
+    pipeline_connect_signature_in(p, "a", "n", "x");
+    pipeline_connect_signature_in(p, "b", "n", "y");
+    pipeline_connect_signature_out(p, "n", "out", "y");
+    char *txt = NULL;
+    int ok = corpus_round_trip_check(p, &txt);
+    ASSERT(ok);
+    ASSERT(strstr(txt, "@graph ex_add") != NULL);
+    ASSERT(strstr(txt, "add(x: <a>, y: <b>)") != NULL);
+    free(txt);
+    pipeline_free(p);
+}
+
+TEST(corpus_ex_negate_chain) {
+    /* add_then_negate(a, b) — 2-node chain, exercises node-to-node edge. */
+    Pipeline *p = pipeline_create("ex_chain");
+    csig_int2(p, "a", "b", "y");
+    cnode_2in(p, "sum", "add");
+    cnode_1in(p, "neg", "negate");
+    pipeline_connect_signature_in(p, "a", "sum", "x");
+    pipeline_connect_signature_in(p, "b", "sum", "y");
+    pipeline_connect(p, "sum", "out", "neg", "x");
+    pipeline_connect_signature_out(p, "neg", "out", "y");
+    char *txt = NULL;
+    int ok = corpus_round_trip_check(p, &txt);
+    ASSERT(ok);
+    ASSERT(strstr(txt, "negate(x: sum.out)") != NULL);
+    free(txt);
+    pipeline_free(p);
+}
+
+TEST(corpus_ex_multi_node_tree) {
+    /* square_sum(a, b) — 3 nodes, two parallel siblings then a join.
+     * Tests deterministic topo order across rebuilds. */
+    Pipeline *p = pipeline_create("ex_tree");
+    csig_int2(p, "a", "b", "y");
+    cnode_2in(p, "sq_a", "multiply");
+    cnode_2in(p, "sq_b", "multiply");
+    cnode_2in(p, "sum",  "add");
+    pipeline_connect_signature_in(p, "a", "sq_a", "x");
+    pipeline_connect_signature_in(p, "a", "sq_a", "y");
+    pipeline_connect_signature_in(p, "b", "sq_b", "x");
+    pipeline_connect_signature_in(p, "b", "sq_b", "y");
+    pipeline_connect(p, "sq_a", "out", "sum", "x");
+    pipeline_connect(p, "sq_b", "out", "sum", "y");
+    pipeline_connect_signature_out(p, "sum", "out", "y");
+    char *txt = NULL;
+    int ok = corpus_round_trip_check(p, &txt);
+    ASSERT(ok);
+    /* Topological order must place both squares before the sum. */
+    const char *p_sq_a = strstr(txt, "sq_a");
+    const char *p_sq_b = strstr(txt, "sq_b");
+    const char *p_sum  = strstr(txt, "| sum =");
+    ASSERT(p_sq_a && p_sq_b && p_sum);
+    ASSERT(p_sum > p_sq_a && p_sum > p_sq_b);
+    free(txt);
+    pipeline_free(p);
+}
+
+TEST(corpus_ex_5_nodes) {
+    /* distance_squared(a1, a2, b1, b2) — 5 nodes, deeper graph. */
+    Pipeline *p = pipeline_create("ex_dist2");
+    const char *in_names[]  = { "a1", "a2", "b1", "b2" };
+    PipelineType *in_types[] = { pipeline_type_int(), pipeline_type_int(),
+                                 pipeline_type_int(), pipeline_type_int() };
+    const char *out_names[] = { "y" };
+    PipelineType *out_types[] = { pipeline_type_int() };
+    pipeline_set_signature(p, 4, in_names, in_types, 1, out_names, out_types);
+    cnode_2in(p, "dx",  "subtract");
+    cnode_2in(p, "dy",  "subtract");
+    cnode_2in(p, "dx2", "multiply");
+    cnode_2in(p, "dy2", "multiply");
+    cnode_2in(p, "sum", "add");
+    pipeline_connect_signature_in(p, "a1", "dx", "x");
+    pipeline_connect_signature_in(p, "b1", "dx", "y");
+    pipeline_connect_signature_in(p, "a2", "dy", "x");
+    pipeline_connect_signature_in(p, "b2", "dy", "y");
+    pipeline_connect(p, "dx", "out", "dx2", "x");
+    pipeline_connect(p, "dx", "out", "dx2", "y");
+    pipeline_connect(p, "dy", "out", "dy2", "x");
+    pipeline_connect(p, "dy", "out", "dy2", "y");
+    pipeline_connect(p, "dx2", "out", "sum", "x");
+    pipeline_connect(p, "dy2", "out", "sum", "y");
+    pipeline_connect_signature_out(p, "sum", "out", "y");
+    char *txt = NULL;
+    int ok = corpus_round_trip_check(p, &txt);
+    ASSERT(ok);
+    ASSERT(strstr(txt, "ex_dist2") != NULL);
+    free(txt);
+    pipeline_free(p);
+}
+
+TEST(corpus_round_trip_byte_equal_iterated) {
+    /* Build → render → parse → render → parse → render. The third
+     * render must equal the second (and the second must equal the
+     * first). Iterates the round-trip to surface cumulative drift. */
+    Pipeline *p = pipeline_create("ex_iter");
+    csig_int2(p, "a", "b", "y");
+    cnode_2in(p, "sum", "add");
+    cnode_1in(p, "neg", "negate");
+    pipeline_connect_signature_in(p, "a", "sum", "x");
+    pipeline_connect_signature_in(p, "b", "sum", "y");
+    pipeline_connect(p, "sum", "out", "neg", "x");
+    pipeline_connect_signature_out(p, "neg", "out", "y");
+    ASSERT_EQ(pipeline_verify(p), PIPE_OK);
+
+    char *r1 = pipeline_render_text(p);
+    Pipeline *p2 = pipeline_parse_text(r1);
+    ASSERT(p2 != NULL);
+    ASSERT_EQ(pipeline_verify(p2), PIPE_OK);
+    char *r2 = pipeline_render_text(p2);
+    Pipeline *p3 = pipeline_parse_text(r2);
+    ASSERT(p3 != NULL);
+    ASSERT_EQ(pipeline_verify(p3), PIPE_OK);
+    char *r3 = pipeline_render_text(p3);
+
+    ASSERT(strcmp(r1, r2) == 0);
+    ASSERT(strcmp(r2, r3) == 0);
+
+    free(r1); free(r2); free(r3);
+    pipeline_free(p); pipeline_free(p2); pipeline_free(p3);
+}
+
+/* ============================================================
  *  Last-error reporting
  * ============================================================ */
 
@@ -749,6 +945,13 @@ int main(void) {
     printf("\n[Pipeline IR — Phase 2 VM dispatch (deferred)]\n");
     RUN(execute_vm_returns_deferred_error);
     RUN(execute_vm_null_args_rejected);
+
+    printf("\n[Pipeline IR — Phase 3a corpus integrity]\n");
+    RUN(corpus_ex_add);
+    RUN(corpus_ex_negate_chain);
+    RUN(corpus_ex_multi_node_tree);
+    RUN(corpus_ex_5_nodes);
+    RUN(corpus_round_trip_byte_equal_iterated);
 
     printf("\n[Pipeline IR — Error reporting]\n");
     RUN(last_error_set_on_failure);

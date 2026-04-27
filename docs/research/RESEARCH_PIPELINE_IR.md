@@ -295,8 +295,9 @@ This paper documents **Phase 1**. The full plan:
 | Phase | Deliverable | Status |
 |---|---|---|
 | **1** | **IR + verifier + text round-trip + DOT + callback executor + tests** | **✅ Shipped** |
-| **2** | **Typed round-trip + partial verify + VM dispatch surface + parser bug fixes** | **✅ Shipped (see §10 below)** |
-| 3 | Wiring Organelle: train on (prompt, graph-text) pairs, incrementally verify partial graphs | Pending |
+| **2** | **Typed round-trip + partial verify + VM dispatch surface + parser bug fixes** | **✅ Shipped (see §10)** |
+| **3a** | **Hand-curated corpus generator + canonical topo sort + corpus integrity tests** | **✅ Shipped (see §11)** |
+| 3b | Wiring Organelle: train on (prompt, graph-text) pairs, incrementally verify partial graphs | Pending |
 | 4 | SysML multi-view rendering (block, internal block, activity, parametric) + headline benchmark | Pending |
 
 Phase 1 is genuinely useful on its own — an embeddable graph IR with type-checked composition, a deterministic Judge, and visualisation support. Even if Phase 3's wiring-organelle hypothesis fails empirically, Phase 1 is reusable infrastructure: any future organelle that wants to emit verifiable compositions can target this IR.
@@ -448,7 +449,111 @@ The next step for Phase 3 is to design the corpus generator: walk existing VM fu
 
 ---
 
-## 11. Closing Remark
+## 11. Phase 3a — Corpus generator + canonical topological sort
+
+Phase 3a delivers a hand-curated corpus of `(prompt, graph-text)` examples for the future Wiring Organelle, plus a determinism fix that surfaced when round-trip-testing the corpus.
+
+### 12.1 Why hand-curated rather than AST-converted
+
+The existing `c_vm_functions_combined.txt` is 1597 imperative VM functions with loops, conditionals, and stateful variables. The Pipeline IR is a pure-dataflow graph — no control flow, no state. AST-walking the existing corpus would produce mostly garbage (the loop-heavy functions don't decompose) and would require hundreds of lines of conversion logic for marginal yield.
+
+Phase 3a's choice: build ~10 carefully-designed examples directly via the Pipeline IR API as small C functions. Each function returns a verified, renderable Pipeline*. The corpus is the program's output — the program itself is the source of truth. Phase 3b can scale up via the same pattern.
+
+### 12.2 The 10 examples
+
+Covers 1- through 5-node graphs, all `int`-typed, using the standard arithmetic primitives (`add`, `multiply`, `subtract`, `negate`, `abs`):
+
+| # | Example | Nodes | Shape |
+|---|---|---:|---|
+| 1 | `add(a, b) → y` | 1 | single-node |
+| 2 | `multiply(a, b) → y` | 1 | single-node |
+| 3 | `negate(x) → y` | 1 | single-node |
+| 4 | `abs_val(x) → y` | 1 | single-node |
+| 5 | `negate(a + b)` | 2 | linear chain |
+| 6 | `a*a + b*b` | 3 | parallel siblings → join |
+| 7 | `axpy: a*x + y_in` | 2 | linear chain |
+| 8 | `a*x*x + b` | 3 | linear chain (3-step) |
+| 9 | `(a1-b1)² + (a2-b2)²` | 5 | dual subtree → join |
+| 10 | `a + (b-a)*t` (lerp) | 3 | linear chain |
+
+Each example is a small builder function in `tools/pipeline_corpus_gen.c` (~10–25 LOC each). The main loop verifies each, renders it via `pipeline_render_text()`, and emits the corpus stream:
+
+```
+# Pipeline IR — hand-curated training corpus (Phase 3a)
+# 10 examples; format: prompt comment + @graph...@end + --- separator
+
+// add two integers
+@graph ex_add
+  : in a -> int
+  : in b -> int
+  : out y -> int
+  | n = add(x: <a>, y: <b>) :: x:int, y:int -> out:int
+  y <- n.out
+@end
+---
+…
+```
+
+This format is what the Wiring Organelle will be trained on in Phase 3b: comment lines as natural-language prompts, `@graph`-blocks as targets, `---` as document separators.
+
+### 12.3 The determinism bug surfaced by corpus tests
+
+The corpus integrity tests assert that for every example: render → parse → strict-verify → re-render produces the same bytes as the first render. On `ex_distance_squared` (5 nodes, parallel `dx, dy` siblings) this failed:
+
+```
+First render order:  dy, dy2, dx, dx2, sum
+Second render order: dx, dx2, dy, dy2, sum
+```
+
+Both are valid topological orders — `dx` and `dy` have no inter-dependency, so DFS-based topo sort emitted them in whichever order the recursion happened to reach them. The DFS order depends on insertion order, and the parser's insertion order differs from the original builder's, so the round-trip wasn't byte-stable.
+
+**Fix:** swap DFS topo for **Kahn's algorithm with lexicographic-id tiebreaker**. At each step, pick the lexicographically smallest node with in-degree 0 among the unfinished set. The output order is now canonical: any two equivalent DAGs produce the same `exec_order` regardless of insertion order.
+
+Verified by running the corpus generator twice and diffing the output:
+
+```
+$ ./pipeline_corpus_gen v1.txt && ./pipeline_corpus_gen v2.txt
+$ md5 v1.txt v2.txt
+9e6d0608fa3565269af0635e568c2ffb  v1.txt
+9e6d0608fa3565269af0635e568c2ffb  v2.txt
+$ diff -q v1.txt v2.txt
+(no output — files are identical)
+```
+
+### 12.4 Corpus integrity tests
+
+5 new tests in `test_microgpt_pipeline.c` (now 36 total, was 31):
+
+```
+[Phase 3a corpus integrity]
+  corpus_ex_add                                                PASS
+  corpus_ex_negate_chain                                       PASS
+  corpus_ex_multi_node_tree                                    PASS
+  corpus_ex_5_nodes                                            PASS
+  corpus_round_trip_byte_equal_iterated                        PASS
+```
+
+Each test runs the full pipeline: build → verify → render → parse → re-verify → re-render → assert byte-equal. The iterated test does this **three times** to catch any cumulative drift across multiple parse-render cycles.
+
+### 12.5 What Phase 3b needs
+
+The corpus generator and integrity tests are ready. To start Phase 3b (Wiring Organelle training):
+
+1. **Scale the corpus to ~500-2000 examples.** Same hand-curated approach extended with statistical pipelines (`mean`, `stddev`, `zscore`), signal-processing chains (`lowpass → fft`), and aggregations (`sum_of_squares`, `dot_product`). Each ~10-25 LOC, totaling maybe 25-50K LOC of generator code OR a templated DSL that emits builder calls. The latter is the right Phase 3b investment.
+
+2. **Tokenise the corpus.** The graph-text format uses ~30 grammar tokens plus identifiers and primitive names. Build a word-level vocab via the existing `build_word_vocab` infrastructure. Expect vocab size around 200-500 tokens.
+
+3. **Train an organelle.** Same `organelle_train_words` API used by `vm_codegen`. Architecture per the prior codegen experiments — 4-layer 96-emb 256-context. The model's task: given a comment line, predict the `@graph...@end` block.
+
+4. **Inference + incremental verification.** The model generates one node line at a time; after each line, run `pipeline_verify_partial` to check for hard errors (type mismatches, cycles). Reject and resample on errors — this is the equivalent of `OpaCycleDetector` rejecting A↔B oscillations in the existing organelle pipeline.
+
+5. **Compare to the `vm_compose` 15%/5% baseline.** Score: fraction of held-out prompts that produce a graph that (a) verifies, (b) executes, (c) computes the correct output for sample inputs. This is the headline benchmark.
+
+The active-attention V4 stack (RoPE + sink + Q/K RMSNorm) **should not be enabled** for the Wiring Organelle based on the prior codegen ablation — grammar-rigid generation regressed under the V4 stack. Stick with the engine defaults.
+
+---
+
+## 12. Closing Remark
 
 The IR ships. 24 tests pass. The header has detailed doc-comments. The DOT renderer makes graphs human-readable. The text format is small enough for a tiny model to emit.
 

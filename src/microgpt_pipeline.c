@@ -670,32 +670,50 @@ static int verify_impl(Pipeline *p, int strict, int *missing_out) {
         }
     }
 
-    /* 7. Topological sort + cycle check. */
+    /* 7. Topological sort + cycle check.
+     *
+     * Use Kahn's algorithm with a lexicographic-id tiebreaker so the
+     * output order is canonical: any two equivalent DAGs (same edges,
+     * any insertion order) produce the same exec_order. This is
+     * required for round-trip byte-equality of the rendered text. */
     if (p->exec_order) { free(p->exec_order); p->exec_order = NULL; }
     if (p->n_nodes == 0) { p->verified = strict ? 1 : 0; if (missing_out) *missing_out = missing; return PIPE_OK; }
     p->exec_order = (int *)calloc(p->n_nodes, sizeof(int));
     if (!p->exec_order) { set_err("OOM"); return PIPE_ERR_OOM; }
-    char *state = (char *)calloc(p->n_nodes, 1);
-    if (!state) { free(p->exec_order); p->exec_order = NULL; set_err("OOM"); return PIPE_ERR_OOM; }
-    int order_pos = 0;
-    for (size_t i = 0; i < p->n_nodes; i++) {
-        if (state[i] == 0) {
-            int rc = topo_visit(p, (int)i, state, p->exec_order, &order_pos);
-            if (rc != 0) {
-                free(state);
-                free(p->exec_order); p->exec_order = NULL;
-                set_err("verify: cycle detected involving node '%s'", p->nodes[i]->id);
-                return PIPE_ERR_CYCLE;
+    int *indegree = (int *)calloc(p->n_nodes, sizeof(int));
+    if (!indegree) { free(p->exec_order); p->exec_order = NULL; set_err("OOM"); return PIPE_ERR_OOM; }
+    for (size_t e = 0; e < p->n_edges; e++) {
+        const PipelineEdge *edge = p->edges[e];
+        if (edge->src_node_idx >= 0 && edge->dst_node_idx >= 0) {
+            indegree[edge->dst_node_idx]++;
+        }
+    }
+    int emitted = 0;
+    while (emitted < (int)p->n_nodes) {
+        /* Pick the lexicographically smallest node with in-degree 0
+         * that hasn't been emitted yet. */
+        int pick = -1;
+        for (size_t i = 0; i < p->n_nodes; i++) {
+            if (indegree[i] != 0) continue;     /* already emitted (-1) or has deps */
+            if (pick < 0) { pick = (int)i; continue; }
+            if (strcmp(p->nodes[i]->id, p->nodes[pick]->id) < 0) pick = (int)i;
+        }
+        if (pick < 0) {
+            free(indegree);
+            free(p->exec_order); p->exec_order = NULL;
+            set_err("verify: cycle detected (no node with in-degree 0 remaining)");
+            return PIPE_ERR_CYCLE;
+        }
+        p->exec_order[emitted++] = pick;
+        indegree[pick] = -1;                    /* mark emitted */
+        for (size_t e = 0; e < p->n_edges; e++) {
+            const PipelineEdge *edge = p->edges[e];
+            if (edge->src_node_idx == pick && edge->dst_node_idx >= 0) {
+                indegree[edge->dst_node_idx]--;
             }
         }
     }
-    free(state);
-    /* Reverse to forward-topological order. */
-    for (int i = 0, j = order_pos - 1; i < j; i++, j--) {
-        int tmp = p->exec_order[i];
-        p->exec_order[i] = p->exec_order[j];
-        p->exec_order[j] = tmp;
-    }
+    free(indegree);
 
     /* Only mark verified=1 in strict mode (partial graphs can't safely
      * be executed even if no hard errors). */
