@@ -302,6 +302,35 @@ int pipeline_node_set_config_string(Pipeline *p, const char *node_id,
 
 int pipeline_verify(Pipeline *p);
 
+/* ============================================================
+ *  Partial verification (Phase 2 — for incremental construction)
+ * ============================================================
+ *
+ * pipeline_verify_partial() runs the same checks as pipeline_verify()
+ * but treats "still incomplete" conditions as recoverable warnings
+ * rather than hard errors:
+ *
+ *   - Dangling input ports are allowed (they will be wired later).
+ *   - Unconnected signature outputs are allowed.
+ *   - Unused signature inputs are allowed.
+ *
+ * Hard errors (still rejected):
+ *   - Duplicate node ids.
+ *   - Edge endpoints referencing nonexistent nodes/ports.
+ *   - Type mismatches on connected edges.
+ *   - Cycles among connected nodes.
+ *
+ * On success returns PIPE_OK and writes the count of "missing"
+ * elements (dangling ports + unconnected sig outputs + unused sig
+ * inputs) into *missing_out (may be NULL). The caller can decide
+ * whether the graph is complete enough to execute (typically
+ * complete iff missing == 0, equivalent to pipeline_verify success).
+ *
+ * Designed for the future Wiring Organelle — it constructs a graph
+ * one node at a time and gets actionable feedback after each step.
+ */
+int pipeline_verify_partial(Pipeline *p, int *missing_out);
+
 /* Returns a pointer to a static buffer holding the most recent error
  * message produced by any pipeline_* function in this thread. Buffer
  * is overwritten by subsequent calls. Never returns NULL. */
@@ -364,6 +393,38 @@ int pipeline_execute(const Pipeline *p,
                      const PipelineValue *inputs,
                      PipelineValue *outputs,
                      PipelineDispatchFn dispatch, void *user_data);
+
+/* ============================================================
+ *  VM-backed dispatch (Phase 2 — convenience integration)
+ * ============================================================
+ *
+ * Executes a pipeline by resolving each leaf node's primitive name to
+ * a registered native function in the supplied vm_engine, then calling
+ * it via the engine's dispatch path.
+ *
+ * Phase 2 limitation: vm_native_fn takes (int argc, const double *argv)
+ * and returns double — so this entry point only works for pipelines
+ * whose leaf nodes use INT/FLOAT-typed ports exclusively. Pipelines
+ * with STRING/LIST/TENSOR/RECORD ports must use the callback-based
+ * pipeline_execute().
+ *
+ * The host is responsible for:
+ *   - Calling vm_engine_register_fn() for every primitive name that
+ *     appears in the pipeline (before pipeline_execute_vm).
+ *   - Disposing the engine when done.
+ *
+ * Returns 0 on success or a negative PIPE_ERR_* code. If a primitive
+ * is missing from the engine, returns PIPE_ERR_EXEC and
+ * pipeline_last_error() identifies the missing primitive.
+ */
+
+/* Forward declaration to avoid including microgpt_vm.h in this header. */
+typedef struct vm_engine_t vm_engine;
+
+int pipeline_execute_vm(const Pipeline *p,
+                        vm_engine *vm,
+                        const PipelineValue *inputs,
+                        PipelineValue *outputs);
 
 /* ============================================================
  *  Text serialisation (round-trip safe for verified graphs)

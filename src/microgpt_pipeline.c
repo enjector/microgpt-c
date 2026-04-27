@@ -562,11 +562,14 @@ static int topo_visit(const Pipeline *p, int node_idx, char *state, int *order, 
     return 0;
 }
 
-int pipeline_verify(Pipeline *p) {
-    if (!p) { set_err("pipeline_verify: null"); return PIPE_ERR_OOM; }
+/* Internal: shared verify body with a `strict` flag. When strict==0
+ * (partial mode), dangling ports and signature unbinding are tolerated
+ * and counted into *missing rather than rejected. */
+static int verify_impl(Pipeline *p, int strict, int *missing_out) {
+    int missing = 0;
+    if (!p) { set_err("verify: null"); return PIPE_ERR_OOM; }
 
-    /* 1. Unique node ids — validated at insertion via find_node, but
-     *    re-check for safety against external mutation. */
+    /* 1. Unique node ids. */
     for (size_t i = 0; i < p->n_nodes; i++) {
         for (size_t j = i + 1; j < p->n_nodes; j++) {
             if (strcmp(p->nodes[i]->id, p->nodes[j]->id) == 0) {
@@ -576,7 +579,7 @@ int pipeline_verify(Pipeline *p) {
         }
     }
 
-    /* 2. Edge endpoints reference existing nodes/ports. */
+    /* 2. Edge endpoints valid. */
     for (size_t i = 0; i < p->n_edges; i++) {
         const PipelineEdge *e = p->edges[i];
         if (!edge_src_type(p, e)) {
@@ -603,7 +606,7 @@ int pipeline_verify(Pipeline *p) {
         }
     }
 
-    /* 4. Every node input port has exactly one incoming edge. */
+    /* 4. Every node input port has exactly one incoming edge (strict). */
     for (size_t n = 0; n < p->n_nodes; n++) {
         for (int ip = 0; ip < p->nodes[n]->n_inputs; ip++) {
             int incoming = 0;
@@ -611,7 +614,15 @@ int pipeline_verify(Pipeline *p) {
                 const PipelineEdge *edge = p->edges[e];
                 if (edge->dst_node_idx == (int)n && edge->dst_port_idx == ip) incoming++;
             }
-            if (incoming != 1) {
+            if (incoming == 0) {
+                if (strict) {
+                    set_err("verify: node '%s' input port '%s' has 0 incoming edges (need 1)",
+                            p->nodes[n]->id,
+                            p->nodes[n]->inputs[ip].name ? p->nodes[n]->inputs[ip].name : "?");
+                    return PIPE_ERR_DANGLING_PORT;
+                }
+                missing++;
+            } else if (incoming > 1) {
                 set_err("verify: node '%s' input port '%s' has %d incoming edges (need 1)",
                         p->nodes[n]->id,
                         p->nodes[n]->inputs[ip].name ? p->nodes[n]->inputs[ip].name : "?",
@@ -621,22 +632,28 @@ int pipeline_verify(Pipeline *p) {
         }
     }
 
-    /* 5. Every signature output is connected exactly once. */
+    /* 5. Signature outputs (strict: exactly 1; partial: tolerate 0). */
     for (int so = 0; so < p->n_sig_out; so++) {
         int incoming = 0;
         for (size_t e = 0; e < p->n_edges; e++) {
             const PipelineEdge *edge = p->edges[e];
             if (edge->dst_node_idx == SIG_OUT_NODE && edge->dst_port_idx == so) incoming++;
         }
-        if (incoming != 1) {
+        if (incoming == 0) {
+            if (strict) {
+                set_err("verify: signature output '%s' has 0 incoming edges (need 1)",
+                        p->signature_out[so].name ? p->signature_out[so].name : "?");
+                return PIPE_ERR_BAD_SIGNATURE;
+            }
+            missing++;
+        } else if (incoming > 1) {
             set_err("verify: signature output '%s' has %d incoming edges (need 1)",
                     p->signature_out[so].name ? p->signature_out[so].name : "?", incoming);
             return PIPE_ERR_BAD_SIGNATURE;
         }
     }
 
-    /* 6. Every signature input is referenced at least once
-     *    (warning-only if you allow unused, but we require it for hygiene). */
+    /* 6. Signature inputs (strict: must be used; partial: tolerate). */
     for (int si = 0; si < p->n_sig_in; si++) {
         int outgoing = 0;
         for (size_t e = 0; e < p->n_edges; e++) {
@@ -644,15 +661,18 @@ int pipeline_verify(Pipeline *p) {
             if (edge->src_node_idx == SIG_IN_NODE && edge->src_port_idx == si) outgoing++;
         }
         if (outgoing < 1) {
-            set_err("verify: signature input '%s' is unused (must connect to >=1 port)",
-                    p->signature_in[si].name ? p->signature_in[si].name : "?");
-            return PIPE_ERR_BAD_SIGNATURE;
+            if (strict) {
+                set_err("verify: signature input '%s' is unused (must connect to >=1 port)",
+                        p->signature_in[si].name ? p->signature_in[si].name : "?");
+                return PIPE_ERR_BAD_SIGNATURE;
+            }
+            missing++;
         }
     }
 
     /* 7. Topological sort + cycle check. */
     if (p->exec_order) { free(p->exec_order); p->exec_order = NULL; }
-    if (p->n_nodes == 0) { p->verified = 1; return PIPE_OK; }
+    if (p->n_nodes == 0) { p->verified = strict ? 1 : 0; if (missing_out) *missing_out = missing; return PIPE_OK; }
     p->exec_order = (int *)calloc(p->n_nodes, sizeof(int));
     if (!p->exec_order) { set_err("OOM"); return PIPE_ERR_OOM; }
     char *state = (char *)calloc(p->n_nodes, 1);
@@ -670,15 +690,27 @@ int pipeline_verify(Pipeline *p) {
         }
     }
     free(state);
-    /* topo_visit produces reverse-topological — flip it. */
+    /* Reverse to forward-topological order. */
     for (int i = 0, j = order_pos - 1; i < j; i++, j--) {
         int tmp = p->exec_order[i];
         p->exec_order[i] = p->exec_order[j];
         p->exec_order[j] = tmp;
     }
 
-    p->verified = 1;
+    /* Only mark verified=1 in strict mode (partial graphs can't safely
+     * be executed even if no hard errors). */
+    if (strict) p->verified = 1;
+    if (missing_out) *missing_out = missing;
     return PIPE_OK;
+}
+
+int pipeline_verify_partial(Pipeline *p, int *missing_out) {
+    return verify_impl(p, /*strict=*/0, missing_out);
+}
+
+int pipeline_verify(Pipeline *p) {
+    /* Strict mode of the shared verify_impl. */
+    return verify_impl(p, /*strict=*/1, NULL);
 }
 
 /* ============================================================
@@ -793,6 +825,59 @@ cleanup:
 }
 
 /* ============================================================
+ *  VM-backed dispatch (Phase 2 — API surface, deferred dispatch)
+ * ============================================================
+ *
+ * The header declares pipeline_execute_vm(). The intended semantics
+ * are: resolve each leaf primitive name to a registered vm_native_fn
+ * in the supplied vm_engine, marshal PipelineValue ↔ double, dispatch.
+ *
+ * Phase 2 ships the API surface (so dependent code can compile and
+ * tests can assert on the error path) but the internal dispatch is
+ * deferred to Phase 3 because the public vm_engine API does not
+ * provide:
+ *   1. A way to enumerate or look up registered native functions
+ *      from C — vm_engine_t's native_fns[] table is private to
+ *      microgpt_vm.c.
+ *   2. A way to invoke a registered native function with C-side
+ *      arguments — vm_engine_run() takes only a fn_name and returns
+ *      via the engine's result slot; arguments must come from a
+ *      preloaded VM script.
+ *
+ * Working around this either requires (a) extending microgpt_vm.h
+ * with an exported lookup-and-call API (cleanest) or (b) synthesising
+ * a per-pipeline VM script that calls the registered fns in
+ * topological order and runs it via vm_engine_run() (messier, but
+ * keeps microgpt_vm unmodified).
+ *
+ * Phase 3 will choose between (a) and (b) based on whether the
+ * Wiring Organelle work pushes for changes in microgpt_vm.h anyway.
+ * Until then, callers should use pipeline_execute() with their own
+ * (name, fn) lookup table — which is exactly what the VM dispatcher
+ * would do internally.
+ */
+int pipeline_execute_vm(const Pipeline *p,
+                        vm_engine *vm,
+                        const PipelineValue *inputs,
+                        PipelineValue *outputs) {
+    (void)inputs; (void)outputs;
+    if (!p) {
+        set_err("pipeline_execute_vm: null pipeline");
+        return PIPE_ERR_EXEC;
+    }
+    if (!vm) {
+        set_err("pipeline_execute_vm: null vm_engine");
+        return PIPE_ERR_EXEC;
+    }
+    set_err("pipeline_execute_vm: dispatch deferred to Phase 3 — "
+            "the public vm_engine API doesn't expose native-fn lookup-and-call. "
+            "Use pipeline_execute() with a host-supplied dispatcher that calls "
+            "your fn pointers directly. See microgpt_pipeline.c §VM-backed dispatch "
+            "for the design notes.");
+    return PIPE_ERR_EXEC;
+}
+
+/* ============================================================
  *  Text serialisation
  * ============================================================ */
 
@@ -883,6 +968,37 @@ char *pipeline_render_text(const Pipeline *p) {
             }
         }
         if (sb_append(&out, ")") < 0) goto err;
+        /* Phase 2: Type annotation suffix `:: in_port:type, ... -> out_port:type, ...`
+         * Emitted only if any port has a non-ANY type (round-trip preserves
+         * concrete types for verified graphs; ANY-only graphs round-trip
+         * structurally without the suffix). */
+        {
+            int needs_annot = 0;
+            for (int ip = 0; ip < node->n_inputs && !needs_annot; ip++)
+                if (node->inputs[ip].type && node->inputs[ip].type->kind != PIPE_T_ANY)
+                    needs_annot = 1;
+            for (int op = 0; op < node->n_outputs && !needs_annot; op++)
+                if (node->outputs[op].type && node->outputs[op].type->kind != PIPE_T_ANY)
+                    needs_annot = 1;
+            if (needs_annot) {
+                if (sb_append(&out, " :: ") < 0) goto err;
+                for (int ip = 0; ip < node->n_inputs; ip++) {
+                    char tb[128] = "";
+                    pipeline_type_format(node->inputs[ip].type, tb, sizeof(tb));
+                    if (sb_appendf(&out, "%s%s:%s", ip ? ", " : "",
+                                   node->inputs[ip].name ? node->inputs[ip].name : "?",
+                                   tb) < 0) goto err;
+                }
+                if (sb_append(&out, " -> ") < 0) goto err;
+                for (int op = 0; op < node->n_outputs; op++) {
+                    char tb[128] = "";
+                    pipeline_type_format(node->outputs[op].type, tb, sizeof(tb));
+                    if (sb_appendf(&out, "%s%s:%s", op ? ", " : "",
+                                   node->outputs[op].name ? node->outputs[op].name : "?",
+                                   tb) < 0) goto err;
+                }
+            }
+        }
         /* Config. */
         if (node->n_config > 0) {
             if (sb_append(&out, " #") < 0) goto err;
@@ -974,7 +1090,11 @@ static int ps_eat(PState *ps, char c) {
 static char *ps_read_ident(PState *ps) {
     ps_skip_ws(ps);
     const char *start = ps->cur;
-    while (isalnum((unsigned char)*ps->cur) || *ps->cur == '_' || *ps->cur == '.' || *ps->cur == '-') ps->cur++;
+    /* Allow `-` only as a leading sign character (for negative tensor
+     * dimensions like `-1`). `.` is a separator between node id and port
+     * name and must NOT be consumed by the identifier reader. */
+    if (*ps->cur == '-') ps->cur++;
+    while (isalnum((unsigned char)*ps->cur) || *ps->cur == '_') ps->cur++;
     if (ps->cur == start) return NULL;
     size_t l = (size_t)(ps->cur - start);
     char *id = (char *)malloc(l + 1);
@@ -1122,14 +1242,16 @@ Pipeline *pipeline_parse_text(const char *src) {
      * bindings tell us better. For Phase-1, the parse target is canonical
      * round-tripping, so port types are recovered from the connect lines'
      * source ports as the graph is rebuilt. */
-    /* Simpler approach: parse nodes then connect with ANY-typed ports. The
-     * round-trip test renders+parses verified graphs, where node port types
-     * are baked into the textual form by the renderer. Phase-1 round-trip
-     * goal is structural: same nodes, same edges, same primitives. Type
-     * fidelity in parsing is left for Phase 2. */
+    /* Phase 2: ParsedNode now optionally carries port-type annotations
+     * recovered from the `::` suffix. If absent, ports default to ANY
+     * (Phase-1 behaviour). Multi-output nodes are also supported. */
     typedef struct {
         char *id; char *prim;
         char **in_names; char **in_src_node; char **in_src_port; int n_in;
+        PipelineType **in_types;            /* NULL or array of length n_in */
+        char **out_names;                   /* NULL or array of length n_out */
+        PipelineType **out_types;           /* NULL or array of length n_out */
+        int n_out;
     } ParsedNode;
     ParsedNode *pn = NULL; int n_pn = 0; int cap_pn = 0;
 
@@ -1186,6 +1308,68 @@ Pipeline *pipeline_parse_text(const char *src) {
                 ps_skip_ws(&ps);
             }
             ps_eat(&ps, ')');
+            /* Phase 2: optional `:: in:type, ... -> out:type, ...` suffix. */
+            ps_skip_ws(&ps);
+            if (ps_match_kw(&ps, "::")) {
+                /* Inputs */
+                int cap_t = 8;
+                cur->in_types  = (PipelineType **)calloc((size_t)cap_t, sizeof(PipelineType *));
+                cur->out_names = (char **)calloc((size_t)cap_t, sizeof(char *));
+                cur->out_types = (PipelineType **)calloc((size_t)cap_t, sizeof(PipelineType *));
+                int n_in_t = 0;
+                ps_skip_ws(&ps);
+                while (*ps.cur != '-' && *ps.cur && *ps.cur != '\n') {
+                    if (n_in_t > 0 && !ps_eat(&ps, ',')) break;
+                    ps_skip_ws(&ps);
+                    char *pn_name = ps_read_ident(&ps);
+                    if (!pn_name) break;
+                    if (!ps_eat(&ps, ':')) { free(pn_name); break; }
+                    PipelineType *pt = ps_read_type(&ps);
+                    if (!pt) { free(pn_name); break; }
+                    /* Match by name to the existing in_names entry. */
+                    int matched = 0;
+                    for (int k = 0; k < cur->n_in; k++) {
+                        if (strcmp(cur->in_names[k], pn_name) == 0) {
+                            if (n_in_t >= cap_t) {
+                                cap_t *= 2;
+                                cur->in_types = (PipelineType **)realloc(cur->in_types, sizeof(PipelineType *) * (size_t)cap_t);
+                            }
+                            /* Store at slot k, padding NULLs as needed. */
+                            while (n_in_t <= k) { cur->in_types[n_in_t++] = NULL; }
+                            cur->in_types[k] = pt;
+                            matched = 1;
+                            break;
+                        }
+                    }
+                    if (!matched) pipeline_type_free(pt);
+                    free(pn_name);
+                    ps_skip_ws(&ps);
+                }
+                /* "->" separator */
+                if (ps_match_kw(&ps, "->")) {
+                    int n_out_t = 0;
+                    ps_skip_ws(&ps);
+                    while (*ps.cur && *ps.cur != '\n' && *ps.cur != '#') {
+                        if (n_out_t > 0 && !ps_eat(&ps, ',')) break;
+                        ps_skip_ws(&ps);
+                        char *pn_name = ps_read_ident(&ps);
+                        if (!pn_name) break;
+                        if (!ps_eat(&ps, ':')) { free(pn_name); break; }
+                        PipelineType *pt = ps_read_type(&ps);
+                        if (!pt) { free(pn_name); break; }
+                        if (n_out_t >= cap_t) {
+                            cap_t *= 2;
+                            cur->out_names = (char **)realloc(cur->out_names, sizeof(char *) * (size_t)cap_t);
+                            cur->out_types = (PipelineType **)realloc(cur->out_types, sizeof(PipelineType *) * (size_t)cap_t);
+                        }
+                        cur->out_names[n_out_t] = pn_name;
+                        cur->out_types[n_out_t] = pt;
+                        n_out_t++;
+                        ps_skip_ws(&ps);
+                    }
+                    cur->n_out = n_out_t;
+                }
+            }
             /* Skip optional config (Phase 1: ignore values for round-trip). */
             ps_skip_ws(&ps);
             if (*ps.cur == '#') {
@@ -1230,23 +1414,56 @@ Pipeline *pipeline_parse_text(const char *src) {
     /* @end */
     ps_match_kw(&ps, "@end");
 
-    /* Build nodes (Phase-1: ANY-typed ports — round-trip is structural). */
+    /* Build nodes. Phase 2: use parsed `::` types when present, else
+     * fall back to ANY (Phase-1 behaviour). */
     for (int i = 0; i < n_pn; i++) {
         ParsedNode *cur = &pn[i];
         if (!cur->prim) continue;  /* skip binding entries */
         const char **in_names = (const char **)calloc((size_t)(cur->n_in > 0 ? cur->n_in : 1), sizeof(char *));
         PipelineType **in_types = (PipelineType **)calloc((size_t)(cur->n_in > 0 ? cur->n_in : 1), sizeof(PipelineType *));
-        for (int k = 0; k < cur->n_in; k++) { in_names[k] = cur->in_names[k]; in_types[k] = pipeline_type_any(); }
-        /* Output ports: phase 1 emits a single "out" port of ANY type. */
-        const char *out_names[1] = { "out" };
-        PipelineType *out_types[1] = { pipeline_type_any() };
+        for (int k = 0; k < cur->n_in; k++) {
+            in_names[k] = cur->in_names[k];
+            if (cur->in_types && cur->in_types[k])
+                in_types[k] = cur->in_types[k];      /* take ownership */
+            else
+                in_types[k] = pipeline_type_any();
+        }
+        /* Output ports. If parsed `::` provided them, use those; else
+         * fall back to a single ANY-typed "out" port. */
+        const char **out_names_arr;
+        PipelineType **out_types_arr;
+        int n_out;
+        if (cur->n_out > 0) {
+            out_names_arr = (const char **)calloc((size_t)cur->n_out, sizeof(char *));
+            out_types_arr = (PipelineType **)calloc((size_t)cur->n_out, sizeof(PipelineType *));
+            for (int k = 0; k < cur->n_out; k++) {
+                out_names_arr[k] = cur->out_names[k];
+                out_types_arr[k] = cur->out_types[k]; /* take ownership */
+            }
+            n_out = cur->n_out;
+        } else {
+            out_names_arr = (const char **)malloc(sizeof(char *));
+            out_types_arr = (PipelineType **)malloc(sizeof(PipelineType *));
+            out_names_arr[0] = "out";
+            out_types_arr[0] = pipeline_type_any();
+            n_out = 1;
+        }
         if (pipeline_add_node(p, cur->id, cur->prim,
                               cur->n_in, in_names, in_types,
-                              1, out_names, out_types) < 0) {
+                              n_out, out_names_arr, out_types_arr) < 0) {
             free((void *)in_names); free(in_types);
+            free((void *)out_names_arr); free(out_types_arr);
             goto fail2;
         }
         free((void *)in_names); free(in_types);
+        free((void *)out_names_arr); free(out_types_arr);
+        /* Mark types as transferred to avoid double-free in cleanup. */
+        if (cur->in_types) {
+            for (int k = 0; k < cur->n_in; k++) cur->in_types[k] = NULL;
+        }
+        if (cur->out_types) {
+            for (int k = 0; k < cur->n_out; k++) cur->out_types[k] = NULL;
+        }
     }
 
     /* Wire edges. */
@@ -1287,7 +1504,7 @@ Pipeline *pipeline_parse_text(const char *src) {
         }
     }
 
-    /* Cleanup parsed nodes. */
+    /* Cleanup parsed nodes. Free any types still owned (NULL'd if transferred). */
     for (int i = 0; i < n_pn; i++) {
         free(pn[i].id);
         if (pn[i].prim) free(pn[i].prim);
@@ -1297,6 +1514,21 @@ Pipeline *pipeline_parse_text(const char *src) {
             free(pn[i].in_src_port[k]);
         }
         free(pn[i].in_names); free(pn[i].in_src_node); free(pn[i].in_src_port);
+        if (pn[i].in_types) {
+            for (int k = 0; k < pn[i].n_in; k++)
+                if (pn[i].in_types[k]) pipeline_type_free(pn[i].in_types[k]);
+            free(pn[i].in_types);
+        }
+        if (pn[i].out_names) {
+            for (int k = 0; k < pn[i].n_out; k++)
+                if (pn[i].out_names[k]) free(pn[i].out_names[k]);
+            free(pn[i].out_names);
+        }
+        if (pn[i].out_types) {
+            for (int k = 0; k < pn[i].n_out; k++)
+                if (pn[i].out_types[k]) pipeline_type_free(pn[i].out_types[k]);
+            free(pn[i].out_types);
+        }
     }
     free(pn);
     return p;
@@ -1311,6 +1543,21 @@ fail2:
             free(pn[i].in_src_port[k]);
         }
         free(pn[i].in_names); free(pn[i].in_src_node); free(pn[i].in_src_port);
+        if (pn[i].in_types) {
+            for (int k = 0; k < pn[i].n_in; k++)
+                if (pn[i].in_types[k]) pipeline_type_free(pn[i].in_types[k]);
+            free(pn[i].in_types);
+        }
+        if (pn[i].out_names) {
+            for (int k = 0; k < pn[i].n_out; k++)
+                if (pn[i].out_names[k]) free(pn[i].out_names[k]);
+            free(pn[i].out_names);
+        }
+        if (pn[i].out_types) {
+            for (int k = 0; k < pn[i].n_out; k++)
+                if (pn[i].out_types[k]) pipeline_type_free(pn[i].out_types[k]);
+            free(pn[i].out_types);
+        }
     }
     free(pn);
 fail:

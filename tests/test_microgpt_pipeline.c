@@ -17,16 +17,22 @@ static int g_tests_run = 0;
 static int g_tests_passed = 0;
 static int g_tests_failed = 0;
 
+/* Per-test failure flag — set by ASSERT-failed paths so the runner
+ * knows not to report PASS afterward. */
+static int g_current_test_failed = 0;
+
 #define TEST(name)                                                             \
   static void test_##name(void);                                               \
   static void run_##name(void) {                                               \
     g_tests_run++;                                                             \
+    g_current_test_failed = 0;                                                 \
     printf("  %-60s ", #name);                                                 \
     fflush(stdout);                                                            \
     test_##name();                                                             \
-    printf("PASS\n");                                                          \
+    if (!g_current_test_failed) {                                              \
+      printf("PASS\n"); g_tests_passed++;                                      \
+    }                                                                          \
     fflush(stdout);                                                            \
-    g_tests_passed++;                                                          \
   }                                                                            \
   static void test_##name(void)
 
@@ -35,6 +41,7 @@ static int g_tests_failed = 0;
     if (!(cond)) {                                                             \
       printf("FAIL\n    %s:%d  Assertion failed: %s\n", __FILE__, __LINE__, #cond); \
       g_tests_failed++;                                                        \
+      g_current_test_failed = 1;                                               \
       return;                                                                  \
     }                                                                          \
   } while (0)
@@ -503,6 +510,182 @@ TEST(dot_render_smoke) {
 }
 
 /* ============================================================
+ *  Phase 2 — Typed round-trip
+ * ============================================================ */
+
+TEST(text_round_trip_preserves_int_types) {
+    Pipeline *p = build_add_graph();
+    pipeline_verify(p);
+    char *txt = pipeline_render_text(p);
+    ASSERT(txt != NULL);
+    ASSERT(strstr(txt, "::") != NULL);  /* annotation present */
+    ASSERT(strstr(txt, "x:int") != NULL || strstr(txt, "y:int") != NULL);
+
+    Pipeline *p2 = pipeline_parse_text(txt);
+    if (!p2) printf("\n    parse err: %s ", pipeline_last_error());
+    ASSERT(p2 != NULL);
+    /* Verify port types are int, not ANY. */
+    ASSERT_EQ(p2->nodes[0]->n_inputs, 2);
+    ASSERT(p2->nodes[0]->inputs[0].type != NULL);
+    ASSERT_EQ(p2->nodes[0]->inputs[0].type->kind, PIPE_T_INT);
+    ASSERT_EQ(p2->nodes[0]->inputs[1].type->kind, PIPE_T_INT);
+    ASSERT_EQ(p2->nodes[0]->outputs[0].type->kind, PIPE_T_INT);
+
+    /* Reparsed graph also verifies. */
+    int rc = pipeline_verify(p2);
+    if (rc != 0) printf("\n    re-verify err: %s ", pipeline_last_error());
+    ASSERT_EQ(rc, PIPE_OK);
+
+    free(txt);
+    pipeline_free(p);
+    pipeline_free(p2);
+}
+
+TEST(text_round_trip_preserves_complex_types) {
+    /* Build a graph with float + tensor types so the type annotations
+     * exercise multiple code paths. */
+    Pipeline *p = pipeline_create("typed_chain");
+    int dims[] = {-1};   /* tensor[float, *] */
+    const char *sin_names[]  = {"signal"};
+    PipelineType *sin_types[] = {pipeline_type_tensor(pipeline_type_float(), 1, dims)};
+    const char *sout_names[] = {"result"};
+    PipelineType *sout_types[] = {pipeline_type_tensor(pipeline_type_float(), 1, dims)};
+    pipeline_set_signature(p, 1, sin_names, sin_types, 1, sout_names, sout_types);
+
+    int dims2[] = {-1};
+    const char *in_names[]  = {"x"};
+    PipelineType *in_types[] = {pipeline_type_tensor(pipeline_type_float(), 1, dims2)};
+    int dims3[] = {-1};
+    const char *out_names[] = {"out"};
+    PipelineType *out_types[] = {pipeline_type_tensor(pipeline_type_float(), 1, dims3)};
+    pipeline_add_node(p, "norm", "normalize", 1, in_names, in_types, 1, out_names, out_types);
+
+    pipeline_connect_signature_in(p, "signal", "norm", "x");
+    pipeline_connect_signature_out(p, "norm", "out", "result");
+    ASSERT_EQ(pipeline_verify(p), PIPE_OK);
+
+    char *txt = pipeline_render_text(p);
+    ASSERT(txt != NULL);
+    ASSERT(strstr(txt, "tensor[float") != NULL);
+
+    Pipeline *p2 = pipeline_parse_text(txt);
+    ASSERT(p2 != NULL);
+    /* Reparsed graph verifies — proves type fidelity is good enough
+     * to pass the type-equality check on connected edges. */
+    int rc = pipeline_verify(p2);
+    if (rc != 0) printf("\n    re-verify err: %s ", pipeline_last_error());
+    ASSERT_EQ(rc, PIPE_OK);
+
+    free(txt);
+    pipeline_free(p);
+    pipeline_free(p2);
+}
+
+/* ============================================================
+ *  Phase 2 — Partial verification
+ * ============================================================ */
+
+TEST(verify_partial_accepts_dangling_input_port) {
+    /* Same scenario as verify_dangling_input_port_rejected — but
+     * pipeline_verify_partial() should accept it with missing > 0. */
+    Pipeline *p = pipeline_create("g");
+    const char *sig_in_names[]  = {"a"};
+    PipelineType *sig_in_types[] = {pipeline_type_int()};
+    const char *sig_out_names[] = {"y"};
+    PipelineType *sig_out_types[] = {pipeline_type_int()};
+    pipeline_set_signature(p, 1, sig_in_names, sig_in_types, 1, sig_out_names, sig_out_types);
+
+    const char *in_names[]   = {"x", "y"};
+    PipelineType *in_types[] = {pipeline_type_int(), pipeline_type_int()};
+    const char *out_names[]  = {"out"};
+    PipelineType *out_types[] = {pipeline_type_int()};
+    pipeline_add_node(p, "n_add", "add", 2, in_names, in_types, 1, out_names, out_types);
+    pipeline_connect_signature_in(p, "a", "n_add", "x");
+    pipeline_connect_signature_out(p, "n_add", "out", "y");
+    /* "y" input is dangling. */
+
+    int missing = 0;
+    int rc = pipeline_verify_partial(p, &missing);
+    ASSERT_EQ(rc, PIPE_OK);
+    ASSERT_EQ(missing, 1);                   /* the dangling y port */
+    ASSERT_EQ(p->verified, 0);               /* not safe to execute */
+    pipeline_free(p);
+}
+
+TEST(verify_partial_still_rejects_type_mismatch) {
+    /* Type mismatch is a hard error even in partial mode. */
+    Pipeline *p = pipeline_create("g");
+    const char *sig_in_names[]  = {"a"};
+    PipelineType *sig_in_types[] = {pipeline_type_string()};
+    const char *sig_out_names[] = {"y"};
+    PipelineType *sig_out_types[] = {pipeline_type_int()};
+    pipeline_set_signature(p, 1, sig_in_names, sig_in_types, 1, sig_out_names, sig_out_types);
+
+    const char *in_names[]   = {"x"};
+    PipelineType *in_types[] = {pipeline_type_int()};
+    const char *out_names[]  = {"out"};
+    PipelineType *out_types[] = {pipeline_type_int()};
+    pipeline_add_node(p, "n", "f", 1, in_names, in_types, 1, out_names, out_types);
+    pipeline_connect_signature_in(p, "a", "n", "x");
+    pipeline_connect_signature_out(p, "n", "out", "y");
+
+    int missing = 0;
+    int rc = pipeline_verify_partial(p, &missing);
+    ASSERT_EQ(rc, PIPE_ERR_TYPE_MISMATCH);
+    pipeline_free(p);
+}
+
+TEST(verify_partial_complete_graph_zero_missing) {
+    Pipeline *p = build_add_graph();
+    int missing = 999;
+    int rc = pipeline_verify_partial(p, &missing);
+    ASSERT_EQ(rc, PIPE_OK);
+    ASSERT_EQ(missing, 0);
+    /* But the verified flag is NOT set by partial — strict verify is required. */
+    ASSERT_EQ(p->verified, 0);
+    rc = pipeline_verify(p);
+    ASSERT_EQ(rc, PIPE_OK);
+    ASSERT_EQ(p->verified, 1);
+    pipeline_free(p);
+}
+
+/* ============================================================
+ *  Phase 2 — VM dispatch (deferred — verify error path)
+ * ============================================================ */
+
+TEST(execute_vm_returns_deferred_error) {
+    /* Phase 2 ships pipeline_execute_vm() as an API surface; the actual
+     * dispatch is deferred to Phase 3 because vm_engine doesn't expose
+     * a public lookup-and-call for registered native fns. The function
+     * must return PIPE_ERR_EXEC with a clear message that explains what
+     * to do instead. */
+    Pipeline *p = build_add_graph();
+    pipeline_verify(p);
+    /* Pass a non-NULL but bogus vm_engine pointer — Phase 2 stub doesn't
+     * dereference it, just checks the args. */
+    PipelineValue inputs[2] = {0};
+    PipelineValue outputs[1] = {0};
+    int rc = pipeline_execute_vm(p, (vm_engine *)0xdeadbeef, inputs, outputs);
+    ASSERT_EQ(rc, PIPE_ERR_EXEC);
+    const char *msg = pipeline_last_error();
+    ASSERT(msg != NULL);
+    ASSERT(strstr(msg, "Phase 3") != NULL);
+    pipeline_free(p);
+}
+
+TEST(execute_vm_null_args_rejected) {
+    int rc = pipeline_execute_vm(NULL, NULL, NULL, NULL);
+    ASSERT_EQ(rc, PIPE_ERR_EXEC);
+    Pipeline *p = build_add_graph();
+    pipeline_verify(p);
+    rc = pipeline_execute_vm(p, NULL, NULL, NULL);
+    ASSERT_EQ(rc, PIPE_ERR_EXEC);
+    const char *msg = pipeline_last_error();
+    ASSERT(strstr(msg, "vm_engine") != NULL || strstr(msg, "null") != NULL);
+    pipeline_free(p);
+}
+
+/* ============================================================
  *  Last-error reporting
  * ============================================================ */
 
@@ -553,6 +736,19 @@ int main(void) {
 
     printf("\n[Pipeline IR — DOT renderer]\n");
     RUN(dot_render_smoke);
+
+    printf("\n[Pipeline IR — Phase 2 typed round-trip]\n");
+    RUN(text_round_trip_preserves_int_types);
+    RUN(text_round_trip_preserves_complex_types);
+
+    printf("\n[Pipeline IR — Phase 2 partial verify]\n");
+    RUN(verify_partial_accepts_dangling_input_port);
+    RUN(verify_partial_still_rejects_type_mismatch);
+    RUN(verify_partial_complete_graph_zero_missing);
+
+    printf("\n[Pipeline IR — Phase 2 VM dispatch (deferred)]\n");
+    RUN(execute_vm_returns_deferred_error);
+    RUN(execute_vm_null_args_rejected);
 
     printf("\n[Pipeline IR — Error reporting]\n");
     RUN(last_error_set_on_failure);

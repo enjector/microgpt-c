@@ -294,8 +294,8 @@ This paper documents **Phase 1**. The full plan:
 
 | Phase | Deliverable | Status |
 |---|---|---|
-| **1** | **IR + verifier + text round-trip + DOT + callback executor + tests** | **✅ Shipped (this paper)** |
-| 2 | VM-backed dispatch — leaf primitives lower automatically to vm_call | Pending |
+| **1** | **IR + verifier + text round-trip + DOT + callback executor + tests** | **✅ Shipped** |
+| **2** | **Typed round-trip + partial verify + VM dispatch surface + parser bug fixes** | **✅ Shipped (see §10 below)** |
 | 3 | Wiring Organelle: train on (prompt, graph-text) pairs, incrementally verify partial graphs | Pending |
 | 4 | SysML multi-view rendering (block, internal block, activity, parametric) + headline benchmark | Pending |
 
@@ -338,7 +338,117 @@ Phase 1 is genuinely useful on its own — an embeddable graph IR with type-chec
 
 ---
 
-## 9. Closing Remark
+## 10. Phase 2 — Typed round-trip, partial verify, VM dispatch surface
+
+Phase 2 lands additively on top of Phase 1. No breaking changes; all Phase 1 tests still pass. Three deliverables and two parser bug fixes surfaced by the new tests.
+
+### 10.1 Typed round-trip
+
+The text format gains a `::` annotation suffix on node lines, capturing per-port types so the parsed graph re-verifies cleanly without falling back to ANY:
+
+```
+| n_add = add(x: <a>, y: <b>) :: x:int, y:int -> out:int
+```
+
+The renderer emits the annotation only when at least one port has a non-ANY type — so trivial all-ANY graphs round-trip through the compact Phase-1 form. The parser matches input-side annotations by name to existing in_names entries, and creates output ports verbatim from the output-side list (supports multi-output nodes).
+
+Verified by two new tests:
+
+```
+text_round_trip_preserves_int_types         PASS
+  - asserts the rendered text contains "::" and "x:int"/"y:int"
+  - asserts parsed graph's port types are PIPE_T_INT (not ANY)
+  - asserts pipeline_verify(parsed) returns PIPE_OK
+
+text_round_trip_preserves_complex_types     PASS
+  - tests tensor[float, *] type fidelity through render+parse+verify
+```
+
+### 10.2 Partial verification (`pipeline_verify_partial`)
+
+A new entry point that runs the same checks as `pipeline_verify` but treats "still incomplete" conditions as recoverable warnings:
+
+| Condition | Strict (verify) | Partial (verify_partial) |
+|---|---|---|
+| Duplicate node ids | error | error |
+| Edge endpoint invalid | error | error |
+| Type mismatch | error | error |
+| Cycle | error | error |
+| Dangling input port | error | warning, counted in `*missing` |
+| Unconnected signature output | error | warning, counted in `*missing` |
+| Unused signature input | error | warning, counted in `*missing` |
+
+The partial verifier writes the warning count into `*missing_out` (may be NULL). It does NOT set `p->verified = 1` — partial graphs are not safe to execute; the caller must do a strict verify before `pipeline_execute`. This matches the planner-player-judge pattern from the existing organelle pipeline: get incremental feedback at each construction step, but only release-to-execute when complete.
+
+Verified by three new tests:
+
+```
+verify_partial_accepts_dangling_input_port  PASS  - missing == 1
+verify_partial_still_rejects_type_mismatch  PASS  - hard error preserved
+verify_partial_complete_graph_zero_missing  PASS  - missing == 0, but verified=0
+```
+
+### 10.3 VM-backed dispatch surface (deferred)
+
+`pipeline_execute_vm(p, vm, inputs, outputs)` is declared in the header and returns a stub error in Phase 2, with a clear diagnostic explaining why. The honest reason: **the public `vm_engine` API doesn't expose what's needed.**
+
+Specifically:
+1. Registered native fns are stored in a private `native_fns[]` table inside `vm_engine_t` (struct definition is in `microgpt_vm.c`, not the header). No public lookup-and-call API.
+2. `vm_engine_run(e, fn_name)` takes only a function name and returns via the engine's result slot — there's no way to pass C-side arguments at call time.
+
+Working around this requires either:
+- **(a) Extending `microgpt_vm.h`** with a `vm_engine_call_native(e, name, argc, argv)` function. Cleanest, but touches the VM module which is otherwise stable.
+- **(b) Synthesising a per-pipeline VM script** that calls the registered fns in topological order via `vm_engine_load(e, source)` then `vm_engine_run(e, "_pipeline_main")`. Keeps `microgpt_vm` unchanged, but adds a code-generation layer.
+
+Phase 3 will choose between (a) and (b) based on whether the Wiring Organelle work pushes for changes in `microgpt_vm.h` anyway. Until then, callers should use `pipeline_execute()` with their own `(name, fn)` lookup table — which is exactly what the VM dispatcher would do internally.
+
+Verified by two new tests:
+
+```
+execute_vm_returns_deferred_error           PASS  - clear "Phase 3" diagnostic
+execute_vm_null_args_rejected               PASS  - null-arg validation
+```
+
+### 10.4 Parser bug fixes surfaced by Phase 2 tests
+
+Phase 1's text round-trip test only checked structural equivalence (same nodes, same edges, same primitives) — not that the parsed graph re-verifies. Phase 2's tests run `pipeline_verify` on the parsed graph and surfaced two bugs in the Phase-1 parser:
+
+**Bug 1: Greedy dot in identifier reader.** `ps_read_ident` allowed `.` as an identifier character, causing it to read `n_add.out` as one token instead of `n_add` + `.` + `out`. Phase-1 tests didn't trigger this because no node-to-node edges existed in the simple test fixture; only signature-bound graphs were tested. Phase 2's `text_round_trip_preserves_int_types` runs the renderer's emitted `y <- n_add.out` line through the parser, which corrupted the source-node lookup.
+
+**Fix:** `ps_read_ident` no longer consumes `.`. Leading `-` is still allowed for negative tensor dimensions like `-1`. The `.` separator between node id and port name is now reliably tokenised.
+
+**Bug 2: Test harness reported PASS after ASSERT failure.** The runner macro printed `"PASS\n"` and incremented `g_tests_passed` unconditionally after `test_##name()` returned, so an ASSERT-failure that `return`'d early still showed as PASS. Counts were correct in the summary line but per-test output was misleading.
+
+**Fix:** Added a `g_current_test_failed` flag, reset at the top of each `run_##name()` and set by ASSERT before `return`. The runner only prints PASS and increments `g_tests_passed` when the flag is still 0.
+
+### 10.5 Phase 2 test results
+
+After the additions and fixes:
+
+```
+test_microgpt:           61/61 passed  (no regression)
+test_microgpt_msa:        3/3  passed  (no regression)
+test_microgpt_pipeline:  31/31 passed  (was 24, +7 new)
+```
+
+The +7 split:
+- 2 typed round-trip tests
+- 3 partial verify tests
+- 2 VM dispatch surface tests
+
+### 10.6 Phase 3 setup
+
+With Phase 2 in place, Phase 3 has the prerequisites it needs:
+
+- **Typed round-trip** lets the Wiring Organelle's training corpus be a stream of `(prompt, graph-text)` pairs that round-trip cleanly — the model's output token stream becomes a faithful graph specification.
+- **Partial verify** lets the model construct a graph one node at a time and get actionable feedback after each step — equivalent to how the Connect-4 player gets cycle-detector feedback after each invalid move.
+- **VM dispatch surface** lets dependent code compile and link against the API today, so Phase 3 demos can be sketched without waiting on the dispatch implementation.
+
+The next step for Phase 3 is to design the corpus generator: walk existing VM functions in `demos/turbo_quant/vm_codegen/c_vm_functions_combined.txt`, decompose each into a graph-text representation via AST analysis, and pair with templated natural-language prompts.
+
+---
+
+## 11. Closing Remark
 
 The IR ships. 24 tests pass. The header has detailed doc-comments. The DOT renderer makes graphs human-readable. The text format is small enough for a tiny model to emit.
 
