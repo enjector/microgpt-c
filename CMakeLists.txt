@@ -1853,6 +1853,41 @@ add_demo(
 )
 target_link_libraries(tq_vm_codegen_tq PRIVATE microgpt_vm_lib)
 
+# 4b) VM Codegen + TurboQuant — Q/K RMSNorm A/B comparison.
+#     Both targets fresh-train (NUM_STEPS=5000), differ only by the
+#     MICROGPT_QK_NORM flag. Q/K RMSNorm is the V4 port specifically
+#     recommended for noisy-K regimes — exactly what 4-bit dequantised
+#     K vectors produce. See docs/research/RESEARCH_DEEPSEEK_V4_QK_RMSNORM_PREDOT.md
+#     and the codegen-fit analysis in the conversation transcript.
+add_demo(
+  NAME    tq_vm_codegen_tq_v4baseline
+  SOURCE  demos/turbo_quant/vm_codegen/main.c
+  THREADS METAL BLAS
+  COPY    demos/turbo_quant/vm_codegen/c_vm_functions_combined.txt
+  DEFINES N_EMBD=96 N_HEAD=4 N_LAYER=2 BLOCK_SIZE=256 MLP_DIM=384
+          NUM_STEPS=5000 LEARNING_RATE=0.0005 BATCH_SIZE=16
+          MAX_VOCAB=1200 MAX_DOCS=5000 MAX_DOC_LEN=512
+          ENABLE_TURBOQUANT=1
+          CHECKPOINT_FILE="tq_vm_codegen_v4baseline.ckpt"
+          TRAINING_LOG="tq_vm_codegen_v4baseline.log"
+)
+target_link_libraries(tq_vm_codegen_tq_v4baseline PRIVATE microgpt_vm_lib)
+
+add_demo(
+  NAME    tq_vm_codegen_tq_qknorm
+  SOURCE  demos/turbo_quant/vm_codegen/main.c
+  THREADS METAL BLAS
+  COPY    demos/turbo_quant/vm_codegen/c_vm_functions_combined.txt
+  DEFINES N_EMBD=96 N_HEAD=4 N_LAYER=2 BLOCK_SIZE=256 MLP_DIM=384
+          NUM_STEPS=5000 LEARNING_RATE=0.0005 BATCH_SIZE=16
+          MAX_VOCAB=1200 MAX_DOCS=5000 MAX_DOC_LEN=512
+          ENABLE_TURBOQUANT=1
+          MICROGPT_QK_NORM=1
+          CHECKPOINT_FILE="tq_vm_codegen_qknorm.ckpt"
+          TRAINING_LOG="tq_vm_codegen_qknorm.log"
+)
+target_link_libraries(tq_vm_codegen_tq_qknorm PRIVATE microgpt_vm_lib)
+
 # 5) Standalone KV-cache compression demo (no corpus needed)
 add_executable(tq_kv_cache_demo demos/turbo_quant/simple/main.c)
 target_link_libraries(tq_kv_cache_demo PRIVATE microgpt_lib)

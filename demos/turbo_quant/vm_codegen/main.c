@@ -39,8 +39,12 @@ TurboQuant g_tq;
 
 #define CODEGEN_TEMP 0.3
 #define GEN_LEN 80 /* word tokens to generate per sample */
+#ifndef CHECKPOINT_FILE
 #define CHECKPOINT_FILE "c_vm_codegen.ckpt"
+#endif
+#ifndef TRAINING_LOG
 #define TRAINING_LOG "c_vm_codegen.ckpt.log"
+#endif
 
 #define MAX_TOKENS_PER_DOC 512
 #define MAX_TOK_LEN 64
