@@ -447,7 +447,11 @@ int main(void) {
 
             int p_ok = 0, v_ok = 0;
             if (wf) {
+                /* Phase 5a: try strict parse first, fall back to tolerant
+                 * (auto-promotes referenced sig names, dedups duplicate
+                 * sig declarations). */
                 Pipeline *p = pipeline_parse_text(output_buf);
+                if (!p) p = pipeline_parse_text_tolerant(output_buf);
                 p_ok = (p != NULL);
                 if (p_ok) {
                     v_ok = (pipeline_verify(p) == PIPE_OK);
@@ -568,7 +572,9 @@ int main(void) {
 
                 int p_ok = 0, v_ok = 0, fid_ok = 0;
                 if (wf) {
+                    /* Phase 5a: tolerant fallback for held-out NL too. */
                     Pipeline *pp = pipeline_parse_text(output_buf);
+                    if (!pp) pp = pipeline_parse_text_tolerant(output_buf);
                     p_ok = (pp != NULL);
                     if (p_ok) {
                         v_ok = (pipeline_verify(pp) == PIPE_OK);

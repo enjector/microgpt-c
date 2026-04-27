@@ -1797,6 +1797,16 @@ target_include_directories(pipeline_corpus_gen PRIVATE ${CMAKE_CURRENT_SOURCE_DI
 if(NOT MSVC)
   target_link_libraries(pipeline_corpus_gen PRIVATE m)
 endif()
+
+# Phase 5a — parser re-eval tool. Reads a wiring_organelle_demo log and
+# re-parses each "best output" graph through both strict and tolerant
+# parsers; reports the verify/fidelity delta. No retrain needed.
+add_executable(reeval_parser tools/reeval_parser.c)
+target_link_libraries(reeval_parser PRIVATE microgpt_lib)
+target_include_directories(reeval_parser PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+if(NOT MSVC)
+  target_link_libraries(reeval_parser PRIVATE m)
+endif()
 # Smoke test — generator runs end-to-end with zero failures.
 add_test(NAME pipeline_corpus_smoke
          COMMAND pipeline_corpus_gen ${CMAKE_BINARY_DIR}/_corpus_smoke.txt

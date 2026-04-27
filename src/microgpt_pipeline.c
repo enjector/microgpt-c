@@ -1201,7 +1201,10 @@ static PipelineType *ps_read_type(PState *ps) {
     return t;
 }
 
-Pipeline *pipeline_parse_text(const char *src) {
+/* Internal parse impl. tolerant=0 → strict (legacy behavior).
+ * tolerant=1 → Phase 5a repairs: dedup sig inputs, auto-promote
+ * undeclared sig refs, auto-promote undeclared output bindings. */
+static Pipeline *pipeline_parse_impl(const char *src, int tolerant) {
     if (!src) return NULL;
     PState ps = { src, src, 1, 1 };
     ps_skip_ws_nl(&ps);
@@ -1235,15 +1238,39 @@ Pipeline *pipeline_parse_text(const char *src) {
         PipelineType *t = ps_read_type(&ps);
         if (!t) { free(kind); free(port_name); break; }
         if (strcmp(kind, "in") == 0) {
-            if (n_sig_in >= 64) { free(kind); free(port_name); pipeline_type_free(t); set_err("parse: too many sig inputs"); goto fail; }
-            sig_in_names[n_sig_in] = port_name;
-            sig_in_types[n_sig_in] = t;
-            n_sig_in++;
+            int dup_idx = -1;
+            if (tolerant) {
+                /* Phase 5a repair 1: dedup. If port_name already declared,
+                 * keep the first declaration and drop this one. */
+                for (int i = 0; i < n_sig_in; i++) {
+                    if (strcmp(sig_in_names[i], port_name) == 0) { dup_idx = i; break; }
+                }
+            }
+            if (dup_idx >= 0) {
+                free(port_name); pipeline_type_free(t);
+            } else if (n_sig_in >= 64) {
+                free(kind); free(port_name); pipeline_type_free(t); set_err("parse: too many sig inputs"); goto fail;
+            } else {
+                sig_in_names[n_sig_in] = port_name;
+                sig_in_types[n_sig_in] = t;
+                n_sig_in++;
+            }
         } else if (strcmp(kind, "out") == 0) {
-            if (n_sig_out >= 64) { free(kind); free(port_name); pipeline_type_free(t); set_err("parse: too many sig outputs"); goto fail; }
-            sig_out_names[n_sig_out] = port_name;
-            sig_out_types[n_sig_out] = t;
-            n_sig_out++;
+            int dup_idx = -1;
+            if (tolerant) {
+                for (int i = 0; i < n_sig_out; i++) {
+                    if (strcmp(sig_out_names[i], port_name) == 0) { dup_idx = i; break; }
+                }
+            }
+            if (dup_idx >= 0) {
+                free(port_name); pipeline_type_free(t);
+            } else if (n_sig_out >= 64) {
+                free(kind); free(port_name); pipeline_type_free(t); set_err("parse: too many sig outputs"); goto fail;
+            } else {
+                sig_out_names[n_sig_out] = port_name;
+                sig_out_types[n_sig_out] = t;
+                n_sig_out++;
+            }
         } else {
             free(kind); free(port_name); pipeline_type_free(t);
             set_err("parse: unknown signature kind"); goto fail;
@@ -1251,14 +1278,19 @@ Pipeline *pipeline_parse_text(const char *src) {
         free(kind);
         ps_skip_ws_nl(&ps);
     }
-    if (pipeline_set_signature(p, n_sig_in, sig_in_names, sig_in_types,
-                               n_sig_out, sig_out_names, sig_out_types) != 0) {
+    /* Phase 5a repairs 2 + 3 need to scan node args + output bindings,
+     * but we haven't parsed them yet. Defer pipeline_set_signature until
+     * after node parsing in tolerant mode. In strict mode, set now. */
+    if (!tolerant) {
+        if (pipeline_set_signature(p, n_sig_in, sig_in_names, sig_in_types,
+                                   n_sig_out, sig_out_names, sig_out_types) != 0) {
+            for (int i = 0; i < n_sig_in; i++) free((char *)sig_in_names[i]);
+            for (int i = 0; i < n_sig_out; i++) free((char *)sig_out_names[i]);
+            goto fail;
+        }
         for (int i = 0; i < n_sig_in; i++) free((char *)sig_in_names[i]);
         for (int i = 0; i < n_sig_out; i++) free((char *)sig_out_names[i]);
-        goto fail;
     }
-    for (int i = 0; i < n_sig_in; i++) free((char *)sig_in_names[i]);
-    for (int i = 0; i < n_sig_out; i++) free((char *)sig_out_names[i]);
 
     /* Phase 2: node lines. We collect them, defer connections to phase 3
      * because edges may reference forward declarations. We don't have port
@@ -1426,16 +1458,10 @@ Pipeline *pipeline_parse_text(const char *src) {
             ps_skip_ws_nl(&ps);
             continue;
         }
-        /* Defer wiring until after nodes exist. We'll re-find bind_name in signature_out. */
-        /* Add a parsed-node-style entry for the binding so we can wire after. */
-        int sig_idx = find_signature_port(p, bind_name, 1);
-        if (sig_idx >= 0 && src_node && src_port) {
-            /* Defer until all nodes inserted — store as outputs to wire below. */
-        }
-        free(bind_name);
         /* Save src_node/src_port for second pass. We reuse pn list for simplicity:
-         * a "binding" entry is encoded as a ParsedNode with id="<bind>" and prim
-         * holding the binding name. Quick & dirty for Phase 1. */
+         * a "binding" entry is encoded as a ParsedNode with prim==NULL.
+         * in_names[0] holds the binding name (the signature-output name)
+         * so tolerant mode can auto-promote it later. */
         if (n_pn >= cap_pn) { cap_pn = cap_pn ? cap_pn * 2 : 16; pn = (ParsedNode *)realloc(pn, sizeof(ParsedNode) * (size_t)cap_pn); }
         ParsedNode *cur = &pn[n_pn++];
         memset(cur, 0, sizeof(*cur));
@@ -1444,7 +1470,7 @@ Pipeline *pipeline_parse_text(const char *src) {
         cur->in_names = (char **)calloc(1, sizeof(char *));
         cur->in_src_node = (char **)calloc(1, sizeof(char *));
         cur->in_src_port = (char **)calloc(1, sizeof(char *));
-        cur->in_names[0] = strdup("<bind>");  /* placeholder */
+        cur->in_names[0] = bind_name;       /* preserved bind_name */
         cur->in_src_node[0] = src_node;
         cur->in_src_port[0] = src_port;
         cur->n_in = 1;
@@ -1453,6 +1479,58 @@ Pipeline *pipeline_parse_text(const char *src) {
 
     /* @end */
     ps_match_kw(&ps, "@end");
+
+    /* Phase 5a tolerant repairs 2+3: scan parsed node args for `<name>`
+     * references (treated by parser as in_src_node=="<sig>") and parsed
+     * binding entries' bind_name slot. For any name not in the declared
+     * signature, append a new int-typed sig port. THEN call
+     * pipeline_set_signature with the augmented union. */
+    if (tolerant) {
+        /* Repair 2: auto-promote referenced sig inputs. */
+        for (int i = 0; i < n_pn; i++) {
+            ParsedNode *cur = &pn[i];
+            if (!cur->prim) continue;  /* skip binding entries */
+            for (int k = 0; k < cur->n_in; k++) {
+                if (!cur->in_src_node[k] || strcmp(cur->in_src_node[k], "<sig>") != 0) continue;
+                const char *ref = cur->in_src_port[k];
+                if (!ref) continue;
+                int found = 0;
+                for (int s = 0; s < n_sig_in; s++) {
+                    if (strcmp(sig_in_names[s], ref) == 0) { found = 1; break; }
+                }
+                if (!found && n_sig_in < 64) {
+                    sig_in_names[n_sig_in] = strdup(ref);
+                    sig_in_types[n_sig_in] = pipeline_type_int();
+                    n_sig_in++;
+                }
+            }
+        }
+        /* Repair 3: auto-promote referenced sig outputs. */
+        for (int i = 0; i < n_pn; i++) {
+            ParsedNode *cur = &pn[i];
+            if (cur->prim) continue;  /* nodes only */
+            const char *bn = cur->in_names ? cur->in_names[0] : NULL;
+            if (!bn) continue;
+            int found = 0;
+            for (int s = 0; s < n_sig_out; s++) {
+                if (strcmp(sig_out_names[s], bn) == 0) { found = 1; break; }
+            }
+            if (!found && n_sig_out < 64) {
+                sig_out_names[n_sig_out] = strdup(bn);
+                sig_out_types[n_sig_out] = pipeline_type_int();
+                n_sig_out++;
+            }
+        }
+        /* Now apply the augmented signature. */
+        if (pipeline_set_signature(p, n_sig_in, sig_in_names, sig_in_types,
+                                   n_sig_out, sig_out_names, sig_out_types) != 0) {
+            for (int i = 0; i < n_sig_in; i++) free((char *)sig_in_names[i]);
+            for (int i = 0; i < n_sig_out; i++) free((char *)sig_out_names[i]);
+            goto fail2;
+        }
+        for (int i = 0; i < n_sig_in; i++) free((char *)sig_in_names[i]);
+        for (int i = 0; i < n_sig_out; i++) free((char *)sig_out_names[i]);
+    }
 
     /* Build nodes. Phase 2: use parsed `::` types when present, else
      * fall back to ANY (Phase-1 behaviour). */
@@ -1526,26 +1604,41 @@ Pipeline *pipeline_parse_text(const char *src) {
             }
         }
     }
-    /* Wire output bindings. */
+    /* Wire output bindings.
+     * Phase 5a: bind_name is preserved in cur->in_names[0]. If it matches
+     * a declared sig_out, use it directly. Otherwise (legacy / strict
+     * mode without an exact match), fall back to first-unconnected. */
     for (int i = 0; i < n_pn; i++) {
         ParsedNode *cur = &pn[i];
         if (cur->prim) continue;
         if (cur->n_in != 1 || !cur->in_src_node[0]) continue;
-        /* "id" was "<bind>" but we stashed the actual bind name elsewhere — Phase 1
-         * iterates every signature_out and connects to the first matching unconnected
-         * one. For our round-trip canonical form this produces correct output ordering. */
-        /* TODO: store bind_name properly; for Phase-1 the simpler version is to rely on
-         * insertion order matching signature_out order. */
-        /* Connect the kth unconnected signature_out. */
-        for (int so = 0; so < p->n_sig_out; so++) {
-            int already = 0;
-            for (size_t e = 0; e < p->n_edges; e++) {
-                if (p->edges[e]->dst_node_idx == SIG_OUT_NODE && p->edges[e]->dst_port_idx == so) { already = 1; break; }
+        const char *bind_name = (cur->in_names && cur->in_names[0]) ? cur->in_names[0] : NULL;
+        int wired = 0;
+        if (bind_name) {
+            int sig_idx = find_signature_port(p, bind_name, 1);
+            if (sig_idx >= 0) {
+                int already = 0;
+                for (size_t e = 0; e < p->n_edges; e++) {
+                    if (p->edges[e]->dst_node_idx == SIG_OUT_NODE && p->edges[e]->dst_port_idx == sig_idx) { already = 1; break; }
+                }
+                if (!already) {
+                    pipeline_connect_signature_out(p, cur->in_src_node[0], cur->in_src_port[0], bind_name);
+                    wired = 1;
+                }
             }
-            if (already) continue;
-            pipeline_connect_signature_out(p, cur->in_src_node[0], cur->in_src_port[0],
-                                           p->signature_out[so].name);
-            break;
+        }
+        if (!wired) {
+            /* Legacy fallback: first unconnected sig_out (insertion-order). */
+            for (int so = 0; so < p->n_sig_out; so++) {
+                int already = 0;
+                for (size_t e = 0; e < p->n_edges; e++) {
+                    if (p->edges[e]->dst_node_idx == SIG_OUT_NODE && p->edges[e]->dst_port_idx == so) { already = 1; break; }
+                }
+                if (already) continue;
+                pipeline_connect_signature_out(p, cur->in_src_node[0], cur->in_src_port[0],
+                                               p->signature_out[so].name);
+                break;
+            }
         }
     }
 
@@ -1608,6 +1701,14 @@ fail2:
 fail:
     pipeline_free(p);
     return NULL;
+}
+
+Pipeline *pipeline_parse_text(const char *src) {
+    return pipeline_parse_impl(src, /*tolerant=*/0);
+}
+
+Pipeline *pipeline_parse_text_tolerant(const char *src) {
+    return pipeline_parse_impl(src, /*tolerant=*/1);
 }
 
 /* ============================================================

@@ -1004,6 +1004,98 @@ TEST(parser_fuzz_phase3c_crash_input) {
 }
 
 /* ============================================================
+ *  Phase 5a — Tolerant parser
+ * ============================================================ */
+
+/* Strict parser must REJECT a graph with a duplicate signature input;
+ * tolerant parser must ACCEPT it (deduplicating the duplicate). */
+TEST(tolerant_parser_dedups_duplicate_sig_input) {
+    const char *src =
+        "@graph dup_sig\n"
+        "  : in x -> int\n"
+        "  : in x -> int\n"        /* duplicate */
+        "  : out y -> int\n"
+        "  | n = abs(x: <x>) :: x:int -> out:int\n"
+        "  y <- n.out\n"
+        "@end\n";
+    Pipeline *p_strict = pipeline_parse_text(src);
+    if (p_strict) {
+        /* Strict parse may succeed but verify must fail (dup port name). */
+        int rc = pipeline_verify(p_strict);
+        ASSERT(rc != PIPE_OK);  /* duplicate sig port name → reject */
+        pipeline_free(p_strict);
+    }
+    /* Tolerant: accepts and verifies cleanly. */
+    Pipeline *p_tol = pipeline_parse_text_tolerant(src);
+    ASSERT(p_tol != NULL);
+    ASSERT_EQ(pipeline_verify(p_tol), PIPE_OK);
+    ASSERT_EQ(p_tol->n_sig_in, 1);
+    pipeline_free(p_tol);
+}
+
+/* Tolerant parser must auto-promote a node-arg `<name>` reference to
+ * a signature input when the corresponding `: in name` declaration is
+ * missing. Strict parser must reject. */
+TEST(tolerant_parser_auto_promotes_undeclared_sig_input) {
+    const char *src =
+        "@graph missing_sig\n"
+        "  : out y -> int\n"        /* no `: in x` */
+        "  | n = abs(x: <x>) :: x:int -> out:int\n"
+        "  y <- n.out\n"
+        "@end\n";
+    Pipeline *p_strict = pipeline_parse_text(src);
+    /* Strict: parse may succeed but verify rejects (sig input ref to <x>
+     * which doesn't exist in sig). */
+    if (p_strict) {
+        int rc = pipeline_verify(p_strict);
+        ASSERT(rc != PIPE_OK);
+        pipeline_free(p_strict);
+    }
+    /* Tolerant: auto-adds `x` as int sig input. */
+    Pipeline *p_tol = pipeline_parse_text_tolerant(src);
+    ASSERT(p_tol != NULL);
+    ASSERT_EQ(pipeline_verify(p_tol), PIPE_OK);
+    ASSERT(p_tol->n_sig_in >= 1);
+    pipeline_free(p_tol);
+}
+
+/* Tolerant parser must auto-promote a `name <- node.port` binding to a
+ * signature output when the corresponding `: out name` declaration is
+ * missing. */
+TEST(tolerant_parser_auto_promotes_undeclared_sig_output) {
+    const char *src =
+        "@graph missing_out\n"
+        "  : in x -> int\n"
+        "  | n = abs(x: <x>) :: x:int -> out:int\n"
+        "  result <- n.out\n"   /* `result` not in any `: out` line */
+        "@end\n";
+    Pipeline *p_tol = pipeline_parse_text_tolerant(src);
+    ASSERT(p_tol != NULL);
+    ASSERT_EQ(pipeline_verify(p_tol), PIPE_OK);
+    ASSERT(p_tol->n_sig_out >= 1);
+    pipeline_free(p_tol);
+}
+
+/* Sanity: strict parser still works on a clean graph. */
+TEST(tolerant_parser_clean_graph_unchanged) {
+    const char *src =
+        "@graph clean\n"
+        "  : in x -> int\n"
+        "  : out y -> int\n"
+        "  | n = abs(x: <x>) :: x:int -> out:int\n"
+        "  y <- n.out\n"
+        "@end\n";
+    Pipeline *p_strict = pipeline_parse_text(src);
+    ASSERT(p_strict != NULL);
+    ASSERT_EQ(pipeline_verify(p_strict), PIPE_OK);
+    pipeline_free(p_strict);
+    Pipeline *p_tol = pipeline_parse_text_tolerant(src);
+    ASSERT(p_tol != NULL);
+    ASSERT_EQ(pipeline_verify(p_tol), PIPE_OK);
+    pipeline_free(p_tol);
+}
+
+/* ============================================================
  *  Last-error reporting
  * ============================================================ */
 
@@ -1082,6 +1174,12 @@ int main(void) {
     RUN(parser_fuzz_random_byte_mutation);
     RUN(parser_fuzz_random_bytes);
     RUN(parser_fuzz_phase3c_crash_input);
+
+    printf("\n[Pipeline IR — Phase 5a tolerant parser]\n");
+    RUN(tolerant_parser_dedups_duplicate_sig_input);
+    RUN(tolerant_parser_auto_promotes_undeclared_sig_input);
+    RUN(tolerant_parser_auto_promotes_undeclared_sig_output);
+    RUN(tolerant_parser_clean_graph_unchanged);
 
     printf("\n[Pipeline IR — Error reporting]\n");
     RUN(last_error_set_on_failure);

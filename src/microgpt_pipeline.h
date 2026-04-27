@@ -453,6 +453,31 @@ char *pipeline_render_text(const Pipeline *p);
  * problem with line/column where possible. */
 Pipeline *pipeline_parse_text(const char *src);
 
+/* Phase 5a — Tolerant parser. Same grammar as pipeline_parse_text, but
+ * applies three targeted repairs that recover from common organelle-
+ * generation incoherences:
+ *
+ *   1. Duplicate signature input declarations are deduplicated by name
+ *      (the second `: in x -> int` after the first is silently dropped).
+ *   2. Signature inputs referenced via `<name>` in node args but not
+ *      declared in any `: in name` line are auto-promoted to int sig
+ *      inputs at parse time. Closes the loop when the model omits a
+ *      declaration but uses the variable.
+ *   3. Output bindings (`y <- node.out`) referencing a signature output
+ *      that wasn't declared in any `: out name` line auto-promote a
+ *      matching int signature output. Symmetric to repair 2.
+ *
+ * Returns a NEW unverified Pipeline (caller owns), or NULL on a
+ * fundamentally unparsable input. The returned graph may still fail
+ * pipeline_verify() — repairs only address declaration/reference
+ * mismatches, not type errors or true cycles.
+ *
+ * Designed for the Wiring Organelle's emit-and-verify loop: try
+ * pipeline_parse_text first (strict), fall back to this tolerant
+ * version if strict parse rejects.
+ */
+Pipeline *pipeline_parse_text_tolerant(const char *src);
+
 /* ============================================================
  *  DOT renderer (visualisation)
  * ============================================================
