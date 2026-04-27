@@ -1,16 +1,16 @@
 /*
  * MicroGPT-C — Wiring Organelle reference-answer implementations.
  * Phase 7: ground-truth answers for held-out NL prompts.
+ * Phase 8: 5 distinct input sets per prompt; correctness requires
+ * all 5 references to match the model's executions.
  *
  * Each reference uses the same int64_t arithmetic as the natives in
  * wiring_natives.c so that integer truncation effects don't penalise
- * the model. The test inputs are a fixed sequence (5, 7, 3, 11, 2, ...)
- * — adjusting them changes both the model's executions and the
- * reference answers in lock-step.
+ * the model.
  *
  * Naming convention: ref_<short-name>; the held-out file annotates
  * each prompt with `# REFERENCE: <short-name>` (lines starting with
- * `#` are skipped by the corpus preprocessor — they are pure metadata).
+ * `#` are skipped by the corpus preprocessor).
  *
  * Copyright (c) 2026 Ajay Soni, Enjector Software Ltd. MIT License.
  */
@@ -20,8 +20,33 @@
 #include "wiring_references.h"
 #include <string.h>
 
-/* Test input sequence. Must match demo's test_seq[] in main.c. */
-static const int64_t S[] = {5, 7, 3, 11, 2, 13, 4, 9, 6, 8, 1, 10, 12, 15, 14, 16};
+/* ============================================================
+ *  5 distinct input sets — Phase 8 multi-input correctness.
+ *
+ *  Each set provides at least 16 int64 values to cover any
+ *  signature arity the demo encounters. Sets are intentionally
+ *  varied (small/medium/edge-cases) so a model that wires args
+ *  incorrectly is unlikely to match all 5 by coincidence.
+ * ============================================================ */
+static const int64_t INPUT_SETS[WIRING_INPUT_SETS][WIRING_MAX_INPUTS] = {
+    /* set 0 — original Phase 6/7 sequence */
+    { 5, 7, 3, 11, 2, 13, 4, 9, 6, 8, 1, 10, 12, 15, 14, 16 },
+    /* set 1 — even-spread small ints */
+    { 4, 6, 2, 10, 8, 12, 3, 5, 7, 9, 11, 13, 15, 1, 14, 16 },
+    /* set 2 — single small set */
+    { 2, 3, 1, 5, 4, 6, 7, 8, 9, 10, 1, 2, 3, 4, 5, 6 },
+    /* set 3 — small wide spread */
+    { 8, 12, 4, 20, 6, 16, 10, 14, 2, 18, 3, 7, 11, 5, 9, 13 },
+    /* set 4 — sequence with a zero (catches divide-by-zero, exp(0), etc.) */
+    { 3, 4, 1, 8, 0, 9, 2, 6, 5, 7, 10, 11, 12, 13, 14, 15 },
+};
+
+void wiring_input_set(int set_idx, int64_t *dst) {
+    if (!dst) return;
+    int idx = set_idx % WIRING_INPUT_SETS;
+    if (idx < 0) idx += WIRING_INPUT_SETS;
+    for (int i = 0; i < WIRING_MAX_INPUTS; i++) dst[i] = INPUT_SETS[idx][i];
+}
 
 /* ============================================================
  *  Native primitive helpers — duplicated semantics, used so the
@@ -50,8 +75,6 @@ static int64_t r_future_value(int64_t p, int64_t r, int64_t n)   { return r_comp
 static int64_t r_distance_1d(int64_t a, int64_t b)               { return r_abs(a - b); }
 static int64_t r_midpoint(int64_t a, int64_t b)                  { return (a + b) / 2; }
 static int64_t r_average_two(int64_t a, int64_t b)               { return (a + b) / 2; }
-static int64_t r_min(int64_t a, int64_t b)                       { return a < b ? a : b; }
-static int64_t r_max(int64_t a, int64_t b)                       { return a > b ? a : b; }
 static int64_t r_factorial(int64_t n) { if (n < 0) return 0; int64_t r = 1; for (int64_t i = 2; i <= n && i <= 20; i++) r *= i; return r; }
 static int64_t r_fibonacci(int64_t n) { if (n < 0) return 0; if (n < 2) return n; int64_t a = 0, b = 1; for (int64_t i = 2; i <= n && i <= 90; i++) { int64_t c = a + b; a = b; b = c; } return b; }
 static int64_t r_gcd(int64_t a, int64_t b) { a = r_abs(a); b = r_abs(b); while (b) { int64_t t = b; b = a % b; a = t; } return a; }
@@ -64,62 +87,68 @@ static int64_t r_sigmoid(int64_t x) {
 static int64_t r_bmi(int64_t w, int64_t h) { return h == 0 ? 0 : (w * 10000) / (h * h); }
 
 /* ============================================================
- *  Reference functions, one per held-out prompt.
- *  Inputs follow the order of each prompt's "expected" signature.
+ *  Reference functions — each takes the input set as `S[]` and
+ *  computes the canonical answer for its prompt. Inputs follow
+ *  the order of each prompt's "expected" signature.
  * ============================================================ */
 
+#define DEF_REF(NAME) static int64_t ref_##NAME(const int64_t *S)
+
 /* #1: bmi(weight, height) clamped between lo, hi */
-static int64_t ref_bmi_clamped(void)        { return r_clamp(r_bmi(S[0], S[1]), S[2], S[3]); }
+DEF_REF(bmi_clamped)        { return r_clamp(r_bmi(S[0], S[1]), S[2], S[3]); }
 /* #2: compound interest earned = compound(P, r, n) - P */
-static int64_t ref_compound_interest(void)  { return r_compound(S[0], S[1], S[2]) - S[0]; }
-/* #3: weighted average — assume v1*w1 + v2*w2 + v3*w3, then divide by sum of weights via percentage(s,w) */
-static int64_t ref_weighted_three(void)     {
-    /* inputs: v1=5, w1=7, v2=3, w2=11, v3=2, w3=13 */
+DEF_REF(compound_interest)  { return r_compound(S[0], S[1], S[2]) - S[0]; }
+/* #3: weighted average — v1*w1 + v2*w2 + v3*w3 normalised by sum of weights as percentage */
+DEF_REF(weighted_three)     {
     int64_t num = S[0]*S[1] + S[2]*S[3] + S[4]*S[5];
     int64_t den = S[1] + S[3] + S[5];
-    return den == 0 ? 0 : (num * 100) / den;  /* percentage form */
+    return den == 0 ? 0 : (num * 100) / den;
 }
 /* #4: clamp(sigmoid(x), lo, hi) */
-static int64_t ref_clamped_sigmoid(void)    { return r_clamp(r_sigmoid(S[0]), S[1], S[2]); }
+DEF_REF(clamped_sigmoid)    { return r_clamp(r_sigmoid(S[0]), S[1], S[2]); }
 /* #5: gcd(a, b) * k */
-static int64_t ref_gcd_scaled(void)         { return r_gcd(S[0], S[1]) * S[2]; }
+DEF_REF(gcd_scaled)         { return r_gcd(S[0], S[1]) * S[2]; }
 /* #6: apply_tax(gross, tax_rate) */
-static int64_t ref_apply_tax(void)          { return r_apply_tax(S[0], S[1]); }
+DEF_REF(apply_tax)          { return r_apply_tax(S[0], S[1]); }
 /* #7: fibonacci(n) * factorial(n) */
-static int64_t ref_fib_fact_mul(void)       { return r_fibonacci(S[0]) * r_factorial(S[0]); }
+DEF_REF(fib_fact_mul)       { return r_fibonacci(S[0]) * r_factorial(S[0]); }
 /* #8: invoice = price*qty + tax_amount(price*qty, rate) */
-static int64_t ref_invoice_total(void)      { int64_t st = S[0]*S[1]; return st + r_tax_amount(st, S[2]); }
+DEF_REF(invoice_total)      { int64_t st = S[0]*S[1]; return st + r_tax_amount(st, S[2]); }
 /* #9: clamp(average_two(a, b), lo, hi) */
-static int64_t ref_clamped_average(void)    { return r_clamp(r_average_two(S[0], S[1]), S[2], S[3]); }
+DEF_REF(clamped_average)    { return r_clamp(r_average_two(S[0], S[1]), S[2], S[3]); }
 /* #10: abs(a - b) */
-static int64_t ref_abs_diff(void)           { return r_abs(S[0] - S[1]); }
+DEF_REF(abs_diff)           { return r_abs(S[0] - S[1]); }
 /* #11: relu(x) * scale */
-static int64_t ref_scaled_relu(void)        { return r_relu(S[0]) * S[1]; }
+DEF_REF(scaled_relu)        { return r_relu(S[0]) * S[1]; }
 /* #12: tax_amount(discount(price, rate), tax_rate) */
-static int64_t ref_discounted_tax(void)     {
+DEF_REF(discounted_tax)     {
     int64_t disc = S[0] - (S[0] * S[1]) / 100;
     return r_tax_amount(disc, S[2]);
 }
 /* #13: percentage(income - expenses, income) — savings rate */
-static int64_t ref_savings_rate(void)       { return r_percentage(S[0] - S[1], S[0]); }
+DEF_REF(savings_rate)       { return r_percentage(S[0] - S[1], S[0]); }
 /* #14: square(distance(a1,b1) + distance(a2,b2)) */
-static int64_t ref_distance_metrics(void)   { int64_t s = r_distance_1d(S[0], S[1]) + r_distance_1d(S[2], S[3]); return s * s; }
+DEF_REF(distance_metrics)   { int64_t s = r_distance_1d(S[0], S[1]) + r_distance_1d(S[2], S[3]); return s * s; }
 /* #15: distance_1d(a, b) + midpoint(a, b) */
-static int64_t ref_distance_midpoint(void)  { return r_distance_1d(S[0], S[1]) + r_midpoint(S[0], S[1]); }
+DEF_REF(distance_midpoint)  { return r_distance_1d(S[0], S[1]) + r_midpoint(S[0], S[1]); }
 /* #16: present_value(future_value(cashflow, r, n), r, n) */
-static int64_t ref_pv_of_fv(void)           { return r_present_value(r_future_value(S[0], S[1], S[2]), S[1], S[2]); }
+DEF_REF(pv_of_fv)           { return r_present_value(r_future_value(S[0], S[1], S[2]), S[1], S[2]); }
 /* #17: fibonacci(n) + factorial(n) */
-static int64_t ref_fib_fact_add(void)       { return r_fibonacci(S[0]) + r_factorial(S[0]); }
+DEF_REF(fib_fact_add)       { return r_fibonacci(S[0]) + r_factorial(S[0]); }
 /* #18: gross - tax_amount(gross, rate) */
-static int64_t ref_gross_minus_tax(void)    { return S[0] - r_tax_amount(S[0], S[1]); }
-/* #19: compound(P, r, n) - P  (same shape as #2 but distinct entry) */
-static int64_t ref_compound_minus_p(void)   { return r_compound(S[0], S[1], S[2]) - S[0]; }
-/* #20: clamp(sigmoid(x), lo, hi) — same shape as #4 */
-static int64_t ref_sigmoid_clamped(void)    { return r_clamp(r_sigmoid(S[0]), S[1], S[2]); }
+DEF_REF(gross_minus_tax)    { return S[0] - r_tax_amount(S[0], S[1]); }
+/* #19: compound(P, r, n) - P */
+DEF_REF(compound_minus_p)   { return r_compound(S[0], S[1], S[2]) - S[0]; }
+/* #20: clamp(sigmoid(x), lo, hi) */
+DEF_REF(sigmoid_clamped)    { return r_clamp(r_sigmoid(S[0]), S[1], S[2]); }
+
+#undef DEF_REF
+
+typedef int64_t (*RefFn)(const int64_t *S);
 
 typedef struct {
     const char *name;
-    int64_t (*fn)(void);
+    RefFn fn;
 } RefEntry;
 
 static const RefEntry references[] = {
@@ -146,13 +175,19 @@ static const RefEntry references[] = {
 };
 static const int references_count = (int)(sizeof(references) / sizeof(references[0]));
 
-int wiring_reference_compute(const char *name, int64_t *out) {
+int wiring_reference_compute_at(const char *name, int set_idx, int64_t *out) {
     if (!name || !out) return 0;
+    int idx = set_idx % WIRING_INPUT_SETS;
+    if (idx < 0) idx += WIRING_INPUT_SETS;
     for (int i = 0; i < references_count; i++) {
         if (strcmp(references[i].name, name) == 0) {
-            *out = references[i].fn();
+            *out = references[i].fn(INPUT_SETS[idx]);
             return 1;
         }
     }
     return 0;
+}
+
+int wiring_reference_compute(const char *name, int64_t *out) {
+    return wiring_reference_compute_at(name, 0, out);
 }

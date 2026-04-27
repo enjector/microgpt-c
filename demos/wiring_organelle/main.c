@@ -54,6 +54,16 @@
  * **Headline: 35% (7/20) numerically correct end-to-end; 87.5%
  * accuracy among executing graphs — see RESEARCH_PIPELINE_IR.md §21.**
  *
+ * Phase 8: multi-input correctness + self-consistency vote re-ranking.
+ * Each held-out prompt is tested against 5 distinct input sets; a
+ * candidate is "correct" iff its 5-vector matches the reference's
+ * 5-vector exactly. The demo collects every verified candidate's
+ * 5-vector during voting, then picks the self-consistent majority
+ * winner. **Headline: 35% (7/20) correct on all 5 inputs — same
+ * percentage as Phase 7 but now robustly confirmed; bimodal pattern
+ * shows model is either right on all 5 or wrong on all 5. See
+ * RESEARCH_PIPELINE_IR.md §22.**
+ *
  * Copyright (c) 2026 Ajay Soni, Enjector Software Ltd. MIT License.
  */
 
@@ -584,8 +594,9 @@ int main(void) {
         printf("================================================================\n\n");
 
         int held_well = 0, held_parse = 0, held_verify = 0, held_fidelity = 0;
-        int held_executed = 0;   /* Phase 6: end-to-end pipeline_execute success */
-        int held_correct = 0;    /* Phase 7: numeric answer matches reference */
+        int held_executed = 0;     /* Phase 6: end-to-end pipeline_execute success */
+        int held_correct = 0;      /* Phase 7: numeric answer matches reference (single input) */
+        int held_correct_all = 0;  /* Phase 8: matches reference on all 5 input sets */
         int held_print = 0;
         const int MAX_HELD_PRINTS = 20;
         for (int i = 0; i < n_held; i++) {
@@ -595,6 +606,20 @@ int main(void) {
             int have_best = 0;
             int have_verified_with_fidelity = 0;
             int have_verified_any = 0;
+
+            /* Phase 8 — collect every verified candidate's multi-input
+             * execution results so we can pick the self-consistent
+             * majority winner across the 16 votes. */
+            #define MAX_VOTE_CAND N_VOTES
+            typedef struct {
+                char *text;
+                int has_results;
+                int has_fidelity;
+                int64_t results[WIRING_INPUT_SETS];
+                int valid_results;  /* count of input sets that executed cleanly */
+            } VoteCandidate;
+            VoteCandidate cands[MAX_VOTE_CAND] = {0};
+            int n_cands = 0;
 
             for (int v = 0; v < N_VOTES; v++) {
                 wiring_generate(org, &cfg, held[i].prompt, output_buf, sizeof(output_buf),
@@ -643,15 +668,63 @@ int main(void) {
                     if (fid_ok) {
                         fidelity = 1;
                         have_verified_with_fidelity = 1;
+                    }
+                    /* Cache best_buf as a verified candidate (with fidelity
+                     * preferred). Don't break — keep collecting for
+                     * self-consistency voting. */
+                    if (fid_ok || !have_best) {
                         strncpy(best_buf, output_buf, sizeof(best_buf) - 1);
                         best_buf[sizeof(best_buf) - 1] = '\0';
                         have_best = 1;
-                        break;  /* best-case match found — stop early. */
-                    } else if (!have_verified_any || !have_verified_with_fidelity) {
-                        /* Cache as best fallback; keep searching for fidelity match. */
-                        strncpy(best_buf, output_buf, sizeof(best_buf) - 1);
-                        best_buf[sizeof(best_buf) - 1] = '\0';
-                        have_best = 1;
+                    }
+
+                    /* Phase 8: execute this candidate on all 5 input sets,
+                     * cache results for later self-consistency vote. */
+                    if (n_cands < MAX_VOTE_CAND) {
+                        VoteCandidate *c = &cands[n_cands];
+                        c->text = strdup(output_buf);
+                        c->has_fidelity = fid_ok;
+                        c->valid_results = 0;
+                        for (int s = 0; s < WIRING_INPUT_SETS; s++) {
+                            Pipeline *exec_p = pipeline_parse_text(output_buf);
+                            if (!exec_p) exec_p = pipeline_parse_text_tolerant(output_buf);
+                            if (!exec_p) continue;
+                            if (pipeline_verify(exec_p) != PIPE_OK) {
+                                PipelineRepairReport rep = {0};
+                                pipeline_repair(exec_p, &rep);
+                            }
+                            if (exec_p->n_nodes > 0
+                                && pipeline_verify(exec_p) == PIPE_OK) {
+                                int n_in = exec_p->n_sig_in;
+                                int n_out = exec_p->n_sig_out;
+                                if (n_in <= WIRING_MAX_INPUTS && n_out >= 1) {
+                                    int64_t input_buf[WIRING_MAX_INPUTS];
+                                    wiring_input_set(s, input_buf);
+                                    PipelineValue *ins  = (PipelineValue *)calloc((size_t)(n_in  > 0 ? n_in  : 1), sizeof(PipelineValue));
+                                    PipelineValue *outs = (PipelineValue *)calloc((size_t)(n_out > 0 ? n_out : 1), sizeof(PipelineValue));
+                                    for (int k = 0; k < n_in; k++) {
+                                        ins[k].type = exec_p->signature_in[k].type;
+                                        ins[k].v.i  = input_buf[k];
+                                    }
+                                    int rc = pipeline_execute(exec_p, ins, outs,
+                                                              wiring_natives_dispatch, NULL);
+                                    if (rc == 0) {
+                                        c->results[s] = outs[0].v.i;
+                                        c->valid_results++;
+                                        c->has_results = 1;
+                                    }
+                                    free(ins); free(outs);
+                                }
+                            }
+                            pipeline_free(exec_p);
+                        }
+                        n_cands++;
+                    }
+
+                    if (fid_ok && have_verified_with_fidelity) {
+                        /* Stop early once we have at least one fidelity
+                         * match — diminishing returns for self-consistency. */
+                        break;
                     }
                 }
             }
@@ -661,72 +734,118 @@ int main(void) {
             if (verified)    held_verify++;
             if (fidelity)    held_fidelity++;
 
-            /* Phase 6: end-to-end execution. Re-parse the verified
-             * best output, supply small int test inputs (cycle 5,7,3,11,2),
-             * dispatch to wiring_natives_dispatch, capture the result. */
+            /* Phase 8: self-consistency vote re-ranking.
+             * Among the verified candidates collected during voting,
+             * pick the one whose 5-input result vector matches the
+             * most siblings (majority vote on the vector). Ties broken
+             * by: fidelity-having candidates first, then highest
+             * valid_results count, then earliest. */
             int executed = 0;
             int64_t exec_result = 0;
-            if (verified && have_best) {
-                Pipeline *exec_p = pipeline_parse_text(best_buf);
-                if (!exec_p) exec_p = pipeline_parse_text_tolerant(best_buf);
-                if (exec_p) {
-                    if (pipeline_verify(exec_p) != PIPE_OK) {
-                        PipelineRepairReport rep = {0};
-                        pipeline_repair(exec_p, &rep);
-                    }
-                    if (exec_p->n_nodes > 0 && pipeline_verify(exec_p) == PIPE_OK) {
-                        /* Build inputs: cycle through small ints. */
-                        int n_in = exec_p->n_sig_in;
-                        int n_out = exec_p->n_sig_out;
-                        if (n_in <= 16 && n_out >= 1) {
-                            static const int64_t test_seq[] = {5, 7, 3, 11, 2, 13, 4, 9, 6, 8, 1, 10, 12, 15, 14, 16};
-                            PipelineValue *ins  = (PipelineValue *)calloc((size_t)(n_in  > 0 ? n_in  : 1), sizeof(PipelineValue));
-                            PipelineValue *outs = (PipelineValue *)calloc((size_t)(n_out > 0 ? n_out : 1), sizeof(PipelineValue));
-                            for (int k = 0; k < n_in; k++) {
-                                ins[k].type = exec_p->signature_in[k].type;
-                                ins[k].v.i  = test_seq[k];
-                            }
-                            int rc = pipeline_execute(exec_p, ins, outs,
-                                                      wiring_natives_dispatch, NULL);
-                            if (rc == 0) {
-                                executed = 1;
-                                exec_result = outs[0].v.i;
-                            }
-                            free(ins); free(outs);
+            int64_t exec_results_all[WIRING_INPUT_SETS] = {0};
+            int valid_results_all = 0;
+            int picked = -1;
+            if (n_cands > 0) {
+                /* Vote: each candidate scored by # of siblings with
+                 * identical results vector (only across valid sets). */
+                int best_score = -1;
+                for (int a = 0; a < n_cands; a++) {
+                    if (!cands[a].has_results) continue;
+                    int score = 0;
+                    for (int b = 0; b < n_cands; b++) {
+                        if (a == b || !cands[b].has_results) continue;
+                        int agree = 0;
+                        int compared = 0;
+                        for (int s = 0; s < WIRING_INPUT_SETS; s++) {
+                            if (cands[a].results[s] == cands[b].results[s]) agree++;
+                            compared++;
                         }
+                        if (compared > 0 && agree == compared) score++;
                     }
-                    pipeline_free(exec_p);
+                    /* Tiebreaker: fidelity > valid_results > earlier. */
+                    int promote = 0;
+                    if (score > best_score) promote = 1;
+                    else if (score == best_score && picked >= 0) {
+                        if (cands[a].has_fidelity && !cands[picked].has_fidelity) promote = 1;
+                        else if (cands[a].has_fidelity == cands[picked].has_fidelity
+                                 && cands[a].valid_results > cands[picked].valid_results) promote = 1;
+                    }
+                    if (promote) { best_score = score; picked = a; }
+                }
+                /* Fallback: if no candidate had results, pick first verified one. */
+                if (picked < 0) {
+                    for (int a = 0; a < n_cands; a++) { picked = a; break; }
+                }
+            }
+            if (picked >= 0 && cands[picked].has_results) {
+                executed = 1;
+                exec_result = cands[picked].results[0];
+                for (int s = 0; s < WIRING_INPUT_SETS; s++) {
+                    exec_results_all[s] = cands[picked].results[s];
+                }
+                valid_results_all = cands[picked].valid_results;
+                /* Update best_buf to the picked candidate's text. */
+                if (cands[picked].text) {
+                    strncpy(best_buf, cands[picked].text, sizeof(best_buf) - 1);
+                    best_buf[sizeof(best_buf) - 1] = '\0';
+                    have_best = 1;
                 }
             }
             if (executed) held_executed++;
 
-            /* Phase 7: compare exec_result against reference answer. */
+            /* Phase 7: single-input correctness (set 0 only). */
             int correct = 0;
             int64_t ref_value = 0;
             int has_ref = (held[i].reference && held[i].reference[0]
-                           && wiring_reference_compute(held[i].reference, &ref_value));
+                           && wiring_reference_compute_at(held[i].reference, 0, &ref_value));
             if (executed && has_ref && exec_result == ref_value) correct = 1;
             if (correct) held_correct++;
+
+            /* Phase 8: all-input correctness — must match on every
+             * input set the picked candidate executed on. */
+            int correct_all = 0;
+            int ref_matches = 0;
+            int ref_compared = 0;
+            int64_t ref_all[WIRING_INPUT_SETS] = {0};
+            if (executed && has_ref && valid_results_all == WIRING_INPUT_SETS) {
+                for (int s = 0; s < WIRING_INPUT_SETS; s++) {
+                    int64_t r = 0;
+                    if (wiring_reference_compute_at(held[i].reference, s, &r)) {
+                        ref_all[s] = r;
+                        ref_compared++;
+                        if (r == exec_results_all[s]) ref_matches++;
+                    }
+                }
+                if (ref_compared == WIRING_INPUT_SETS && ref_matches == WIRING_INPUT_SETS) {
+                    correct_all = 1;
+                }
+            }
+            if (correct_all) held_correct_all++;
 
             if (held_print < MAX_HELD_PRINTS) {
                 printf("[%d] %s\n", i + 1, held[i].prompt);
                 printf("    EXPECTED: %s\n", held[i].expected[0] ? held[i].expected : "(none)");
-                printf("    well=%s parse=%s verify=%s fidelity=%s exec=%s correct=%s votes=%d/%d\n",
+                printf("    well=%s parse=%s verify=%s fidelity=%s exec=%s correct=%s correct_all=%s votes=%d/%d cands=%d\n",
                        well_formed ? "Y" : "n",
                        parsed      ? "Y" : "n",
                        verified    ? "Y" : "n",
                        fidelity    ? "Y" : "n",
                        executed    ? "Y" : "n",
                        correct     ? "Y" : "n",
-                       votes_used, N_VOTES);
-                if (executed) {
-                    if (has_ref) {
-                        printf("    EXEC %lld  vs REF %lld  (%s)\n",
-                               (long long)exec_result, (long long)ref_value,
-                               correct ? "match" : "drift");
-                    } else {
-                        printf("    EXEC RESULT: %lld (no reference annotated)\n", (long long)exec_result);
-                    }
+                       correct_all ? "Y" : "n",
+                       votes_used, N_VOTES, n_cands);
+                if (executed && has_ref) {
+                    printf("    EXEC [%lld %lld %lld %lld %lld]\n",
+                           (long long)exec_results_all[0], (long long)exec_results_all[1],
+                           (long long)exec_results_all[2], (long long)exec_results_all[3],
+                           (long long)exec_results_all[4]);
+                    printf("    REF  [%lld %lld %lld %lld %lld]  (%d/%d match)\n",
+                           (long long)ref_all[0], (long long)ref_all[1],
+                           (long long)ref_all[2], (long long)ref_all[3],
+                           (long long)ref_all[4],
+                           ref_matches, ref_compared);
+                } else if (executed) {
+                    printf("    EXEC RESULT: %lld (no reference annotated)\n", (long long)exec_result);
                 }
                 if (have_best) {
                     printf("    --- best output ---\n%s\n", best_buf);
@@ -734,6 +853,12 @@ int main(void) {
                 printf("    ---\n\n");
                 held_print++;
             }
+
+            /* Free per-candidate text buffers. */
+            for (int a = 0; a < n_cands; a++) {
+                if (cands[a].text) free(cands[a].text);
+            }
+            #undef MAX_VOTE_CAND
         }
 
         printf("================================================================\n");
@@ -753,9 +878,12 @@ int main(void) {
         printf("Best-of-%-2d end-to-end executed:       %d/%d (%.0f%%)  [Phase 6: prompt → graph → numeric answer]\n",
                N_VOTES, held_executed, n_held,
                n_held > 0 ? 100.0 * held_executed / n_held : 0.0);
-        printf("Best-of-%-2d numerically correct:       %d/%d (%.0f%%)  [Phase 7: matches reference answer]\n",
+        printf("Best-of-%-2d numerically correct (1×):  %d/%d (%.0f%%)  [Phase 7: matches single reference]\n",
                N_VOTES, held_correct, n_held,
                n_held > 0 ? 100.0 * held_correct / n_held : 0.0);
+        printf("Best-of-%-2d correct on all %d inputs:   %d/%d (%.0f%%)  [Phase 8: self-consistency + multi-input]\n",
+               N_VOTES, WIRING_INPUT_SETS, held_correct_all, n_held,
+               n_held > 0 ? 100.0 * held_correct_all / n_held : 0.0);
         printf("\n");
 
         for (int i = 0; i < n_held; i++) {
