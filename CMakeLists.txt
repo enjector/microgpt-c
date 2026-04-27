@@ -1802,6 +1802,30 @@ add_test(NAME pipeline_corpus_smoke
          COMMAND pipeline_corpus_gen ${CMAKE_BINARY_DIR}/_corpus_smoke.txt
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
+# Wiring Organelle demo (Pipeline IR Phase 3c) — train a small word-level
+# Transformer on the templated corpus, evaluate novel-prompt generation.
+# See docs/research/RESEARCH_PIPELINE_IR.md §13.
+#
+# NOTE: V4 active-attention stack (PARTIAL_ROPE/ATTN_SINK/QK_NORM) is
+# DELIBERATELY NOT enabled — codegen is grammar-rigid and the V4 stack
+# regresses such tasks by 30pp per the prior ablation.
+add_demo(
+  NAME    wiring_organelle_demo
+  SOURCE  demos/wiring_organelle/main.c
+  THREADS
+  DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=2 BLOCK_SIZE=192 MLP_DIM=192
+          NUM_STEPS=1500 LEARNING_RATE=0.001 BATCH_SIZE=16
+          MAX_VOCAB=600 MAX_DOCS=5000 MAX_DOC_LEN=2048
+)
+# Generate the corpus next to the binary as a POST_BUILD step.
+add_custom_command(TARGET wiring_organelle_demo POST_BUILD
+  COMMAND pipeline_corpus_gen
+          $<TARGET_FILE_DIR:wiring_organelle_demo>/pipeline_corpus_train.txt
+          $<TARGET_FILE_DIR:wiring_organelle_demo>/pipeline_corpus_val.txt
+  DEPENDS pipeline_corpus_gen
+  COMMENT "Generating Pipeline IR corpus (train+val) for wiring_organelle_demo"
+)
+
 add_executable(test_microgpt_turboquant tests/test_microgpt_turboquant.c)
 target_link_libraries(test_microgpt_turboquant PRIVATE microgpt_lib)
 target_include_directories(test_microgpt_turboquant PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests ${CMAKE_CURRENT_SOURCE_DIR}/src)

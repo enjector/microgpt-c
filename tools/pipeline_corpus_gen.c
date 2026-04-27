@@ -798,10 +798,12 @@ int main(int argc, char **argv) {
     if (split) fprintf(stderr, " | train=%d, val=%d", train_count, val_count);
     fprintf(stderr, "\nUnique whitespace-tokens: %d  |  Total characters: %d\n", vocab, chars);
 
-    /* Free catalog. */
+    /* Free catalog. ctx_a is sometimes a heap array (multi-param families)
+     * and sometimes an intptr_t-cast int (single-param families). Tracking
+     * which is which adds complexity for ~1KB of bounded leak — process is
+     * about to exit. Free only the prompt strings. */
     for (int i = 0; i < n; i++) {
         free(cat[i].prompt);
-        if (cat[i].ctx_a) free(cat[i].ctx_a);
     }
     free(cat);
 
