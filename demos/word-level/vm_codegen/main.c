@@ -43,6 +43,10 @@
 #define WORD_VOCAB_SIZE 600
 #endif
 
+#ifndef CHECKPOINT_FILE
+#define CHECKPOINT_FILE "w_vm_codegen_v2.ckpt"
+#endif
+
 /* Temperature schedule for best-of-N */
 static const float CANDIDATE_TEMPS[NUM_CANDIDATES] = {
     0.3f, 0.4f, 0.5f, 0.5f, 0.6f, 0.6f, 0.7f, 0.7f, 0.8f, 0.5f};
@@ -309,7 +313,7 @@ int main(void) {
   Organelle *org = organelle_train_words(
       "vm_codegen_v2",           /* name */
       "w_vm_functions_pretok.txt", /* corpus (pre-tokenized) */
-      "w_vm_codegen_v2.ckpt",      /* checkpoint */
+      CHECKPOINT_FILE,             /* checkpoint (overridable via build) */
       &cfg,                      /* config */
       NUM_STEPS,                 /* training steps */
       WORD_VOCAB_SIZE            /* max words */

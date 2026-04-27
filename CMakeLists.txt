@@ -893,6 +893,41 @@ add_demo(
 )
 target_link_libraries(w_vm_codegen_deep PRIVATE microgpt_vm_lib)
 
+# Deep codegen + full V4 stack A/B comparison.
+# This is the deep config sweet spot where the V4 papers measured
+# the headline -8.7% PPL win. Codegen is densely relative-positional
+# (RoPE), has prompt-vs-body asymmetry (sinks), and benefits from
+# stable attention magnitudes (Q/K RMSNorm). Both targets fresh-train
+# with NUM_STEPS=5000 from distinct checkpoints for clean A/B.
+add_demo(
+  NAME    w_vm_codegen_deep_v4baseline
+  SOURCE  demos/word-level/vm_codegen/main.c
+  THREADS METAL BLAS
+  COPY    demos/word-level/vm_codegen/w_vm_functions_pretok.txt
+  DEFINES N_EMBD=96 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=256 MLP_DIM=384
+          NUM_STEPS=5000 LEARNING_RATE=0.001 BATCH_SIZE=16
+          MAX_VOCAB=1200 MAX_DOCS=5000 MAX_DOC_LEN=512
+          WORD_VOCAB_SIZE=900
+          CHECKPOINT_FILE="w_vm_codegen_deep_v4baseline.ckpt"
+)
+target_link_libraries(w_vm_codegen_deep_v4baseline PRIVATE microgpt_vm_lib)
+
+add_demo(
+  NAME    w_vm_codegen_deep_v4
+  SOURCE  demos/word-level/vm_codegen/main.c
+  THREADS METAL BLAS
+  COPY    demos/word-level/vm_codegen/w_vm_functions_pretok.txt
+  DEFINES N_EMBD=96 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=256 MLP_DIM=384
+          NUM_STEPS=5000 LEARNING_RATE=0.001 BATCH_SIZE=16
+          MAX_VOCAB=1200 MAX_DOCS=5000 MAX_DOC_LEN=512
+          WORD_VOCAB_SIZE=900
+          MICROGPT_PARTIAL_ROPE=1
+          MICROGPT_ATTN_SINK=1 ATTN_SINK_LOGIT=-1.0
+          MICROGPT_QK_NORM=1
+          CHECKPOINT_FILE="w_vm_codegen_deep_v4.ckpt"
+)
+target_link_libraries(w_vm_codegen_deep_v4 PRIVATE microgpt_vm_lib)
+
 # VM codegen A/B: N_LAYER=4 + AttnRes (block=2)
 add_demo(
   NAME    w_vm_codegen_attnres
