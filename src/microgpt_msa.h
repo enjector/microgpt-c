@@ -254,4 +254,57 @@ size_t msa_recency_inject_rope(const MsaRecency *rec,
                                size_t start_pos,
                                int n_head);
 
+/* ============================================================
+ *  RoPE-aware MsaPool wrappers
+ * ============================================================
+ *
+ * The mean-of-rotated-vectors problem: msa_pool_chunk averages
+ * chunk_len token K vectors that were each rotated by *different*
+ * RoPE angles. The mean of rotated vectors is NOT the same as the
+ * rotation of a mean — there is no well-defined position to assign
+ * to the pooled chunk's K vector.
+ *
+ * The fix: bracket the existing mean-pool with rotation operations
+ * so that pool entries are stored in "position-zero space" (no
+ * rotation imprint), and re-rotated to their target slot at expand
+ * time.
+ *
+ *   At pool time:    K_t' = R(-pos_t) · K_t      (un-rotate per token)
+ *                    pool stores mean(K_t')      (still well-defined)
+ *
+ *   At expand time:  K_pool_at_p_new = R(p_new) · pooled_mean
+ *
+ * The Q at p_new dot-products with R(p_new)·pooled_mean, giving
+ *   Q · R(p_new)·pooled_mean = R(-p_new)·Q · pooled_mean
+ * which is a clean relative-position match against the chunk's
+ * neutralised summary.
+ *
+ * Both wrappers fall back to the legacy non-rotating path when
+ * MICROGPT_PARTIAL_ROPE is not defined or n_head <= 0.
+ *
+ * See RESEARCH_DEEPSEEK_V4_MSA_POOL_ROPE_REROTATE.md for measurements.
+ */
+
+/* RoPE-aware version of msa_pool_chunk. Same parameters plus:
+ *   start_pos : absolute pos_id of the FIRST token in the chunk (token t
+ *               in the chunk window has absolute pos = start_pos + t).
+ *   n_head    : number of attention heads (RoPE rotates per-head).
+ * Returns same as msa_pool_chunk: new chunk index, or -1 on failure. */
+int msa_pool_chunk_rope(MsaPool *pool,
+                        scalar_t **active_keys,
+                        scalar_t **active_values,
+                        size_t chunk_len,
+                        size_t start_pos,
+                        int n_head);
+
+/* RoPE-aware version of msa_expand_context. Calls the legacy expand,
+ * then re-rotates the just-written K at slot pos by +pos per head. V
+ * is unchanged — RoPE doesn't touch V. */
+void msa_expand_context_rope(const MsaPool *pool,
+                             int chunk_idx,
+                             scalar_t **active_keys,
+                             scalar_t **active_values,
+                             size_t pos,
+                             int n_head);
+
 #endif /* MICROGPT_MSA_H */

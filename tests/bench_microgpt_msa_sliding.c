@@ -103,9 +103,19 @@ static size_t build_long_sequence(const Docs *docs, size_t holdout_start,
  */
 static int msa_step_baseline(MsaPool *pool, scalar_t **inf_keys,
                              scalar_t **inf_values, size_t *inf_cache_len,
-                             size_t *pos, const MicrogptConfig *cfg) {
+                             size_t *pos, const MicrogptConfig *cfg,
+                             size_t abs_pos_at_slot0) {
   size_t chunk_size = (size_t)cfg->block_size / 2;
+#ifdef MICROGPT_PARTIAL_ROPE
+  /* Un-rotate per-token K back to position-zero space, then mean-pool.
+   * abs_pos_at_slot0 = absolute pos_id of the K vector currently at slot 0
+   * in the active cache. */
+  msa_pool_chunk_rope(pool, inf_keys, inf_values, chunk_size,
+                      abs_pos_at_slot0, cfg->n_head);
+#else
+  (void)abs_pos_at_slot0;
   msa_pool_chunk(pool, inf_keys, inf_values, chunk_size);
+#endif
   for (int L = 0; L < cfg->n_layer; L++) {
     memmove(inf_keys[L],
             inf_keys[L] + (chunk_size * (size_t)cfg->n_embd),
@@ -130,12 +140,24 @@ static int msa_step_baseline(MsaPool *pool, scalar_t **inf_keys,
   int top[16];
   int n = msa_route_top_k(pool, q, BENCH_MSA_TOPK, top, NULL);
   for (int i = 0; i < n; i++) {
-    if (top[i] >= 0)
+    if (top[i] >= 0) {
+#ifdef MICROGPT_PARTIAL_ROPE
+      msa_expand_context_rope(pool, top[i], inf_keys, inf_values,
+                              (size_t)i, cfg->n_head);
+#else
       msa_expand_context(pool, top[i], inf_keys, inf_values, (size_t)i);
+#endif
+    }
   }
 #else
   int best = msa_route_top_1(pool, q);
-  if (best >= 0) msa_expand_context(pool, best, inf_keys, inf_values, 0);
+  if (best >= 0) {
+#ifdef MICROGPT_PARTIAL_ROPE
+    msa_expand_context_rope(pool, best, inf_keys, inf_values, 0, cfg->n_head);
+#else
+    msa_expand_context(pool, best, inf_keys, inf_values, 0);
+#endif
+  }
 #endif
   for (int L = 0; L < cfg->n_layer; L++) free(q[L]);
   free(q);
@@ -146,10 +168,17 @@ static int msa_step_baseline(MsaPool *pool, scalar_t **inf_keys,
 static int msa_step_sliding(MsaPool *pool, MsaRecency *rec,
                             scalar_t **inf_keys, scalar_t **inf_values,
                             size_t *inf_cache_len, size_t *pos,
-                            const MicrogptConfig *cfg) {
+                            const MicrogptConfig *cfg,
+                            size_t abs_pos_at_slot0) {
   /* Pool ALL active tokens into MsaPool (not just half). */
   size_t chunk_size = (size_t)cfg->block_size;
+#ifdef MICROGPT_PARTIAL_ROPE
+  msa_pool_chunk_rope(pool, inf_keys, inf_values, chunk_size,
+                      abs_pos_at_slot0, cfg->n_head);
+#else
+  (void)abs_pos_at_slot0;
   msa_pool_chunk(pool, inf_keys, inf_values, chunk_size);
+#endif
   /* Wipe the active cache. */
   for (int L = 0; L < cfg->n_layer; L++) {
     memset(inf_keys[L], 0,
@@ -179,7 +208,11 @@ static int msa_step_sliding(MsaPool *pool, MsaRecency *rec,
   int best = msa_route_top_1(pool, q);
   size_t inject_pos = 0;
   if (best >= 0) {
+#ifdef MICROGPT_PARTIAL_ROPE
+    msa_expand_context_rope(pool, best, inf_keys, inf_values, 0, cfg->n_head);
+#else
     msa_expand_context(pool, best, inf_keys, inf_values, 0);
+#endif
     inject_pos = 1;
   }
   for (int L = 0; L < cfg->n_layer; L++) free(q[L]);
@@ -308,12 +341,20 @@ int main(void) {
   int chunk_events = 0;
 
   size_t pos = 0;
+  /* abs_pos_at_slot0 = absolute pos_id of the K vector currently sitting
+   * at active-cache slot 0. Bumps by chunk_size at each baseline event
+   * (= bs/2) and by block_size at each sliding-window event. */
+  size_t abs_pos_at_slot0 = 0;
   for (size_t i = 0; i < long_n - 1; i++) {
     if (pos >= (size_t)bs) {
 #if BENCH_MSA_SLIDING_WINDOW
-      msa_step_sliding(pool, rec, keys, values, cache_len, &pos, &cfg);
+      msa_step_sliding(pool, rec, keys, values, cache_len, &pos, &cfg,
+                       abs_pos_at_slot0);
+      abs_pos_at_slot0 += (size_t)cfg.block_size;
 #else
-      msa_step_baseline(pool, keys, values, cache_len, &pos, &cfg);
+      msa_step_baseline(pool, keys, values, cache_len, &pos, &cfg,
+                        abs_pos_at_slot0);
+      abs_pos_at_slot0 += (size_t)cfg.block_size / 2;
 #endif
       chunk_events++;
     }

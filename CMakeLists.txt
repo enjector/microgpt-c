@@ -676,6 +676,37 @@ add_demo(
           MICROGPT_PARTIAL_ROPE=1
 )
 
+# ==================================================================
+#  MSA pool rotation fix — un-rotate-before-pool, re-rotate-on-expand.
+#  Closes the cross-regime gap (RoPE-on absolute MSA PPL was higher than
+#  RoPE-off because mean-pool of rotated K vectors is undefined).
+#  See docs/research/RESEARCH_DEEPSEEK_V4_MSA_POOL_ROPE_REROTATE.md
+#
+#  Both targets below use the rope-aware pool wrappers automatically
+#  via #ifdef MICROGPT_PARTIAL_ROPE, since the bench source now calls
+#  msa_pool_chunk_rope and msa_expand_context_rope when the flag is on.
+#  These targets exist as separately-named binaries to make the
+#  cross-regime comparison reproducible from the command line.
+# ==================================================================
+add_demo(
+  NAME    bench_rope_msa_pool_rotated_baseline
+  SOURCE  tests/bench_microgpt_msa_sliding.c
+  COPY    demos/character-level/names/c_names.txt
+  DEFINES N_EMBD=64 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=64 MLP_DIM=128
+          BENCH_NUM_STEPS=1500 BENCH_BATCH_SIZE=16 BENCH_LONG_SEQ_LEN=2048
+          MICROGPT_PARTIAL_ROPE=1
+)
+
+add_demo(
+  NAME    bench_rope_msa_pool_rotated_sliding
+  SOURCE  tests/bench_microgpt_msa_sliding.c
+  COPY    demos/character-level/names/c_names.txt
+  DEFINES N_EMBD=64 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=64 MLP_DIM=128
+          BENCH_NUM_STEPS=1500 BENCH_BATCH_SIZE=16 BENCH_LONG_SEQ_LEN=2048
+          BENCH_MSA_SLIDING_WINDOW=1 MSA_WIN=32
+          MICROGPT_PARTIAL_ROPE=1
+)
+
 # Full unit-test suite with PARTIAL_ROPE=1 to validate the RoPE backward.
 add_executable(test_microgpt_rope tests/test_microgpt.c)
 target_compile_definitions(test_microgpt_rope PRIVATE MICROGPT_PARTIAL_ROPE=1)

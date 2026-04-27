@@ -6,6 +6,7 @@
 
 #include "microgpt_msa.h"
 #include <stdlib.h>
+#include <string.h>
 #include <math.h>
 
 MsaPool *msa_pool_create(size_t capacity, int n_layer, int n_embd) {
@@ -497,6 +498,103 @@ static void _msa_rope_rotate_inplace(scalar_t *x, size_t head_dim,
     }
 }
 #endif /* MICROGPT_PARTIAL_ROPE */
+
+/* ============================================================
+ *  RoPE-aware pool wrappers
+ * ============================================================
+ *
+ * These don't modify MsaPool's storage layout. They bracket the
+ * existing msa_pool_chunk / msa_expand_context calls with rotation
+ * operations, transforming K vectors into and out of the
+ * "position-zero space" needed for averaging to be well-defined.
+ *
+ * The active_keys arrays passed in MUST NOT be modified, since the
+ * caller may still be using them after pooling. We allocate scratch
+ * buffers per layer, copy the chunk window in, un-rotate per token
+ * per head, and pass the scratch to msa_pool_chunk.
+ */
+
+int msa_pool_chunk_rope(MsaPool *pool,
+                        scalar_t **active_keys,
+                        scalar_t **active_values,
+                        size_t chunk_len,
+                        size_t start_pos,
+                        int n_head) {
+#ifndef MICROGPT_PARTIAL_ROPE
+    /* Compile-time fallback. */
+    (void)start_pos; (void)n_head;
+    return msa_pool_chunk(pool, active_keys, active_values, chunk_len);
+#else
+    if (!pool || chunk_len == 0) return -1;
+    if (n_head <= 0) {
+        return msa_pool_chunk(pool, active_keys, active_values, chunk_len);
+    }
+    _msa_rope_tables_init();
+    size_t head_dim = (size_t)(pool->n_embd / n_head);
+
+    /* Build per-layer scratch K buffers holding the un-rotated chunk. */
+    scalar_t **scratch_k = (scalar_t **)malloc((size_t)pool->n_layer * sizeof(scalar_t *));
+    if (!scratch_k) return -1;
+    for (int l = 0; l < pool->n_layer; l++) {
+        scratch_k[l] = (scalar_t *)malloc(chunk_len * (size_t)pool->n_embd * sizeof(scalar_t));
+        if (!scratch_k[l]) {
+            for (int j = 0; j < l; j++) free(scratch_k[j]);
+            free(scratch_k);
+            return -1;
+        }
+        memcpy(scratch_k[l], active_keys[l],
+               chunk_len * (size_t)pool->n_embd * sizeof(scalar_t));
+        /* Un-rotate each token's K per head: K_t' = R(-(start_pos+t)) · K_t.
+         * Implemented as _msa_rope_rotate_inplace with p_orig=(start_pos+t)
+         * and p_new=0, which produces a rotation by (-(start_pos+t)). */
+        for (size_t t = 0; t < chunk_len; t++) {
+            size_t p_orig = start_pos + t;
+            for (int h = 0; h < n_head; h++) {
+                _msa_rope_rotate_inplace(
+                    scratch_k[l] + t * (size_t)pool->n_embd + (size_t)h * head_dim,
+                    head_dim, p_orig, /*p_new=*/0);
+            }
+        }
+    }
+
+    /* Now call the legacy mean-pool on the scratch (un-rotated) K and
+     * the unmodified V. RoPE doesn't touch V. */
+    int ret = msa_pool_chunk(pool, scratch_k, active_values, chunk_len);
+
+    for (int l = 0; l < pool->n_layer; l++) free(scratch_k[l]);
+    free(scratch_k);
+    return ret;
+#endif
+}
+
+void msa_expand_context_rope(const MsaPool *pool,
+                             int chunk_idx,
+                             scalar_t **active_keys,
+                             scalar_t **active_values,
+                             size_t pos,
+                             int n_head) {
+#ifndef MICROGPT_PARTIAL_ROPE
+    (void)n_head;
+    msa_expand_context(pool, chunk_idx, active_keys, active_values, pos);
+#else
+    if (!pool || chunk_idx < 0) return;
+    /* Copy the (position-zero space) pool vector to slot `pos`. */
+    msa_expand_context(pool, chunk_idx, active_keys, active_values, pos);
+    if (n_head <= 0) return;
+    _msa_rope_tables_init();
+    size_t head_dim = (size_t)(pool->n_embd / n_head);
+    /* Re-rotate the K at slot pos per head: K_at_pos = R(pos) · pooled_K.
+     * Implemented as rotate-by-delta with p_orig=0 and p_new=pos. V is
+     * unchanged — RoPE doesn't touch V. */
+    for (int l = 0; l < pool->n_layer; l++) {
+        scalar_t *dst_k = active_keys[l] + pos * (size_t)pool->n_embd;
+        for (int h = 0; h < n_head; h++) {
+            _msa_rope_rotate_inplace(dst_k + (size_t)h * head_dim,
+                                     head_dim, /*p_orig=*/0, /*p_new=*/pos);
+        }
+    }
+#endif
+}
 
 size_t msa_recency_inject_rope(const MsaRecency *rec,
                                scalar_t **active_keys,
