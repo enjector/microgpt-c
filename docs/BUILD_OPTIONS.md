@@ -117,7 +117,7 @@ cmake -DMSA_POOL_MODE=3 ..   # recommended
 
 ### Recommended V4 stack
 
-For any model with `N_LAYER ≥ 2` and `BLOCK_SIZE ≥ 64`, enable the active-attention triumvirate plus content-aware pool:
+For **free-text generation** models (Shakespeare, names, prose) with `N_LAYER ≥ 2` and `BLOCK_SIZE ≥ 64`, enable the active-attention triumvirate plus content-aware pool:
 
 ```bash
 cmake -S . -B build \
@@ -128,6 +128,28 @@ cmake -S . -B build \
 ```
 
 Combined effect: −8.7% held-out PPL on the deep benchmark, zero new parameters, ~1% extra runtime. For demos that integrate MSA directly, also opt in to the rope-aware injection by replacing `msa_pool_chunk` → `msa_pool_chunk_rope`, `msa_expand_context` → `msa_expand_context_rope`, `msa_recency_inject` → `msa_recency_inject_rope`. See `msa_infinite_shakespeare_v4` in `CMakeLists.txt` for a worked example.
+
+> **Caveat — do NOT enable the V4 stack for grammar-rigid generation tasks** (VM codegen, structured DSL output, anything where token positions follow a strict template). Measured ablation on `w_vm_codegen_deep` at the same depth shows every V4 flag REGRESSES codegen pass rate — including in isolation. The least-harmful single flag is `MICROGPT_ATTN_SINK` (−10pp); the full stack is −30pp.
+>
+> | Variant | Controls | Novel | Total | Δ vs no-V4 |
+> |---|---:|---:|---:|---:|
+> | Baseline | 5/5 | 3/5 | 8/10 (80%) | — |
+> | Sink only | 4/5 | 3/5 | 7/10 (70%) | −10pp (least harmful) |
+> | RoPE only | 4/5 | 2/5 | 6/10 (60%) | −20pp |
+> | Q/K RMSNorm only | 5/5 | 1/5 | 6/10 (60%) | −20pp |
+> | Full V4 stack | 4/5 | 1/5 | 5/10 (50%) | −30pp |
+>
+> Hypothesis: code is **absolute-position-rigid** (a function template's tokens occupy fixed slots). RoPE replaces absolute `wpe` with relative-position rotation, removing structure that codegen relies on. Q/K RMSNorm strips magnitude information that may carry token-frequency priors. The active-attention V4 ports were validated on free-text PPL benchmarks and do not generalise to grammar-rigid generation. See the targets `w_vm_codegen_deep_v4_*` in `CMakeLists.txt` for reproducing this measurement.
+
+**Heuristic for which workloads benefit:**
+
+| Workload type | V4 stack | Examples |
+|---|---|---|
+| Free-text generation | ✅ Enable | Shakespeare, names, prose, dialogue |
+| Long-context generation under MSA | ✅ Enable | infinite_shakespeare, context_extender |
+| **Grammar-rigid generation** | ❌ **Skip** | **VM codegen, C codegen, JSON/DSL output** |
+| Game playing (organelle pipeline) | ⚠ Untested | Connect-4, Tic-Tac-Toe, etc. — measure first |
+| Quantised KV (TurboQuant/RotorQuant) | ⚠ Saturates | At safe LR + ample steps, metric ceilings hide differences |
 
 ---
 

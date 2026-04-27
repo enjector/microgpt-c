@@ -928,6 +928,71 @@ add_demo(
 )
 target_link_libraries(w_vm_codegen_deep_v4 PRIVATE microgpt_vm_lib)
 
+# Single-flag ablation to identify which V4 port is the culprit for the
+# 30-percentage-point regression observed with the full stack on
+# w_vm_codegen_deep_v4. Hypothesis (per commit e92129d): RoPE removes
+# absolute-position structure that grammar-rigid codegen relies on, so
+# RoPE-only should be the biggest hurter while sink-only and qknorm-only
+# may be near-neutral.
+add_demo(
+  NAME    w_vm_codegen_deep_v4_rope_only
+  SOURCE  demos/word-level/vm_codegen/main.c
+  THREADS METAL BLAS
+  COPY    demos/word-level/vm_codegen/w_vm_functions_pretok.txt
+  DEFINES N_EMBD=96 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=256 MLP_DIM=384
+          NUM_STEPS=5000 LEARNING_RATE=0.001 BATCH_SIZE=16
+          MAX_VOCAB=1200 MAX_DOCS=5000 MAX_DOC_LEN=512
+          WORD_VOCAB_SIZE=900
+          MICROGPT_PARTIAL_ROPE=1
+          CHECKPOINT_FILE="w_vm_codegen_deep_v4_rope.ckpt"
+)
+target_link_libraries(w_vm_codegen_deep_v4_rope_only PRIVATE microgpt_vm_lib)
+
+add_demo(
+  NAME    w_vm_codegen_deep_v4_sink_only
+  SOURCE  demos/word-level/vm_codegen/main.c
+  THREADS METAL BLAS
+  COPY    demos/word-level/vm_codegen/w_vm_functions_pretok.txt
+  DEFINES N_EMBD=96 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=256 MLP_DIM=384
+          NUM_STEPS=5000 LEARNING_RATE=0.001 BATCH_SIZE=16
+          MAX_VOCAB=1200 MAX_DOCS=5000 MAX_DOC_LEN=512
+          WORD_VOCAB_SIZE=900
+          MICROGPT_ATTN_SINK=1 ATTN_SINK_LOGIT=-1.0
+          CHECKPOINT_FILE="w_vm_codegen_deep_v4_sink.ckpt"
+)
+target_link_libraries(w_vm_codegen_deep_v4_sink_only PRIVATE microgpt_vm_lib)
+
+add_demo(
+  NAME    w_vm_codegen_deep_v4_qknorm_only
+  SOURCE  demos/word-level/vm_codegen/main.c
+  THREADS METAL BLAS
+  COPY    demos/word-level/vm_codegen/w_vm_functions_pretok.txt
+  DEFINES N_EMBD=96 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=256 MLP_DIM=384
+          NUM_STEPS=5000 LEARNING_RATE=0.001 BATCH_SIZE=16
+          MAX_VOCAB=1200 MAX_DOCS=5000 MAX_DOC_LEN=512
+          WORD_VOCAB_SIZE=900
+          MICROGPT_QK_NORM=1
+          CHECKPOINT_FILE="w_vm_codegen_deep_v4_qknorm.ckpt"
+)
+target_link_libraries(w_vm_codegen_deep_v4_qknorm_only PRIVATE microgpt_vm_lib)
+
+# Sink + Q/K RMSNorm only (no RoPE) — the "safe-for-codegen" V4 subset
+# if the hypothesis holds. Should match or beat baseline.
+add_demo(
+  NAME    w_vm_codegen_deep_v4_sink_qknorm
+  SOURCE  demos/word-level/vm_codegen/main.c
+  THREADS METAL BLAS
+  COPY    demos/word-level/vm_codegen/w_vm_functions_pretok.txt
+  DEFINES N_EMBD=96 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=256 MLP_DIM=384
+          NUM_STEPS=5000 LEARNING_RATE=0.001 BATCH_SIZE=16
+          MAX_VOCAB=1200 MAX_DOCS=5000 MAX_DOC_LEN=512
+          WORD_VOCAB_SIZE=900
+          MICROGPT_ATTN_SINK=1 ATTN_SINK_LOGIT=-1.0
+          MICROGPT_QK_NORM=1
+          CHECKPOINT_FILE="w_vm_codegen_deep_v4_sink_qknorm.ckpt"
+)
+target_link_libraries(w_vm_codegen_deep_v4_sink_qknorm PRIVATE microgpt_vm_lib)
+
 # VM codegen A/B: N_LAYER=4 + AttnRes (block=2)
 add_demo(
   NAME    w_vm_codegen_attnres
