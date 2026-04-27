@@ -59,6 +59,18 @@ static void node_1in(Pipeline *p, const char *id, const char *prim) {
     pipeline_add_node(p, id, prim, 1, in_names, in_types, 1, out_names, out_types);
 }
 
+/* Add an N-input node with caller-chosen port names; single "out" port, all int.
+ * Used for domain primitives like clamp(x, lo, hi), compound(principal, rate, periods). */
+static void node_named(Pipeline *p, const char *id, const char *prim,
+                       int n_in, const char **in_names) {
+    PipelineType **in_types = (PipelineType **)calloc((size_t)n_in, sizeof(PipelineType *));
+    for (int i = 0; i < n_in; i++) in_types[i] = T_int();
+    const char *out_names[] = { "out" };
+    PipelineType *out_types[] = { T_int() };
+    pipeline_add_node(p, id, prim, n_in, in_names, in_types, 1, out_names, out_types);
+    free(in_types);
+}
+
 /* ============================================================
  *  Template family 1: chain(prim, n)
  *    y = x_1 prim x_2 prim ... prim x_n   (left-folded binary chain)
@@ -531,6 +543,716 @@ static Pipeline *tpl_range(int n) {
 }
 
 /* ============================================================
+ *  Phase 4 — Real-primitive seed graphs.
+ *
+ *  Each builder mirrors one of the already-composed end-of-file
+ *  functions in demos/word-level/vm_codegen/w_vm_functions.txt.
+ *  Together they teach the organelle that real primitive names
+ *  (compound, bmi, gcd, sigmoid, clamp, ...) are valid node ops.
+ * ============================================================ */
+
+/* sum_results(a, b) = double_val(a) + triple_val(b) */
+static Pipeline *seed_sum_results(void) {
+    Pipeline *p = pipeline_create("sum_results");
+    const char *ins[] = { "a", "b" };
+    sig_n_in_1_out(p, 2, ins, "y");
+    node_1in(p, "x", "double_val");
+    node_1in(p, "y_n", "triple_val");
+    node_2in(p, "s", "add");
+    pipeline_connect_signature_in(p, "a", "x", "x");
+    pipeline_connect_signature_in(p, "b", "y_n", "x");
+    pipeline_connect(p, "x", "out", "s", "x");
+    pipeline_connect(p, "y_n", "out", "s", "y");
+    pipeline_connect_signature_out(p, "s", "out", "y");
+    return p;
+}
+
+/* compound_interest(principal, rate, years) = compound(p,r,y) - principal */
+static Pipeline *seed_compound_interest(void) {
+    Pipeline *p = pipeline_create("compound_interest");
+    const char *ins[] = { "principal", "rate", "years" };
+    sig_n_in_1_out(p, 3, ins, "y");
+    const char *cnames[] = { "principal", "rate", "periods" };
+    node_named(p, "amount", "compound", 3, cnames);
+    node_2in(p, "diff", "subtract");
+    pipeline_connect_signature_in(p, "principal", "amount", "principal");
+    pipeline_connect_signature_in(p, "rate",      "amount", "rate");
+    pipeline_connect_signature_in(p, "years",     "amount", "periods");
+    pipeline_connect(p, "amount", "out", "diff", "x");
+    pipeline_connect_signature_in(p, "principal", "diff", "y");
+    pipeline_connect_signature_out(p, "diff", "out", "y");
+    return p;
+}
+
+/* analyze_two_points(a, b) = distance_1d(a,b) + midpoint(a,b) */
+static Pipeline *seed_analyze_two_points(void) {
+    Pipeline *p = pipeline_create("analyze_two_points");
+    const char *ins[] = { "a", "b" };
+    sig_n_in_1_out(p, 2, ins, "y");
+    const char *abnames[] = { "a", "b" };
+    node_named(p, "dist", "distance_1d", 2, abnames);
+    node_named(p, "mid",  "midpoint",    2, abnames);
+    node_2in(p, "s", "add");
+    pipeline_connect_signature_in(p, "a", "dist", "a");
+    pipeline_connect_signature_in(p, "b", "dist", "b");
+    pipeline_connect_signature_in(p, "a", "mid", "a");
+    pipeline_connect_signature_in(p, "b", "mid", "b");
+    pipeline_connect(p, "dist", "out", "s", "x");
+    pipeline_connect(p, "mid",  "out", "s", "y");
+    pipeline_connect_signature_out(p, "s", "out", "y");
+    return p;
+}
+
+/* clamped_average(a, b, lo, hi) = clamp(average_two(a,b), lo, hi) */
+static Pipeline *seed_clamped_average(void) {
+    Pipeline *p = pipeline_create("clamped_average");
+    const char *ins[] = { "a", "b", "lo", "hi" };
+    sig_n_in_1_out(p, 4, ins, "y");
+    const char *abnames[] = { "a", "b" };
+    node_named(p, "avg", "average_two", 2, abnames);
+    const char *cnames[] = { "x", "lo", "hi" };
+    node_named(p, "c", "clamp", 3, cnames);
+    pipeline_connect_signature_in(p, "a", "avg", "a");
+    pipeline_connect_signature_in(p, "b", "avg", "b");
+    pipeline_connect(p, "avg", "out", "c", "x");
+    pipeline_connect_signature_in(p, "lo", "c", "lo");
+    pipeline_connect_signature_in(p, "hi", "c", "hi");
+    pipeline_connect_signature_out(p, "c", "out", "y");
+    return p;
+}
+
+/* abs_difference(a, b) = abs_val(a - b) */
+static Pipeline *seed_abs_difference(void) {
+    Pipeline *p = pipeline_create("abs_difference");
+    const char *ins[] = { "a", "b" };
+    sig_n_in_1_out(p, 2, ins, "y");
+    node_2in(p, "d", "subtract");
+    node_1in(p, "a_v", "abs_val");
+    pipeline_connect_signature_in(p, "a", "d", "x");
+    pipeline_connect_signature_in(p, "b", "d", "y");
+    pipeline_connect(p, "d", "out", "a_v", "x");
+    pipeline_connect_signature_out(p, "a_v", "out", "y");
+    return p;
+}
+
+/* discounted_tax(price, discount_rate, tax_rate) =
+ *   tax_amount(discount(price, discount_rate), tax_rate)              */
+static Pipeline *seed_discounted_tax(void) {
+    Pipeline *p = pipeline_create("discounted_tax");
+    const char *ins[] = { "price", "discount_rate", "tax_rate" };
+    sig_n_in_1_out(p, 3, ins, "y");
+    const char *dnames[] = { "price", "rate" };
+    node_named(p, "disc", "discount", 2, dnames);
+    const char *tnames[] = { "amount", "rate" };
+    node_named(p, "tax",  "tax_amount", 2, tnames);
+    pipeline_connect_signature_in(p, "price",         "disc", "price");
+    pipeline_connect_signature_in(p, "discount_rate", "disc", "rate");
+    pipeline_connect(p, "disc", "out", "tax", "amount");
+    pipeline_connect_signature_in(p, "tax_rate",      "tax",  "rate");
+    pipeline_connect_signature_out(p, "tax", "out", "y");
+    return p;
+}
+
+/* total_with_tax(price, tax_rate) = price + tax_amount(price, tax_rate) */
+static Pipeline *seed_total_with_tax(void) {
+    Pipeline *p = pipeline_create("total_with_tax");
+    const char *ins[] = { "price", "tax_rate" };
+    sig_n_in_1_out(p, 2, ins, "y");
+    const char *tnames[] = { "amount", "rate" };
+    node_named(p, "tax", "tax_amount", 2, tnames);
+    node_2in(p, "tot", "add");
+    pipeline_connect_signature_in(p, "price",    "tax", "amount");
+    pipeline_connect_signature_in(p, "tax_rate", "tax", "rate");
+    pipeline_connect_signature_in(p, "price",    "tot", "x");
+    pipeline_connect(p, "tax", "out", "tot", "y");
+    pipeline_connect_signature_out(p, "tot", "out", "y");
+    return p;
+}
+
+/* net_pay(gross, tax_rate) = apply_tax(gross, tax_rate)               */
+static Pipeline *seed_net_pay(void) {
+    Pipeline *p = pipeline_create("net_pay");
+    const char *ins[] = { "gross", "tax_rate" };
+    sig_n_in_1_out(p, 2, ins, "y");
+    const char *anames[] = { "amount", "rate" };
+    node_named(p, "net", "apply_tax", 2, anames);
+    pipeline_connect_signature_in(p, "gross",    "net", "amount");
+    pipeline_connect_signature_in(p, "tax_rate", "net", "rate");
+    pipeline_connect_signature_out(p, "net", "out", "y");
+    return p;
+}
+
+/* savings_rate(income, expenses) = percentage(income - expenses, income) */
+static Pipeline *seed_savings_rate(void) {
+    Pipeline *p = pipeline_create("savings_rate");
+    const char *ins[] = { "income", "expenses" };
+    sig_n_in_1_out(p, 2, ins, "y");
+    node_2in(p, "saved", "subtract");
+    const char *pnames[] = { "part", "whole" };
+    node_named(p, "rate", "percentage", 2, pnames);
+    pipeline_connect_signature_in(p, "income",   "saved", "x");
+    pipeline_connect_signature_in(p, "expenses", "saved", "y");
+    pipeline_connect(p, "saved", "out", "rate", "part");
+    pipeline_connect_signature_in(p, "income",   "rate",  "whole");
+    pipeline_connect_signature_out(p, "rate", "out", "y");
+    return p;
+}
+
+/* fib_fact_product(n) = fibonacci(n) * factorial(n)                   */
+static Pipeline *seed_fib_fact_product(void) {
+    Pipeline *p = pipeline_create("fib_fact_product");
+    const char *ins[] = { "n" };
+    sig_n_in_1_out(p, 1, ins, "y");
+    node_1in(p, "fib",  "fibonacci");
+    node_1in(p, "fact", "factorial");
+    node_2in(p, "prod", "multiply");
+    pipeline_connect_signature_in(p, "n", "fib",  "x");
+    pipeline_connect_signature_in(p, "n", "fact", "x");
+    pipeline_connect(p, "fib",  "out", "prod", "x");
+    pipeline_connect(p, "fact", "out", "prod", "y");
+    pipeline_connect_signature_out(p, "prod", "out", "y");
+    return p;
+}
+
+/* net_present_value(cashflow, rate, years) = present_value(future_value(cashflow,r,y), r, y) */
+static Pipeline *seed_net_present_value(void) {
+    Pipeline *p = pipeline_create("net_present_value");
+    const char *ins[] = { "cashflow", "rate", "years" };
+    sig_n_in_1_out(p, 3, ins, "y");
+    const char *fnames[] = { "present", "rate", "periods" };
+    node_named(p, "fv", "future_value", 3, fnames);
+    const char *pnames[] = { "future", "rate", "periods" };
+    node_named(p, "pv", "present_value", 3, pnames);
+    pipeline_connect_signature_in(p, "cashflow", "fv", "present");
+    pipeline_connect_signature_in(p, "rate",     "fv", "rate");
+    pipeline_connect_signature_in(p, "years",    "fv", "periods");
+    pipeline_connect(p, "fv", "out", "pv", "future");
+    pipeline_connect_signature_in(p, "rate",     "pv", "rate");
+    pipeline_connect_signature_in(p, "years",    "pv", "periods");
+    pipeline_connect_signature_out(p, "pv", "out", "y");
+    return p;
+}
+
+/* clamped_sigmoid(x, lo, hi) = clamp(sigmoid(x), lo, hi)              */
+static Pipeline *seed_clamped_sigmoid(void) {
+    Pipeline *p = pipeline_create("clamped_sigmoid");
+    const char *ins[] = { "x", "lo", "hi" };
+    sig_n_in_1_out(p, 3, ins, "y");
+    node_1in(p, "s", "sigmoid");
+    const char *cnames[] = { "x", "lo", "hi" };
+    node_named(p, "c", "clamp", 3, cnames);
+    pipeline_connect_signature_in(p, "x", "s", "x");
+    pipeline_connect(p, "s", "out", "c", "x");
+    pipeline_connect_signature_in(p, "lo", "c", "lo");
+    pipeline_connect_signature_in(p, "hi", "c", "hi");
+    pipeline_connect_signature_out(p, "c", "out", "y");
+    return p;
+}
+
+/* scaled_relu(x, scale) = relu(x) * scale                             */
+static Pipeline *seed_scaled_relu(void) {
+    Pipeline *p = pipeline_create("scaled_relu");
+    const char *ins[] = { "x", "scale" };
+    sig_n_in_1_out(p, 2, ins, "y");
+    node_1in(p, "r", "relu");
+    node_2in(p, "m", "multiply");
+    pipeline_connect_signature_in(p, "x", "r", "x");
+    pipeline_connect(p, "r", "out", "m", "x");
+    pipeline_connect_signature_in(p, "scale", "m", "y");
+    pipeline_connect_signature_out(p, "m", "out", "y");
+    return p;
+}
+
+/* gcd_product(a, b) = gcd(a, b) * a * b                                */
+static Pipeline *seed_gcd_product(void) {
+    Pipeline *p = pipeline_create("gcd_product");
+    const char *ins[] = { "a", "b" };
+    sig_n_in_1_out(p, 2, ins, "y");
+    const char *abnames[] = { "a", "b" };
+    node_named(p, "g", "gcd", 2, abnames);
+    node_2in(p, "ga", "multiply");
+    node_2in(p, "gab", "multiply");
+    pipeline_connect_signature_in(p, "a", "g", "a");
+    pipeline_connect_signature_in(p, "b", "g", "b");
+    pipeline_connect(p, "g", "out", "ga", "x");
+    pipeline_connect_signature_in(p, "a", "ga", "y");
+    pipeline_connect(p, "ga", "out", "gab", "x");
+    pipeline_connect_signature_in(p, "b", "gab", "y");
+    pipeline_connect_signature_out(p, "gab", "out", "y");
+    return p;
+}
+
+/* bmi_classified(weight, height, lo, hi) = clamp(bmi(weight, height), lo, hi)
+ *  (a hand-rolled instance — also covered parametrically by tpl_bmi_classified) */
+static Pipeline *seed_bmi_classified(void) {
+    Pipeline *p = pipeline_create("bmi_classified");
+    const char *ins[] = { "weight", "height", "lo", "hi" };
+    sig_n_in_1_out(p, 4, ins, "y");
+    const char *bnames[] = { "weight", "height" };
+    node_named(p, "b", "bmi", 2, bnames);
+    const char *cnames[] = { "x", "lo", "hi" };
+    node_named(p, "c", "clamp", 3, cnames);
+    pipeline_connect_signature_in(p, "weight", "b", "weight");
+    pipeline_connect_signature_in(p, "height", "b", "height");
+    pipeline_connect(p, "b", "out", "c", "x");
+    pipeline_connect_signature_in(p, "lo", "c", "lo");
+    pipeline_connect_signature_in(p, "hi", "c", "hi");
+    pipeline_connect_signature_out(p, "c", "out", "y");
+    return p;
+}
+
+/* Wrapper-with-no-args adapter for seeds. */
+typedef Pipeline *(*SeedFn)(void);
+static Pipeline *w_seed(void *ctx) { return ((SeedFn)ctx)(); }
+
+/* ============================================================
+ *  Phase 4 — Templated families using REAL primitives
+ * ============================================================ */
+
+/* tpl_clamped_op(unary_op): clamp(unary_op(x), lo, hi). */
+static Pipeline *tpl_clamped_op(const char *unary_op) {
+    char name[64]; snprintf(name, sizeof(name), "clamped_%s", unary_op);
+    Pipeline *p = pipeline_create(name);
+    const char *ins[] = { "x", "lo", "hi" };
+    sig_n_in_1_out(p, 3, ins, "y");
+    node_1in(p, "u", unary_op);
+    const char *cnames[] = { "x", "lo", "hi" };
+    node_named(p, "c", "clamp", 3, cnames);
+    pipeline_connect_signature_in(p, "x", "u", "x");
+    pipeline_connect(p, "u", "out", "c", "x");
+    pipeline_connect_signature_in(p, "lo", "c", "lo");
+    pipeline_connect_signature_in(p, "hi", "c", "hi");
+    pipeline_connect_signature_out(p, "c", "out", "y");
+    return p;
+}
+
+/* tpl_taxed_total(qty_first): price * qty (or qty * price), then add tax_amount. */
+static Pipeline *tpl_taxed_total(int qty_first) {
+    char name[64]; snprintf(name, sizeof(name), "taxed_total_%d", qty_first);
+    Pipeline *p = pipeline_create(name);
+    const char *ins[] = { "price", "qty", "tax_rate" };
+    sig_n_in_1_out(p, 3, ins, "y");
+    node_2in(p, "subtotal", "multiply");
+    const char *tnames[] = { "amount", "rate" };
+    node_named(p, "tax", "tax_amount", 2, tnames);
+    node_2in(p, "tot", "add");
+    if (qty_first) {
+        pipeline_connect_signature_in(p, "qty",   "subtotal", "x");
+        pipeline_connect_signature_in(p, "price", "subtotal", "y");
+    } else {
+        pipeline_connect_signature_in(p, "price", "subtotal", "x");
+        pipeline_connect_signature_in(p, "qty",   "subtotal", "y");
+    }
+    pipeline_connect(p, "subtotal", "out", "tax", "amount");
+    pipeline_connect_signature_in(p, "tax_rate", "tax", "rate");
+    pipeline_connect(p, "subtotal", "out", "tot", "x");
+    pipeline_connect(p, "tax",      "out", "tot", "y");
+    pipeline_connect_signature_out(p, "tot", "out", "y");
+    return p;
+}
+
+/* tpl_savings_pipeline(n_expenses):
+ *   sum n expense terms, subtract from income, then percentage of income. */
+static Pipeline *tpl_savings_pipeline(int n_expenses) {
+    char name[64]; snprintf(name, sizeof(name), "savings_pipeline_%d", n_expenses);
+    Pipeline *p = pipeline_create(name);
+    int n_in = 1 + n_expenses;
+    char in_buf[8][16];
+    const char *in_names[8];
+    snprintf(in_buf[0], sizeof(in_buf[0]), "income"); in_names[0] = in_buf[0];
+    for (int i = 0; i < n_expenses; i++) {
+        snprintf(in_buf[1 + i], sizeof(in_buf[0]), "exp%d", i + 1);
+        in_names[1 + i] = in_buf[1 + i];
+    }
+    sig_n_in_1_out(p, n_in, in_names, "y");
+    /* Sum expenses left-to-right. */
+    for (int i = 1; i < n_expenses; i++) {
+        char id[16]; snprintf(id, sizeof(id), "se%d", i);
+        node_2in(p, id, "add");
+        if (i == 1) {
+            pipeline_connect_signature_in(p, "exp1", id, "x");
+        } else {
+            char prev[16]; snprintf(prev, sizeof(prev), "se%d", i - 1);
+            pipeline_connect(p, prev, "out", id, "x");
+        }
+        char e[16]; snprintf(e, sizeof(e), "exp%d", i + 1);
+        pipeline_connect_signature_in(p, e, id, "y");
+    }
+    /* total_exp source */
+    char total_id[16];
+    if (n_expenses == 1) {
+        snprintf(total_id, sizeof(total_id), "exp1");  /* sig ref */
+    } else {
+        snprintf(total_id, sizeof(total_id), "se%d", n_expenses - 1);
+    }
+    /* saved = income - total_exp */
+    node_2in(p, "saved", "subtract");
+    pipeline_connect_signature_in(p, "income", "saved", "x");
+    if (n_expenses == 1) {
+        pipeline_connect_signature_in(p, "exp1", "saved", "y");
+    } else {
+        pipeline_connect(p, total_id, "out", "saved", "y");
+    }
+    /* rate = percentage(saved, income) */
+    const char *pnames[] = { "part", "whole" };
+    node_named(p, "rate", "percentage", 2, pnames);
+    pipeline_connect(p, "saved", "out", "rate", "part");
+    pipeline_connect_signature_in(p, "income", "rate", "whole");
+    pipeline_connect_signature_out(p, "rate", "out", "y");
+    return p;
+}
+
+/* tpl_compound_chain(periods):  compound interest earned = compound(p,r,n) - p. */
+static Pipeline *tpl_compound_chain(int periods) {
+    (void)periods; /* periods is conceptual — we still emit one compound + one subtract */
+    char name[64]; snprintf(name, sizeof(name), "compound_chain_%d", periods);
+    Pipeline *p = pipeline_create(name);
+    const char *ins[] = { "principal", "rate", "years" };
+    sig_n_in_1_out(p, 3, ins, "y");
+    const char *cnames[] = { "principal", "rate", "periods" };
+    node_named(p, "amt", "compound", 3, cnames);
+    node_2in(p, "earned", "subtract");
+    pipeline_connect_signature_in(p, "principal", "amt", "principal");
+    pipeline_connect_signature_in(p, "rate",      "amt", "rate");
+    pipeline_connect_signature_in(p, "years",     "amt", "periods");
+    pipeline_connect(p, "amt", "out", "earned", "x");
+    pipeline_connect_signature_in(p, "principal", "earned", "y");
+    pipeline_connect_signature_out(p, "earned", "out", "y");
+    return p;
+}
+
+/* tpl_gcd_chain(depth):  gcd(...gcd(a,b)... ) of `depth+1` inputs, then * by another input. */
+static Pipeline *tpl_gcd_chain(int depth) {
+    char name[64]; snprintf(name, sizeof(name), "gcd_chain_%d", depth);
+    Pipeline *p = pipeline_create(name);
+    int n_in = depth + 2;  /* x_1..x_{depth+1}, k */
+    char in_buf[8][8];
+    const char *in_names[8];
+    for (int i = 0; i <= depth; i++) {
+        snprintf(in_buf[i], sizeof(in_buf[0]), "x%d", i + 1);
+        in_names[i] = in_buf[i];
+    }
+    snprintf(in_buf[depth + 1], sizeof(in_buf[0]), "k");
+    in_names[depth + 1] = in_buf[depth + 1];
+    sig_n_in_1_out(p, n_in, in_names, "y");
+    /* gcd chain. */
+    const char *gn[] = { "a", "b" };
+    for (int i = 1; i <= depth; i++) {
+        char id[16]; snprintf(id, sizeof(id), "g%d", i);
+        node_named(p, id, "gcd", 2, gn);
+        if (i == 1) {
+            pipeline_connect_signature_in(p, "x1", id, "a");
+        } else {
+            char prev[16]; snprintf(prev, sizeof(prev), "g%d", i - 1);
+            pipeline_connect(p, prev, "out", id, "a");
+        }
+        char x[8]; snprintf(x, sizeof(x), "x%d", i + 1);
+        pipeline_connect_signature_in(p, x, id, "b");
+    }
+    /* Multiply gcd by k. */
+    node_2in(p, "m", "multiply");
+    char last[16]; snprintf(last, sizeof(last), "g%d", depth);
+    pipeline_connect(p, last, "out", "m", "x");
+    pipeline_connect_signature_in(p, "k", "m", "y");
+    pipeline_connect_signature_out(p, "m", "out", "y");
+    return p;
+}
+
+/* tpl_fib_fact_blend(combine_op): fibonacci(n) op factorial(n). */
+static Pipeline *tpl_fib_fact_blend(const char *op) {
+    char name[64]; snprintf(name, sizeof(name), "fib_fact_%s", op);
+    Pipeline *p = pipeline_create(name);
+    const char *ins[] = { "n" };
+    sig_n_in_1_out(p, 1, ins, "y");
+    node_1in(p, "fib",  "fibonacci");
+    node_1in(p, "fact", "factorial");
+    int two_input = 1;
+    /* All ops we use here are 2-input binary primitives. */
+    if (two_input) {
+        node_2in(p, "blend", op);
+        pipeline_connect_signature_in(p, "n", "fib",  "x");
+        pipeline_connect_signature_in(p, "n", "fact", "x");
+        pipeline_connect(p, "fib",  "out", "blend", "x");
+        pipeline_connect(p, "fact", "out", "blend", "y");
+        pipeline_connect_signature_out(p, "blend", "out", "y");
+    }
+    return p;
+}
+
+/* tpl_bmi_classified(class_kind):  clamp(bmi(weight, height), lo, hi).
+ * class_kind toggles whether output is post-clamp or post-clamp+normalize. */
+static Pipeline *tpl_bmi_classified(int normalize) {
+    char name[64]; snprintf(name, sizeof(name), "bmi_classified_%d", normalize);
+    Pipeline *p = pipeline_create(name);
+    const char *ins[] = { "weight", "height", "lo", "hi" };
+    sig_n_in_1_out(p, 4, ins, "y");
+    const char *bn[] = { "weight", "height" };
+    node_named(p, "b", "bmi", 2, bn);
+    const char *cn[] = { "x", "lo", "hi" };
+    node_named(p, "c", "clamp", 3, cn);
+    pipeline_connect_signature_in(p, "weight", "b", "weight");
+    pipeline_connect_signature_in(p, "height", "b", "height");
+    pipeline_connect(p, "b", "out", "c", "x");
+    pipeline_connect_signature_in(p, "lo", "c", "lo");
+    pipeline_connect_signature_in(p, "hi", "c", "hi");
+    if (normalize) {
+        node_1in(p, "n", "sigmoid");
+        pipeline_connect(p, "c", "out", "n", "x");
+        pipeline_connect_signature_out(p, "n", "out", "y");
+    } else {
+        pipeline_connect_signature_out(p, "c", "out", "y");
+    }
+    return p;
+}
+
+/* tpl_pv_npv_chain(years_param):  net_present_value-style pipeline. */
+static Pipeline *tpl_pv_npv_chain(int variant) {
+    char name[64]; snprintf(name, sizeof(name), "pv_npv_chain_%d", variant);
+    Pipeline *p = pipeline_create(name);
+    const char *ins[] = { "cashflow", "rate", "years" };
+    sig_n_in_1_out(p, 3, ins, "y");
+    const char *fn[] = { "present", "rate", "periods" };
+    node_named(p, "fv", "future_value", 3, fn);
+    const char *pn[] = { "future", "rate", "periods" };
+    node_named(p, "pv", "present_value", 3, pn);
+    pipeline_connect_signature_in(p, "cashflow", "fv", "present");
+    pipeline_connect_signature_in(p, "rate",     "fv", "rate");
+    pipeline_connect_signature_in(p, "years",    "fv", "periods");
+    pipeline_connect(p, "fv", "out", "pv", "future");
+    pipeline_connect_signature_in(p, "rate",     "pv", "rate");
+    pipeline_connect_signature_in(p, "years",    "pv", "periods");
+    if (variant == 0) {
+        pipeline_connect_signature_out(p, "pv", "out", "y");
+    } else {
+        /* variant 1: subtract original cashflow to get net. */
+        node_2in(p, "net", "subtract");
+        pipeline_connect(p, "pv", "out", "net", "x");
+        pipeline_connect_signature_in(p, "cashflow", "net", "y");
+        pipeline_connect_signature_out(p, "net", "out", "y");
+    }
+    return p;
+}
+
+/* tpl_distance_metrics(dim):  sum of distance_1d(a_i, b_i) for i in 1..dim,
+ * then take square (Euclidean-squared style on absolute distances). */
+static Pipeline *tpl_distance_metrics(int dim) {
+    char name[64]; snprintf(name, sizeof(name), "distance_metrics_%d", dim);
+    Pipeline *p = pipeline_create(name);
+    int n_in = 2 * dim;
+    char in_buf[16][8];
+    const char *in_names[16];
+    for (int i = 0; i < dim; i++) {
+        snprintf(in_buf[2 * i],     sizeof(in_buf[0]), "a%d", i + 1);
+        snprintf(in_buf[2 * i + 1], sizeof(in_buf[0]), "b%d", i + 1);
+        in_names[2 * i]     = in_buf[2 * i];
+        in_names[2 * i + 1] = in_buf[2 * i + 1];
+    }
+    sig_n_in_1_out(p, n_in, in_names, "y");
+    const char *abn[] = { "a", "b" };
+    for (int i = 0; i < dim; i++) {
+        char d[16]; snprintf(d, sizeof(d), "d%d", i + 1);
+        node_named(p, d, "distance_1d", 2, abn);
+        char a[8], b[8];
+        snprintf(a, sizeof(a), "a%d", i + 1);
+        snprintf(b, sizeof(b), "b%d", i + 1);
+        pipeline_connect_signature_in(p, a, d, "a");
+        pipeline_connect_signature_in(p, b, d, "b");
+    }
+    if (dim == 1) {
+        node_1in(p, "sq", "square");
+        pipeline_connect(p, "d1", "out", "sq", "x");
+        pipeline_connect_signature_out(p, "sq", "out", "y");
+    } else {
+        for (int i = 1; i < dim; i++) {
+            char id[16]; snprintf(id, sizeof(id), "s%d", i);
+            node_2in(p, id, "add");
+            if (i == 1) {
+                pipeline_connect(p, "d1", "out", id, "x");
+            } else {
+                char prev[16]; snprintf(prev, sizeof(prev), "s%d", i - 1);
+                pipeline_connect(p, prev, "out", id, "x");
+            }
+            char d_next[16]; snprintf(d_next, sizeof(d_next), "d%d", i + 1);
+            pipeline_connect(p, d_next, "out", id, "y");
+        }
+        char last[16]; snprintf(last, sizeof(last), "s%d", dim - 1);
+        node_1in(p, "sq", "square");
+        pipeline_connect(p, last, "out", "sq", "x");
+        pipeline_connect_signature_out(p, "sq", "out", "y");
+    }
+    return p;
+}
+
+/* tpl_weighted_real(n):  weighted_avg-style chain over n (value, weight) pairs. */
+static Pipeline *tpl_weighted_real(int n) {
+    char name[64]; snprintf(name, sizeof(name), "weighted_real_%d", n);
+    Pipeline *p = pipeline_create(name);
+    int n_in = 2 * n;
+    char in_buf[16][8];
+    const char *in_names[16];
+    for (int i = 0; i < n; i++) {
+        snprintf(in_buf[2 * i],     sizeof(in_buf[0]), "v%d", i + 1);
+        snprintf(in_buf[2 * i + 1], sizeof(in_buf[0]), "w%d", i + 1);
+        in_names[2 * i]     = in_buf[2 * i];
+        in_names[2 * i + 1] = in_buf[2 * i + 1];
+    }
+    sig_n_in_1_out(p, n_in, in_names, "y");
+    /* Multiply each value by its weight. */
+    for (int i = 0; i < n; i++) {
+        char id[16]; snprintf(id, sizeof(id), "vw%d", i + 1);
+        node_2in(p, id, "multiply");
+        char v[8], w[8];
+        snprintf(v, sizeof(v), "v%d", i + 1);
+        snprintf(w, sizeof(w), "w%d", i + 1);
+        pipeline_connect_signature_in(p, v, id, "x");
+        pipeline_connect_signature_in(p, w, id, "y");
+    }
+    /* Sum products. */
+    if (n == 1) {
+        pipeline_connect_signature_out(p, "vw1", "out", "y");
+        return p;
+    }
+    for (int i = 1; i < n; i++) {
+        char id[16]; snprintf(id, sizeof(id), "ss%d", i);
+        node_2in(p, id, "add");
+        if (i == 1) {
+            pipeline_connect(p, "vw1", "out", id, "x");
+        } else {
+            char prev[16]; snprintf(prev, sizeof(prev), "ss%d", i - 1);
+            pipeline_connect(p, prev, "out", id, "x");
+        }
+        char vw[16]; snprintf(vw, sizeof(vw), "vw%d", i + 1);
+        pipeline_connect(p, vw, "out", id, "y");
+    }
+    char last_sum[16]; snprintf(last_sum, sizeof(last_sum), "ss%d", n - 1);
+    /* Sum of weights (denominator) — simple add chain. */
+    if (n == 2) {
+        node_2in(p, "wsum", "add");
+        pipeline_connect_signature_in(p, "w1", "wsum", "x");
+        pipeline_connect_signature_in(p, "w2", "wsum", "y");
+    } else {
+        for (int i = 1; i < n; i++) {
+            char id[16]; snprintf(id, sizeof(id), "ws%d", i);
+            node_2in(p, id, "add");
+            if (i == 1) {
+                pipeline_connect_signature_in(p, "w1", id, "x");
+            } else {
+                char prev[16]; snprintf(prev, sizeof(prev), "ws%d", i - 1);
+                pipeline_connect(p, prev, "out", id, "x");
+            }
+            char w[8]; snprintf(w, sizeof(w), "w%d", i + 1);
+            pipeline_connect_signature_in(p, w, id, "y");
+        }
+    }
+    /* Final divide via percentage(part, whole) for naturalness. */
+    const char *pn[] = { "part", "whole" };
+    node_named(p, "wavg", "percentage", 2, pn);
+    pipeline_connect(p, last_sum, "out", "wavg", "part");
+    if (n == 2) {
+        pipeline_connect(p, "wsum", "out", "wavg", "whole");
+    } else {
+        char wlast[16]; snprintf(wlast, sizeof(wlast), "ws%d", n - 1);
+        pipeline_connect(p, wlast, "out", "wavg", "whole");
+    }
+    pipeline_connect_signature_out(p, "wavg", "out", "y");
+    return p;
+}
+
+/* tpl_micro_unary(prim): single-node unary primitive graph.
+ *   y = prim(x)                                                       */
+static Pipeline *tpl_micro_unary(const char *prim) {
+    char name[64]; snprintf(name, sizeof(name), "micro_%s", prim);
+    Pipeline *p = pipeline_create(name);
+    const char *ins[] = { "x" };
+    sig_n_in_1_out(p, 1, ins, "y");
+    node_1in(p, "n", prim);
+    pipeline_connect_signature_in(p, "x", "n", "x");
+    pipeline_connect_signature_out(p, "n", "out", "y");
+    return p;
+}
+
+/* tpl_micro_binary(prim, in_names_kind):
+ *   y = prim(x, y)  with caller-chosen port names.
+ * port_kind 0: {x, y}, 1: {a, b}, 2: {amount, rate}, 3: {part, whole},
+ * 4: {weight, height}, 5: {price, rate}, 6: {cost, rate},
+ * 7: {base, exp}, 8: {m, v}                                           */
+static Pipeline *tpl_micro_binary(const char *prim, int port_kind) {
+    char name[80]; snprintf(name, sizeof(name), "micro_%s_%d", prim, port_kind);
+    Pipeline *p = pipeline_create(name);
+    const char *port_pairs[][2] = {
+        {"x", "y"}, {"a", "b"}, {"amount", "rate"}, {"part", "whole"},
+        {"weight", "height"}, {"price", "rate"}, {"cost", "rate"},
+        {"base", "exp"}, {"m", "v"}
+    };
+    const char *p1 = port_pairs[port_kind][0];
+    const char *p2 = port_pairs[port_kind][1];
+    const char *ins[] = { p1, p2 };
+    sig_n_in_1_out(p, 2, ins, "y");
+    if (port_kind == 0) {
+        node_2in(p, "n", prim);
+        pipeline_connect_signature_in(p, p1, "n", "x");
+        pipeline_connect_signature_in(p, p2, "n", "y");
+    } else {
+        const char *node_in_names[] = { p1, p2 };
+        node_named(p, "n", prim, 2, node_in_names);
+        pipeline_connect_signature_in(p, p1, "n", p1);
+        pipeline_connect_signature_in(p, p2, "n", p2);
+    }
+    pipeline_connect_signature_out(p, "n", "out", "y");
+    return p;
+}
+
+/* tpl_micro_ternary(prim, port_kind):
+ *   y = prim(a, b, c)                                                  */
+static Pipeline *tpl_micro_ternary(const char *prim, int port_kind) {
+    char name[80]; snprintf(name, sizeof(name), "micro_%s_%d", prim, port_kind);
+    Pipeline *p = pipeline_create(name);
+    const char *port_triples[][3] = {
+        {"x", "lo", "hi"},                  /* clamp */
+        {"a", "b", "t"},                    /* lerp */
+        {"principal", "rate", "periods"},   /* compound */
+        {"present", "rate", "periods"},     /* future_value */
+        {"future", "rate", "periods"}       /* present_value */
+    };
+    const char *p1 = port_triples[port_kind][0];
+    const char *p2 = port_triples[port_kind][1];
+    const char *p3 = port_triples[port_kind][2];
+    const char *ins[] = { p1, p2, p3 };
+    sig_n_in_1_out(p, 3, ins, "y");
+    const char *node_ins[] = { p1, p2, p3 };
+    node_named(p, "n", prim, 3, node_ins);
+    pipeline_connect_signature_in(p, p1, "n", p1);
+    pipeline_connect_signature_in(p, p2, "n", p2);
+    pipeline_connect_signature_in(p, p3, "n", p3);
+    pipeline_connect_signature_out(p, "n", "out", "y");
+    return p;
+}
+
+/* Micro template wrapper-context structs (heap-stable for ADD3). */
+typedef struct { const char *prim; int port_kind; } MicroBinCtx;
+typedef struct { const char *prim; int port_kind; } MicroTerCtx;
+
+static Pipeline *w_micro_unary(void *ctx) { return tpl_micro_unary((const char *)ctx); }
+static Pipeline *w_micro_binary(void *ctx) {
+    MicroBinCtx *m = (MicroBinCtx *)ctx; return tpl_micro_binary(m->prim, m->port_kind);
+}
+static Pipeline *w_micro_ternary(void *ctx) {
+    MicroTerCtx *m = (MicroTerCtx *)ctx; return tpl_micro_ternary(m->prim, m->port_kind);
+}
+
+/* Wrappers for the Phase 4 templates. */
+static Pipeline *w_clamped_op(void *ctx) { return tpl_clamped_op((const char *)ctx); }
+static Pipeline *w_taxed_total(void *ctx) { return tpl_taxed_total((int)(intptr_t)ctx); }
+static Pipeline *w_savings_pipeline(void *ctx) { return tpl_savings_pipeline((int)(intptr_t)ctx); }
+static Pipeline *w_compound_chain(void *ctx) { return tpl_compound_chain((int)(intptr_t)ctx); }
+static Pipeline *w_gcd_chain(void *ctx) { return tpl_gcd_chain((int)(intptr_t)ctx); }
+static Pipeline *w_fib_fact_blend(void *ctx) { return tpl_fib_fact_blend((const char *)ctx); }
+static Pipeline *w_bmi_classified(void *ctx) { return tpl_bmi_classified((int)(intptr_t)ctx); }
+static Pipeline *w_pv_npv_chain(void *ctx) { return tpl_pv_npv_chain((int)(intptr_t)ctx); }
+static Pipeline *w_distance_metrics(void *ctx) { return tpl_distance_metrics((int)(intptr_t)ctx); }
+static Pipeline *w_weighted_real(void *ctx) { return tpl_weighted_real((int)(intptr_t)ctx); }
+
+/* ============================================================
  *  Catalog of all examples (templates expanded)
  * ============================================================ */
 
@@ -682,6 +1404,378 @@ static CorpusEntry *build_catalog(int *out_count) {
                  "// range (max minus min) of %d integers", nn);
         ADD3(prompt, w_range, (void *)(intptr_t)nn, NULL, NULL);
     }
+
+    /* ============================================================
+     *  Phase 4 — Real-primitive seed graphs (paraphrased prompts).
+     *  Each seed graph appears with 3 different natural-English prompts
+     *  so the model learns to map domain wording → primitive composition.
+     * ============================================================ */
+#define ADD_SEED3(p1, p2, p3, fn) do {                                     \
+    ADD3(p1, w_seed, (void *)(SeedFn)(fn), NULL, NULL);                    \
+    ADD3(p2, w_seed, (void *)(SeedFn)(fn), NULL, NULL);                    \
+    ADD3(p3, w_seed, (void *)(SeedFn)(fn), NULL, NULL);                    \
+} while (0)
+
+    ADD_SEED3(
+        "// double the first value triple the second and add",
+        "// sum doubled a and tripled b",
+        "// add double of a to triple of b",
+        seed_sum_results);
+
+    ADD_SEED3(
+        "// compute compound interest earned on principal at rate over years",
+        "// money compounded at interest rate over years minus principal",
+        "// interest amount after compound growth of principal",
+        seed_compound_interest);
+
+    ADD_SEED3(
+        "// distance between two points plus their midpoint",
+        "// add one dimensional distance and midpoint of a and b",
+        "// combine distance and midpoint of two values",
+        seed_analyze_two_points);
+
+    ADD_SEED3(
+        "// average two numbers then clamp between bounds",
+        "// clamped mean of a and b within lo and hi",
+        "// take average of a and b and limit to range",
+        seed_clamped_average);
+
+    ADD_SEED3(
+        "// absolute difference of a and b",
+        "// magnitude of a minus b",
+        "// distance from a to b without sign",
+        seed_abs_difference);
+
+    ADD_SEED3(
+        "// tax on price after applying a discount",
+        "// discounted then taxed amount",
+        "// compute tax amount on price after a discount rate",
+        seed_discounted_tax);
+
+    ADD_SEED3(
+        "// total cost of price including tax",
+        "// price plus tax amount on price",
+        "// gross total after adding sales tax",
+        seed_total_with_tax);
+
+    ADD_SEED3(
+        "// take home pay from gross income at tax rate",
+        "// net income after applying tax rate",
+        "// post tax pay given gross and rate",
+        seed_net_pay);
+
+    ADD_SEED3(
+        "// savings rate as percentage of income",
+        "// fraction saved out of income after expenses",
+        "// percentage of income left after expenses",
+        seed_savings_rate);
+
+    ADD_SEED3(
+        "// fibonacci of n times factorial of n",
+        "// product of fibonacci and factorial of n",
+        "// multiply fib n by fact n",
+        seed_fib_fact_product);
+
+    ADD_SEED3(
+        "// net present value of cashflow at rate over years",
+        "// present value of future value of cashflow",
+        "// discount the future value of a cashflow back to present",
+        seed_net_present_value);
+
+    ADD_SEED3(
+        "// sigmoid of x clamped within lo and hi",
+        "// bounded sigmoid output between lo and hi",
+        "// clip sigmoid x to range lo hi",
+        seed_clamped_sigmoid);
+
+    ADD_SEED3(
+        "// relu of x scaled by a factor",
+        "// rectified linear unit times scale",
+        "// scaled rectified output of x",
+        seed_scaled_relu);
+
+    ADD_SEED3(
+        "// gcd of a and b multiplied by both a and b",
+        "// product of gcd a b times a times b",
+        "// multiply greatest common divisor by a and b",
+        seed_gcd_product);
+
+    ADD_SEED3(
+        "// bmi of weight and height clamped between lo and hi",
+        "// body mass index limited within bounds",
+        "// classify bmi by clamping into a range",
+        seed_bmi_classified);
+
+#undef ADD_SEED3
+
+    /* ============================================================
+     *  Phase 4 — Real-primitive parametric families.
+     * ============================================================ */
+
+    /* tpl_clamped_op(unary_op): unary then clamp within bounds. */
+    static const char *clamp_ops[] = {
+        "sigmoid", "relu", "abs_val", "square", "double_val", "triple_val"
+    };
+    for (size_t op = 0; op < sizeof(clamp_ops) / sizeof(clamp_ops[0]); op++) {
+        char prompt[160];
+        snprintf(prompt, sizeof(prompt),
+                 "// apply %s to x then clamp result within lo and hi",
+                 clamp_ops[op]);
+        ADD3(prompt, w_clamped_op, (void *)clamp_ops[op], NULL, NULL);
+    }
+
+    /* tpl_taxed_total: invoice total = price * qty + tax. */
+    for (int qf = 0; qf < 2; qf++) {
+        char prompt[160];
+        snprintf(prompt, sizeof(prompt),
+                 "// invoice total of %s times %s plus tax amount at rate",
+                 qf ? "quantity" : "price",
+                 qf ? "price" : "quantity");
+        ADD3(prompt, w_taxed_total, (void *)(intptr_t)qf, NULL, NULL);
+        char prompt2[160];
+        snprintf(prompt2, sizeof(prompt2),
+                 "// %sgross billing including sales tax on units sold",
+                 qf ? "" : "");
+        ADD3(prompt2, w_taxed_total, (void *)(intptr_t)qf, NULL, NULL);
+    }
+
+    /* tpl_savings_pipeline(n_expenses): sum n expenses, subtract from income, percent. */
+    for (int n_e = 1; n_e <= 4; n_e++) {
+        char prompt[160];
+        snprintf(prompt, sizeof(prompt),
+                 "// savings rate after subtracting %d expense items from income",
+                 n_e);
+        ADD3(prompt, w_savings_pipeline, (void *)(intptr_t)n_e, NULL, NULL);
+    }
+
+    /* tpl_compound_chain(periods): interest earned. */
+    for (int per = 2; per <= 6; per++) {
+        char prompt[160];
+        snprintf(prompt, sizeof(prompt),
+                 "// interest earned on principal compounded at rate for %d years",
+                 per);
+        ADD3(prompt, w_compound_chain, (void *)(intptr_t)per, NULL, NULL);
+    }
+
+    /* tpl_gcd_chain(depth): gcd chain * k. */
+    for (int dep = 1; dep <= 4; dep++) {
+        char prompt[160];
+        snprintf(prompt, sizeof(prompt),
+                 "// gcd of %d integers multiplied by k",
+                 dep + 1);
+        ADD3(prompt, w_gcd_chain, (void *)(intptr_t)dep, NULL, NULL);
+    }
+
+    /* tpl_fib_fact_blend(op): combine fibonacci(n) and factorial(n). */
+    static const char *blend_ops[] = { "add", "multiply", "max", "min" };
+    for (size_t op = 0; op < sizeof(blend_ops) / sizeof(blend_ops[0]); op++) {
+        char prompt[160];
+        snprintf(prompt, sizeof(prompt),
+                 "// %s of fibonacci of n and factorial of n",
+                 blend_ops[op]);
+        ADD3(prompt, w_fib_fact_blend, (void *)blend_ops[op], NULL, NULL);
+    }
+
+    /* tpl_bmi_classified(normalize). */
+    for (int nor = 0; nor <= 1; nor++) {
+        char prompt[160];
+        if (nor) {
+            snprintf(prompt, sizeof(prompt),
+                     "// bmi from weight and height clamped to bounds and sigmoid normalized");
+        } else {
+            snprintf(prompt, sizeof(prompt),
+                     "// bmi from weight and height clamped to lo and hi range");
+        }
+        ADD3(prompt, w_bmi_classified, (void *)(intptr_t)nor, NULL, NULL);
+    }
+
+    /* tpl_pv_npv_chain(variant). */
+    for (int var = 0; var <= 1; var++) {
+        char prompt[160];
+        if (var) {
+            snprintf(prompt, sizeof(prompt),
+                     "// net of present value of future value minus original cashflow");
+        } else {
+            snprintf(prompt, sizeof(prompt),
+                     "// present value of future value of cashflow at rate over years");
+        }
+        ADD3(prompt, w_pv_npv_chain, (void *)(intptr_t)var, NULL, NULL);
+    }
+
+    /* tpl_distance_metrics(dim). */
+    for (int d = 1; d <= 4; d++) {
+        char prompt[160];
+        snprintf(prompt, sizeof(prompt),
+                 "// squared sum of one dimensional distances across %d coordinate pairs",
+                 d);
+        ADD3(prompt, w_distance_metrics, (void *)(intptr_t)d, NULL, NULL);
+    }
+
+    /* tpl_weighted_real(n). */
+    for (int nn = 2; nn <= 5; nn++) {
+        char prompt[160];
+        snprintf(prompt, sizeof(prompt),
+                 "// weighted average of %d value weight pairs",
+                 nn);
+        ADD3(prompt, w_weighted_real, (void *)(intptr_t)nn, NULL, NULL);
+    }
+
+    /* ============================================================
+     *  Phase 4 — Micro examples (single-primitive 1-node graphs).
+     *
+     *  Each primitive gets several minimal 1-node examples so the
+     *  organelle gets a strong prior on the syntax of every primitive
+     *  it needs to assemble. Without these, rare primitives like
+     *  fibonacci/factorial/apply_tax appear too few times to be
+     *  reliably emitted in held-out generation.
+     * ============================================================ */
+
+    /* Unary primitives — each with multiple paraphrased prompts. */
+    struct { const char *prim; const char *p[3]; } unary_set[] = {
+        {"sigmoid",     {"// apply sigmoid to x", "// sigmoid activation of x", "// squash x with sigmoid"}},
+        {"relu",        {"// apply relu to x", "// rectified linear of x", "// relu activation"}},
+        {"abs_val",     {"// absolute value of x", "// magnitude of x", "// abs of x"}},
+        {"square",      {"// square of x", "// x squared", "// raise x to the second power"}},
+        {"cube",        {"// cube of x", "// x cubed", "// x to the third"}},
+        {"double_val",  {"// double the value x", "// twice x", "// 2 times x"}},
+        {"triple_val",  {"// triple the value x", "// 3 times x", "// thrice x"}},
+        {"negate",      {"// negate x", "// minus x", "// flip the sign of x"}},
+        {"factorial",   {"// factorial of n", "// n factorial", "// compute n bang"}},
+        {"fibonacci",   {"// fibonacci of n", "// nth fibonacci number", "// fib n"}},
+        {"harmonic_n",  {"// harmonic series sum of n terms", "// nth harmonic number", "// sum of 1 over k for k up to n"}},
+        {"circle_area", {"// area of circle with radius r", "// circle area from radius", "// pi r squared"}}
+    };
+    for (size_t u = 0; u < sizeof(unary_set) / sizeof(unary_set[0]); u++) {
+        for (int k = 0; k < 3; k++) {
+            ADD3(unary_set[u].p[k], w_micro_unary, (void *)unary_set[u].prim, NULL, NULL);
+        }
+    }
+
+    /* Binary primitives — port_kind chooses naming convention. */
+    struct { const char *prim; int kind; const char *p[3]; } binary_set[] = {
+        {"add",          0, {"// add x and y", "// sum of x and y", "// x plus y"}},
+        {"subtract",     0, {"// subtract y from x", "// x minus y", "// difference between x and y"}},
+        {"multiply",     0, {"// multiply x and y", "// product of x and y", "// x times y"}},
+        {"min_two",      1, {"// minimum of a and b", "// smaller of a and b", "// min a b"}},
+        {"max_two",      1, {"// maximum of a and b", "// larger of a and b", "// max a b"}},
+        {"average_two",  1, {"// average of a and b", "// mean of a and b", "// midpoint between a and b"}},
+        {"distance_1d",  1, {"// distance from a to b", "// one dimensional distance a b", "// absolute gap between a and b"}},
+        {"midpoint",     1, {"// midpoint of a and b", "// halfway between a and b", "// center of segment a b"}},
+        {"gcd",          1, {"// gcd of a and b", "// greatest common divisor of a and b", "// largest divisor of both a and b"}},
+        {"mse",          1, {"// mean squared error of a and b", "// squared error a b", "// quadratic loss between a and b"}},
+        {"tax_amount",   2, {"// tax amount on a given amount at rate", "// compute tax due", "// amount times tax rate"}},
+        {"apply_tax",    2, {"// take home after tax on amount at rate", "// net of amount after tax", "// post tax remainder"}},
+        {"percentage",   3, {"// percentage of part out of whole", "// part as a fraction of whole times 100", "// part divided by whole as percent"}},
+        {"bmi",          4, {"// bmi from weight and height", "// body mass index", "// weight over height squared"}},
+        {"discount",     5, {"// discounted price after rate", "// price after applying discount rate", "// reduced price"}},
+        {"markup",       6, {"// price after markup on cost", "// cost plus markup rate", "// retail price from cost"}},
+        {"power",        7, {"// base to the power exp", "// exponentiation base exp", "// raise base to exp"}},
+        {"kinetic_energy", 8, {"// kinetic energy from mass m and velocity v", "// half m v squared", "// energy of motion"}}
+    };
+    for (size_t b = 0; b < sizeof(binary_set) / sizeof(binary_set[0]); b++) {
+        for (int k = 0; k < 3; k++) {
+            MicroBinCtx *ctx = (MicroBinCtx *)calloc(1, sizeof(MicroBinCtx));
+            ctx->prim = binary_set[b].prim;
+            ctx->port_kind = binary_set[b].kind;
+            ADD3(binary_set[b].p[k], w_micro_binary, (void *)ctx, NULL, NULL);
+        }
+    }
+
+    /* Ternary primitives. */
+    struct { const char *prim; int kind; const char *p[3]; } ternary_set[] = {
+        {"clamp",         0, {"// clamp x between lo and hi", "// limit x to range lo hi", "// bound x within lo and hi"}},
+        {"lerp",          1, {"// lerp from a to b at t", "// linear interpolation a b t", "// blend a and b by t"}},
+        {"compound",      2, {"// compound principal at rate over periods", "// compounded amount", "// compound growth of principal"}},
+        {"future_value",  3, {"// future value of present at rate over periods", "// fv compounded forward", "// future worth of present"}},
+        {"present_value", 4, {"// present value of future at rate over periods", "// pv discounted backward", "// present worth of future"}}
+    };
+    for (size_t t = 0; t < sizeof(ternary_set) / sizeof(ternary_set[0]); t++) {
+        for (int k = 0; k < 3; k++) {
+            MicroTerCtx *ctx = (MicroTerCtx *)calloc(1, sizeof(MicroTerCtx));
+            ctx->prim = ternary_set[t].prim;
+            ctx->port_kind = ternary_set[t].kind;
+            ADD3(ternary_set[t].p[k], w_micro_ternary, (void *)ctx, NULL, NULL);
+        }
+    }
+
+    /* ============================================================
+     *  Phase 4 — Vocabulary-bridging paraphrases.
+     *
+     *  Bridge held-out NL phrasing patterns to seen primitives. Each
+     *  entry pairs an unusual surface form with the core seed graph
+     *  it should activate. Without these, novel words like
+     *  "body mass index", "magnitude", "scaled by", "rectified output",
+     *  "limit", "bounded between" map to <unk> at inference time.
+     * ============================================================ */
+    /* Bridge prompts for seed graphs. */
+    ADD3("// compute body mass index then limit inside lo and hi bounds",
+         w_seed, (void *)(SeedFn)seed_bmi_classified, NULL, NULL);
+    ADD3("// body mass index of weight and height bounded between minimum and maximum",
+         w_seed, (void *)(SeedFn)seed_bmi_classified, NULL, NULL);
+    ADD3("// determine bmi and restrict to range lo and hi",
+         w_seed, (void *)(SeedFn)seed_bmi_classified, NULL, NULL);
+
+    ADD3("// interest gained on an investment when principal compounds at rate over years",
+         w_seed, (void *)(SeedFn)seed_compound_interest, NULL, NULL);
+    ADD3("// final balance after compound growth minus the original principal",
+         w_seed, (void *)(SeedFn)seed_compound_interest, NULL, NULL);
+    ADD3("// total return after compound growth subtract original",
+         w_seed, (void *)(SeedFn)seed_compound_interest, NULL, NULL);
+
+    ADD3("// limit the output of sigmoid to lo and hi range",
+         w_seed, (void *)(SeedFn)seed_clamped_sigmoid, NULL, NULL);
+    ADD3("// sigmoid of x normalised by clamping into bounded range",
+         w_seed, (void *)(SeedFn)seed_clamped_sigmoid, NULL, NULL);
+    ADD3("// bounded sigmoid neuron output",
+         w_seed, (void *)(SeedFn)seed_clamped_sigmoid, NULL, NULL);
+
+    ADD3("// take home pay from gross income at tax rate",
+         w_seed, (void *)(SeedFn)seed_net_pay, NULL, NULL);
+    ADD3("// gross income reduced by tax liability",
+         w_seed, (void *)(SeedFn)seed_net_pay, NULL, NULL);
+    ADD3("// post tax pay from gross at federal rate",
+         w_seed, (void *)(SeedFn)seed_net_pay, NULL, NULL);
+
+    ADD3("// magnitude of difference between two forecasts",
+         w_seed, (void *)(SeedFn)seed_abs_difference, NULL, NULL);
+    ADD3("// absolute gap between a and b",
+         w_seed, (void *)(SeedFn)seed_abs_difference, NULL, NULL);
+
+    ADD3("// rectified output of x scaled by a gain factor",
+         w_seed, (void *)(SeedFn)seed_scaled_relu, NULL, NULL);
+    ADD3("// relu of x times a scale coefficient",
+         w_seed, (void *)(SeedFn)seed_scaled_relu, NULL, NULL);
+
+    ADD3("// greatest common divisor of a b and the result times k",
+         w_seed, (void *)(SeedFn)seed_gcd_product, NULL, NULL);
+    ADD3("// gcd of a b scaled by both a and b",
+         w_seed, (void *)(SeedFn)seed_gcd_product, NULL, NULL);
+
+    ADD3("// average a and b bounded between minimum and maximum",
+         w_seed, (void *)(SeedFn)seed_clamped_average, NULL, NULL);
+    ADD3("// mean of a and b limited within lo and hi",
+         w_seed, (void *)(SeedFn)seed_clamped_average, NULL, NULL);
+
+    ADD3("// future cashflow discounted back to its present worth",
+         w_seed, (void *)(SeedFn)seed_net_present_value, NULL, NULL);
+    ADD3("// net present value of cashflow at rate over years",
+         w_seed, (void *)(SeedFn)seed_net_present_value, NULL, NULL);
+
+    ADD3("// fibonacci of n times factorial of n",
+         w_seed, (void *)(SeedFn)seed_fib_fact_product, NULL, NULL);
+    ADD3("// product of fib n and fact n",
+         w_seed, (void *)(SeedFn)seed_fib_fact_product, NULL, NULL);
+
+    /* Bridge prompts that name primitives explicitly to anchor them. */
+    ADD3("// invoice total of price times quantity plus tax amount at rate",
+         w_taxed_total, (void *)(intptr_t)0, NULL, NULL);
+    ADD3("// gross billing including sales tax on units sold",
+         w_taxed_total, (void *)(intptr_t)1, NULL, NULL);
+
+    ADD3("// fraction of income saved after subtracting expenses",
+         w_savings_pipeline, (void *)(intptr_t)2, NULL, NULL);
+    ADD3("// percentage of income remaining after deducting expenses",
+         w_savings_pipeline, (void *)(intptr_t)3, NULL, NULL);
 
 #undef ADD3
     *out_count = n;

@@ -1813,17 +1813,21 @@ add_demo(
   NAME    wiring_organelle_demo
   SOURCE  demos/wiring_organelle/main.c
   THREADS
-  DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=2 BLOCK_SIZE=256 MLP_DIM=192
-          NUM_STEPS=2000 LEARNING_RATE=0.001 BATCH_SIZE=16
-          MAX_VOCAB=600 MAX_DOCS=5000 MAX_DOC_LEN=2048
+  DEFINES N_EMBD=96 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=384 MLP_DIM=384
+          NUM_STEPS=5000 LEARNING_RATE=0.001 BATCH_SIZE=16
+          MAX_VOCAB=1200 MAX_DOCS=5000 MAX_DOC_LEN=4096
 )
 # Generate the corpus next to the binary as a POST_BUILD step.
 add_custom_command(TARGET wiring_organelle_demo POST_BUILD
   COMMAND pipeline_corpus_gen
           $<TARGET_FILE_DIR:wiring_organelle_demo>/pipeline_corpus_train.txt
           $<TARGET_FILE_DIR:wiring_organelle_demo>/pipeline_corpus_val.txt
+  COMMAND ${CMAKE_COMMAND} -E copy
+          ${CMAKE_CURRENT_SOURCE_DIR}/demos/wiring_organelle/pipeline_corpus_held_out.txt
+          $<TARGET_FILE_DIR:wiring_organelle_demo>/pipeline_corpus_held_out.txt
   DEPENDS pipeline_corpus_gen
-  COMMENT "Generating Pipeline IR corpus (train+val) for wiring_organelle_demo"
+          ${CMAKE_CURRENT_SOURCE_DIR}/demos/wiring_organelle/pipeline_corpus_held_out.txt
+  COMMENT "Generating Pipeline IR corpus (train+val) and copying Phase 4 held-out NL prompts"
 )
 
 add_executable(test_microgpt_turboquant tests/test_microgpt_turboquant.c)

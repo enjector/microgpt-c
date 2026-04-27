@@ -1,0 +1,88 @@
+# Pipeline IR — Phase 4 held-out natural-English prompts
+# 20 prompts that are NOT in train or val. Each probes whether the
+# Wiring Organelle has learned to map domain wording → real primitive
+# composition, rather than memorising template surface forms.
+#
+# Format: '# EXPECTED: <primitives>' annotation lines are skipped by
+# the preprocessor (lines starting with '#'). The '// prompt' line
+# becomes the eval prompt; each example terminates with '---'.
+
+# EXPECTED: bmi clamp
+// compute the body mass index from weight and height and limit it inside lo and hi bounds
+---
+
+# EXPECTED: compound subtract
+// interest gained on an investment when principal compounds at rate r over n years
+---
+
+# EXPECTED: multiply add percentage
+// weighted combination of three measurements each scaled by its own weight
+---
+
+# EXPECTED: sigmoid clamp
+// limit the output of a sigmoid neuron to a low high range
+---
+
+# EXPECTED: gcd multiply
+// greatest common divisor of two numbers scaled by a coefficient k
+---
+
+# EXPECTED: apply_tax
+// take home pay from gross income at federal tax rate
+---
+
+# EXPECTED: fibonacci factorial multiply
+// fibonacci of n multiplied by factorial of n
+---
+
+# EXPECTED: multiply tax_amount add
+// invoice total of price times quantity plus tax due at rate
+---
+
+# EXPECTED: average_two clamp
+// average of a and b bounded between minimum and maximum
+---
+
+# EXPECTED: subtract abs_val
+// magnitude of difference between two forecasts
+---
+
+# EXPECTED: relu multiply
+// rectified output of x scaled by a gain factor
+---
+
+# EXPECTED: discount tax_amount
+// tax due on a price after a discount has been applied
+---
+
+# EXPECTED: subtract percentage
+// fraction of income saved after subtracting expenses
+---
+
+# EXPECTED: distance_1d add square
+// total of distances across two coordinate axes squared
+---
+
+# EXPECTED: distance_1d midpoint add
+// distance between two readings combined with their midpoint
+---
+
+# EXPECTED: future_value present_value
+// future cashflow discounted back to its present worth
+---
+
+# EXPECTED: fibonacci factorial add
+// fibonacci of n combined with factorial of n by adding
+---
+
+# EXPECTED: tax_amount subtract
+// gross income reduced by tax liability
+---
+
+# EXPECTED: compound subtract
+// final balance after compound growth minus the original principal
+---
+
+# EXPECTED: sigmoid clamp
+// sigmoid of x normalised by clamping into a bounded range
+---

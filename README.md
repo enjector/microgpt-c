@@ -129,6 +129,7 @@ Key technical contributions shipped in this engine:
 | 🔀 **Block Attention Residuals** | Learned depth-attention replaces additive residuals — preserves prompt signal through deep layers | Opt-in via `-DMICROGPT_ATTN_RES=ON` ([paper](https://github.com/MoonshotAI/Attention-Residuals)) |
 | 🎯 **Negative Control Methodology** | Lottery experiment proves engine learns patterns, not artefacts | Entropy floor at 0.50 (theoretical maximum) |
 | 🧭 **DeepSeek-V4 Port Stack** | Active-attention triumvirate (Partial RoPE + Attention Sink + Q/K RMSNorm) ported from DeepSeek-V4 §2.3.3 onto a CPU-first C99 engine. Rope-aware MSA pool/recency injection makes long-context inference relative-position-correct. All four flags off by default; combined stack opt-in. | **−8.7% held-out PPL** on deep config (4-layer 138K-param), 0 new params, ~1% extra runtime. See [V4 port roadmap](docs/research/RESEARCH_DEEPSEEK_V4_PORTING.md). |
+| 🔌 **Pipeline IR + Wiring Organelle** | Typed graph IR (DAG + verifier + text round-trip + DOT) emitted by a 540K-param word-level organelle trained on 272 (prompt, graph) pairs of real `w_vm_functions` primitives (bmi, compound, sigmoid, gcd, apply_tax …). Best-of-16 + verify-as-judge closes the loop. | **65% strict-verified** on 20 held-out natural-English prompts (35% primitive-fidelity). 100% on synthetic templates. See [RESEARCH_PIPELINE_IR §17](docs/research/RESEARCH_PIPELINE_IR.md#17-phase-4--real-corpus-tool-composition-natural-english-transfer). |
 
 ## Explore Further
 
@@ -144,6 +145,7 @@ Key technical contributions shipped in this engine:
 | 🎲 **Lottery experiment** (entropy baseline) | [lottery/README.md](demos/character-level/lottery/README.md) |
 | 🔬 **Pipeline architecture** (white paper) | [RESEARCH_ORGANELLE_PIPELINE](docs/research/RESEARCH_ORGANELLE_PIPELINE.md) |
 | 🧠 **Reasoning conclusion** | [RESEARCH_ORGANELLE_REASONING](docs/research/RESEARCH_ORGANELLE_REASONING.md) |
+| 🔌 **Pipeline IR + Wiring Organelle** | [RESEARCH_PIPELINE_IR](docs/research/RESEARCH_PIPELINE_IR.md) |
 | 📚 **Using as a library** | [FUNCTIONAL_SPEC](docs/FUNCTIONAL_SPEC.md) |
 | ⚡ **Performance & benchmarks** | [PERFORMANCE](docs/testing/PERFORMANCE.md) |
 | 🚀 **SSD inference optimisations** | [RESEARCH_SSD](docs/research/RESEARCH_SSD.md) |

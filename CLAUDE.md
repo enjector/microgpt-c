@@ -41,6 +41,7 @@ Binaries land in `build/` on Linux/macOS, `build/Release/` on Windows. Each demo
 ./test_microgpt_turboquant   # 4-bit KV compression
 ./test_microgpt_rotorquant   # rotor quantisation
 ./test_microgpt_organelle    # organelle pipeline
+./test_microgpt_pipeline     # Pipeline IR (graph DAG + verifier + text round-trip + DOT)
 ./test_microgpt_vm           # VM compiler/runtime (needs resources/vm/, copied automatically)
 
 # Or run all registered tests via CTest:
@@ -68,6 +69,7 @@ demos/  — applications (Shakespeare, 11 games, VM codegen, lottery, MSA, Turbo
    ├── microgpt_msa.c/.h        — Memory Sparse Attention (LRU-paged latent storage)
    ├── microgpt_turboquant.c/.h — 4-bit dual-state KV compression
    ├── microgpt_rotorquant.c/.h — rotor-based KV compression
+   ├── microgpt_pipeline.c/.h   — Pipeline IR (typed graph DAG, verifier, text round-trip, DOT)
    ├── microgpt_vm.c/.h         — bytecode compiler + runtime (Flex/Bison frontend)
    └── microgpt_metal.{h,m,metal} — optional Apple Metal GPU kernels
    │
@@ -76,7 +78,7 @@ demos/  — applications (Shakespeare, 11 games, VM codegen, lottery, MSA, Turbo
                                   checkpoint I/O, TrainWorker pthread harness
 ```
 
-**`microgpt.h` is a single-header API** (~1k lines) — including it gets you the whole core engine. `microgpt.c` is ~3k lines of implementation. Two more headers layer on top: `microgpt_organelle.h` for pipelines, `microgpt_vm.h` for VM scripting.
+**`microgpt.h` is a single-header API** (~1k lines) — including it gets you the whole core engine. `microgpt.c` is ~3k lines of implementation. Three more headers layer on top: `microgpt_organelle.h` for pipelines, `microgpt_pipeline.h` for the graph IR (typed dataflow DAG that the Wiring Organelle emits), `microgpt_vm.h` for VM scripting.
 
 ### Compile-time architecture (critical)
 
@@ -91,6 +93,10 @@ To add a new demo: create `demos/<category>/<name>/main.c`, then register with `
 The "intelligence" claim is in the *coordination*: each organelle is its own checkpoint of the same ~30K–460K-param transformer, trained on a different role (planner / player / judge). They communicate via flat pipe-separated text strings — the planner's stdout is fed as the player's prompt. `OpaKanban` is the shared working memory (history, blocked moves, stalls). `OpaCycleDetector` breaks A↔B oscillations. The deterministic C scaffolding (~340 lines) does what gradient descent can't, freeing tiny models to be pattern-matchers.
 
 When changing organelle wire formats, update both the producer's output template *and* the consumer's parser — they're symmetric and there is no schema enforcement.
+
+### Pipeline IR + Wiring Organelle
+
+`microgpt_pipeline.{h,c}` is an orthogonal optional module — no changes to the core engine. It defines a typed graph IR (`Pipeline`, `PipelineNode`, `PipelineEdge`, `PipelineType`, `@graph...@end` text format) with a verifier (cycle/connectivity/type checks) that doubles as a Judge for generated graphs. The **Wiring Organelle** (`demos/wiring_organelle/`) is a 540K-param word-level transformer trained on (prompt, graph) pairs from `tools/pipeline_corpus_gen.c`. Best-of-16 sampling + verify-as-judge gives **65% strict-verify on natural-English transfer** to real `w_vm_functions.txt` primitives (bmi, compound, sigmoid, gcd, …). When extending the corpus generator, ensure `pipeline_render_text()` round-trips byte-stably via the canonical Kahn topo sort. See `docs/research/RESEARCH_PIPELINE_IR.md`.
 
 ### VM engine
 
