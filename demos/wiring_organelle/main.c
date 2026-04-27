@@ -295,57 +295,109 @@ int main(void) {
     printf("================================================================\n\n");
 
     int well_formed_count = 0, parse_count = 0, verify_count = 0;
+    int singleshot_verify_count = 0;   /* baseline: first-attempt verify rate */
     /* Print at most this many sample outputs; suppress the rest. */
     const int MAX_PRINTS = 5;
     int printed = 0;
     char output_buf[8192];
+    char best_buf[8192];
+
+    /* Phase 3e/f/g: best-of-N with verify-as-judge.
+     *
+     * For each held-out prompt, run wiring_generate up to N=8 times with
+     * varied temperatures. After each attempt, parse + verify. If any
+     * attempt verifies, that's the answer for this prompt — stop early.
+     * If none verify after N tries, fall back to the first well-formed
+     * candidate.
+     *
+     * This converts "single-shot success" to "best-of-N success" — the
+     * same pattern that took the Connect-4 player from 55% to 88% in the
+     * existing organelle work.
+     */
+    /* 16 temperatures spanning low-greedy through high-creative. Low temps
+     * pin to the strongest training-data shapes; high temps explore. */
+    const float TEMPS[] = {
+        0.20f, 0.25f, 0.30f, 0.35f, 0.40f, 0.45f, 0.50f, 0.55f,
+        0.60f, 0.65f, 0.70f, 0.75f, 0.80f, 0.85f, 0.90f, 0.95f
+    };
+    const int N_VOTES = (int)(sizeof(TEMPS) / sizeof(TEMPS[0]));
 
     for (int i = 0; i < n_val; i++) {
-        wiring_generate(org, &cfg, val_prompts[i], output_buf, sizeof(output_buf),
-                        /*temperature=*/0.4f, /*max_words=*/200);
-        /* Phase 3d: dump each output to disk before parsing — lets us
-         * reproduce any remaining crash with pipeline_parse_text on a
-         * specific saved file. */
-        char dump_path[64]; snprintf(dump_path, sizeof(dump_path),
-                                     "wiring_out_%02d.txt", i + 1);
-        FILE *df = fopen(dump_path, "w");
-        if (df) { fwrite(output_buf, 1, strlen(output_buf), df); fclose(df); }
+        int well_formed = 0, parsed = 0, verified = 0;
+        int single_shot_verified = 0;
+        int votes_used = 0;
+        best_buf[0] = '\0';
+        int have_best = 0;
 
-        /* Defensive: only attempt to parse output that has all required
-         * structural markers. The parser was designed for canonical
-         * renderer output and can segfault on malformed model emissions
-         * (real bug — see RESEARCH_PIPELINE_IR.md §13 limitations).
-         * Score "well-formed" as a separate axis. */
-        int well_formed =
-            strstr(output_buf, "@graph") &&
-            strstr(output_buf, "@end") &&
-            strstr(output_buf, ": in") &&
-            strstr(output_buf, ": out") &&
-            strstr(output_buf, "|") &&
-            strstr(output_buf, "<-");
-        /* Phase 3d: parser hardened against malformed input (fuzz tests
-         * cover empty/garbage/truncation/byte-mutation/random-bytes).
-         * Re-enabled the parse + verify path. */
-        int parsed = 0, verified = 0;
-        if (well_formed) {
-            Pipeline *p = pipeline_parse_text(output_buf);
-            parsed = (p != NULL);
-            if (parsed) {
-                verified = (pipeline_verify(p) == PIPE_OK);
-                pipeline_free(p);
+        for (int v = 0; v < N_VOTES; v++) {
+            /* max_words=360 leaves headroom in the 384-block-size config
+             * for the longest examples (distance_squared 6d ≈ 250 words). */
+            wiring_generate(org, &cfg, val_prompts[i], output_buf, sizeof(output_buf),
+                            TEMPS[v], /*max_words=*/360);
+            votes_used = v + 1;
+
+            int wf =
+                strstr(output_buf, "@graph") &&
+                strstr(output_buf, "@end") &&
+                strstr(output_buf, ": in") &&
+                strstr(output_buf, ": out") &&
+                strstr(output_buf, "|") &&
+                strstr(output_buf, "<-");
+
+            int p_ok = 0, v_ok = 0;
+            if (wf) {
+                Pipeline *p = pipeline_parse_text(output_buf);
+                p_ok = (p != NULL);
+                if (p_ok) {
+                    v_ok = (pipeline_verify(p) == PIPE_OK);
+                    pipeline_free(p);
+                }
             }
+
+            /* Track first-shot stats (the Phase 3d baseline). */
+            if (v == 0) {
+                well_formed = wf;
+                parsed = p_ok;
+                if (v_ok) single_shot_verified = 1;
+            }
+
+            /* Cache the first well-formed candidate as fallback. */
+            if (wf && !have_best) {
+                strncpy(best_buf, output_buf, sizeof(best_buf) - 1);
+                best_buf[sizeof(best_buf) - 1] = '\0';
+                have_best = 1;
+            }
+
+            /* Stop early on first verified candidate. */
+            if (v_ok) {
+                strncpy(best_buf, output_buf, sizeof(best_buf) - 1);
+                best_buf[sizeof(best_buf) - 1] = '\0';
+                have_best = 1;
+                well_formed = 1;   /* by construction */
+                parsed = 1;
+                verified = 1;
+                break;
+            }
+
+            /* Update aggregate flags from any vote (best so far). */
+            if (wf) well_formed = 1;
+            if (p_ok) parsed = 1;
         }
+
         if (well_formed) well_formed_count++;
         if (parsed) parse_count++;
         if (verified) verify_count++;
+        if (single_shot_verified) singleshot_verify_count++;
 
         if (printed < MAX_PRINTS) {
             printf("[%d] %s\n", i + 1, val_prompts[i]);
-            printf("  well-formed=%s, parse=%s, verify=%s\n",
+            printf("  well-formed=%s, parse=%s, verify=%s, votes=%d/%d\n",
                    well_formed ? "✅" : "❌",
                    parsed ? "✅" : "❌",
-                   verified ? "✅" : "❌");
-            printf("  --- generated ---\n%s\n", output_buf);
+                   verified ? "✅" : "❌",
+                   votes_used, N_VOTES);
+            printf("  --- best output ---\n%s\n",
+                   have_best ? best_buf : "(none)");
             printf("  ---\n\n");
             printed++;
         }
@@ -354,12 +406,15 @@ int main(void) {
     printf("================================================================\n");
     printf("  RESULTS\n");
     printf("================================================================\n");
-    printf("Held-out prompts:    %d\n", n_val);
-    printf("Well-formed:         %d/%d (%.0f%%)\n", well_formed_count, n_val,
+    printf("Held-out prompts:                     %d\n", n_val);
+    printf("Single-shot strict-verified:          %d/%d (%.0f%%)  [Phase 3d baseline]\n",
+           singleshot_verify_count, n_val,
+           n_val > 0 ? 100.0 * singleshot_verify_count / n_val : 0.0);
+    printf("Best-of-%-2d well-formed:               %d/%d (%.0f%%)\n", N_VOTES, well_formed_count, n_val,
            n_val > 0 ? 100.0 * well_formed_count / n_val : 0.0);
-    printf("Parsed:              %d/%d (%.0f%%)\n", parse_count, n_val,
+    printf("Best-of-%-2d parsed:                    %d/%d (%.0f%%)\n", N_VOTES, parse_count, n_val,
            n_val > 0 ? 100.0 * parse_count / n_val : 0.0);
-    printf("Strict-verified:     %d/%d (%.0f%%)\n", verify_count, n_val,
+    printf("Best-of-%-2d strict-verified:           %d/%d (%.0f%%)  [Phase 3e/f/g]\n", N_VOTES, verify_count, n_val,
            n_val > 0 ? 100.0 * verify_count / n_val : 0.0);
     printf("\n");
 

@@ -1813,8 +1813,8 @@ add_demo(
   NAME    wiring_organelle_demo
   SOURCE  demos/wiring_organelle/main.c
   THREADS
-  DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=2 BLOCK_SIZE=192 MLP_DIM=192
-          NUM_STEPS=1500 LEARNING_RATE=0.001 BATCH_SIZE=16
+  DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=2 BLOCK_SIZE=256 MLP_DIM=192
+          NUM_STEPS=2000 LEARNING_RATE=0.001 BATCH_SIZE=16
           MAX_VOCAB=600 MAX_DOCS=5000 MAX_DOC_LEN=2048
 )
 # Generate the corpus next to the binary as a POST_BUILD step.
