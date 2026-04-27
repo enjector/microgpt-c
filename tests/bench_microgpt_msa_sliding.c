@@ -56,6 +56,16 @@
 #ifndef MSA_WIN
 #define MSA_WIN 16
 #endif
+/* Routing modes:
+ *   0 = top-1 cosine (existing baseline)
+ *   1 = top-k Lightning Indexer (multi-layer ReLU-summed scoring)
+ */
+#ifndef BENCH_MSA_ROUTING_MODE
+#define BENCH_MSA_ROUTING_MODE 0
+#endif
+#ifndef BENCH_MSA_TOPK
+#define BENCH_MSA_TOPK 1
+#endif
 
 /* ---------- Helper: build a long held-out token sequence ----------- */
 static size_t build_long_sequence(const Docs *docs, size_t holdout_start,
@@ -85,7 +95,12 @@ static size_t build_long_sequence(const Docs *docs, size_t holdout_start,
   return n;
 }
 
-/* ---------- MSA flow A: existing baseline ---------- */
+/* ---------- MSA flow A: existing baseline (or top-k variant) ----------
+ *
+ * Memmove second half down, then inject either:
+ *   ROUTING_MODE=0 : top-1 best chunk at pos 0 via cosine (existing)
+ *   ROUTING_MODE=1 : top-K best chunks at pos 0..K-1 via Lightning Indexer
+ */
 static int msa_step_baseline(MsaPool *pool, scalar_t **inf_keys,
                              scalar_t **inf_values, size_t *inf_cache_len,
                              size_t *pos, const MicrogptConfig *cfg) {
@@ -103,7 +118,7 @@ static int msa_step_baseline(MsaPool *pool, scalar_t **inf_keys,
     inf_cache_len[L] -= chunk_size;
   }
   *pos -= chunk_size;
-  /* Inject single best chunk at pos 0. */
+  /* Build query from the most-recent K (across all layers). */
   scalar_t **q = (scalar_t **)malloc((size_t)cfg->n_layer * sizeof(scalar_t *));
   for (int L = 0; L < cfg->n_layer; L++) {
     q[L] = (scalar_t *)malloc((size_t)cfg->n_embd * sizeof(scalar_t));
@@ -111,8 +126,17 @@ static int msa_step_baseline(MsaPool *pool, scalar_t **inf_keys,
            inf_keys[L] + ((*pos > 0 ? *pos - 1 : 0) * (size_t)cfg->n_embd),
            (size_t)cfg->n_embd * sizeof(scalar_t));
   }
+#if BENCH_MSA_ROUTING_MODE == 1
+  int top[16];
+  int n = msa_route_top_k(pool, q, BENCH_MSA_TOPK, top, NULL);
+  for (int i = 0; i < n; i++) {
+    if (top[i] >= 0)
+      msa_expand_context(pool, top[i], inf_keys, inf_values, (size_t)i);
+  }
+#else
   int best = msa_route_top_1(pool, q);
   if (best >= 0) msa_expand_context(pool, best, inf_keys, inf_values, 0);
+#endif
   for (int L = 0; L < cfg->n_layer; L++) free(q[L]);
   free(q);
   return 1;

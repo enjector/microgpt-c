@@ -469,6 +469,71 @@ add_demo(
           MSA_POOL_MODE=3
 )
 
+# ==================================================================
+#  MSA Lightning Indexer + Top-K A/B sweep (DeepSeek-V4 §2.3.1 port)
+#  Reuses the same long-context benchmark.
+#  See docs/research/RESEARCH_DEEPSEEK_V4_LIGHTNING_INDEXER_TOPK.md
+# ==================================================================
+# Baseline: existing top-1 cosine retrieval.
+add_demo(
+  NAME    bench_msa_indexer_baseline
+  SOURCE  tests/bench_microgpt_msa_sliding.c
+  COPY    demos/character-level/names/c_names.txt
+  DEFINES N_EMBD=64 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=64 MLP_DIM=128
+          BENCH_NUM_STEPS=1500 BENCH_BATCH_SIZE=16 BENCH_LONG_SEQ_LEN=2048
+          BENCH_MSA_ROUTING_MODE=0
+)
+
+# Lightning indexer at K=1 — isolates the scoring change from top-K.
+add_demo(
+  NAME    bench_msa_indexer_k1
+  SOURCE  tests/bench_microgpt_msa_sliding.c
+  COPY    demos/character-level/names/c_names.txt
+  DEFINES N_EMBD=64 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=64 MLP_DIM=128
+          BENCH_NUM_STEPS=1500 BENCH_BATCH_SIZE=16 BENCH_LONG_SEQ_LEN=2048
+          BENCH_MSA_ROUTING_MODE=1 BENCH_MSA_TOPK=1
+)
+
+# Lightning indexer at K=2.
+add_demo(
+  NAME    bench_msa_indexer_k2
+  SOURCE  tests/bench_microgpt_msa_sliding.c
+  COPY    demos/character-level/names/c_names.txt
+  DEFINES N_EMBD=64 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=64 MLP_DIM=128
+          BENCH_NUM_STEPS=1500 BENCH_BATCH_SIZE=16 BENCH_LONG_SEQ_LEN=2048
+          BENCH_MSA_ROUTING_MODE=1 BENCH_MSA_TOPK=2
+)
+
+# Lightning indexer at K=4.
+add_demo(
+  NAME    bench_msa_indexer_k4
+  SOURCE  tests/bench_microgpt_msa_sliding.c
+  COPY    demos/character-level/names/c_names.txt
+  DEFINES N_EMBD=64 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=64 MLP_DIM=128
+          BENCH_NUM_STEPS=1500 BENCH_BATCH_SIZE=16 BENCH_LONG_SEQ_LEN=2048
+          BENCH_MSA_ROUTING_MODE=1 BENCH_MSA_TOPK=4
+)
+
+# Lightning indexer at K=8 — half the active cache becomes pool-derived.
+add_demo(
+  NAME    bench_msa_indexer_k8
+  SOURCE  tests/bench_microgpt_msa_sliding.c
+  COPY    demos/character-level/names/c_names.txt
+  DEFINES N_EMBD=64 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=64 MLP_DIM=128
+          BENCH_NUM_STEPS=1500 BENCH_BATCH_SIZE=16 BENCH_LONG_SEQ_LEN=2048
+          BENCH_MSA_ROUTING_MODE=1 BENCH_MSA_TOPK=8
+)
+
+# Combined: Lightning Indexer K=4 + content-aware pool (mode 3).
+add_demo(
+  NAME    bench_msa_indexer_k4_csa
+  SOURCE  tests/bench_microgpt_msa_sliding.c
+  COPY    demos/character-level/names/c_names.txt
+  DEFINES N_EMBD=64 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=64 MLP_DIM=128
+          BENCH_NUM_STEPS=1500 BENCH_BATCH_SIZE=16 BENCH_LONG_SEQ_LEN=2048
+          BENCH_MSA_ROUTING_MODE=1 BENCH_MSA_TOPK=4 MSA_POOL_MODE=3
+)
+
 add_demo(
   NAME    bench_msa_sliding_long_on
   SOURCE  tests/bench_microgpt_msa_sliding.c

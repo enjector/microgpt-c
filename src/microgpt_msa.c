@@ -287,6 +287,93 @@ int msa_route_top_1(const MsaPool *pool, scalar_t **query_keys) {
 }
 
 /* ============================================================
+ *  Lightning Indexer + Top-K implementation
+ * ============================================================
+ *
+ * Multi-layer ReLU-summed scoring with top-k selection. Walks the
+ * pool linearly; for each chunk computes the score, then maintains
+ * a sorted top-k buffer via insertion sort (k typically <= 16).
+ */
+
+int msa_route_top_k(const MsaPool *pool, scalar_t **query_keys,
+                    int k, int *indices_out, scalar_t *scores_out) {
+    if (!pool || !query_keys || !indices_out || k <= 0) return 0;
+    if (pool->length == 0) {
+        for (int i = 0; i < k; i++) indices_out[i] = -1;
+        if (scores_out) for (int i = 0; i < k; i++) scores_out[i] = 0;
+        return 0;
+    }
+
+    int kmax = k;
+    if ((size_t)kmax > pool->length) kmax = (int)pool->length;
+
+    /* Initialise top-k with sentinel -inf scores. */
+    for (int i = 0; i < k; i++) indices_out[i] = -1;
+    scalar_t local_scores[64]; /* k <= 64 in practice */
+    if (k > 64) k = 64;
+    for (int i = 0; i < k; i++) local_scores[i] = (scalar_t)(-1e30);
+
+    scalar_t scale = 1.0f / (scalar_t)sqrt((double)(pool->n_embd > 0 ? pool->n_embd : 1));
+
+    for (size_t i = 0; i < pool->length; i++) {
+        scalar_t score = 0;
+        for (int l = 0; l < pool->n_layer; l++) {
+            size_t p_offset = i * (size_t)pool->n_layer * (size_t)pool->n_embd
+                            + (size_t)l * (size_t)pool->n_embd;
+#if defined(ENABLE_TURBOQUANT) || defined(ENABLE_ROTORQUANT)
+            float *dequant_k = pool->n_embd > 0 ? (float*)malloc(pool->n_embd * sizeof(float)) : NULL;
+            if (dequant_k) {
+                uint32_t *idx = &pool->tq_keys_idx[p_offset];
+                int8_t *qjl = &pool->tq_keys_qjl[p_offset];
+                float rnorm = pool->tq_keys_rnorm[i * (size_t)pool->n_layer + (size_t)l];
+#  ifdef ENABLE_TURBOQUANT
+                turboquant_dequant_prod(&g_tq, idx, qjl, rnorm, dequant_k);
+#  else
+                rotorquant_dequant_prod(&g_rq, idx, qjl, rnorm, dequant_k);
+#  endif
+            }
+#endif
+            scalar_t dot = 0;
+            for (int d = 0; d < pool->n_embd; d++) {
+#if defined(ENABLE_TURBOQUANT) || defined(ENABLE_ROTORQUANT)
+                scalar_t p_val = dequant_k ? (scalar_t)dequant_k[d] : 0.0f;
+#else
+                scalar_t p_val = pool->keys[p_offset + (size_t)d];
+#endif
+                dot += p_val * query_keys[l][d];
+            }
+#if defined(ENABLE_TURBOQUANT) || defined(ENABLE_ROTORQUANT)
+            if (dequant_k) free(dequant_k);
+#endif
+            /* Per-layer ReLU contribution (V4 eq. 16). */
+            scalar_t s = dot * scale;
+            if (s > 0) score += s;
+        }
+
+        /* Insertion-sort score into the local top-k (descending). */
+        if (score > local_scores[k - 1]) {
+            int j = k - 1;
+            while (j > 0 && local_scores[j - 1] < score) {
+                local_scores[j] = local_scores[j - 1];
+                indices_out[j] = indices_out[j - 1];
+                j--;
+            }
+            local_scores[j] = score;
+            indices_out[j] = (int)i;
+        }
+    }
+
+    if (scores_out) {
+        for (int i = 0; i < k; i++) scores_out[i] = local_scores[i];
+    }
+
+    /* Number of valid entries actually filled. */
+    int n_valid = 0;
+    for (int i = 0; i < k; i++) if (indices_out[i] >= 0) n_valid++;
+    return n_valid;
+}
+
+/* ============================================================
  *  Sliding-Window Recency implementation
  * ============================================================ */
 

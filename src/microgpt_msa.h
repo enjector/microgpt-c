@@ -73,6 +73,59 @@ int msa_pool_chunk(MsaPool *pool, scalar_t **active_keys, scalar_t **active_valu
  */
 int msa_route_top_1(const MsaPool *pool, scalar_t **query_keys);
 
+/* ============================================================
+ *  Lightning Indexer + Top-K (DeepSeek-V4 §2.3.1 port)
+ * ============================================================
+ *
+ * Replaces the single-layer cosine top-1 retrieval of msa_route_top_1
+ * with a multi-layer ReLU-summed scoring function and top-k selection.
+ *
+ * V4's lightning indexer (eqs. 13-17) is:
+ *   I_{t,s} = sum_h w_{t,h} * ReLU(q^I_{t,h} · K^IComp_s / sqrt(d))
+ * where the per-head queries q^I and compressed-keys K^IComp come
+ * from learned low-rank projections (W^DQ, W^IUQ, W^w).
+ *
+ * Our parameter-free port uses the model's own multi-LAYER K vectors
+ * as the "multi-head" projection: layer 0..L-1 each contribute one
+ * ReLU score, with uniform weights. This captures V4's two key
+ * structural innovations without learned parameters:
+ *
+ *   1. ReLU-summed scoring (not raw cosine) — only positive matches
+ *      contribute, so noisy negatively-aligned chunks don't drag the
+ *      score down. Empirically more selective than cosine.
+ *   2. Top-K retrieval (not top-1) — broader historical coverage.
+ *      The benchmark injects top-k chunks at positions 0..k-1 in the
+ *      active cache after each MSA chunking event.
+ *
+ * Why not the learnable form: same reason as CSA pooling. MSA routing
+ * happens outside the training graph, so backprop through the indexer
+ * isn't available without a substantial refactor. Fixed-form lets us
+ * measure whether *the technique* helps before committing to a
+ * learnable implementation. See RESEARCH_DEEPSEEK_V4_LIGHTNING_INDEXER_TOPK.md
+ * for measurements.
+ */
+
+/*
+ * msa_route_top_k — Lightning-indexer-style top-K retrieval.
+ *
+ *   For each chunk i in the pool, compute:
+ *     score[i] = sum_l ReLU(K_q[l] · K_pool[i][l] / sqrt(n_embd))
+ *   then return the top-k indices in descending score order.
+ *
+ * pool         : the MsaPool instance
+ * query_keys   : single token's K vector across all layers (semantic query)
+ * k            : number of top chunks to retain (capped at pool->length)
+ * indices_out  : caller-allocated output array of length >= k.
+ *                indices_out[0] is the highest-scoring chunk; ties broken
+ *                by lower index (stable). Slots beyond returned count
+ *                are filled with -1.
+ * scores_out   : optional (may be NULL); same length as indices_out.
+ *
+ * Returns the number of valid indices written (<= k, == 0 if pool empty).
+ */
+int msa_route_top_k(const MsaPool *pool, scalar_t **query_keys,
+                    int k, int *indices_out, scalar_t *scores_out);
+
 /*
  * msa_expand_context: Loads the semantic essence of a chosen compressed chunk
  * back into a single token position in the active KV cache.
