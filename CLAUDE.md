@@ -1,0 +1,99 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Build
+
+Pure C99, CMake, no required dependencies beyond `libc`/`libm`. Optional Flex/Bison ≥ 3.0 (pre-generated parser sources are committed as a fallback).
+
+```bash
+# Standard build (Release, parallel)
+./bootstrap.sh                              # Linux/macOS
+bootstrap.bat                               # Windows
+# or manually:
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release --parallel 8
+```
+
+Binaries land in `build/` on Linux/macOS, `build/Release/` on Windows. Each demo's training/data files are copied next to its binary by `add_demo()` POST_BUILD steps — **always run demos from `build/`**, not the source tree.
+
+### Build flags (cmake `-D...`)
+
+- `MICROGPT_USE_FLOAT=ON|OFF` — float32 (default) vs double64. Hyperparameters stay double for stability; test tolerances auto-adjust via `SCALAR_TOL`.
+- `MICROGPT_SIMD=ON` (default) — `-march=native` / `/arch:AVX2`.
+- `MICROGPT_BLAS=ON` — Apple Accelerate / OpenBLAS / MKL. Single-threaded only (Accelerate's internal threading conflicts with our pthread training).
+- `MICROGPT_METAL=ON` — Apple Metal GPU. Worth it only for `N_EMBD ≥ 512`; for small models, dispatch overhead exceeds compute.
+- `MICROGPT_PAGED_KV=ON`, `MICROGPT_HEAD_PARALLEL=ON`, `MICROGPT_ATTN_RES=ON`, `QUANTIZATION_INT8=ON`, `ENABLE_TURBOQUANT=ON`, `ENABLE_ROTORQUANT=ON` — opt-in features.
+
+## Tests & benchmarks
+
+```bash
+# From build/:
+./test_microgpt              # core engine
+./test_microgpt_msa          # Memory Sparse Attention
+./test_microgpt_turboquant   # 4-bit KV compression
+./test_microgpt_rotorquant   # rotor quantisation
+./test_microgpt_organelle    # organelle pipeline
+./test_microgpt_vm           # VM compiler/runtime (needs resources/vm/, copied automatically)
+
+# Or run all registered tests via CTest:
+ctest --test-dir build --output-on-failure
+
+# Benchmarks (no asserts, print timings):
+./bench_microgpt  ./bench_microgpt_msa  ./bench_microgpt_turboquant
+./bench_microgpt_rotorquant  ./bench_microgpt_vm  ./bench_ssd
+```
+
+Tests use a homegrown harness (`tests/test.h` plus inline `TEST(name) { ... }` / `RUN(name)` macros in `test_microgpt.c`). To run a single test: build, then comment out unwanted `RUN(...)` calls in `main()` of the relevant test file, or filter by stdout — there is no `--filter` flag.
+
+CI (`.github/workflows/cmake-multi-platform.yml`) builds and runs `test_microgpt` + `bench_microgpt` on Ubuntu (gcc/clang), macOS (clang), Windows (cl).
+
+## Architecture
+
+Three-layer system, all in `src/`:
+
+```
+demos/  — applications (Shakespeare, 11 games, VM codegen, lottery, MSA, TurboQuant)
+   │
+   ├── microgpt_organelle.c/.h  — OPA Kanban pipeline, planner→player→judge,
+   │                              cycle detection, multi-organelle coordination
+   │
+   ├── microgpt_msa.c/.h        — Memory Sparse Attention (LRU-paged latent storage)
+   ├── microgpt_turboquant.c/.h — 4-bit dual-state KV compression
+   ├── microgpt_rotorquant.c/.h — rotor-based KV compression
+   ├── microgpt_vm.c/.h         — bytecode compiler + runtime (Flex/Bison frontend)
+   └── microgpt_metal.{h,m,metal} — optional Apple Metal GPU kernels
+   │
+   └── microgpt.c/.h            — core: forward/backward, attention, Adam,
+                                  KV-cache, tokeniser (char + word level),
+                                  checkpoint I/O, TrainWorker pthread harness
+```
+
+**`microgpt.h` is a single-header API** (~1k lines) — including it gets you the whole core engine. `microgpt.c` is ~3k lines of implementation. Two more headers layer on top: `microgpt_organelle.h` for pipelines, `microgpt_vm.h` for VM scripting.
+
+### Compile-time architecture (critical)
+
+Model dimensions are **`#define` macros**, not runtime config: `N_EMBD`, `N_HEAD`, `N_LAYER`, `BLOCK_SIZE`, `MLP_DIM`, `NUM_STEPS`, `LEARNING_RATE`, `BATCH_SIZE`, `MAX_VOCAB`, `MAX_DOCS`, `MAX_DOC_LEN`, `GRAD_CLIP`, `LABEL_SMOOTH`, `WARMUP_STEPS`. Each demo passes its own values via `add_demo(... DEFINES ...)` in `CMakeLists.txt`, which causes the constants to constant-fold into matmul loops.
+
+Because demos use different macro values, **each unique combination compiles its own `microgpt_lib_<md5>` static library variant** (see `_microgpt_lib_for_defines()` in `CMakeLists.txt:130`). This is why a small change to `microgpt.c` rebuilds many `.o` files — that's expected, not a bug. Never `#define` these in source files; always pass via the `add_demo(... DEFINES ...)` block.
+
+To add a new demo: create `demos/<category>/<name>/main.c`, then register with `add_demo(NAME ... SOURCE ... [THREADS] [METAL] [BLAS] COPY data.txt DEFINES N_EMBD=... ...)` in the root `CMakeLists.txt`. Don't write your own `add_executable` — `add_demo` handles library variant selection, data file copy-out, threading, BLAS, and Metal shader copy.
+
+### Organelle pipeline pattern
+
+The "intelligence" claim is in the *coordination*: each organelle is its own checkpoint of the same ~30K–460K-param transformer, trained on a different role (planner / player / judge). They communicate via flat pipe-separated text strings — the planner's stdout is fed as the player's prompt. `OpaKanban` is the shared working memory (history, blocked moves, stalls). `OpaCycleDetector` breaks A↔B oscillations. The deterministic C scaffolding (~340 lines) does what gradient descent can't, freeing tiny models to be pattern-matchers.
+
+When changing organelle wire formats, update both the producer's output template *and* the consumer's parser — they're symmetric and there is no schema enforcement.
+
+### VM engine
+
+`microgpt_vm.l` (Flex) → `microgpt_vm.y` (Bison ≥ 3.0, uses `%define api.prefix`) → AST → bytecode → 6-pass verifier → stack-based runtime. macOS ships Bison 2.3 which **cannot** parse this grammar; CMake auto-falls back to the committed pre-generated `microgpt_vm_parser.{l,tab}.c`. If you regenerate them, install Bison ≥ 3.0 (`brew install bison && export PATH=/opt/homebrew/opt/bison/bin:$PATH`).
+
+## Code style
+
+- **C99 only** in core engine. C11/C23 features are not allowed in `microgpt.{h,c}`.
+- **Zero deps** in core. Platform accelerators (Metal, BLAS, etc.) live behind `#ifdef` guards and are gated by CMake options.
+- Use `scalar_t` for weights/activations — never hardcode `float` or `double`. Constants use `(scalar_t)0.5f` style.
+- BLAS is dispatched through `CBLAS_GEMV`/`CBLAS_GER` macros that pick `s` vs `d` based on `scalar_t`.
+- Optimizer state (Adam β1/β2/ε, LR) stays `double` regardless of `scalar_t`.
+- Hot paths avoid `malloc` — prefer stack scratch buffers; the VM uses an arena pattern.

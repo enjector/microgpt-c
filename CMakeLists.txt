@@ -241,6 +241,64 @@ add_demo(
 )
 
 # ==================================================================
+#  Attention Sink A/B benchmark (DeepSeek-V4 §2.3.3 port evaluation)
+#  Two binaries with identical seeds & data; only ATTN_SINK differs.
+#  See docs/research/RESEARCH_DEEPSEEK_V4_PORTING_ATTENTION_SINK.md
+# ==================================================================
+
+add_demo(
+  NAME    bench_attn_sink_baseline
+  SOURCE  tests/bench_microgpt_attn_sink.c
+  COPY    demos/character-level/names/c_names.txt
+  DEFINES BENCH_NUM_STEPS=600 BENCH_BATCH_SIZE=8
+)
+
+add_demo(
+  NAME    bench_attn_sink_on
+  SOURCE  tests/bench_microgpt_attn_sink.c
+  COPY    demos/character-level/names/c_names.txt
+  DEFINES BENCH_NUM_STEPS=600 BENCH_BATCH_SIZE=8
+          MICROGPT_ATTN_SINK=1 ATTN_SINK_LOGIT=-1.0
+)
+
+# Deeper config: 4 layers, BLOCK_SIZE=64 — long-context probe exercises sink.
+add_demo(
+  NAME    bench_attn_sink_deep_baseline
+  SOURCE  tests/bench_microgpt_attn_sink.c
+  COPY    demos/character-level/names/c_names.txt
+  DEFINES N_EMBD=64 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=64 MLP_DIM=128
+          BENCH_NUM_STEPS=1500 BENCH_BATCH_SIZE=16 BENCH_PROBE_LEN=64
+)
+
+add_demo(
+  NAME    bench_attn_sink_deep_on
+  SOURCE  tests/bench_microgpt_attn_sink.c
+  COPY    demos/character-level/names/c_names.txt
+  DEFINES N_EMBD=64 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=64 MLP_DIM=128
+          BENCH_NUM_STEPS=1500 BENCH_BATCH_SIZE=16 BENCH_PROBE_LEN=64
+          MICROGPT_ATTN_SINK=1 ATTN_SINK_LOGIT=-1.0
+)
+
+# Sink-magnitude sensitivity sweep on the deeper config.
+add_demo(
+  NAME    bench_attn_sink_deep_on_strong
+  SOURCE  tests/bench_microgpt_attn_sink.c
+  COPY    demos/character-level/names/c_names.txt
+  DEFINES N_EMBD=64 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=64 MLP_DIM=128
+          BENCH_NUM_STEPS=1500 BENCH_BATCH_SIZE=16 BENCH_PROBE_LEN=64
+          MICROGPT_ATTN_SINK=1 ATTN_SINK_LOGIT=0.0
+)
+
+add_demo(
+  NAME    bench_attn_sink_deep_on_weak
+  SOURCE  tests/bench_microgpt_attn_sink.c
+  COPY    demos/character-level/names/c_names.txt
+  DEFINES N_EMBD=64 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=64 MLP_DIM=128
+          BENCH_NUM_STEPS=1500 BENCH_BATCH_SIZE=16 BENCH_PROBE_LEN=64
+          MICROGPT_ATTN_SINK=1 ATTN_SINK_LOGIT=-3.0
+)
+
+# ==================================================================
 #  Foundation: Character-level Shakespeare generation
 # ==================================================================
 

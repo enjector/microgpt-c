@@ -350,6 +350,30 @@ typedef struct {
 #define ATTN_RES_MAX_BLOCKS ((N_LAYER) / (ATTN_RES_BLOCK_SIZE) + 2)
 #endif
 
+/* ---- Attention Sink (opt-in: -DMICROGPT_ATTN_SINK) ----
+ *
+ * Adds exp(ATTN_SINK_LOGIT) to the softmax denominator in every head, giving
+ * each query the option to attend to "nothing" rather than being forced to
+ * spread probability mass across irrelevant positions. From DeepSeek-V4
+ * (eq. 27) and StreamingLLM (Xiao et al., 2024).
+ *
+ *   s_{h,i,j} = exp(z_{h,i,j}) / (sum_k exp(z_{h,i,k}) + exp(ATTN_SINK_LOGIT))
+ *
+ * ATTN_SINK_LOGIT sets the magnitude of the sink. Negative values (e.g.,
+ * -1.0) make the sink absorb a small fraction of mass; 0.0 makes it
+ * compete with real positions; positive values dominate.
+ *
+ * This implementation uses a fixed (non-learnable) per-model sink logit, so
+ * gradient and optimiser code is unchanged: the saved attention weights
+ * already include the sink contribution and standard softmax-backward math
+ * still holds (see RESEARCH_DEEPSEEK_V4_PORTING_ATTENTION_SINK.md §3.2).
+ */
+#ifdef MICROGPT_ATTN_SINK
+#ifndef ATTN_SINK_LOGIT
+#define ATTN_SINK_LOGIT (-1.0) /* sink magnitude; <0 = absorb a small fraction */
+#endif
+#endif
+
 /*
  * microgpt_default_config - Return a config populated with sensible defaults.
  *   These match the compile-time constants above.
@@ -454,6 +478,11 @@ static inline void microgpt_print_config(const char *demo_name,
   printf("    AttnRes      = ON (block=%d)\n", ATTN_RES_BLOCK_SIZE);
 #else
   printf("    AttnRes      = OFF\n");
+#endif
+#ifdef MICROGPT_ATTN_SINK
+  printf("    AttnSink     = ON (logit=%.3f)\n", (double)ATTN_SINK_LOGIT);
+#else
+  printf("    AttnSink     = OFF\n");
 #endif
   printf("\n");
   printf(

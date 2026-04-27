@@ -1779,11 +1779,20 @@ static void *attn_head_fwd_worker(void *arg) {
   for (size_t t = 1; t < a->T; t++)
     if (a->attn_weights[hw + t] > max_s)
       max_s = a->attn_weights[hw + t];
+#ifdef MICROGPT_ATTN_SINK
+  if ((scalar_t)ATTN_SINK_LOGIT > max_s) max_s = (scalar_t)ATTN_SINK_LOGIT;
+#endif
   scalar_t sum = 0;
   for (size_t t = 0; t < a->T; t++) {
     a->attn_weights[hw + t] = M_EXP(a->attn_weights[hw + t] - max_s);
     sum += a->attn_weights[hw + t];
   }
+#ifdef MICROGPT_ATTN_SINK
+  /* Sink: absorbs probability mass without contributing to value sum.
+   * exp(sink - max) is added to the denominator only — never written into
+   * attn_weights — so backward (which sums sv_attn_w * d_attn) is unchanged. */
+  sum += M_EXP((scalar_t)ATTN_SINK_LOGIT - max_s);
+#endif
   for (size_t t = 0; t < a->T; t++)
     a->attn_weights[hw + t] /= sum;
   /* Step 3: Weighted sum of values */
@@ -2140,11 +2149,17 @@ scalar_t forward_backward_one(const Model *model, size_t token_id,
       for (size_t t = 1; t < T; t++)
         if (attn_weights[hw + t] > max_s)
           max_s = attn_weights[hw + t];
+#ifdef MICROGPT_ATTN_SINK
+      if ((scalar_t)ATTN_SINK_LOGIT > max_s) max_s = (scalar_t)ATTN_SINK_LOGIT;
+#endif
       scalar_t sum = 0;
       for (size_t t = 0; t < T; t++) {
         attn_weights[hw + t] = M_EXP(attn_weights[hw + t] - max_s);
         sum += attn_weights[hw + t];
       }
+#ifdef MICROGPT_ATTN_SINK
+      sum += M_EXP((scalar_t)ATTN_SINK_LOGIT - max_s);
+#endif
       for (size_t t = 0; t < T; t++)
         attn_weights[hw + t] /= sum;
       /* Step 3: Weighted sum of value vectors → attention output */
@@ -2630,11 +2645,17 @@ void forward_inference(const Model *model, size_t token_id, size_t pos_id,
       for (size_t t = 1; t < T; t++)
         if (attn_weights[hw + t] > max_s)
           max_s = attn_weights[hw + t];
+#ifdef MICROGPT_ATTN_SINK
+      if ((scalar_t)ATTN_SINK_LOGIT > max_s) max_s = (scalar_t)ATTN_SINK_LOGIT;
+#endif
       scalar_t sum = 0;
       for (size_t t = 0; t < T; t++) {
         attn_weights[hw + t] = M_EXP(attn_weights[hw + t] - max_s);
         sum += attn_weights[hw + t];
       }
+#ifdef MICROGPT_ATTN_SINK
+      sum += M_EXP((scalar_t)ATTN_SINK_LOGIT - max_s);
+#endif
       for (size_t t = 0; t < T; t++)
         attn_weights[hw + t] /= sum;
       for (size_t d = 0; d < hd; d++) {
