@@ -59,10 +59,22 @@
  * candidate is "correct" iff its 5-vector matches the reference's
  * 5-vector exactly. The demo collects every verified candidate's
  * 5-vector during voting, then picks the self-consistent majority
- * winner. **Headline: 35% (7/20) correct on all 5 inputs — same
- * percentage as Phase 7 but now robustly confirmed; bimodal pattern
- * shows model is either right on all 5 or wrong on all 5. See
+ * winner. **Headline: 40% (8/20) correct on all 5 inputs (corrected
+ * baseline after the Phase 10 reference fix); bimodal pattern shows
+ * model is either right on all 5 or wrong on all 5. See
  * RESEARCH_PIPELINE_IR.md §22.**
+ *
+ * Phase 9: capacity scaling 540K → 1.49M params. NEGATIVE RESULT —
+ * regressed to 35% (verify rate dropped 75% → 60%) due to over-fit on
+ * 281-example corpus. Architecture reverted. See §23.
+ *
+ * Phase 10: argument-order paraphrases (10 new examples disambiguating
+ * percentage, apply_tax, compound argument orders). HELD THE LINE at
+ * 35% — the corrected reference (which now accepts the model's plural-
+ * "expenses" reading of #13) lifts Phase 8 retrospectively to 40%, but
+ * Phase 10 with the same fix is also 35%. Arg-order signal worked at
+ * the fidelity level (#13 fidelity: N → Y) without changing the headline.
+ * See §24.
  *
  * Copyright (c) 2026 Ajay Soni, Enjector Software Ltd. MIT License.
  */

@@ -1823,6 +1823,11 @@ add_demo(
   NAME    wiring_organelle_demo
   SOURCE  demos/wiring_organelle/main.c
   THREADS
+  # Phase 9 attempted 1.49M params (128-emb / 6-layer / 8000 steps) and
+  # regressed: 35% → 30% correct due to overfitting on 272 examples.
+  # Phase 10 reverts to the 540K sweet spot (Phase 8 config) and adds
+  # argument-order paraphrases to the corpus instead. See §23 of
+  # RESEARCH_PIPELINE_IR.md.
   DEFINES N_EMBD=96 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=384 MLP_DIM=384
           NUM_STEPS=5000 LEARNING_RATE=0.001 BATCH_SIZE=16
           MAX_VOCAB=1200 MAX_DOCS=5000 MAX_DOC_LEN=4096

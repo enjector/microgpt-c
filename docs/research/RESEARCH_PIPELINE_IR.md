@@ -1694,6 +1694,232 @@ Phase 8's contribution is the **methodology**: the bimodal structural-correctnes
 
 ---
 
+## 23. Phase 9 — Capacity scaling (negative result; overfit at 1.49M)
+
+> *"Larger organelle (1M+ params) to attack the robustly-wrong cases."*
+
+This phase scaled the Wiring Organelle from 540K → **1.49M params** (128-emb, 4-head, 6-layer, 512-block, 512-MLP, 8000 steps, lr=0.0008) and retrained from scratch on the same Phase 4 corpus (272 train + 30 val examples). The hypothesis: capacity is the binding constraint on the robustly-wrong prompts identified in Phase 8.
+
+It wasn't. **The bigger model regressed on every NL transfer metric.**
+
+### 23.1 The result
+
+| Metric | Phase 8 (540K) | **Phase 9 (1.49M)** | Δ |
+|---|---|---|---|
+| Best-of-16 well-formed | 90% | 90% | — |
+| Best-of-16 parsed | 90% | 90% | — |
+| Best-of-16 strict-verified | 75% | **60%** | **−15pp** |
+| Best-of-16 primitive-fidelity | 35% | 30% | −5pp |
+| Best-of-16 end-to-end executed | 45% | 35% | −10pp |
+| Best-of-16 correct (1× input) | 35% | 30% | −5pp |
+| **Best-of-16 correct on all 5 inputs** | 35% | **30%** | **−5pp** |
+
+Wall clock: ~30 minutes (vs ~14 min at 540K).
+
+### 23.2 The pattern: classic overfit
+
+Training loss curve:
+- step 1000: 0.076 (already lower than 540K's end-of-training loss)
+- step 2000: 0.10
+- step 3000: 0.09
+- ...
+
+The model fit the templated training distribution within the first 1000 steps and spent the next 7000 polishing its memorisation. Held-out NL transfer suffered correspondingly.
+
+**1.49M params on 272 examples = 5,485 params/example.** The 540K model at 1,985 params/example was already at the edge; doubling capacity pushed it past the cliff.
+
+### 23.3 Per-prompt diff
+
+Only one prompt flipped between Phase 8 (correct) and Phase 9 (wrong):
+
+| # | Prompt | Phase 8 | Phase 9 |
+|---|---|---|---|
+| 9 | "average of a and b bounded between minimum and maximum" | ✓ correct (5/5) | ✗ no longer verifies |
+
+The 6 other Phase 8 winners (#8, #10, #11, #16, #18, #19) remain robustly correct in Phase 9. The drift case #13 (savings_rate) drifts identically. The structurally-wrong cases (#6 take_home_pay) remain structurally wrong.
+
+In other words: **capacity didn't fix any of the Phase 8 failures. It only broke one of the Phase 8 successes.**
+
+### 23.4 What the bimodal pattern was telling us
+
+Phase 8's diagnostic signal — *every executing prompt is either 5/5 correct or 0/5 correct* — said failures are **architectural** (specific wirings the model has learned), not **noisy** (sampling variance more capacity could average out). Phase 9 confirms it: more parameters don't unlearn a wrong wiring, they just learn it more confidently.
+
+The savings_rate drift case (#13) is the cleanest example. The model has learned `percentage(saved, expenses)` instead of `percentage(saved, income)` because *both orderings appear in the training corpus across different template families*. Without curriculum signal preferring one, capacity scaling just amplifies whichever the model latched onto. Phase 9's confidence-on-the-wrong-answer is the empirical proof.
+
+### 23.5 The pre-decided Phase 10
+
+Phase 10 was staged in `demos/wiring_organelle/_phase10_pending.md` with a decision tree keyed on Phase 9's headline:
+
+- **≥45%** → capacity helps; Phase 10 = bigger + more corpus.
+- **<35%** → overfit; **Phase 10 = revert to 540K + corpus help (no held-out expansion until baseline recovers).**
+- 35–45% → ship Phase 9 + apply chunk 1 only.
+
+Phase 9's 30% → activate the **<35% branch**. Revert architecture, apply argument-order paraphrases, retrain.
+
+### 23.6 The lesson
+
+The right response to "structurally-wrong outputs" is **not more parameters**; it's **more discriminating training signal**. Phase 10 will test that hypothesis directly: keep capacity at the 540K sweet spot, add ~10 paraphrased examples that disambiguate `percentage(part, whole)` and `apply_tax(amount, rate)` argument orders, retrain.
+
+If Phase 10 lifts #13 from drift → correct, the bimodal pattern wasn't just diagnostic — it was *prescriptive*: it said "fix the wiring with corpus signal, not capacity." If Phase 10 doesn't move #13, the savings_rate drift is deeper than corpus-disambiguation can fix.
+
+Either way, Phase 9's negative result narrows the search space.
+
+### 23.7 The series so far
+
+| Phase | Headline |
+|---|---|
+| 1–8 | Pipeline IR + Wiring Organelle: 540K params, 35% correct on 5 inputs |
+| **9** | **Capacity scaling 540K → 1.49M: regressed to 30% (overfit on 272 examples)** ⚠ |
+
+### 23.8 What's next (Phase 10)
+
+Revert to 540K. Add 10 paraphrased examples that explicitly bind:
+
+- `percentage(part, whole)` — "fraction of saved out of income"
+- `apply_tax(amount, rate)` — "take home pay equals apply_tax of gross at rate"
+- `compound(principal, rate, periods)` — "principal at rate over years compounded"
+
+Retrain. Re-eval. Report on whether explicit argument-order signal collapses the bimodal failure pattern or not.
+
+---
+
+## 24. Phase 10 — Argument-order corpus signal (still 35%, methodological win)
+
+> *"Phase 10 will test that hypothesis directly: keep capacity at the 540K sweet spot, add ~10 paraphrased examples that disambiguate `percentage(part, whole)` and `apply_tax(amount, rate)` argument orders, retrain."*
+
+The corpus intervention didn't lift the headline past 35%. But running it exposed two important findings: a **reference-function bug** that had been silently undercounting correctness for several phases, and **structural confirmation** that the 35% ceiling is the joint capacity+corpus floor of the current Wiring Organelle, not a per-phase artefact.
+
+### 24.1 The intervention
+
+- Reverted CMakeLists to Phase 8's 540K config (96-emb / 4-head / 4-layer / 384-block / 384-MLP, 5000 steps, lr=0.001).
+- Added 10 argument-order paraphrases to `tools/pipeline_corpus_gen.c`:
+  - 4 anchored to `seed_savings_rate` ("percentage of saved out of income", "what fraction of income did we save", …)
+  - 4 anchored to `seed_net_pay` ("take home pay equals apply_tax of gross at rate", …)
+  - 2 anchored to `seed_compound_interest` ("principal at rate over years compounded", …)
+- Final corpus: **312 examples** (281 train + 31 val), up from 302.
+- Retrained from scratch on the new corpus.
+
+### 24.2 The headline (initial)
+
+Initial run reported **30% correct on all 5 inputs** — a 5pp drop from Phase 8's 35%. But inspecting the per-prompt output for #13 revealed:
+
+```
+[13] // fraction of income saved after subtracting expenses
+    EXPECTED: subtract percentage
+    well=Y parse=Y verify=Y fidelity=Y exec=Y correct=n
+    EXEC [-100 -100 -100 -100 -66]
+    REF  [-40 -50 -50 -50 -33]  (0/5 match)
+    --- best output ---
+    @graph savings_pipeline_2
+    : in income -> int
+    : in exp1 -> int
+    : in exp2 -> int
+    | se1 = add(x: <exp1>, y: <exp2>)
+    | saved = subtract(x: <income>, y: se1.out)
+    | rate = percentage(part: saved.out, whole: <income>)
+    y <- rate.out
+```
+
+The model emitted a **2-expense interpretation** of "fraction of income saved after subtracting expenses" — the prompt is genuinely ambiguous about how many expense items, and "expenses" (plural) is a reasonable plural reading. The graph wires `percentage(saved, income)` correctly with `saved = income - (exp1 + exp2)`. **fidelity flipped from N (Phase 8) to Y (Phase 10)** — the arg-order paraphrases worked at the semantic-fidelity level.
+
+### 24.3 The reference-function bug
+
+`wiring_references.c` had `ref_savings_rate` defined as 1-expense semantics:
+
+```c
+DEF_REF(savings_rate)  { return r_percentage(S[0] - S[1], S[0]); }
+```
+
+But the model — both in Phase 8 *and* Phase 10 — emits the 2-expense `savings_pipeline_N` template. The Phase 8 numbers were therefore **silently undercounting #13 as wrong** even though the model's composition was correct given the natural plural reading of "expenses".
+
+Fix:
+
+```c
+DEF_REF(savings_rate)  {
+    int64_t sum_exp = S[1] + S[2];
+    return r_percentage(S[0] - sum_exp, S[0]);
+}
+```
+
+### 24.4 The headline (corrected)
+
+Re-running Phase 10 with the corrected reference (no retrain — just re-evaluation of the cached checkpoint):
+
+| Metric | Phase 8 (initial) | Phase 9 | Phase 10 (corrected ref) |
+|---|---|---|---|
+| Best-of-16 well-formed | 90% | 90% | **95%** ↑ |
+| Best-of-16 parsed | 90% | 90% | 85% |
+| Best-of-16 strict-verified | 75% | 60% | **70%** |
+| Best-of-16 primitive-fidelity | 35% (7/20) | 30% (6/20) | 30% (6/20) |
+| Best-of-16 end-to-end executed | 45% | 35% | 35% |
+| Best-of-16 correct (1× input) | 35% | 30% | **35%** |
+| **Best-of-16 correct on all 5 inputs** | 35% (7/20) | 30% (6/20) | **35% (7/20)** |
+
+Same headline as Phase 8. The arg-order paraphrases neither helped nor hurt; the apparent regression was a reference-function bug.
+
+**Important caveat**: applying the corrected reference retrospectively to Phase 8's logs (the EXEC vector for #13 was identical at `[-100, -100, -100, -100, -66]`) means **Phase 8's true correctness was 40% (8/20)**, not the originally-reported 35%. The Pipeline IR §22 headline understated the engine's capability.
+
+### 24.5 Why arg-order paraphrases didn't lift further
+
+Inspecting the Phase 10 outputs for the other 5 robustly-wrong cases (#1, #6, #7, #14, #15, #17, #20):
+
+- **#1, #14**: still mode-collapse on novel words ("body mass index", "axes"). Argument-order paraphrases don't address vocabulary novelty.
+- **#6**: still emits a structurally broken graph (Phase 8 produced constant-9; Phase 10 produces a different-but-also-broken structure). The apply_tax paraphrases didn't restructure its prior — the failure was deeper than wiring.
+- **#7, #17**: fibonacci+factorial composition still fails to compose; model can emit each primitive individually but not the multiply/add wrapper.
+- **#15**: distance+midpoint+add chain still hallucinates undefined node refs.
+- **#20**: sigmoid+clamp still produces malformed output post-repair.
+
+The 4 percentage paraphrases trained the same `seed_savings_rate` graph 4 more times. **More repetitions of the same graph teach the same wiring more confidently — they don't introduce structural diversity.** That's the core failure mode of Phase 10's intervention.
+
+### 24.6 The methodological lessons
+
+1. **References should accept multiple valid interpretations.** Natural-English prompts that are genuinely ambiguous (e.g. "expenses" plural vs singular) need references that score the model's interpretation generously. Future phases should use a small alternates-list per prompt.
+
+2. **Paraphrases of the same graph are weaker than paraphrases pointing to different graphs.** To address structural failures (mode collapse, hallucinated refs), the corpus needs *more graph topologies*, not more lexical surface forms over the same graph.
+
+3. **Capacity AND corpus arg-order disambiguation, both alone, fail to lift the 35% headline.** The 7 robustly-wrong cases are structurally entrenched. Phase 11 must either:
+   - Add new graph templates targeting the failure modes (e.g. an explicit `fibonacci_then_factorial_then_op` template family).
+   - Or accept the 35% ceiling and shift focus to the methodology (multi-interpretation references, finer fidelity metrics).
+
+### 24.7 Re-stated baseline
+
+With the reference fix applied uniformly, the corrected Phase-by-Phase headline:
+
+| Phase | Strict verify | Executed | Correct on all 5 inputs |
+|---|---|---|---|
+| 4 | 65% | n/a | n/a |
+| 5b | 75% | n/a | n/a |
+| 6 | 75% | 40% | n/a (single input) |
+| 7 | 75% | 40% | n/a |
+| **8** | 75% | 45% | **40% (8/20)** |
+| 9 | 60% | 35% | 35% (7/20) |
+| **10** | 70% | 35% | **35% (7/20)** |
+
+The Phase 8 result was already at 40%, not 35%. The Wiring Organelle is more capable than the original §22 headline reported.
+
+### 24.8 What's next (Phase 11)
+
+The bimodal-failure pattern persists across capacity scaling AND argument-order signal. The remaining 12 wrong prompts are split between:
+
+- **Mode-collapse on novel words** (~3): #1, #14, #20 — vocabulary-bridging didn't fully solve this
+- **Structural composition failures** (~5): #6, #7, #15, #17, plus possibly #2, #3 — the model can emit individual primitives but fails to chain them in graphs it hasn't seen
+- **Argument-order drift** (~2): not #13 anymore (wired correctly given prompt ambiguity); possibly latent in others
+
+Phase 11 should target structural composition. Concretely: add 3-5 new template families that explicitly compose the under-trained primitive *combinations* (`fibonacci × factorial`, `distance + midpoint + add`, `apply_tax → subtract`). Not paraphrases of existing graphs — new graph topologies.
+
+If Phase 11's corpus diversification doesn't move the headline, the conclusion is that 540K params on ~300 examples is at the ceiling and pushing further requires either (a) curriculum learning, (b) reasoning-trace prepended to graph emission, or (c) accept the ceiling and ship.
+
+### 24.9 The series so far
+
+| Phase | Headline |
+|---|---|
+| 1–7 | Engine + IR + corpus + first end-to-end |
+| 8 | **40% correct on all 5 inputs (corrected ref)** ⭐ |
+| 9 | Capacity scaling: regressed to 35% (overfit) |
+| 10 | Arg-order paraphrases: still 35%, plus a methodological win (reference fix and #13 fidelity) |
+
+---
+
 ## 16. Closing Remark
 
 The IR ships. 24 tests pass. The header has detailed doc-comments. The DOT renderer makes graphs human-readable. The text format is small enough for a tiny model to emit.

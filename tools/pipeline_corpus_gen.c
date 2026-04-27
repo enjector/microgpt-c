@@ -1777,6 +1777,37 @@ static CorpusEntry *build_catalog(int *out_count) {
     ADD3("// percentage of income remaining after deducting expenses",
          w_savings_pipeline, (void *)(intptr_t)3, NULL, NULL);
 
+    /* Phase 10: argument-order disambiguation. Each pair of paraphrases
+     * locks one drift-prone primitive into ONE specific arg-order
+     * interpretation by naming the args' roles in the prompt. Targets
+     * the savings_rate (#13) and take_home_pay (#6) drift cases. */
+
+    /* percentage(part, whole) — first arg is the numerator. */
+    ADD3("// percentage of saved out of income",
+         w_seed, (void *)(SeedFn)seed_savings_rate, NULL, NULL);
+    ADD3("// what fraction of income did we save",
+         w_seed, (void *)(SeedFn)seed_savings_rate, NULL, NULL);
+    ADD3("// saved as a percentage of total income",
+         w_seed, (void *)(SeedFn)seed_savings_rate, NULL, NULL);
+    ADD3("// take saved divided by income times one hundred",
+         w_seed, (void *)(SeedFn)seed_savings_rate, NULL, NULL);
+
+    /* apply_tax(amount, rate) — first arg is the gross amount. */
+    ADD3("// take home pay equals apply_tax of gross at rate",
+         w_seed, (void *)(SeedFn)seed_net_pay, NULL, NULL);
+    ADD3("// net pay from gross income at federal rate",
+         w_seed, (void *)(SeedFn)seed_net_pay, NULL, NULL);
+    ADD3("// pay after federal tax",
+         w_seed, (void *)(SeedFn)seed_net_pay, NULL, NULL);
+    ADD3("// post tax net of gross at rate",
+         w_seed, (void *)(SeedFn)seed_net_pay, NULL, NULL);
+
+    /* compound(principal, rate, periods) — order locked by paraphrase. */
+    ADD3("// principal at rate over years compounded then minus original",
+         w_seed, (void *)(SeedFn)seed_compound_interest, NULL, NULL);
+    ADD3("// compound principal by rate for years yields total return",
+         w_seed, (void *)(SeedFn)seed_compound_interest, NULL, NULL);
+
 #undef ADD3
     *out_count = n;
     return cat;
