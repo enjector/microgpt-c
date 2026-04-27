@@ -1358,6 +1358,42 @@ add_demo(
 )
 target_include_directories(msa_infinite_shakespeare PRIVATE src)
 
+# Same demo with the V4 active-attention stack (RoPE + sink + Q/K RMSNorm)
+# and the rope-aware MSA pool/expand wrappers. Fresh training (5000 steps)
+# since the legacy checkpoint isn't compatible with the rope-rotated
+# attention path. Separate checkpoint filename so it doesn't collide.
+# See docs/research/RESEARCH_DEEPSEEK_V4_PARTIAL_ROPE.md and
+# RESEARCH_DEEPSEEK_V4_MSA_POOL_ROPE_REROTATE.md.
+add_demo(
+  NAME    msa_infinite_shakespeare_v4
+  SOURCE  demos/msa/infinite_shakespeare/main.c
+  THREADS
+  COPY    demos/msa/infinite_shakespeare/w_shakespeare.txt
+  DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=1 BLOCK_SIZE=64 MLP_DIM=192
+          NUM_STEPS=5000 LEARNING_RATE=0.001 BATCH_SIZE=8
+          MAX_VOCAB=5000 MAX_DOCS=200000 MAX_DOC_LEN=512
+          MICROGPT_PARTIAL_ROPE=1
+          MICROGPT_ATTN_SINK=1 ATTN_SINK_LOGIT=-1.0
+          MICROGPT_QK_NORM=1
+          CHECKPOINT_FILE="w_shakespeare_v4.ckpt"
+)
+target_include_directories(msa_infinite_shakespeare_v4 PRIVATE src)
+
+# Apples-to-apples baseline: same arch and step count as the V4 variant,
+# but with all V4 flags off. Distinct checkpoint name so it can be built
+# and run alongside the v4 variant for direct comparison.
+add_demo(
+  NAME    msa_infinite_shakespeare_v4_baseline
+  SOURCE  demos/msa/infinite_shakespeare/main.c
+  THREADS
+  COPY    demos/msa/infinite_shakespeare/w_shakespeare.txt
+  DEFINES N_EMBD=48 N_HEAD=4 N_LAYER=1 BLOCK_SIZE=64 MLP_DIM=192
+          NUM_STEPS=5000 LEARNING_RATE=0.001 BATCH_SIZE=8
+          MAX_VOCAB=5000 MAX_DOCS=200000 MAX_DOC_LEN=512
+          CHECKPOINT_FILE="w_shakespeare_v4baseline.ckpt"
+)
+target_include_directories(msa_infinite_shakespeare_v4_baseline PRIVATE src)
+
 # ==================================================================
 #  Organelle: Red Donkey (Huarong Dao) multi-organelle pipeline
 # ==================================================================

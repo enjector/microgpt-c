@@ -28,7 +28,9 @@
 #define SHAKES_SAMPLES 3
 #define SHAKES_TEMP 0.7
 #define GEN_LEN 500 /* 500 words using infinite MSA memory! */
+#ifndef CHECKPOINT_FILE
 #define CHECKPOINT_FILE "w_shakespeare.ckpt"
+#endif
 #define TRAINING_LOG "w_shakespeare.ckpt.log"
 
 /* Max threads (actual count is auto-detected at runtime) */
@@ -98,7 +100,7 @@ int main(void) {
   cfg.n_layer = 1;
   cfg.block_size = 64;
   cfg.batch_size = 16;
-  cfg.num_steps = 0;
+  cfg.num_steps = NUM_STEPS;     /* honour CMake-passed NUM_STEPS */
   cfg.learning_rate = 0.001;
   cfg.max_vocab = 5000;
   cfg.max_docs = 200000;
@@ -466,7 +468,7 @@ int main(void) {
     /* Generate words using MSA to prevent context exhaustion */
     int gen_len = GEN_LEN;
     int gen_count = 0;
-    
+
     MsaPool *inf_pool = msa_pool_create(10000, nl, cfg.n_embd);
 
     /* Feed BOS then seed word */
@@ -476,14 +478,29 @@ int main(void) {
                       logits_buf);
     size_t pos = 2;
 
+    /* abs_pos_at_slot0 = absolute pos_id of the K vector currently sitting
+     * at active-cache slot 0. Used by the rope-aware MSA wrappers under
+     * MICROGPT_PARTIAL_ROPE to un-rotate pool entries to position-zero
+     * space and re-rotate them at injection time. Bumps by chunk_size at
+     * each chunking event. */
+    size_t abs_pos_at_slot0 = 0;
+
     for (int g = 0; g < gen_len; g++) {
       /* [MSA INFINITE CONTEXT EXTENSION] */
       if (pos >= (size_t)cfg.block_size) {
         size_t chunk_size = cfg.block_size / 2;
-        
-        /* 1. Pool the oldest half of our active context into O(1) latent memory */
+
+        /* 1. Pool the oldest half of our active context into O(1) latent memory.
+         *    Under RoPE, msa_pool_chunk_rope un-rotates each token's K back to
+         *    position 0 before averaging, so the pooled summary has no stale
+         *    rotation imprint. */
+#ifdef MICROGPT_PARTIAL_ROPE
+        msa_pool_chunk_rope(inf_pool, inf_keys, inf_values, chunk_size,
+                            abs_pos_at_slot0, cfg.n_head);
+#else
         msa_pool_chunk(inf_pool, inf_keys, inf_values, chunk_size);
-        
+#endif
+
         /* 2. Shift active window down, wiping out the chunked memory */
         for (int L = 0; L < nl; L++) {
             memmove(inf_keys[L], inf_keys[L] + (chunk_size * cfg.n_embd), (cfg.block_size - chunk_size) * cfg.n_embd * sizeof(scalar_t));
@@ -491,21 +508,29 @@ int main(void) {
             inf_cache_len[L] -= chunk_size;
         }
         pos -= chunk_size;
-        
+        abs_pos_at_slot0 += chunk_size;
+
         /* 3. Query the entire multi-year latency history for relevance using Cosine */
         scalar_t **query_keys = (scalar_t **)malloc((size_t)nl * sizeof(scalar_t *));
         for (int L = 0; L < nl; L++) {
             query_keys[L] = (scalar_t *)malloc(cfg.n_embd * sizeof(scalar_t));
             /* Formulate query based on latest token state */
-            memcpy(query_keys[L], inf_keys[L] + ((pos-1) * cfg.n_embd), cfg.n_embd * sizeof(scalar_t)); 
+            memcpy(query_keys[L], inf_keys[L] + ((pos-1) * cfg.n_embd), cfg.n_embd * sizeof(scalar_t));
         }
-        
+
         int best_chunk = msa_route_top_1(inf_pool, query_keys);
         if (best_chunk >= 0) {
-            /* 4. Teleport the most relevant historical chunk into the pos=0 embedding */
+            /* 4. Teleport the most relevant historical chunk into the pos=0 embedding.
+             *    Under RoPE, msa_expand_context_rope re-rotates the pooled summary by
+             *    R(pos=0), giving it the rotation angle the model expects at slot 0. */
+#ifdef MICROGPT_PARTIAL_ROPE
+            msa_expand_context_rope(inf_pool, best_chunk, inf_keys, inf_values,
+                                    0, cfg.n_head);
+#else
             msa_expand_context(inf_pool, best_chunk, inf_keys, inf_values, 0);
+#endif
         }
-        
+
         for (int L = 0; L < nl; L++) free(query_keys[L]);
         free(query_keys);
       }
