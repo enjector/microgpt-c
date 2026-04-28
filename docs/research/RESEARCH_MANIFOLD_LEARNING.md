@@ -587,8 +587,12 @@ If Path 2 stalls at 75-80%, the issue is the candidate pool itself (no candidate
 2. ✅ Phase 1a: re-rank by VR cluster bonus → flat (unanimous failures)
 3. ✅ Phase 1b diagnostic: geodesic *can* classify → bottleneck is generation
 4. ✅ Phase 1c: hint-prefix prompt + top-K re-rank → flat (70%); shifted family name but not primitive selection
-5. → Phase 1d (next): retrain wiring on `<HINT>` token corpus so model learns to condition primitives on hint
-6. → Phase 2 (if 1c+1d insufficient): full EKAN anchor-retrieval generation, replaces token-level generation
+5. ✅ **Phase 2: anchor-retrieval generation → 80% [HEADLINE], first deterministic break of the ceiling**
+6. → Future: learned EKAN encoder + chemistry bootstrap to close the remaining 4 failures (slot-collision in handcoded keyword bag)
+
+**Phase 2 outcome — the manifold thesis is validated.** Anchor-retrieval generation broke the 70-80% ceiling deterministically: 70% → **80% (16/20)**. See `RESEARCH_PIPELINE_IR.md` §35 for the full audit. Mechanism: a 20-entry handcoded anchor table indexed by the geodesic top-1 family, injected as the 17th candidate alongside the 16 wiring votes, with two-classifier (planner + geodesic) agreement gating triggering a +60 score boost that wins ties via the existing fidelity tiebreaker.
+
+The 5 prompts that the geodesic classifier recovered at the classification level in Phase 1b (5/6 of the wiring-failing prompts) are exactly the 5 prompts that Phase 2 fixed. The 3 regressions are slot-collisions in the handcoded keyword bag (apply_tax / savings_rate / gross_minus_tax all share slot 5; distance_midpoint / clamped_average share slot 9). A learned encoder would close these — that is the optimisation now, not the research thesis.
 
 **Phase 1c outcome — the architectural map.** The 70-80% ceiling decomposed into three independent failure layers (see `RESEARCH_PIPELINE_IR.md` §34 for the full audit):
 

@@ -1894,7 +1894,8 @@ add_demo(
 target_sources(wiring_organelle_demo PRIVATE
   demos/wiring_organelle/wiring_natives.c
   demos/wiring_organelle/wiring_references.c
-  demos/wiring_organelle/wiring_geo_classifier.c)
+  demos/wiring_organelle/wiring_geo_classifier.c
+  demos/wiring_organelle/wiring_anchor_graphs.c)
 # Generate the wiring + planner corpus next to the binary as a POST_BUILD step.
 # Phase 15: 4-arg invocation also emits pipeline_corpus_planner.txt for the
 # planner organelle (template-family classifier).

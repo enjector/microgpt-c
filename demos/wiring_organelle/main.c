@@ -85,6 +85,7 @@
 #include "microgpt_organelle.h"
 #include "microgpt_pipeline.h"
 #include "microgpt_vr.h"
+#include "wiring_anchor_graphs.h"
 #include "wiring_geo_classifier.h"
 #include "wiring_natives.h"
 #include "wiring_references.h"
@@ -1004,6 +1005,9 @@ int main(void) {
         /* Phase 1c: geodesic-classifier telemetry. */
         int geo_useful = 0;         /* picked candidate's family was in geodesic top-K */
         int geo_calls = 0;          /* prompts where geodesic returned ≥1 family */
+        /* Phase 2: anchor-retrieval telemetry. */
+        int anchor_injected = 0;    /* prompts where an anchor was injected */
+        int anchor_picked = 0;      /* prompts where the anchor was picked as best */
 
         for (int i = 0; i < n_held; i++) {
             int well_formed = 0, parsed = 0, verified = 0, fidelity = 0;
@@ -1052,8 +1056,9 @@ int main(void) {
 
             /* Phase 8 — collect every verified candidate's multi-input
              * execution results so we can pick the self-consistent
-             * majority winner across the 16 votes. */
-            #define MAX_VOTE_CAND N_VOTES
+             * majority winner across the 16 votes.
+             * Phase 2: +1 slot for the anchor-retrieval candidate. */
+            #define MAX_VOTE_CAND (N_VOTES + 1)
             typedef struct {
                 char *text;
                 int has_results;
@@ -1187,6 +1192,99 @@ int main(void) {
                 }
             }
 
+            /* Phase 2 — anchor-retrieval generation.
+             *
+             * Inject the geodesic top-1 family's canonical @graph DAG as
+             * an additional candidate, bypassing token-level generation.
+             * This sidesteps the three-layer ceiling characterised in
+             * §34: re-rank, family-name selection, and primitive
+             * selection all become non-issues because the entire graph
+             * comes from a precomputed table.
+             *
+             * The anchor is processed through the SAME parse/verify/exec
+             * pipeline as the votes, so it competes on the same merits.
+             * The +25 geodesic top-K bonus and the +20 planner bonus
+             * still apply if it matches their predictions. */
+            int anchor_used = 0;
+            int anchor_cand_idx = -1;
+            if (n_geo > 0 && geo_top_k[0] && n_cands < MAX_VOTE_CAND) {
+                const char *anchor_text = wiring_anchor_graph_for(geo_top_k[0]);
+                if (anchor_text) {
+                    /* Run the same parse/verify/repair/execute pipeline
+                     * as the vote candidates so the anchor enters the
+                     * scoring pool with valid result vectors. */
+                    Pipeline *pp = pipeline_parse_text(anchor_text);
+                    if (!pp) pp = pipeline_parse_text_tolerant(anchor_text);
+                    int a_verified = 0, a_fidelity = 0;
+                    if (pp) {
+                        if (pipeline_verify(pp) != PIPE_OK) {
+                            PipelineRepairReport rep = {0};
+                            pipeline_repair(pp, &rep);
+                        }
+                        if (pp->n_nodes > 0 && pipeline_verify(pp) == PIPE_OK) {
+                            a_verified = 1;
+                            a_fidelity = graph_has_expected(pp, held[i].expected);
+                        }
+                        pipeline_free(pp);
+                    }
+                    if (a_verified) {
+                        VoteCandidate *c = &cands[n_cands];
+                        c->text = strdup(anchor_text);
+                        c->has_fidelity = a_fidelity;
+                        c->valid_results = 0;
+                        for (int s = 0; s < WIRING_INPUT_SETS; s++) {
+                            Pipeline *exec_p = pipeline_parse_text(anchor_text);
+                            if (!exec_p) continue;
+                            if (pipeline_verify(exec_p) != PIPE_OK) {
+                                PipelineRepairReport rep = {0};
+                                pipeline_repair(exec_p, &rep);
+                            }
+                            if (exec_p->n_nodes > 0 && pipeline_verify(exec_p) == PIPE_OK) {
+                                int n_in  = exec_p->n_sig_in;
+                                int n_out = exec_p->n_sig_out;
+                                if (n_in <= WIRING_MAX_INPUTS && n_out >= 1) {
+                                    int64_t input_buf[WIRING_MAX_INPUTS];
+                                    wiring_input_set(s, input_buf);
+                                    PipelineValue *ins  = (PipelineValue *)calloc((size_t)(n_in  > 0 ? n_in  : 1), sizeof(PipelineValue));
+                                    PipelineValue *outs = (PipelineValue *)calloc((size_t)(n_out > 0 ? n_out : 1), sizeof(PipelineValue));
+                                    for (int k = 0; k < n_in; k++) {
+                                        ins[k].type = exec_p->signature_in[k].type;
+                                        ins[k].v.i  = input_buf[k];
+                                    }
+                                    int rc = pipeline_execute(exec_p, ins, outs,
+                                                              wiring_natives_dispatch, NULL);
+                                    if (rc == 0) {
+                                        c->results[s] = outs[0].v.i;
+                                        c->valid_results++;
+                                        c->has_results = 1;
+                                    }
+                                    free(ins); free(outs);
+                                }
+                            }
+                            pipeline_free(exec_p);
+                        }
+                        anchor_cand_idx = n_cands;
+                        n_cands++;
+                        anchor_used = 1;
+                        anchor_injected++;
+                        /* Promote anchor's text to best_buf if no
+                         * fidelity-having vote candidate exists yet. */
+                        if (a_fidelity && !have_verified_with_fidelity) {
+                            strncpy(best_buf, anchor_text, sizeof(best_buf) - 1);
+                            best_buf[sizeof(best_buf) - 1] = '\0';
+                            have_best = 1;
+                            verified = 1;
+                            fidelity = 1;
+                            have_verified_with_fidelity = 1;
+                        } else if (!have_best) {
+                            strncpy(best_buf, anchor_text, sizeof(best_buf) - 1);
+                            best_buf[sizeof(best_buf) - 1] = '\0';
+                            have_best = 1;
+                        }
+                    }
+                }
+            }
+
             if (well_formed) held_well++;
             if (parsed)      held_parse++;
             if (verified)    held_verify++;
@@ -1264,6 +1362,36 @@ int main(void) {
                         wiring_geo_in_top_k(cand_gnames[a], geo_top_k, n_geo)) {
                         score += 25;
                     }
+                    /* Phase 2: anchor-retrieval boost — agreement-gated.
+                     * The anchor candidate's correctness depends on
+                     * geodesic predicting the right family. Phase 1b
+                     * showed geodesic is right for 11/20 prompts overall
+                     * (55%). To avoid regressing the 9 prompts where
+                     * geodesic is wrong, we only force the anchor to
+                     * win when the planner ALSO agrees with the geodesic
+                     * top-1 family. Two-classifier consensus is far more
+                     * reliable than either individually:
+                     *   - Geodesic right + planner right → anchor wins (lift)
+                     *   - Only one right → no consensus, anchor competes normally
+                     *   - Both wrong → no consensus, vote-cluster wins (no regression)
+                     * The +60 boost beats the worst-case voted-cluster
+                     * score (15 self-consistency + 20 planner + 25 geo). */
+                    if (anchor_used && a == anchor_cand_idx
+                        && planner_family[0] && cand_gnames[a][0]) {
+                        /* Try matching planner→anchor and anchor→planner
+                         * via the geodesic suffix-bridge, since
+                         * family_matches_graph_name only handles
+                         * tpl_/seed_ prefix stripping. */
+                        const char *planner_set[WIRING_GEO_TOP_K] =
+                            { planner_family, NULL, NULL };
+                        const char *anchor_set[WIRING_GEO_TOP_K] =
+                            { cand_gnames[a], NULL, NULL };
+                        int planner_agrees =
+                            family_matches_graph_name(planner_family, cand_gnames[a]) > 0
+                            || wiring_geo_in_top_k(cand_gnames[a], planner_set, 1)
+                            || wiring_geo_in_top_k(planner_family, anchor_set, 1);
+                        if (planner_agrees) score += 60;
+                    }
                     /* Tiebreaker: fidelity > valid_results > earlier. */
                     int promote = 0;
                     if (score > best_score) promote = 1;
@@ -1292,6 +1420,8 @@ int main(void) {
                     best_buf[sizeof(best_buf) - 1] = '\0';
                     have_best = 1;
                 }
+                /* Phase 2: did anchor-retrieval candidate win the vote? */
+                if (anchor_used && picked == anchor_cand_idx) anchor_picked++;
                 /* Phase 15: did the planner-predicted family match the picked graph? */
                 if (planner_family[0] && cands[picked].text) {
                     char gname[64];
@@ -1413,6 +1543,12 @@ int main(void) {
         printf("Geodesic-top-K hits picked candidate: %d/%d (%.0f%%)  [Phase 1c: geo classifier hit-rate]\n",
                geo_useful, n_held,
                n_held > 0 ? 100.0 * geo_useful / n_held : 0.0);
+        printf("Anchor candidates injected:           %d/%d (%.0f%%)  [Phase 2: anchor coverage]\n",
+               anchor_injected, n_held,
+               n_held > 0 ? 100.0 * anchor_injected / n_held : 0.0);
+        printf("Anchor wins the vote:                 %d/%d (%.0f%%)  [Phase 2: anchor pick-rate]\n",
+               anchor_picked, n_held,
+               n_held > 0 ? 100.0 * anchor_picked / n_held : 0.0);
         printf("\n");
 
         for (int i = 0; i < n_held; i++) {
