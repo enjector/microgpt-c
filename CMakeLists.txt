@@ -1904,7 +1904,8 @@ target_sources(wiring_organelle_demo PRIVATE
   demos/wiring_organelle/wiring_natives.c
   demos/wiring_organelle/wiring_references.c
   demos/wiring_organelle/wiring_geo_classifier.c
-  demos/wiring_organelle/wiring_anchor_graphs.c)
+  demos/wiring_organelle/wiring_anchor_graphs.c
+  demos/wiring_organelle/wiring_fragments.c)
 # Generate the wiring + planner corpus next to the binary as a POST_BUILD step.
 # Phase 15: 4-arg invocation also emits pipeline_corpus_planner.txt for the
 # planner organelle (template-family classifier).
@@ -1916,13 +1917,17 @@ add_custom_command(TARGET wiring_organelle_demo POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy
           ${CMAKE_CURRENT_SOURCE_DIR}/demos/wiring_organelle/pipeline_corpus_held_out.txt
           $<TARGET_FILE_DIR:wiring_organelle_demo>/pipeline_corpus_held_out.txt
+  COMMAND ${CMAKE_COMMAND} -E copy
+          ${CMAKE_CURRENT_SOURCE_DIR}/demos/wiring_organelle/pipeline_corpus_composition.txt
+          $<TARGET_FILE_DIR:wiring_organelle_demo>/pipeline_corpus_composition.txt
   COMMAND sh
           ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_held_out_leakage.sh
           $<TARGET_FILE_DIR:wiring_organelle_demo>
   DEPENDS pipeline_corpus_gen
           ${CMAKE_CURRENT_SOURCE_DIR}/demos/wiring_organelle/pipeline_corpus_held_out.txt
+          ${CMAKE_CURRENT_SOURCE_DIR}/demos/wiring_organelle/pipeline_corpus_composition.txt
           ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_held_out_leakage.sh
-  COMMENT "Generating Pipeline IR corpus (wiring + planner), copying held-out, and running leakage check"
+  COMMENT "Generating Pipeline IR corpus (wiring + planner), copying held-out + composition, leakage check"
 )
 # Phase 16 attempted family-prefixed wiring training (--prefix-family arg)
 # but regressed 80% → 75% — vocab grew 1051 → 1211 tokens, distribution

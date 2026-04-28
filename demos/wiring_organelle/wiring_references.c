@@ -152,6 +152,69 @@ DEF_REF(compound_minus_p)   { return r_compound(S[0], S[1], S[2]) - S[0]; }
 /* #20: clamp(sigmoid(x), lo, hi) */
 DEF_REF(sigmoid_clamped)    { return r_clamp(r_sigmoid(S[0]), S[1], S[2]); }
 
+/* ============================================================
+ * Phase 3b composition test set — 10 multi-stage references that
+ * each chain 2-3 primitives. None matches a single existing
+ * single-family anchor; together they form the §42 test set.
+ * ============================================================ */
+static int64_t r_markup(int64_t p, int64_t r)   { return p + (p * r) / 100; }
+static int64_t r_discount(int64_t p, int64_t r) { return p - (p * r) / 100; }
+
+/* C1: tax_amount(discount(markup(price, m_rate), d_rate), t_rate)
+ *     S[0]=price, S[1]=m_rate, S[2]=d_rate, S[3]=t_rate */
+DEF_REF(markup_discount_tax) {
+    int64_t up = r_markup(S[0], S[1]);
+    int64_t dn = r_discount(up, S[2]);
+    return r_tax_amount(dn, S[3]);
+}
+/* C2: clamp(compound(P, r, n), lo, hi)
+ *     S[0]=P, S[1]=r, S[2]=n, S[3]=lo, S[4]=hi */
+DEF_REF(clamped_compound) {
+    return r_clamp(r_compound(S[0], S[1], S[2]), S[3], S[4]);
+}
+/* C3: apply_tax(average_two(a, b), rate)
+ *     S[0]=a, S[1]=b, S[2]=rate */
+DEF_REF(taxed_average) {
+    return r_apply_tax(r_average_two(S[0], S[1]), S[2]);
+}
+/* C4: abs(a - b) * k
+ *     S[0]=a, S[1]=b, S[2]=k */
+DEF_REF(scaled_abs_diff) {
+    return r_abs(S[0] - S[1]) * S[2];
+}
+/* C5: clamp(gcd(a, b), lo, hi)
+ *     S[0]=a, S[1]=b, S[2]=lo, S[3]=hi */
+DEF_REF(clamped_gcd) {
+    return r_clamp(r_gcd(S[0], S[1]), S[2], S[3]);
+}
+/* C6: clamp(relu(x), lo, hi)
+ *     S[0]=x, S[1]=lo, S[2]=hi */
+DEF_REF(clamped_relu) {
+    return r_clamp(r_relu(S[0]), S[1], S[2]);
+}
+/* C7: sigmoid(x) * k
+ *     S[0]=x, S[1]=k */
+DEF_REF(scaled_sigmoid) {
+    return r_sigmoid(S[0]) * S[1];
+}
+/* C8: percentage(compound(P, r, n) - P, P)
+ *     S[0]=P, S[1]=r, S[2]=n */
+DEF_REF(interest_as_pct) {
+    int64_t interest = r_compound(S[0], S[1], S[2]) - S[0];
+    return r_percentage(interest, S[0]);
+}
+/* C9: discount(markup(price, m_rate), d_rate)
+ *     S[0]=price, S[1]=m_rate, S[2]=d_rate */
+DEF_REF(markup_then_discount) {
+    return r_discount(r_markup(S[0], S[1]), S[2]);
+}
+/* C10: clamp(fibonacci(n) * factorial(n), lo, hi)
+ *      S[0]=n, S[1]=lo, S[2]=hi */
+DEF_REF(clamped_fib_fact) {
+    int64_t prod = r_fibonacci(S[0]) * r_factorial(S[0]);
+    return r_clamp(prod, S[1], S[2]);
+}
+
 #undef DEF_REF
 
 typedef int64_t (*RefFn)(const int64_t *S);
@@ -182,6 +245,17 @@ static const RefEntry references[] = {
     {"gross_minus_tax",    ref_gross_minus_tax},
     {"compound_minus_p",   ref_compound_minus_p},
     {"sigmoid_clamped",    ref_sigmoid_clamped},
+    /* Phase 3b composition test set */
+    {"markup_discount_tax", ref_markup_discount_tax},
+    {"clamped_compound",    ref_clamped_compound},
+    {"taxed_average",       ref_taxed_average},
+    {"scaled_abs_diff",     ref_scaled_abs_diff},
+    {"clamped_gcd",         ref_clamped_gcd},
+    {"clamped_relu",        ref_clamped_relu},
+    {"scaled_sigmoid",      ref_scaled_sigmoid},
+    {"interest_as_pct",     ref_interest_as_pct},
+    {"markup_then_discount", ref_markup_then_discount},
+    {"clamped_fib_fact",    ref_clamped_fib_fact},
 };
 static const int references_count = (int)(sizeof(references) / sizeof(references[0]));
 

@@ -1,0 +1,58 @@
+# Pipeline IR — Phase 3b composition test set
+# 10 multi-stage composition prompts that REQUIRE chaining 2-3 fragments.
+# None directly matches a single existing anchor. Per the §42 pre-registration:
+# - Current architecture (single-anchor retrieval): predicted 0/10
+# - Phase 3b (fragment composition): predicted 5-7/10
+#
+# Each prompt's REFERENCE points to a new function in wiring_references.c
+# computing the canonical numeric answer from the demo's 5-input sets.
+
+# EXPECTED: markup discount tax_amount
+# REFERENCE: markup_discount_tax
+// tax on a price after markup and discount
+---
+
+# EXPECTED: compound clamp
+# REFERENCE: clamped_compound
+// compound balance bounded between lo and hi
+---
+
+# EXPECTED: average_two apply_tax
+# REFERENCE: taxed_average
+// average of a and b then taxed at rate
+---
+
+# EXPECTED: subtract abs_val multiply
+# REFERENCE: scaled_abs_diff
+// absolute difference between two readings then scaled by k
+---
+
+# EXPECTED: gcd clamp
+# REFERENCE: clamped_gcd
+// gcd of a and b bounded inside lo hi
+---
+
+# EXPECTED: relu clamp
+# REFERENCE: clamped_relu
+// rectified output of x bounded inside lo hi
+---
+
+# EXPECTED: sigmoid multiply
+# REFERENCE: scaled_sigmoid
+// sigmoid of x amplified by gain
+---
+
+# EXPECTED: compound subtract percentage
+# REFERENCE: interest_as_pct
+// compound interest as a percentage of principal
+---
+
+# EXPECTED: markup discount
+# REFERENCE: markup_then_discount
+// the discounted price after markup
+---
+
+# EXPECTED: fibonacci factorial multiply clamp
+# REFERENCE: clamped_fib_fact
+// fibonacci of n times factorial of n bounded by lo hi
+---

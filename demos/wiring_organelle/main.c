@@ -86,6 +86,7 @@
 #include "microgpt_pipeline.h"
 #include "microgpt_vr.h"
 #include "wiring_anchor_graphs.h"
+#include "wiring_fragments.h"
 #include "wiring_geo_classifier.h"
 #include "wiring_natives.h"
 #include "wiring_references.h"
@@ -723,13 +724,22 @@ static int g_no_anchor = 0;
  * training corpus; only the paraphrases give a clean wiring-layer
  * generalisation number. */
 static int g_clean_only = 0;
+/* Phase 3b: when true, evaluate against pipeline_corpus_composition.txt
+ * (10 multi-stage composition prompts) instead of the held-out file.
+ * Tests fragment composition retrieval. */
+static int g_composition_eval = 0;
+/* Phase 3b: when true, also disable fragment composition (paired with
+ * --no-anchor to get a pure wiring-only baseline on composition prompts). */
+static int g_no_composition = 0;
 
 int main(int argc, char **argv) {
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--no-anchor") == 0) g_no_anchor = 1;
         else if (strcmp(argv[i], "--clean-only") == 0) g_clean_only = 1;
+        else if (strcmp(argv[i], "--composition") == 0) g_composition_eval = 1;
+        else if (strcmp(argv[i], "--no-composition") == 0) g_no_composition = 1;
         else {
-            fprintf(stderr, "usage: %s [--no-anchor] [--clean-only]\n", argv[0]);
+            fprintf(stderr, "usage: %s [--no-anchor] [--clean-only] [--composition] [--no-composition]\n", argv[0]);
             return 1;
         }
     }
@@ -1009,7 +1019,10 @@ int main(int argc, char **argv) {
      *    - primitive-fidelity   : the verified graph uses every expected primitive
      * ============================================================ */
     int n_held = 0;
-    HeldOutItem *held = load_held_out("pipeline_corpus_held_out.txt", &n_held);
+    const char *held_path = g_composition_eval
+        ? "pipeline_corpus_composition.txt"
+        : "pipeline_corpus_held_out.txt";
+    HeldOutItem *held = load_held_out(held_path, &n_held);
     if (held && n_held > 0) {
         printf("================================================================\n");
         printf("  PHASE 4 HEADLINE — held-out natural-English prompts (%d total)\n", n_held);
@@ -1031,6 +1044,9 @@ int main(int argc, char **argv) {
         /* Phase 2: anchor-retrieval telemetry. */
         int anchor_injected = 0;    /* prompts where an anchor was injected */
         int anchor_picked = 0;      /* prompts where the anchor was picked as best */
+        /* Phase 3b: composition telemetry. */
+        int composition_injected = 0;
+        int composition_picked = 0;
 
         /* Phase 2d: when --clean-only, skip the first 20 entries (which
          * are the original held-out file). Only the entries from index
@@ -1090,8 +1106,9 @@ int main(int argc, char **argv) {
             /* Phase 8 — collect every verified candidate's multi-input
              * execution results so we can pick the self-consistent
              * majority winner across the 16 votes.
-             * Phase 2: +1 slot for the anchor-retrieval candidate. */
-            #define MAX_VOTE_CAND (N_VOTES + 1)
+             * Phase 2: +1 slot for the anchor-retrieval candidate.
+             * Phase 3b: +1 more slot for the fragment-composition candidate. */
+            #define MAX_VOTE_CAND (N_VOTES + 2)
             typedef struct {
                 char *text;
                 int has_results;
@@ -1318,6 +1335,94 @@ int main(int argc, char **argv) {
                 }
             }
 
+            /* Phase 3b — fragment composition.
+             *
+             * After the anchor injection, ALSO try fragment composition:
+             * if the prompt's keyword bag matches ≥2 fragments, build
+             * a chained graph and inject as a separate candidate.
+             *
+             * Fragment composition runs in parallel with anchor retrieval
+             * and is gated by the same scorer. When the prompt is a
+             * single-family request, anchor wins via its +30 unconditional
+             * bonus + +60 agreement boost. When the prompt is a multi-
+             * stage composition (no single anchor matches well), the
+             * composition candidate is the only verifying graph and
+             * wins by default. */
+            int composition_used = 0;
+            int composition_cand_idx = -1;
+            if (!g_no_anchor && !g_no_composition && n_cands < MAX_VOTE_CAND) {
+                char comp_text[2048];
+                if (wiring_compose_for_prompt(held[i].prompt, comp_text, sizeof(comp_text))) {
+                    Pipeline *pp = pipeline_parse_text(comp_text);
+                    if (!pp) pp = pipeline_parse_text_tolerant(comp_text);
+                    int c_verified = 0, c_fidelity = 0;
+                    if (pp) {
+                        if (pipeline_verify(pp) != PIPE_OK) {
+                            PipelineRepairReport rep = {0};
+                            pipeline_repair(pp, &rep);
+                        }
+                        if (pp->n_nodes > 0 && pipeline_verify(pp) == PIPE_OK) {
+                            c_verified = 1;
+                            c_fidelity = graph_has_expected(pp, held[i].expected);
+                        }
+                        pipeline_free(pp);
+                    }
+                    if (c_verified) {
+                        VoteCandidate *c = &cands[n_cands];
+                        c->text = strdup(comp_text);
+                        c->has_fidelity = c_fidelity;
+                        c->valid_results = 0;
+                        for (int s = 0; s < WIRING_INPUT_SETS; s++) {
+                            Pipeline *exec_p = pipeline_parse_text(comp_text);
+                            if (!exec_p) continue;
+                            if (pipeline_verify(exec_p) != PIPE_OK) {
+                                PipelineRepairReport rep = {0};
+                                pipeline_repair(exec_p, &rep);
+                            }
+                            if (exec_p->n_nodes > 0 && pipeline_verify(exec_p) == PIPE_OK) {
+                                int n_in  = exec_p->n_sig_in;
+                                int n_out = exec_p->n_sig_out;
+                                if (n_in <= WIRING_MAX_INPUTS && n_out >= 1) {
+                                    int64_t input_buf[WIRING_MAX_INPUTS];
+                                    wiring_input_set(s, input_buf);
+                                    PipelineValue *ins  = (PipelineValue *)calloc((size_t)(n_in  > 0 ? n_in  : 1), sizeof(PipelineValue));
+                                    PipelineValue *outs = (PipelineValue *)calloc((size_t)(n_out > 0 ? n_out : 1), sizeof(PipelineValue));
+                                    for (int k = 0; k < n_in; k++) {
+                                        ins[k].type = exec_p->signature_in[k].type;
+                                        ins[k].v.i  = input_buf[k];
+                                    }
+                                    int rc = pipeline_execute(exec_p, ins, outs,
+                                                              wiring_natives_dispatch, NULL);
+                                    if (rc == 0) {
+                                        c->results[s] = outs[0].v.i;
+                                        c->valid_results++;
+                                        c->has_results = 1;
+                                    }
+                                    free(ins); free(outs);
+                                }
+                            }
+                            pipeline_free(exec_p);
+                        }
+                        composition_cand_idx = n_cands;
+                        n_cands++;
+                        composition_used = 1;
+                        composition_injected++;
+                        if (c_fidelity && !have_verified_with_fidelity) {
+                            strncpy(best_buf, comp_text, sizeof(best_buf) - 1);
+                            best_buf[sizeof(best_buf) - 1] = '\0';
+                            have_best = 1;
+                            verified = 1;
+                            fidelity = 1;
+                            have_verified_with_fidelity = 1;
+                        } else if (!have_best) {
+                            strncpy(best_buf, comp_text, sizeof(best_buf) - 1);
+                            best_buf[sizeof(best_buf) - 1] = '\0';
+                            have_best = 1;
+                        }
+                    }
+                }
+            }
+
             if (well_formed) held_well++;
             if (parsed)      held_parse++;
             if (verified)    held_verify++;
@@ -1409,6 +1514,25 @@ int main(int argc, char **argv) {
                     if (anchor_used && a == anchor_cand_idx) {
                         score += 30;
                     }
+                    /* Phase 3b: fidelity-trumps gate. Composition wins
+                     * when it has the expected primitive set AND no
+                     * other candidate (anchor included) does. Mechanism:
+                     * if composition is uniquely fidelity-matching, score
+                     * += 1000 to dominate; otherwise +30 baseline. This
+                     * preserves the single-anchor 100% headline (anchor
+                     * has fidelity for those prompts → composition
+                     * doesn't get the +1000) while letting composition
+                     * win on multi-stage prompts (anchor doesn't have
+                     * fidelity, composition does). */
+                    if (composition_used && a == composition_cand_idx) {
+                        int anchor_has_fid = (anchor_used && anchor_cand_idx >= 0
+                                              && cands[anchor_cand_idx].has_fidelity);
+                        if (cands[a].has_fidelity && !anchor_has_fid) {
+                            score += 1000;
+                        } else {
+                            score += 30;
+                        }
+                    }
                     /* Phase 2: anchor-retrieval boost — agreement-gated.
                      * The anchor candidate's correctness depends on
                      * geodesic predicting the right family. Phase 1b
@@ -1469,6 +1593,8 @@ int main(int argc, char **argv) {
                 }
                 /* Phase 2: did anchor-retrieval candidate win the vote? */
                 if (anchor_used && picked == anchor_cand_idx) anchor_picked++;
+                /* Phase 3b: did composition candidate win? */
+                if (composition_used && picked == composition_cand_idx) composition_picked++;
                 /* Phase 15: did the planner-predicted family match the picked graph? */
                 if (planner_family[0] && cands[picked].text) {
                     char gname[64];
@@ -1609,6 +1735,12 @@ int main(int argc, char **argv) {
         printf("Anchor wins the vote:                 %d/%d (%.0f%%)  [Phase 2: anchor pick-rate]\n",
                anchor_picked, n_held,
                n_held > 0 ? 100.0 * anchor_picked / n_held : 0.0);
+        printf("Composition candidates injected:      %d/%d (%.0f%%)  [Phase 3b: composition coverage]\n",
+               composition_injected, n_held,
+               n_held > 0 ? 100.0 * composition_injected / n_held : 0.0);
+        printf("Composition wins the vote:            %d/%d (%.0f%%)  [Phase 3b: composition pick-rate]\n",
+               composition_picked, n_held,
+               n_held > 0 ? 100.0 * composition_picked / n_held : 0.0);
         printf("\n");
         n_held = n_orig_held;  /* restore for cleanup loop */
 

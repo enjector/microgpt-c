@@ -1,0 +1,470 @@
+planner: preprocessed 408 (prompt, family) pairs
+================================================================
+  Wiring Organelle Demo (Pipeline IR Phase 3c)
+================================================================
+
+preprocessed: 368 train + 40 val examples
+
+================================================================
+  Wiring Organelle
+================================================================
+
+  [Model Architecture]
+    n_embd      = 96
+    n_head       = 4
+    head_dim     = 24
+    mlp_dim      = 384
+    n_layer      = 4
+    block_size   = 384
+
+  [Training]
+    num_steps    = 5000
+    learning_rate= 0.001000
+    batch_size   = 16
+    warmup_steps = 100
+    temperature  = 0.5000
+
+  [Data Limits]
+    max_vocab    = 1500
+    max_docs     = 5000
+    max_doc_len  = 4096
+
+  [Feature Switches]
+    scalar_t     = float  (32-bit)
+    SIMD         = ON
+    INT8 quant   = OFF
+    Metal GPU    = OFF
+    BLAS         = OFF
+    Paged KV     = OFF
+    Head Parallel= OFF
+    AttnRes      = OFF
+    AttnSink     = OFF
+    QK RMSNorm   = OFF
+    Partial RoPE = OFF
+
+================================================================
+
+[ensemble 1/3] seed=42 ckpt=wiring_organelle.ckpt
+
+========================================
+ORGANELLE (word-level): wiring_organelle
+========================================
+corpus: 368 docs | 155904 chars (152.2 KB)
+vocab: 1028 word tokens (max_words=1500, unk_id=1025, nl_id=1026, bos_id=1027)
+loaded checkpoint wiring_organelle.ckpt (step 5000) -- skipping training
+[ensemble 2/3] seed=43 ckpt=wiring_organelle_2.ckpt
+
+========================================
+ORGANELLE (word-level): wiring_organelle_2
+========================================
+corpus: 368 docs | 155904 chars (152.2 KB)
+vocab: 1028 word tokens (max_words=1500, unk_id=1025, nl_id=1026, bos_id=1027)
+loaded checkpoint wiring_organelle_2.ckpt (step 5000) -- skipping training
+[ensemble 3/3] seed=44 ckpt=wiring_organelle_3.ckpt
+
+========================================
+ORGANELLE (word-level): wiring_organelle_3
+========================================
+corpus: 368 docs | 155904 chars (152.2 KB)
+vocab: 1028 word tokens (max_words=1500, unk_id=1025, nl_id=1026, bos_id=1027)
+loaded checkpoint wiring_organelle_3.ckpt (step 5000) -- skipping training
+
+ensemble ready: 3 organelles, each ~676608 params
+
+================================================================
+  Phase 15 — PLANNER ORGANELLE
+================================================================
+
+================================================================
+  Wiring Planner
+================================================================
+
+  [Model Architecture]
+    n_embd      = 96
+    n_head       = 4
+    head_dim     = 24
+    mlp_dim      = 384
+    n_layer      = 4
+    block_size   = 384
+
+  [Training]
+    num_steps    = 2000
+    learning_rate= 0.001000
+    batch_size   = 16
+    warmup_steps = 100
+    temperature  = 0.5000
+
+  [Data Limits]
+    max_vocab    = 1500
+    max_docs     = 5000
+    max_doc_len  = 4096
+
+  [Feature Switches]
+    scalar_t     = float  (32-bit)
+    SIMD         = ON
+    INT8 quant   = OFF
+    Metal GPU    = OFF
+    BLAS         = OFF
+    Paged KV     = OFF
+    Head Parallel= OFF
+    AttnRes      = OFF
+    AttnSink     = OFF
+    QK RMSNorm   = OFF
+    Partial RoPE = OFF
+
+================================================================
+
+
+========================================
+ORGANELLE (word-level): wiring_planner
+========================================
+corpus: 408 docs | 32593 chars (31.8 KB)
+vocab: 510 word tokens (max_words=1500, unk_id=507, nl_id=508, bos_id=509)
+loaded checkpoint wiring_planner.ckpt (step 2000) -- skipping training
+
+planner ready: vocab=510 params=577152
+
+================================================================
+  HELD-OUT VALIDATION — 40 prompts
+================================================================
+
+[1] // multiply of 4 integers
+  well-formed=✅, parse=✅, verify=✅, votes=1/16
+  --- best output ---
+@graph chain_max_4
+: in x1 -> int
+: in x2 -> int
+: in x3 -> int
+: in x4 -> int
+: out y -> int
+| n1 = multiply(x: <x1>, y: <x2>) :: x:int, y:int -> out:int
+| n2 = multiply(x: n1.out, y: <x3>) :: x:int, y:int -> out:int
+| n3 = multiply(x: n2.out, y: <x4>) :: x:int, y:int -> out:int
+y <- n3.out
+@end
+  ---
+
+[2] // max of 7 integers
+  well-formed=✅, parse=✅, verify=✅, votes=1/16
+  --- best output ---
+@graph chain_add_7
+: in x1 -> int
+: in x2 -> int
+: in x3 -> int
+: in x4 -> int
+: in x5 -> int
+: in x6 -> int
+: in x7 -> int
+: out y -> int
+| n1 = add(x: <x1>, y: <x2>) :: x:int, y:int -> out:int
+| n2 = max(x: n1.out, y: <x3>) :: x:int, y:int -> out:int
+| n3 = max(x: n2.out, y: <x4>) :: x:int, y:int -> out:int
+| n4 = add(x: n3.out, y: <x5>) :: x:int, y:int -> out:int
+| n5 = max(x: n4.out, y: <x6>) :: x:int, y:int -> out:int
+| n6 = max(x: n5.out, y: <x7>) :: x:int, y:int -> out:int
+y <- n6.out
+@end
+  ---
+
+[3] // negate each of 3 inputs then add them
+  well-formed=✅, parse=✅, verify=✅, votes=1/16
+  --- best output ---
+@graph fanout_abs_add_3
+: in x1 -> int
+: in x2 -> int
+: in x3 -> int
+: out y -> int
+| u1 = negate(x: <x1>) :: x:int -> out:int
+| u2 = add(x: s1.out, y: <x3>) :: x:int, y:int -> out:int
+| div = add(x: n1.out, y: <x2>) :: x:int, y:int -> out:int
+| r1 = add(x: <w1>, y: <x5>) :: x:int, y:int -> out:int
+| b2 = add(x: b1.out, y: u3.out) :: x:int, y:int -> out:int
+y <- tot.out
+@end
+  ---
+
+[4] // abs each of 4 inputs then multiply them
+  well-formed=✅, parse=✅, verify=✅, votes=1/16
+  --- best output ---
+@graph fanout_abs_multiply_2
+: in x1 -> int
+: in x2 -> int
+: in x3 -> int
+: in x4 -> int
+: out y -> int
+| u1 = negate(x: <x1>) :: x:int -> out:int
+| u2 = negate(x: <x2>) :: x:int -> out:int
+| b1 = multiply(x: u1.out, y: u2.out) :: x:int, y:int -> out:int
+| u3 = abs(x: <x3>) :: x:int -> out:int
+| b2 = multiply(x: b1.out, y: u3.out) :: x:int, y:int -> out:int
+| u4 = abs(x: <x4>) :: x:int -> out:int
+| b3 = multiply(x: b2.out, y: u4.out) :: x:int, y:int -> out:int
+y <- b3.out
+@end
+  ---
+
+[5] // squared euclidean distance in 3 dimensions
+  well-formed=✅, parse=✅, verify=✅, votes=1/16
+  --- best output ---
+@graph distance_squared_2d
+: in a1 -> int
+: in b1 -> int
+: in a2 -> int
+: in b2 -> int
+: in a3 -> int
+: in b3 -> int
+: in a4 -> int
+: in b4 -> int
+: out y -> int
+| d1 = subtract(x: <a1>, y: <b1>) :: x:int, y:int -> out:int
+| d2 = subtract(x: <a2>, y: <b2>) :: x:int, y:int -> out:int
+| d3 = subtract(x: <a3>, y: <b3>) :: x:int, y:int -> out:int
+| d4 = subtract(x: <a4>, y: <b4>) :: x:int, y:int -> out:int
+| sq1 = multiply(x: d1.out, y: d1.out) :: x:int, y:int -> out:int
+| sq2 = multiply(x: d2.out, y: d2.out) :: x:int, y:int -> out:int
+| sq3 = multiply(x: d3.out, y: d3.out) :: x:int, y:int -> out:int
+| sq4 = multiply(x: d4.out, y: d4.out) :: x:int, y:int -> out:int
+| sum1 = add(x: sq1.out, y: sq2.out) :: x:int, y:int -> out:int
+| sum2 = add(x: sum1.out, y: sq3.out) :: x:int, y:int -> out:int
+| sum3 = add(x: sum2.out, y: sq4.out) :: x:int, y:int -> out:int
+y <- sum3.out
+@end
+  ---
+
+================================================================
+  RESULTS
+================================================================
+Held-out prompts:                     40
+Single-shot strict-verified:          27/40 (68%)  [Phase 3d baseline]
+Best-of-16 well-formed:               40/40 (100%)
+Best-of-16 parsed:                    39/40 (98%)
+Best-of-16 strict-verified:           34/40 (85%)  [Phase 3e/f/g]
+
+================================================================
+  PHASE 4 HEADLINE — held-out natural-English prompts (10 total)
+================================================================
+
+[1] // tax on a price after markup and discount
+    EXPECTED: markup discount tax_amount
+    PLANNER:  discounted_tax
+    well=Y parse=Y verify=Y fidelity=Y exec=Y correct=Y correct_all=n votes=16/16 cands=8
+    EXEC [0 0 0 0 0]
+    REF  [0 0 0 1 0]  (4/5 match)
+    --- best output ---
+@graph composed_phase3b
+  : in amount_0 -> int
+  : in rate_1 -> int
+  : in rate_2 -> int
+  : in rate_3 -> int
+  : out y -> int
+  | n0 = tax_amount(amount: <amount_0>, rate: <rate_1>) :: amount:int, rate:int -> out:int
+  | n1 = markup(price: n0.out, rate: <rate_2>) :: price:int, rate:int -> out:int
+  | n2 = discount(price: n1.out, rate: <rate_3>) :: price:int, rate:int -> out:int
+  y <- n2.out
+@end
+
+    ---
+
+[2] // compound balance bounded between lo and hi
+    EXPECTED: compound clamp
+    PLANNER:  distance_midpoint_add
+    well=Y parse=Y verify=Y fidelity=Y exec=Y correct=n correct_all=n votes=16/16 cands=3
+    EXEC [2 2 1 4 1]
+    REF  [11 10 5 20 8]  (0/5 match)
+    --- best output ---
+@graph composed_phase3b
+  : in principal_0 -> int
+  : in rate_1 -> int
+  : in periods_2 -> int
+  : in lo_3 -> int
+  : in hi_4 -> int
+  : in y_5 -> int
+  : out y -> int
+  | n0 = compound(principal: <principal_0>, rate: <rate_1>, periods: <periods_2>) :: principal:int, rate:int, periods:int -> out:int
+  | n1 = clamp(x: n0.out, lo: <lo_3>, hi: <hi_4>) :: x:int, lo:int, hi:int -> out:int
+  | n2_sub = subtract(x: n1.out, y: <y_5>) :: x:int, y:int -> out:int
+  | n2_abs = abs_val(x: n2_sub.out) :: x:int -> out:int
+  y <- n2_abs.out
+@end
+
+    ---
+
+[3] // average of a and b then taxed at rate
+    EXPECTED: average_two apply_tax
+    PLANNER:  taxed
+    well=Y parse=Y verify=Y fidelity=n exec=Y correct=Y correct_all=Y votes=16/16 cands=6
+    EXEC [6 5 2 10 3]
+    REF  [6 5 2 10 3]  (5/5 match)
+    --- best output ---
+@graph clamped_average
+  : in a -> int
+  : in b -> int
+  : in lo -> int
+  : in hi -> int
+  : out y -> int
+  | avg = average_two(a: <a>, b: <b>) :: a:int, b:int -> out:int
+  | c = clamp(x: avg.out, lo: <lo>, hi: <hi>) :: x:int, lo:int, hi:int -> out:int
+  y <- c.out
+@end
+
+    ---
+
+[4] // absolute difference between two readings then scaled by k
+    EXPECTED: subtract abs_val multiply
+    PLANNER:  bmi_classified
+    well=Y parse=Y verify=Y fidelity=Y exec=Y correct=Y correct_all=Y votes=16/16 cands=9
+    EXEC [6 4 1 16 1]
+    REF  [6 4 1 16 1]  (5/5 match)
+    --- best output ---
+@graph composed_phase3b
+  : in x_0 -> int
+  : in y_1 -> int
+  : in y_2 -> int
+  : out y -> int
+  | n0_sub = subtract(x: <x_0>, y: <y_1>) :: x:int, y:int -> out:int
+  | n0_abs = abs_val(x: n0_sub.out) :: x:int -> out:int
+  | n1 = multiply(x: n0_abs.out, y: <y_2>) :: x:int, y:int -> out:int
+  y <- n1.out
+@end
+
+    ---
+
+[5] // gcd of a and b bounded inside lo hi
+    EXPECTED: gcd clamp
+    PLANNER:  gcd_product
+    well=Y parse=Y verify=Y fidelity=Y exec=Y correct=Y correct_all=Y votes=16/16 cands=12
+    EXEC [3 2 1 4 1]
+    REF  [3 2 1 4 1]  (5/5 match)
+    --- best output ---
+@graph composed_phase3b
+  : in a_0 -> int
+  : in b_1 -> int
+  : in lo_2 -> int
+  : in hi_3 -> int
+  : out y -> int
+  | n0 = gcd(a: <a_0>, b: <b_1>) :: a:int, b:int -> out:int
+  | n1 = clamp(x: n0.out, lo: <lo_2>, hi: <hi_3>) :: x:int, lo:int, hi:int -> out:int
+  y <- n1.out
+@end
+
+    ---
+
+[6] // rectified output of x bounded inside lo hi
+    EXPECTED: relu clamp
+    PLANNER:  discounted_tax
+    well=Y parse=Y verify=Y fidelity=Y exec=Y correct=Y correct_all=Y votes=16/16 cands=15
+    EXEC [7 6 3 12 4]
+    REF  [7 6 3 12 4]  (5/5 match)
+    --- best output ---
+@graph composed_phase3b
+  : in x_0 -> int
+  : in lo_1 -> int
+  : in hi_2 -> int
+  : out y -> int
+  | n0 = relu(x: <x_0>) :: x:int -> out:int
+  | n1 = clamp(x: n0.out, lo: <lo_1>, hi: <hi_2>) :: x:int, lo:int, hi:int -> out:int
+  y <- n1.out
+@end
+
+    ---
+
+[7] // sigmoid of x amplified by gain
+    EXPECTED: sigmoid multiply
+    PLANNER:  across_3_years
+    well=Y parse=Y verify=Y fidelity=Y exec=Y correct=Y correct_all=Y votes=16/16 cands=11
+    EXEC [644 528 219 1200 324]
+    REF  [644 528 219 1200 324]  (5/5 match)
+    --- best output ---
+@graph composed_phase3b
+  : in x_0 -> int
+  : in y_1 -> int
+  : out y -> int
+  | n0 = sigmoid(x: <x_0>) :: x:int -> out:int
+  | n1 = multiply(x: n0.out, y: <y_1>) :: x:int, y:int -> out:int
+  y <- n1.out
+@end
+
+    ---
+
+[8] // compound interest as a percentage of principal
+    EXPECTED: compound subtract percentage
+    PLANNER:  distance_midpoint_multiply
+    well=Y parse=Y verify=Y fidelity=Y exec=Y correct=n correct_all=n votes=16/16 cands=3
+    EXEC [-300 -75 -75 -200 0]
+    REF  [0 0 0 0 0]  (1/5 match)
+    --- best output ---
+@graph composed_phase3b
+  : in principal_0 -> int
+  : in rate_1 -> int
+  : in periods_2 -> int
+  : in y_3 -> int
+  : in whole_4 -> int
+  : out y -> int
+  | n0 = compound(principal: <principal_0>, rate: <rate_1>, periods: <periods_2>) :: principal:int, rate:int, periods:int -> out:int
+  | n1 = subtract(x: n0.out, y: <y_3>) :: x:int, y:int -> out:int
+  | n2 = percentage(part: n1.out, whole: <whole_4>) :: part:int, whole:int -> out:int
+  y <- n2.out
+@end
+
+    ---
+
+[9] // the discounted price after markup
+    EXPECTED: markup discount
+    PLANNER:  micro_markup_6
+    well=Y parse=Y verify=Y fidelity=Y exec=Y correct=Y correct_all=Y votes=16/16 cands=8
+    EXEC [5 4 2 8 3]
+    REF  [5 4 2 8 3]  (5/5 match)
+    --- best output ---
+@graph composed_phase3b
+  : in price_0 -> int
+  : in rate_1 -> int
+  : in rate_2 -> int
+  : out y -> int
+  | n0 = discount(price: <price_0>, rate: <rate_1>) :: price:int, rate:int -> out:int
+  | n1 = markup(price: n0.out, rate: <rate_2>) :: price:int, rate:int -> out:int
+  y <- n1.out
+@end
+
+    ---
+
+[10] // fibonacci of n times factorial of n bounded by lo hi
+    EXPECTED: fibonacci factorial multiply clamp
+    PLANNER:  n
+    well=Y parse=Y verify=Y fidelity=Y exec=Y correct=n correct_all=n votes=16/16 cands=10
+    EXEC [11 10 5 20 8]
+    REF  [3 2 3 4 1]  (0/5 match)
+    --- best output ---
+@graph composed_phase3b
+  : in n_0 -> int
+  : in y_1 -> int
+  : in lo_2 -> int
+  : in hi_3 -> int
+  : out y -> int
+  | n0_fib = fibonacci(x: <n_0>) :: x:int -> out:int
+  | n0_fact = factorial(x: <n_0>) :: x:int -> out:int
+  | n0_mul = multiply(x: n0_fib.out, y: n0_fact.out) :: x:int, y:int -> out:int
+  | n1 = multiply(x: n0_mul.out, y: <y_1>) :: x:int, y:int -> out:int
+  | n2 = clamp(x: n1.out, lo: <lo_2>, hi: <hi_3>) :: x:int, lo:int, hi:int -> out:int
+  y <- n2.out
+@end
+
+    ---
+
+================================================================
+  PHASE 4 HEADLINE METRIC
+================================================================
+Held-out NL prompts:                  10
+Best-of-16 well-formed:               10/10 (100%)
+Best-of-16 parsed:                    10/10 (100%)
+Best-of-16 strict-verified:           10/10 (100%)  [HEADLINE]
+Best-of-16 primitive-fidelity:        9/10 (90%)  [verified graph uses expected primitives]
+Best-of-16 end-to-end executed:       10/10 (100%)  [Phase 6: prompt → graph → numeric answer]
+Best-of-16 numerically correct (1×):  7/10 (70%)  [Phase 7: matches single reference]
+Best-of-16 correct on all 5 inputs:   6/10 (60%)  [Phase 8: self-consistency + multi-input]
+Planner-family hits picked candidate: 0/10 (0%)  [Phase 15: planner usefulness]
+Geodesic-top-K hits picked candidate: 1/10 (10%)  [Phase 1c: geo classifier hit-rate]
+Anchor candidates injected:           10/10 (100%)  [Phase 2: anchor coverage]
+Anchor wins the vote:                 1/10 (10%)  [Phase 2: anchor pick-rate]
+Composition candidates injected:      10/10 (100%)  [Phase 3b: composition coverage]
+Composition wins the vote:            9/10 (90%)  [Phase 3b: composition pick-rate]
+
