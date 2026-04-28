@@ -34,7 +34,7 @@ option(ENABLE_ROTORQUANT       "Enable RotorQuant for memory compression (MSA)" 
 #  Core library  (single OBJECT library shared by all targets)
 # ==================================================================
 
-add_library(microgpt_lib STATIC src/microgpt.c src/microgpt_organelle.c src/microgpt_msa.c src/microgpt_turboquant.c src/microgpt_rotorquant.c src/microgpt_pipeline.c src/microgpt_vr.c)
+add_library(microgpt_lib STATIC src/microgpt.c src/microgpt_organelle.c src/microgpt_msa.c src/microgpt_turboquant.c src/microgpt_rotorquant.c src/microgpt_pipeline.c src/microgpt_vr.c src/microgpt_geodesic.c)
 target_include_directories(microgpt_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 # --- Compile-time feature flags ---
@@ -147,7 +147,7 @@ function(_microgpt_lib_for_defines OUT_VAR)
   endif()
 
   # Create a new STATIC library with the same sources + features
-  add_library(${_tgt} STATIC src/microgpt.c src/microgpt_organelle.c src/microgpt_msa.c src/microgpt_turboquant.c src/microgpt_rotorquant.c src/microgpt_pipeline.c src/microgpt_vr.c)
+  add_library(${_tgt} STATIC src/microgpt.c src/microgpt_organelle.c src/microgpt_msa.c src/microgpt_turboquant.c src/microgpt_rotorquant.c src/microgpt_pipeline.c src/microgpt_vr.c src/microgpt_geodesic.c)
   target_include_directories(${_tgt} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
   # Propagate all feature flags from the base target
@@ -1797,6 +1797,36 @@ if(NOT MSVC)
   target_link_libraries(test_microgpt_vr PRIVATE m)
 endif()
 add_test(NAME microgpt_vr_tests COMMAND test_microgpt_vr WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+# Geodesic Riemannian solver — Phase 1b manifold-learning lift.
+# Lifted from sibling. C99, GEO_DIMS=12 fixed-point.
+add_executable(test_microgpt_geodesic tests/test_microgpt_geodesic.c)
+target_link_libraries(test_microgpt_geodesic PRIVATE microgpt_lib)
+target_include_directories(test_microgpt_geodesic PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests ${CMAKE_CURRENT_SOURCE_DIR}/src)
+if(NOT MSVC)
+  target_link_libraries(test_microgpt_geodesic PRIVATE m)
+endif()
+add_test(NAME microgpt_geodesic_tests COMMAND test_microgpt_geodesic WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+# EKAN B-spline basis — Phase 1b manifold-learning lift.
+# Header-only fixed-point cubic B-spline.
+add_executable(test_microgpt_ekan tests/test_microgpt_ekan.c)
+target_link_libraries(test_microgpt_ekan PRIVATE microgpt_lib)
+target_include_directories(test_microgpt_ekan PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests ${CMAKE_CURRENT_SOURCE_DIR}/src)
+if(NOT MSVC)
+  target_link_libraries(test_microgpt_ekan PRIVATE m)
+endif()
+add_test(NAME microgpt_ekan_tests COMMAND test_microgpt_ekan WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+# EKAN autoencoder network — Phase 1b manifold-learning lift.
+# Multi-layer KAN with Fourier activations + Adam.
+add_executable(test_microgpt_ekan_network tests/test_microgpt_ekan_network.c)
+target_link_libraries(test_microgpt_ekan_network PRIVATE microgpt_lib)
+target_include_directories(test_microgpt_ekan_network PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests ${CMAKE_CURRENT_SOURCE_DIR}/src)
+if(NOT MSVC)
+  target_link_libraries(test_microgpt_ekan_network PRIVATE m)
+endif()
+add_test(NAME microgpt_ekan_network_tests COMMAND test_microgpt_ekan_network WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
 # Pipeline IR corpus generator (Phase 3a) — produces hand-curated
 # (prompt, graph) training pairs by building Pipeline IR objects
