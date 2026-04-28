@@ -3526,6 +3526,106 @@ The discipline-of-pre-registration result: the §42 prediction matrix dictated t
 
 ---
 
+## 44. State of the arc — where we actually are
+
+This section is the snapshot summary across the full development arc. Every prior section is a phase log; this section is the consolidated view a reader picking up the project today should start with.
+
+### 44.1 The architecture, settled
+
+| Component | Role | Status |
+|---|---|---|
+| Pipeline IR + verifier + repair + executor (`src/microgpt_pipeline.{h,c}`) | Deterministic Judge stack — type-checks, cycle-detects, repairs malformed graphs, executes on inputs | Stable. 51/51 unit tests. Used by every retrieval mechanism without modification. |
+| Wiring transformer (540K-param word-level Transformer + 540K-param planner) | Stochastic candidate source: best-of-16 generation with 5-input self-consistency vote | Documented at 35% true generalisation (§38, §41). Produces noise-and-signal candidates the Judge filters. |
+| Anchor retrieval (`wiring_anchor_graphs.{h,c}` + `wiring_geo_classifier.{h,c}`) | Single-family deterministic retrieval: 20 canonical @graph DAGs indexed by 20D Geodesic distance + handcoded keyword bag | 🎯 100% (20/20) on novel paraphrases (§37) |
+| Fragment composition (`wiring_fragments.{h,c}`) | Multi-stage retrieval: 15 reusable fragments + composition operator chaining 2-3 fragments by output→input linkage | 6/10 on multi-stage prompts (§43) |
+| Fidelity-trumps gate (in `main.c` scoring loop) | Picks the candidate with the *correct primitive set* over the candidate with the highest score; decides between anchor and composition cleanly | Empirically stable: anchor wins single-family prompts, composition wins multi-stage |
+
+The IR + verifier + executor is the *invariant layer*. Every retrieval mechanism (anchor, composition, future) flows through it with no modification. The thesis "*organelles retrieve; pipelines compose*" is now operationally implemented, with one explicit extension: *...and manifold retrieval breaks ties when retrieval saturates*.
+
+### 44.2 Headlines, side-by-side, with leakage discipline applied
+
+| Eval | Mechanism | Result | Comment |
+|---|---|---|---|
+| Phase 2c clean paraphrases (20 prompts) | Anchor retrieval | **🎯 100% (20/20)** | Genuinely clean; the headline claim |
+| Phase 3b composition test (10 prompts) | Fragment composition | **6/10** | Within pre-registered 5-7/10 |
+| Phase 2c clean (no anchor, no composition) | Wiring transformer alone | **35% (7/20)** | True generalisation; 75% wiring-layer claim was Phase 13 training-on-test |
+| Phase 3a adversarial axis-2 (20 prompts) | Handcoded keyword classifier | 2/20 | Bounded by lexical bag — no path forward without corpus expansion |
+| Phase 3a adversarial axis-2 | TF-IDF learned encoder | 4/20 | Falsified pre-registered 12-16/20; 408 examples too few for learned encoder |
+
+### 44.3 The four-axis architectural boundary, as of Phase 3b
+
+Updated from §39 with Phase 3b's resolution of axis 3:
+
+| Axis | Failure mode | Status after Phase 3b |
+|---|---|---|
+| 1. Novel families | Prompts whose semantics map to a family the anchor table doesn't encode | ⏳ **Open** — fix is to add an anchor entry (~30 min per family). Linear in labour. |
+| 2. Weak keyword overlap | Adversarial paraphrases stripping every keyword in the family's bag | ⏳ **Open** — handcoded bag bounded by curator's coverage. Phase 4 corpus expansion would address. |
+| 3. Multi-stage compositions outside any single anchor | Chains of 2-3 primitives where no anchor matches | ✅ **Closed by Phase 3b** at 60% on multi-stage. Failures are downstream wiring/numerical, not retrieval. |
+| 4. Domain-vocabulary drift | Translation into vocabularies the keyword bag doesn't model | ⏳ **Open** — same root cause as axis 2. |
+
+**Three of the four axes remain open.** All three open axes share a single root cause: **the corpus and the keyword bag are both bounded by the curator's hand**. None require a research breakthrough; they require either (a) more curation effort or (b) a different paradigm (Phase 4 corpus expansion + learned encoder, or paradigm-shift to LLM-augmented retrieval).
+
+### 44.4 The research arc, declared closed
+
+The 17-phase corpus-engineering arc + the 8-phase manifold-retrieval addendum (1a/1b/1c/2/2b/2c/2d/3a/3b) constitutes a complete characterisation of what *small specialist organelles + deterministic Judges + manifold retrieval* can do at the 408-example regime, on a single laptop, in pure C99, with zero dependencies.
+
+**What's empirically validated:**
+- Anchor retrieval over a curated 20-family library: 100% on novel paraphrases
+- Fragment composition for multi-stage chains: 60% on 10-prompt test set
+- The deterministic Judge stack as architecture-independent infrastructure
+- Pre-registration discipline as a research-process tool that prevented at least three would-be retroactive rationalisations (Phase 17 multi-seed framing, Phase 1c hint-prefix outcome, Phase 3a TF-IDF result)
+
+**What's empirically falsified:**
+- Wiring transformer's natural-English generalisation at 35% (Phase 2d cleaned the inflated 75-80% headline; Phase 13 was training-on-test)
+- Learned encoders at 408-example scale (Phase 3a TF-IDF)
+- Re-ranking strategies as a path to break unanimous wrong-answer failures (Phases 17, 1a)
+
+**What's empirically validated *as the open frontier*:**
+- Corpus expansion (Phase 4) as the only architectural escape from axes 1, 2, and 4
+- Hand-curation as the immediate engineering escape from axes 1, 2, and 4 (linear-effort scaling)
+- The wiring transformer's text-token generation as architecturally inadequate for this task class — replaced by retrieval, not improved upon
+
+### 44.5 The "soft wall" diagnosis
+
+We have hit a wall in a specific sense: **the next meaningful move is a commitment, not an experiment.** Every research question the architecture can pose has now been answered. The remaining open questions are:
+
+1. **How big does the curated library grow?** Engineering decision, scales with intended deployment scope.
+2. **Is corpus expansion + learned encoder worth a multi-week investment?** Phase 4 — the answer is empirically unsettled but the bet is bounded.
+3. **Should the wiring transformer be retired in favour of a frontier LLM in the same Judge stack?** Out of scope for the project's central thesis but architecturally the same Judge stack accepts any candidate source.
+
+None of these is a research question. The architecture is closed; what's open is *engineering scope and ambition*.
+
+### 44.6 Practical reproducibility surface
+
+For a reader who wants to run any of the headline numbers locally:
+
+```sh
+# 100% on Phase 2c clean paraphrases (anchor retrieval, the headline claim):
+./wiring_organelle_demo --clean-only
+
+# 6/10 on multi-stage compositions (Phase 3b fragment retrieval):
+./wiring_organelle_demo --composition
+
+# 35% wiring transformer alone (the genuinely-clean wiring-layer baseline):
+./wiring_organelle_demo --no-anchor --clean-only
+
+# Baseline showing current architecture has no composition path (predicted 0/10):
+./wiring_organelle_demo --composition --no-anchor --no-composition
+
+# Handcoded vs TF-IDF learned classifier on adversarial axis-2:
+./manifold_classifier_demo pipeline_corpus_adversarial.txt
+./manifold_tfidf_demo  pipeline_corpus_adversarial.txt
+
+# Verify no leakage in the corpus generator:
+./tools/check_held_out_leakage.sh build/
+```
+
+All numbers above reproduce on `main`. Tag `v3.3-wiring-organelle` (post-Phase-3b) is the canonical reference; commit hashes are recorded in `RESEARCH_WIRING_ORGANELLE_PAPER.md` §15.
+
+**State of the arc: closed at the architecture level, open at the engineering level. The next chapter is corpus expansion (Phase 4) or library extension — both labour-bounded, neither research-bounded.**
+
+---
+
 ## 16. Closing Remark
 
 ---
