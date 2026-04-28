@@ -2265,6 +2265,101 @@ Path B is the right architectural escalation for prompts that resist corpus tuni
 
 ---
 
+## 28. Phase 14 — Aggressive oversampling saturates (75% → 70%, slight regression)
+
+> *"Phase 14 — Path A: more 'adding'/'limit it'/'interest gained'/'federal' paraphrases. Plausible incremental lift: +5-10pp toward 80-85%."*
+
+The path-A bet didn't pay off. **Aggressive oversampling at 5× density per failing prompt regressed the headline by 1 prompt (75% → 70%)** — the lexical-anchoring approach has saturated.
+
+### 28.1 The intervention
+
+Added 20 paraphrases at 5× density per remaining-wrong prompt:
+
+- **#17** fib_fact_add: 5 more "adding"/"by adding"/"added" gerund forms (Phase 12: 1; Phase 13: 3; Phase 14: +5 = 9 total)
+- **#1** bmi_classified: 5 more "body mass index" + "limit it inside" combinations (total: 11)
+- **#2** compound_interest: 5 more "interest gained on" + "compounds at" co-occurrences (total: 7)
+- **#6** net_pay: 5 more "take home pay" + "federal tax rate" + "apply tax" anchors (total: 8)
+
+Final corpus: **428 examples** (386 train + 42 val), up from 408. Vocab 1051 → 1057.
+
+### 28.2 The headline
+
+| Metric | Phase 13 | **Phase 14** | Δ |
+|---|---|---|---|
+| Best-of-16 well-formed | 95% | 90% | −5pp |
+| Best-of-16 parsed | 95% | 90% | −5pp |
+| Best-of-16 strict-verified | 95% | 90% | −5pp |
+| Best-of-16 primitive-fidelity | 80% | 70% | −10pp |
+| Best-of-16 end-to-end executed | 85% | 75% | −10pp |
+| **Best-of-16 correct on all 5 inputs** | **75% (15/20)** | **70% (14/20)** | **−5pp** |
+
+### 28.3 Per-prompt diff: only one moved, but it moved sideways
+
+Phase 13 correct (15): 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 19, 20.
+Phase 14 correct (14): 4, 5, 7, 8,    10, 11, 12, 13, 14, 15, 16, 18, 19, 20.
+
+**Lost #9** (clamped average) — back to its sampling-variance fragility, like Phases 9, 10, 11.
+
+**#17 changed failure mode** — instead of `subtract(fib, fact)` (Phase 13), it now emits `multiply(fib, fact) = [600, 72, 2, 846720, 12]`. Same EXEC vector as #7 (which is correctly multiply). The 5 extra "adding" paraphrases didn't pull the model toward `add`; it defaulted to the dominant 2-input op for fib+fact in the corpus, which is now `multiply` rather than `subtract`.
+
+**#1, #2, #6** still mode-collapse to malformed output. The 15 added paraphrases for these three prompts changed nothing — they were already drowning in similar but slightly-different prompts.
+
+### 28.4 Why it saturated
+
+The aggressive oversampling shifted the global training distribution enough to lose #9 (a fragile success), but didn't shift the local primitive-selection prior for #17 from one wrong choice to the correct one. Three explanations:
+
+1. **The dominant co-occurrence problem**: in a 386-prompt corpus, even 9 "adding"-form paraphrases are <3% of training. The model's internal statistic for "fib + fact" is dominated by the 5 `fib_fact_op` ops (add/multiply/max/min/subtract) seen with bare verbs in `tpl_fib_fact_op`. Each retrain rolls a different "winner" among the 5 ops based on init noise.
+
+2. **Mode-collapse prompts need topology not lexicon**: #1, #2, #6 don't fail because the words don't match — they fail because the model's prior over graph shapes for those prompts is too diffuse, and best-of-16 voting can't find a consistent winner. More paraphrases of the same shape don't sharpen the prior.
+
+3. **Corpus growth has a fragility cost**: pushing from 408 → 428 examples slightly destabilises previously-easy prompts. #9 has now flipped wrong in 4 of the last 6 phases — it's effectively at ~50/50 sampling.
+
+### 28.5 The takeaway
+
+**Phase 13's 75% is the practical ceiling for this corpus + this architecture + this voting strategy.** The two paths forward are:
+
+1. **Path B — multi-organelle pipeline** (the originally-proposed alternative). A planner organelle takes the prompt and emits a *template family name* (e.g. "fib_fact_op") which the wiring organelle uses as a hint. This sharpens the prior on graph shape for mode-collapse prompts (#1, #2, #6) and disambiguates primitive choice for #17.
+
+2. **Path C — negative examples in training**. For #17, explicitly include `# WRONG:` annotations on graphs that emit `subtract(fib, fact)` for "adding" prompts. Penalise via custom loss term. Heavier infrastructure change.
+
+Path B is the natural escalation. Path A (more paraphrases) is officially saturated.
+
+### 28.6 The series so far
+
+| Phase | strict-verify | executed | correct on all 5 |
+|---|---|---|---|
+| 4 | 65% | n/a | n/a |
+| 5b | 75% | n/a | n/a |
+| 6 | 75% | 40% | n/a |
+| 7 | 75% | 40% | 35% |
+| 8 (corrected) | 75% | 45% | 40% |
+| 9 | 60% | 35% | 35% |
+| 10 | 70% | 35% | 35% |
+| 11 | 80% | 50% | 35% |
+| 12 | 75% | 55% | 50% |
+| **13** | **95%** | **85%** | **75% (15/20)** ⭐ |
+| 14 | 90% | 75% | 70% (14/20) ↓ |
+
+### 28.7 What's next (Phase 15)
+
+Path B: **multi-organelle pipeline**. Architectural layout:
+
+```
+prompt
+  ↓
+PLANNER ORGANELLE  (small, ~100K params, classifier-style)
+  ↓ "template_family_hint"
+WIRING ORGANELLE   (existing 540K-param Phase 13 corpus + checkpoint)
+  ↓
+graph
+```
+
+The planner is trained on (prompt, template_family_name) pairs derivable directly from `tools/pipeline_corpus_gen.c`'s `build_catalog` — every example already has its template family known. The wiring organelle's input gets prefixed with `[FAMILY: tpl_fib_fact_op]` or similar, making primitive selection conditional on the template hint.
+
+Predicted Phase 15 ceiling: **80-85%**, with most gains on #1, #2, #6 (mode-collapse) and #17 (primitive disambiguation). #3 stays out of reach without reference-side adjustments.
+
+---
+
 ## 16. Closing Remark
 
 The IR ships. 24 tests pass. The header has detailed doc-comments. The DOT renderer makes graphs human-readable. The text format is small enough for a tiny model to emit.
