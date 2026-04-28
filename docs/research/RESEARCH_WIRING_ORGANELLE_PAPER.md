@@ -415,6 +415,10 @@ This is research-grade scope — orders of magnitude harder than the 17 phases o
 
 The manifold-learning direction is the only one that preserves both the **deterministic-infrastructure thesis** and the **tiny-organelle constraint** while offering a path past the structural ceiling.
 
+### 16.5 Detailed feasibility sketch
+
+A separate research note expands this section with: a concrete pipeline diagram, the EKAN+Geodesic+VR API mappings, contrastive embedder training, a chemistry/biology bootstrapping strategy, build-feasibility costing, and a Phase 1 prototype recommendation. See `docs/research/RESEARCH_MANIFOLD_LEARNING.md`.
+
 ---
 
 ## 17. Closing

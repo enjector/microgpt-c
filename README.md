@@ -145,8 +145,9 @@ Key technical contributions shipped in this engine:
 | 🎲 **Lottery experiment** (entropy baseline) | [lottery/README.md](demos/character-level/lottery/README.md) |
 | 🔬 **Pipeline architecture** (white paper) | [RESEARCH_ORGANELLE_PIPELINE](docs/research/RESEARCH_ORGANELLE_PIPELINE.md) |
 | 🧠 **Reasoning conclusion** | [RESEARCH_ORGANELLE_REASONING](docs/research/RESEARCH_ORGANELLE_REASONING.md) |
-| 🔌 **Pipeline IR + Wiring Organelle (paper)** | [RESEARCH_WIRING_ORGANELLE_PAPER](docs/research/RESEARCH_WIRING_ORGANELLE_PAPER.md) |
-| 🔬 **Pipeline IR + Wiring Organelle (13-phase log)** | [RESEARCH_PIPELINE_IR](docs/research/RESEARCH_PIPELINE_IR.md) |
+| 🔌 **Pipeline IR + Wiring Organelle (paper, v2.0)** | [RESEARCH_WIRING_ORGANELLE_PAPER](docs/research/RESEARCH_WIRING_ORGANELLE_PAPER.md) |
+| 🔬 **Pipeline IR + Wiring Organelle (17-phase log)** | [RESEARCH_PIPELINE_IR](docs/research/RESEARCH_PIPELINE_IR.md) |
+| 🌐 **Manifold-learning composition (research sketch)** | [RESEARCH_MANIFOLD_LEARNING](docs/research/RESEARCH_MANIFOLD_LEARNING.md) |
 | 📚 **Using as a library** | [FUNCTIONAL_SPEC](docs/FUNCTIONAL_SPEC.md) |
 | ⚡ **Performance & benchmarks** | [PERFORMANCE](docs/testing/PERFORMANCE.md) |
 | 🚀 **SSD inference optimisations** | [RESEARCH_SSD](docs/research/RESEARCH_SSD.md) |
