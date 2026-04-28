@@ -2706,6 +2706,47 @@ The thesis of *small specialist organelles coordinated by deterministic infrastr
 
 ---
 
+## 32. Phase 1a — Vietoris-Rips modal-cluster re-rank (negative result; diffuse-prior failures are unanimous, leaving no minority signal to amplify)
+
+**The prediction.** `RESEARCH_MANIFOLD_LEARNING.md` §13.3 proposed a phased manifold-learning lift starting with Phase 1a: lift only the Vietoris-Rips persistent cohomology engine from the sibling C99 implementation, embed each best-of-16 candidate as a 12D one-hot family vector, run VR β₀ at small radius to identify the modal-family cluster, and award a +10 bonus to candidates in that cluster. Predicted lift: 75% → 80%.
+
+**The intervention.** Lifted `src/microgpt_vr.{h,c}` from the sibling at `/Users/user/dev/projects/microgpt-c` (pure C99, fixed-point at 12D / 64 points, all 16 ported tests passing). Added `vr_rerank_candidates()` to `demos/wiring_organelle/main.c`: maps each candidate's `@graph` name to a family ID (with trailing `_<digits>` stripped, so `gcd_chain_1` and `gcd_chain_2` share a family slot), embeds as a 12D one-hot point with tiny per-candidate jitter, runs VR β₀ at radius 0.5, awards +10 to candidates in the largest family bucket — but only when the bucket's count exceeds all rivals AND β₀ ≥ 2 (to avoid triggering on uniform pools that are already-handled by the sibling-result voting).
+
+The bonus stacks additively with the existing Phase 15 graded planner bonus (+20 exact, +5 prefix). All other re-ranking infrastructure (3-seed ensemble, 16-vote pool, 5-input self-consistency, fidelity tiebreaker) was unchanged.
+
+**The result.** **70% correct on all 5 inputs (14/20)** — within Phase 17's 75% ±5pp variance band. No statistically meaningful lift. Sub-metrics held: 100% well-formed, 100% parsed, 95% strict-verified, 65% primitive-fidelity, 75% planner-family hits, 75% end-to-end executed, 70% numerically correct.
+
+**Why it didn't lift.** Audited the 6 failing prompts:
+
+| # | Prompt | votes producing modal answer | failure mode |
+|---|---|---|---|
+| 1 | "body mass index limit it inside lo and hi" | 16/16 unanimous | wrong topology (no clamp) |
+| 2 | "interest gained on an investment when principal compounds at rate r over n years" | 16/16 unanimous | missing subtract step |
+| 3 | "weighted combination of three measurements each scaled by its own weight" | 16/16 unanimous | wrong reference topology |
+| 6 | "take home pay from gross income at federal tax rate" | 16/16 unanimous | wrong primitive choice |
+| 9 | "average of a and b bounded between minimum and maximum" | 16/16 unanimous | wrong topology |
+| 17 | "fibonacci of n combined with factorial of n by adding" | 16/16 unanimous | picks `subtract` not `add` |
+
+In **every failing prompt, all 16 candidates emit the same wrong answer.** This exactly matches §10.1 of `RESEARCH_MANIFOLD_LEARNING.md`:
+
+> *The 16 candidates are 16 confident wrong answers. The model has no preferred mass at the right interpretation.*
+
+VR's modal-cluster bonus rewards the largest cluster — but when the modal cluster *is* the wrong answer, the bonus reinforces the wrong consensus. With no minority signal in the candidate pool, no re-ranking strategy operating on the existing 16 candidates can recover the right answer. This is the **diffuse-prior ceiling** in its purest form: the failure happens at *generation time*, not at *re-ranking time*, so a re-ranker (any re-ranker) cannot fix it.
+
+**The honest framing.** Phase 1a is the **second confirmation** (after Phase 17's correlated-failure finding) that the 70-80% ceiling is **not a re-ranking problem.** Both the multi-seed and the geometric-cluster levers converged at 70-75%. The pattern is consistent: any technique that operates on candidates produced by the existing model architecture cannot break the ceiling, because the candidates themselves are biased toward the wrong mode.
+
+**The implication for Phase 1b.** The fix has to be **at generation time**, not at re-ranking time. Phase 1b proposes EKAN + Geodesic: project the held-out prompt to a 12D anchor coordinate via a learned embedder + EKAN parametric surface, then retrieve the K-nearest *anchor* graphs by Riemannian geodesic distance, and use those anchors as a strong prior on which graph the wiring organelle should generate (e.g. as a constrained-decoding prefix, or as an additional planner-family signal beyond the current 540K word-level transformer).
+
+If Phase 1a confirmed "the candidate pool is poisoned at the source," Phase 1b is the test of whether geometric retrieval can produce candidates the softmax-over-vocabulary path doesn't.
+
+**The decision.** Keep `vr_rerank_candidates()` in the codebase — it's small (~80 lines), well-commented, and serves as a working VR integration that Phase 1b can reuse for the cluster-validation step (one of the three subsystems in `RESEARCH_MANIFOLD_LEARNING.md` §3). It's a no-op on the current candidate distribution but its presence costs nothing. Don't update README/ROADMAP headline numbers — the metric stayed within variance.
+
+**Phase 1a status: negative result, diagnosis confirmed.**
+
+The 17-phase arc plus Phase 1a together establish the *necessary* condition for breaking the ceiling: the next experiment must change *what candidates the model produces*, not *how candidates are scored*. This is the EKAN + Geodesic test — the categorical leap §10 predicts will reach ~90%.
+
+---
+
 ## 16. Closing Remark
 
 The IR ships. 24 tests pass. The header has detailed doc-comments. The DOT renderer makes graphs human-readable. The text format is small enough for a tiny model to emit.

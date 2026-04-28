@@ -497,17 +497,22 @@ This sharpens our Phase 1 design: **don't start with the full EKAN+Geodesic+VR p
 
 ### 13.3 The phased lift plan
 
-#### Phase 1a — minimal geometric Judge (≤2 days, target: 80% headline)
+#### Phase 1a — minimal geometric Judge (≤2 days, target: 80% headline) — **RAN, negative result**
 
 Lift only the **VR persistent cohomology engine** + a tiny **anchor-table lookup**, using the existing Wiring Organelle's 16 candidates as the source. After verify-and-repair, embed each candidate's @graph structure as a 12D point (one coordinate per template family, one-hot at the candidate's family); run VR to detect the *expected topology* of the candidate cluster (β₀ = number of distinct families, β₁ = 0 if expecting DAG, etc.). Re-rank: candidates whose presence improves the cluster's Betti signature toward the expected score get a +10 bonus, beyond the existing planner-family bonus.
 
-**Files to copy**:
-- `src/microgpt_vr.h`, `src/microgpt_vr.c` (590 LOC)
-- `tests/test_microgpt_vr.c` (lift the 6 most relevant tests)
+**Files copied** (commit `dd82e9c`):
+- `src/microgpt_vr.h`, `src/microgpt_vr.c` (590 LOC), `tests/test_microgpt_vr.c` — all 16 tests pass.
 
-**Adaptations**: minimal — VR is dimension-fixed at 12D; we adapt by mapping template-family indices to one-hot 12D coordinates.
+**Adaptations**: minimal — VR is dimension-fixed at 12D; mapped template-family indices to one-hot 12D coordinates with tiny per-candidate jitter to avoid coincident points.
 
 **Predicted lift**: 75% → 80%. Catches one or two of the diffuse-prior failures (#17 likely) by topology-validating the candidate set itself.
+
+**Actual result**: **70% (14/20) — flat, within Phase 17's 75% ±5pp variance.** All 6 failing prompts had **all 16 candidates emitting the same wrong answer** (votes=16/16 unanimous on the wrong topology). VR's modal-cluster bonus rewards the largest cluster — but when the modal cluster *is* the wrong answer, the bonus reinforces the wrong consensus instead of breaking it.
+
+This is the predicted outcome from §10.1: *"the 16 candidates are 16 confident wrong answers."* No re-ranker operating on the existing candidate pool can recover the right answer. See `RESEARCH_PIPELINE_IR.md` §32 for the full audit.
+
+**Conclusion from Phase 1a**: the ceiling is **not a re-ranking problem.** The fix has to be at generation time — Phase 1b is the test.
 
 #### Phase 1b — geodesic distance over an EKAN surface (≤3 more days, target: 85%)
 
@@ -549,11 +554,17 @@ Only if Phase 1b stalls below 85%. Pre-train EKAN's parametric surface on a chem
 - **The book chapters in `book.2nd/`** — they treat geometry as a feature encoder, not as primary reasoning. Useful narrative but not headline-driving.
 - **The 12D-fixed assumption** — works for now (~150 anchors fit in 12D), but Phase 2 will need generic-D macro support if we expand to the full 192-primitive `w_vm_functions.txt` library.
 
-### 13.6 Updated recommendation
+### 13.6 Updated recommendation (post Phase 1a)
 
-The §10 verdict's "2-3 weeks Phase 1, 4-6 weeks with chemistry" estimate compresses to **5-7 days Phase 1a+1b** by lifting the sibling's tested C99 engine implementations. **Phase 1a alone (the minimum viable geometric Judge using only VR re-ranking) is a 1-2 day effort** with a plausible +5pp lift, and serves as a useful first-cut measurement of whether topology-aware re-ranking helps at all before investing in the full EKAN+Geodesic stack.
+The §10 verdict's "2-3 weeks Phase 1, 4-6 weeks with chemistry" estimate compresses to **5-7 days Phase 1a+1b** by lifting the sibling's tested C99 engine implementations.
 
-The sibling's `RESEARCH_GEOMETRIC_ORGANELLES.md` counter-point is genuine — start small, measure, escalate only on evidence. If Phase 1a gets to 80%, that's a win even without the manifold composition module. If it stalls at 75%, Phase 1b's Geodesic over EKAN is the next test before assuming the architecture is at fault.
+**Phase 1a ran (commit `dd82e9c` lift, follow-up integration commit, eval logged in `build/wiring_phase1a.log`) and returned a clean negative result: 70% (14/20), within Phase 17's 75% ±5pp variance.** The audit in `RESEARCH_PIPELINE_IR.md` §32 shows all 6 failing prompts had all 16 candidates unanimous on the wrong answer — VR's modal-cluster bonus has no minority signal to amplify when the model is confidently wrong.
+
+This sharpens the §10 verdict in a useful way: **the 70-80% ceiling is not a re-ranking problem.** Two independent re-ranking-only experiments (Phase 17 multi-seed ensemble, Phase 1a VR cluster bonus) converged at the same band. Any technique that operates on the existing candidate pool inherits the modal bias from the existing model.
+
+**Phase 1b is now the critical test.** Its proposition — generate candidates via EKAN-anchor + Geodesic-retrieval, not via vocabulary-softmax — directly addresses the diagnosis. If it lifts to 85%, the manifold-learning thesis is empirically validated. If it stalls at 70-75%, the ceiling is more architectural than generative-vs-discriminative, and the program needs to reconsider.
+
+The sibling's `RESEARCH_GEOMETRIC_ORGANELLES.md` counter-point ("representation > solver sophistication") aligns with this finding: representation is exactly what Phase 1b changes, while Phase 1a only changed the solver over a fixed representation.
 
 ---
 

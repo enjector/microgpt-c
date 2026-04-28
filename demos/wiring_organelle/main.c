@@ -84,6 +84,7 @@
 #include "microgpt.h"
 #include "microgpt_organelle.h"
 #include "microgpt_pipeline.h"
+#include "microgpt_vr.h"
 #include "wiring_natives.h"
 #include "wiring_references.h"
 
@@ -384,6 +385,127 @@ static int extract_graph_name(const char *txt, char *out, int max_out) {
     }
     out[o] = '\0';
     return o > 0;
+}
+
+/* Phase 1a — geometric re-rank via Vietoris-Rips persistent cohomology.
+ *
+ * Given the candidate graph names, embed each as a 12D one-hot at its
+ * family-ID slot (with tiny per-candidate jitter to avoid degenerate
+ * coincident points). Run VR β₀ at radius 0.5 to identify the candidate
+ * cluster structure, then assign a +VR_BONUS bonus to candidates whose
+ * family is the modal (largest) cluster.
+ *
+ * This is a planner-free majority-family voter: when 16 candidates split
+ * across families, the largest family wins, independent of result-vector
+ * voting and the Phase 15 planner. Complementary to both.
+ *
+ * Family ID assignment: first 12 distinct family prefixes encountered
+ * map to coords 0..11. Beyond 12, families share slot 11 (degrades to
+ * a low-resolution bucket but still useful).
+ *
+ * Out: vr_bonus[i] is the bonus to add to candidate i's score (0 or +VR_BONUS).
+ * Returns the dominant cluster size (number of candidates in the largest
+ * family bucket) for telemetry, or 0 if VR was skipped (n_cands<3). */
+#define VR_BONUS 10
+#define VR_MAX_FAMILIES 12
+
+static int vr_rerank_candidates(const char **gnames, int n_cands,
+                                int *vr_bonus_out) {
+    for (int i = 0; i < n_cands; i++) vr_bonus_out[i] = 0;
+    if (n_cands < 3 || n_cands > VR_MAX_PTS) return 0;
+
+    /* Map each candidate's family prefix to a slot 0..11. */
+    char fam_table[VR_MAX_FAMILIES][64] = {{0}};
+    int  n_families = 0;
+    int  cand_family[VR_MAX_PTS];
+    int  family_count[VR_MAX_FAMILIES] = {0};
+
+    for (int i = 0; i < n_cands; i++) {
+        cand_family[i] = -1;
+        if (!gnames[i] || !gnames[i][0]) continue;
+        /* Family prefix: graph name up to first underscore + numeric
+         * suffix (e.g. "gcd_chain_2" → "gcd_chain"). Simpler: take
+         * the whole gname and treat as the family bucket. */
+        char fam[64];
+        size_t l = strnlen(gnames[i], sizeof(fam) - 1);
+        memcpy(fam, gnames[i], l);
+        fam[l] = '\0';
+        /* Strip a trailing _<digits> if present, so gcd_chain_1 and
+         * gcd_chain_2 share a family. */
+        for (int k = (int)l - 1; k > 0; k--) {
+            if (fam[k] >= '0' && fam[k] <= '9') continue;
+            if (fam[k] == '_' && k < (int)l - 1) fam[k] = '\0';
+            break;
+        }
+
+        int slot = -1;
+        for (int f = 0; f < n_families; f++) {
+            if (strcmp(fam_table[f], fam) == 0) { slot = f; break; }
+        }
+        if (slot < 0) {
+            if (n_families < VR_MAX_FAMILIES) {
+                slot = n_families++;
+                strncpy(fam_table[slot], fam, sizeof(fam_table[slot]) - 1);
+            } else {
+                slot = VR_MAX_FAMILIES - 1;  /* overflow bucket */
+            }
+        }
+        cand_family[i] = slot;
+        family_count[slot]++;
+    }
+
+    /* Build 12D one-hot points with tiny per-cand jitter. */
+    VRPoint points[VR_MAX_PTS];
+    int n_points = 0;
+    int idx_to_cand[VR_MAX_PTS];
+    for (int i = 0; i < n_cands; i++) {
+        if (cand_family[i] < 0) continue;
+        VRPoint *p = &points[n_points];
+        memset(p, 0, sizeof(*p));
+        p->n_dims = VR_MAX_FAMILIES;
+        p->id = n_points;
+        p->coords[cand_family[i]] = 1.0f;
+        /* Tiny jitter on a different axis to avoid coincident points. */
+        p->coords[(cand_family[i] + 1) % VR_MAX_FAMILIES] = 0.001f * (float)i;
+        idx_to_cand[n_points] = i;
+        n_points++;
+    }
+    if (n_points < 3) return 0;
+
+    /* Run VR β₀ at small radius — counts distinct family clusters. */
+    VREngine eng;
+    vr_engine_init(&eng, /*max_radius=*/2.0f, /*max_dim=*/0,
+                   /*n_dims=*/VR_MAX_FAMILIES);
+    int betti[3] = {0};
+    vr_betti_numbers(&eng, points, n_points, /*at_radius=*/0.5f,
+                     /*min_persistence=*/0.0f, betti);
+
+    /* Identify the dominant family (largest count). */
+    int best_family = -1, best_count = 0;
+    for (int f = 0; f < n_families; f++) {
+        if (family_count[f] > best_count) {
+            best_count = family_count[f];
+            best_family = f;
+        }
+    }
+    if (best_family < 0) return 0;
+
+    /* Award bonus only when there's actual cluster diversity (β₀ ≥ 2)
+     * AND a clear dominant family (>= 2 members AND > all rivals).
+     * This prevents the bonus from triggering when the pool is uniform
+     * (already-handled by other voting) or when no family dominates. */
+    if (betti[0] < 2) return best_count;  /* uniform pool — no VR signal */
+    int dominant_clear = 1;
+    for (int f = 0; f < n_families; f++) {
+        if (f == best_family) continue;
+        if (family_count[f] >= best_count) { dominant_clear = 0; break; }
+    }
+    if (!dominant_clear || best_count < 2) return best_count;
+
+    for (int i = 0; i < n_cands; i++) {
+        if (cand_family[i] == best_family) vr_bonus_out[i] = VR_BONUS;
+    }
+    return best_count;
 }
 
 /* ============================================================
@@ -1039,11 +1161,29 @@ int main(void) {
             int64_t exec_results_all[WIRING_INPUT_SETS] = {0};
             int valid_results_all = 0;
             int picked = -1;
+            /* Phase 1a: pre-extract graph names and run VR re-rank. The
+             * VR bonus rewards candidates in the modal-family cluster,
+             * complementing the result-vector voting and the planner. */
+            char cand_gnames[MAX_VOTE_CAND][64];
+            const char *gname_ptrs[MAX_VOTE_CAND] = {0};
+            for (int a = 0; a < n_cands; a++) {
+                cand_gnames[a][0] = '\0';
+                if (cands[a].text) {
+                    extract_graph_name(cands[a].text, cand_gnames[a],
+                                       sizeof(cand_gnames[a]));
+                }
+                gname_ptrs[a] = cand_gnames[a];
+            }
+            int vr_bonus[MAX_VOTE_CAND] = {0};
+            vr_rerank_candidates(gname_ptrs, n_cands, vr_bonus);
+
             if (n_cands > 0) {
                 /* Vote: each candidate scored by # of siblings with
                  * identical results vector (only across valid sets).
-                 * Phase 15 adds a +10 bonus to candidates whose @graph
-                 * name prefix matches the planner's predicted family. */
+                 * Phase 15 adds a +10/+5 graded bonus to candidates whose
+                 * @graph name matches the planner's predicted family.
+                 * Phase 1a adds a +VR_BONUS bonus from VR-derived modal
+                 * family clustering (planner-free). */
                 int best_score = -1;
                 for (int a = 0; a < n_cands; a++) {
                     if (!cands[a].has_results) continue;
@@ -1062,14 +1202,14 @@ int main(void) {
                      *   exact graph-name match: +20 (dominant)
                      *   prefix-only match (within family): +5 (mild)
                      *   no match: 0 */
-                    if (planner_family[0] && cands[a].text) {
-                        char gname[64];
-                        if (extract_graph_name(cands[a].text, gname, sizeof(gname))) {
-                            int match = family_matches_graph_name(planner_family, gname);
-                            if (match == 2) score += 20;
-                            else if (match == 1) score += 5;
-                        }
+                    if (planner_family[0] && cand_gnames[a][0]) {
+                        int match = family_matches_graph_name(planner_family,
+                                                              cand_gnames[a]);
+                        if (match == 2) score += 20;
+                        else if (match == 1) score += 5;
                     }
+                    /* Phase 1a: VR modal-cluster bonus. */
+                    score += vr_bonus[a];
                     /* Tiebreaker: fidelity > valid_results > earlier. */
                     int promote = 0;
                     if (score > best_score) promote = 1;
