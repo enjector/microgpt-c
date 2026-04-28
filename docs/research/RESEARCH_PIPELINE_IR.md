@@ -3257,6 +3257,112 @@ This section is committed to the repository **before** the Phase 3a/3b/3c experi
 
 If a prediction is materially wrong (e.g. EKAN scores <5 on adversarial vs predicted 12-16), this section stays untouched and the post-eval section explains the gap. Under no circumstances does this prediction section get retroactively edited.
 
+### 40.7 Scope note (added during execution, before any results)
+
+While starting Phase 3a, I noticed `EKAN_NET_MAX_DIM=16` in the lifted EKAN-Network header — too small to act as a direct classifier over 20 families. The pre-registered §40.2 plan calls for "EKAN-Network as a (prompt → 12D coordinate) classifier"; a faithful implementation requires bumping the macro and writing a custom training loop, which is a multi-day engineering task.
+
+Decision: run **two** Phase 3a experiments, in order, with the second one gated on the first:
+
+1. **Phase 3a-lite — TF-IDF centroid classifier (~150 LOC, ~30 min)**: build a vocabulary from the 408 training prompts; compute TF-IDF features per prompt; for each family, average TF-IDF features over all training prompts in that family → "family centroid"; predict by cosine similarity to nearest centroid. This is a *learned* classifier (parameters derived from data, not handcoded), and tests the core hypothesis at a scale matched to the corpus.
+
+2. **Phase 3a-full — EKAN-Network classifier (only if 3a-lite shows benefit)**: bump `EKAN_NET_MAX_DIM` to 32, build a 408-example training pipeline (TF-IDF features → EKAN → 20-class softmax), train, eval. Engineering effort: 1-2 days. Only worth doing if 3a-lite shows learned encoders are not corpus-limited.
+
+**The pre-registered targets (no-regression ≥18/20 on Phase 2c, adversarial 12-16/20) apply to whichever Phase 3a variant ships.** If Phase 3a-lite hits the targets, the EKAN follow-up is unnecessary at this scale. If 3a-lite misses by a wide margin (e.g. <5/20), the corpus is too small for any learned encoder and Phase 3a-full would be pure overhead — we'd skip it and pivot to Phase 4 (corpus expansion) instead.
+
+This scope note is a transparent acknowledgement of an implementation-side discovery during execution. The targets and predictions in §40.2 stand unchanged.
+
+---
+
+## 41. Phase 3a-lite — TF-IDF centroid classifier (negative result; corpus too small for any learned encoder; pre-registered prediction missed by wide margin)
+
+This section is the post-eval companion to §40 — written **after** Phase 3a-lite ran, with the actual results compared row-by-row against the pre-registered predictions in §40.2.
+
+### 41.1 Implementation
+
+`demos/manifold_classifier/tfidf_main.c` (~280 LOC, self-contained C99): tokenise each prompt → vocabulary built across the 408-example training corpus → TF-IDF feature vector per prompt → average per family for centroids → top-1 cosine similarity prediction at inference.
+
+Adversarial axis-2 test set committed in `demos/wiring_organelle/pipeline_corpus_adversarial.txt`: 20 prompts that paraphrase the existing 20 families using uncommon synonyms. Hand-audited to ensure no original-family keyword survives in any prompt. Examples: "Quetelet ratio from kilograms and centimetres" (BMI), "the largest shared divisor of two integers magnified by a multiplier" (gcd), "logistic activation pinned within a permissible window" (clamped_sigmoid).
+
+Reproducible: `./manifold_tfidf_demo pipeline_corpus_adversarial.txt` and `./manifold_tfidf_demo pipeline_corpus_held_out.txt` from `build/`.
+
+### 41.2 Results vs predictions
+
+| Test | §40.2 prediction | Handcoded baseline | TF-IDF actual | Verdict |
+|---|---|---|---|---|
+| **Adversarial axis-2 set** | **12–16/20** | 2/20 (10%) | **4/20 (20%)** | **MISS by 8-12 prompts** |
+| No-regression on Phase 2c clean | ≥18/20 | 20/20 | ~8/20 | **MISS by ~10 prompts** |
+| Held-out 40 (mixed leaky+clean) | — | 39/40 (98%) | 16/40 (40%) | TF-IDF dramatically worse |
+
+The TF-IDF centroid classifier:
+- Gets only +2 prompts over handcoded on adversarial (10% → 20%) — far below the 12–16/20 target.
+- Regresses on in-distribution prompts (drops from handcoded's 100% on Phase 2c clean to ~40%).
+- Is dramatically worse than handcoded on the mixed held-out set (40% vs 98%).
+
+### 41.3 Per the pre-registered §40.2 outcome table, this lands in row 4
+
+> **"<18 on no-regression: EKAN training is destabilising the existing 20/20 path. The handcoded bag is genuinely better at this scale. Don't ship; keep handcoded forever."**
+
+The verdict was committed in §40 *before* the eval ran. The actual result puts us squarely in this row.
+
+### 41.4 Why TF-IDF underperformed
+
+Concrete diagnosis from the per-prompt audit:
+
+1. **Per-family training data is tiny.** The 408-example corpus maps only 56 prompts to one of the 20 held-out reference families (the rest are synthetic-template families like `chain_add_3`, `fanout_abs_add_5` that never appear in held-out). After mapping, each held-out family has 1–7 training prompts. Centroids averaged over 1–7 sparse TF-IDF vectors are not robust.
+
+2. **Vocabulary is too small (123 unique words across 56 prompts).** TF-IDF can only weight words it has seen. Adversarial paraphrases use words like "Quetelet", "logistic", "withholding", "median", "centroid" that aren't in the vocabulary at all — they get TF-IDF weight 0, so contribute nothing to similarity.
+
+3. **The handcoded keyword bag encodes domain knowledge TF-IDF can't learn.** The 120 handcoded keywords in `wiring_geo_classifier.c` were chosen by a human who knows e.g. "median" is a synonym for "average" and "Quetelet" is a synonym for "BMI". TF-IDF has no access to that semantic mapping; with only 56 training examples and 123 vocabulary words, it can't infer it either.
+
+4. **Confounding training signal.** Many of the 56 mapped training prompts come from Phase 13's leakage paraphrases — close to the held-out set, but distant from the adversarial set. The centroids overfit to the leakage paraphrases, not to abstracted family semantics.
+
+### 41.5 Implications for Phase 3a-full (EKAN-Network)
+
+The §40.7 scope note said *"if 3a-lite misses by a wide margin (e.g. <5/20), the corpus is too small for any learned encoder and Phase 3a-full would be pure overhead — we'd skip it and pivot to Phase 4 (corpus expansion) instead."*
+
+**Phase 3a-lite scored 4/20. The skip condition fires.** Phase 3a-full (EKAN-Network classifier) is **cancelled** at this scale. The decision is committed to §40's outcome-interpretation table — not retroactive rationalisation.
+
+EKAN-Network would have the same fundamental problem: it needs feature-vector input, which is either bag-of-words (same data limit as TF-IDF) or learned word embeddings (which 408 prompts cannot train robustly). At the corpus scale we have, no encoder — handcoded, TF-IDF, or EKAN-Network — beats handcoded keyword curation on adversarial paraphrases.
+
+### 41.6 What the result tells us architecturally
+
+This is a **negative result with positive value**: it falsifies the assumption (which I made too freely while writing §40) that "a learned encoder helps on adversarial because the handcoded keyword bag misses synonyms." The actual data says: at this corpus scale, the human curator beats any data-derived encoder, on both in-distribution AND adversarial inputs. The reason is straightforward — humans bring domain knowledge that 408 examples can't.
+
+The architectural implication is **not to pivot to bigger encoders** but to **expand the corpus** before any learned encoder is worth training:
+
+- **Phase 4 — corpus expansion (the right pivot).** Generate 5,000-50,000 (prompt, family) pairs by combining synonym-substitution + back-translation + LLM-generated paraphrases over the 20 anchor families. At that scale, a learned encoder can plausibly beat handcoded curation on adversarial. The held-out test set can be expanded in parallel to keep evaluation honest.
+
+- **Or — accept the architectural boundary and ship what works.** The handcoded keyword bag is the right component for a 408-example regime. Phase 4 is only worth doing if we plan to scale the system beyond this regime.
+
+### 41.7 Phase 3b/3c re-decision
+
+The pre-registered §40 plan called for Phase 3b (fragment composition) and 3c (RAG fallback) regardless of 3a outcome. With 3a falsified at this scale, both 3b and 3c face the same corpus-size constraint:
+
+- **Phase 3b — fragment composition.** Building fragment anchors from the existing 20 anchors is independent of corpus size; the fragment-retrieval embedding can be the same handcoded keyword bag (just keyed to fragments, not whole anchors). 3b is still worth running.
+- **Phase 3c — RAG fallback.** The 408-example corpus has only ~56 prompts mapping to held-out families. RAG would retrieve the same training prompts the wiring transformer already memorised — pure overhead, no benefit. **Phase 3c is also cancelled at this scale.**
+
+Updated Phase 3 plan after §41 falsification:
+
+| Sub-phase | Status | Reason |
+|---|---|---|
+| 3a-lite (TF-IDF) | ✅ ran, missed targets | Corpus too small for learned encoder |
+| 3a-full (EKAN classifier) | ❌ cancelled | Skip-condition fired per §40.7 |
+| 3b (fragment composition) | ⏳ proceed | Independent of corpus size; tests architecture |
+| 3c (RAG fallback) | ❌ cancelled | Same corpus-size constraint as 3a |
+| **Phase 4 (corpus expansion)** | **⏳ next, if scaling beyond 408 examples is desired** | The right corrective for the 3a falsification |
+
+### 41.8 The discipline-of-pre-registration result
+
+Pre-registering predictions in §40 paid off. Without it, the natural temptation after seeing TF-IDF score 4/20 would be to retroactively reframe ("we expected a small lift") or scope-creep ("let's add EKAN to see if it helps"). The pre-registered outcome-interpretation table dictates the response: skip 3a-full, don't ship the TF-IDF classifier, document the negative result, and either pivot to Phase 4 corpus expansion or accept the architectural boundary.
+
+Phase 3a-lite's outcome is itself a useful empirical finding: *the handcoded keyword bag is the right encoder for the 408-example regime, full stop*. The system's value is in the deterministic-Judge stack and the anchor mechanism, both of which are unaffected by this result.
+
+**Phase 3a status: pre-registered prediction missed by wide margin; falsification confirmed; Phase 3a-full and 3c cancelled per §40.7 skip condition; ship intent for the TF-IDF classifier withdrawn.**
+
+---
+
+## 16. Closing Remark
+
 ---
 
 ## 16. Closing Remark

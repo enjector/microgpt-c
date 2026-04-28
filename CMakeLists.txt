@@ -1773,6 +1773,15 @@ add_demo(
   COPY   demos/wiring_organelle/pipeline_corpus_held_out.txt
 )
 
+# Phase 3a-lite — TF-IDF centroid classifier (learned baseline). See
+# RESEARCH_PIPELINE_IR.md §40.7 for the scoping rationale.
+add_demo(
+  NAME   manifold_tfidf_demo
+  SOURCE demos/manifold_classifier/tfidf_main.c
+  COPY   demos/wiring_organelle/pipeline_corpus_held_out.txt
+         demos/wiring_organelle/pipeline_corpus_adversarial.txt
+)
+
 # ==================================================================
 #  Tests
 # ==================================================================

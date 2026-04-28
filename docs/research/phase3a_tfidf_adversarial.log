@@ -1,0 +1,59 @@
+[tfidf] loaded 56 (prompt, family) training pairs (312 unmapped graph names skipped)
+[tfidf] vocabulary: 123 unique words across 56 training prompts
+[tfidf] family centroids built. Per-family training counts:
+  bmi_clamped           n=0
+  compound_interest     n=9
+  compound_minus_p      n=0
+  weighted_three        n=0
+  clamped_sigmoid       n=11
+  sigmoid_clamped       n=0
+  gcd_scaled            n=0
+  apply_tax             n=0
+  gross_minus_tax       n=0
+  discounted_tax        n=6
+  fib_fact_mul          n=0
+  fib_fact_add          n=10
+  invoice_total         n=0
+  clamped_average       n=4
+  abs_diff              n=0
+  pv_of_fv              n=0
+  distance_metrics      n=6
+  distance_midpoint     n=0
+  savings_rate          n=5
+  scaled_relu           n=5
+================================================================
+  MicroGPT-C — Phase 3a-lite TF-IDF Centroid Classifier
+================================================================
+
+
+Loaded 20 test prompts from pipeline_corpus_adversarial.txt
+Trained on 56 (prompt, family) pairs from pipeline_corpus_train.txt
+Vocabulary: 123 unique words
+
+#   REFERENCE            PREDICTED            MATCH   PROMPT (truncated)
+------------------------------------------------------------------------------------------------
+1   bmi_clamped          clamped_average      no      Quetelet ratio from kilograms and centimetres constrained...
+2   compound_interest    discounted_tax       no      the yield earned on a deposit accumulating annually for s...
+3   weighted_three       scaled_relu          no      blend three observations each amplified by its own factor
+4   clamped_sigmoid      clamped_average      no      logistic activation pinned within a permissible window
+5   gcd_scaled           scaled_relu          no      the largest shared divisor of two integers magnified by a...
+6   apply_tax            discounted_tax       no      disposable earnings remaining after government withholding
+7   fib_fact_mul         fib_fact_add         no      product of the recursive Leonardo series and the descendi...
+8   invoice_total        fib_fact_add         no      receipt sum of unit cost by units bought along with the d...
+9   clamped_average      clamped_average      EXACT   the median of two values held inside lower and upper limits
+10  abs_diff             distance_metrics     no      unsigned gap separating two estimates
+11  scaled_relu          compound_interest    no      thresholded activation amplified by an amplification term
+12  discounted_tax       discounted_tax       EXACT   the duty owed on a marked-down listing
+13  savings_rate         savings_rate         EXACT   portion of earnings preserved after deducting two outlays
+14  distance_metrics     clamped_sigmoid      no      aggregate gap along a pair of dimensional projections rai...
+15  distance_midpoint    clamped_sigmoid      no      the displacement from one observation to another together...
+16  pv_of_fv             discounted_tax       no      today's equivalent of a later sum after temporal correction
+17  fib_fact_add         fib_fact_add         EXACT   summation of the recursive Leonardo series and the descen...
+18  gross_minus_tax      compound_interest    no      earnings less what is owed in withholding
+19  compound_minus_p     discounted_tax       no      surplus remaining after accumulation strips the initial d...
+20  sigmoid_clamped      clamped_average      no      logistic value pinned within a permissible interval
+
+================================================================
+  HEADLINE
+================================================================
+Top-1 EXACT family match: 4/20 (20%)

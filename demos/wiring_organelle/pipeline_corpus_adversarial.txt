@@ -1,0 +1,113 @@
+# Pipeline IR — Phase 3a adversarial axis-2 test set
+# 20 prompts that paraphrase the existing 20 reference families using
+# uncommon synonyms, deliberately stripping every keyword in the
+# handcoded keyword bag (wiring_geo_classifier.c). The handcoded
+# classifier is expected to score 2-5/20 here. Phase 3a's predicted
+# EKAN-trained classifier target: 12-16/20.
+#
+# Each prompt's REFERENCE matches a known family in wiring_anchor_graphs.c.
+# Format identical to pipeline_corpus_held_out.txt.
+#
+# Audit: every prompt below was checked against every other family's
+# keyword bag. No prompt contains any keyword from its own family OR
+# any other family — purely semantic synonyms.
+
+# EXPECTED: bmi clamp
+# REFERENCE: bmi_clamped
+// Quetelet ratio from kilograms and centimetres constrained to a permitted span
+---
+
+# EXPECTED: compound subtract
+# REFERENCE: compound_interest
+// the yield earned on a deposit accumulating annually for some duration
+---
+
+# EXPECTED: multiply add percentage
+# REFERENCE: weighted_three
+// blend three observations each amplified by its own factor
+---
+
+# EXPECTED: sigmoid clamp
+# REFERENCE: clamped_sigmoid
+// logistic activation pinned within a permissible window
+---
+
+# EXPECTED: gcd multiply
+# REFERENCE: gcd_scaled
+// the largest shared divisor of two integers magnified by a multiplier
+---
+
+# EXPECTED: apply_tax
+# REFERENCE: apply_tax
+// disposable earnings remaining after government withholding
+---
+
+# EXPECTED: fibonacci factorial multiply
+# REFERENCE: fib_fact_mul
+// product of the recursive Leonardo series and the descending product series at index n
+---
+
+# EXPECTED: multiply tax_amount add
+# REFERENCE: invoice_total
+// receipt sum of unit cost by units bought along with the duty owed
+---
+
+# EXPECTED: average_two clamp
+# REFERENCE: clamped_average
+// the median of two values held inside lower and upper limits
+---
+
+# EXPECTED: subtract abs_val
+# REFERENCE: abs_diff
+// unsigned gap separating two estimates
+---
+
+# EXPECTED: relu multiply
+# REFERENCE: scaled_relu
+// thresholded activation amplified by an amplification term
+---
+
+# EXPECTED: discount tax_amount
+# REFERENCE: discounted_tax
+// the duty owed on a marked-down listing
+---
+
+# EXPECTED: subtract percentage
+# REFERENCE: savings_rate
+// portion of earnings preserved after deducting two outlays
+---
+
+# EXPECTED: distance_1d add square
+# REFERENCE: distance_metrics
+// aggregate gap along a pair of dimensional projections raised to second power
+---
+
+# EXPECTED: distance_1d midpoint add
+# REFERENCE: distance_midpoint
+// the displacement from one observation to another together with their centroid
+---
+
+# EXPECTED: future_value present_value
+# REFERENCE: pv_of_fv
+// today's equivalent of a later sum after temporal correction
+---
+
+# EXPECTED: fibonacci factorial add
+# REFERENCE: fib_fact_add
+// summation of the recursive Leonardo series and the descending product series at index n
+---
+
+# EXPECTED: tax_amount subtract
+# REFERENCE: gross_minus_tax
+// earnings less what is owed in withholding
+---
+
+# EXPECTED: compound subtract
+# REFERENCE: compound_minus_p
+// surplus remaining after accumulation strips the initial deposit
+---
+
+# EXPECTED: sigmoid clamp
+# REFERENCE: sigmoid_clamped
+// logistic value pinned within a permissible interval
+---
