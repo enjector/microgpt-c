@@ -877,6 +877,11 @@ int main(void) {
             VoteCandidate cands[MAX_VOTE_CAND] = {0};
             int n_cands = 0;
 
+            /* Phase 16 attempted to prefix held-out prompts with the
+             * planner's predicted family ("// [FAMILY: name] <prompt>")
+             * for both training and inference, but the corpus vocab
+             * shift regressed verify rate 100% → 85%. Reverted; the
+             * planner's hint is now used only at re-rank time (Phase 15). */
             for (int v = 0; v < N_VOTES; v++) {
                 wiring_generate(org, &cfg, held[i].prompt, output_buf, sizeof(output_buf),
                                 TEMPS[v], /*max_words=*/360);

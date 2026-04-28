@@ -2293,6 +2293,7 @@ int main(int argc, char **argv) {
     FILE *out_val = NULL;
     FILE *out_planner = NULL;          /* Phase 15: planner training corpus */
     int split = 0;
+    int prefix_with_family = 0;        /* Phase 16: prepend [FAMILY: name] to each prompt */
     if (argc == 2) {
         out_train = fopen(argv[1], "w");
         if (!out_train) { perror(argv[1]); return 1; }
@@ -2307,6 +2308,16 @@ int main(int argc, char **argv) {
         out_planner = fopen(argv[3], "w");
         if (!out_train || !out_val || !out_planner) { perror("open"); return 1; }
         split = 1;
+    } else if (argc == 5) {
+        /* Phase 16: 5th arg "--prefix-family" turns on family-prefix
+         * mode for the wiring corpus, so each prompt becomes
+         * "// [FAMILY: <graph_name>] <original_prompt>". */
+        out_train   = fopen(argv[1], "w");
+        out_val     = fopen(argv[2], "w");
+        out_planner = fopen(argv[3], "w");
+        if (!out_train || !out_val || !out_planner) { perror("open"); return 1; }
+        split = 1;
+        if (strcmp(argv[4], "--prefix-family") == 0) prefix_with_family = 1;
     }
 
     int n = 0;
@@ -2345,7 +2356,20 @@ int main(int argc, char **argv) {
         if (!txt) { pipeline_free(p); fail_count++; continue; }
         FILE *target = (split && (i % 10 == 9)) ? out_val : out_train;
         if (target == out_val) val_count++; else train_count++;
-        fprintf(target, "%s\n%s---\n\n", cat[i].prompt, txt);
+        if (prefix_with_family && p->name && p->name[0]) {
+            /* Phase 16: prepend [FAMILY: <name>] inline to the prompt
+             * so the wiring organelle attends to the family hint at
+             * training time, not just at re-rank time.
+             * The "// " comment prefix is preserved by injecting after it. */
+            const char *original = cat[i].prompt;
+            const char *body = original;
+            if (strncmp(body, "//", 2) == 0) body += 2;
+            while (*body == ' ' || *body == '\t') body++;
+            fprintf(target, "// [FAMILY: %s] %s\n%s---\n\n",
+                    p->name, body, txt);
+        } else {
+            fprintf(target, "%s\n%s---\n\n", cat[i].prompt, txt);
+        }
 
         /* Phase 15b: emit (prompt, graph_name) pair to planner corpus.
          * Using the actual graph name (e.g. "fib_fact_op_add") instead

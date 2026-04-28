@@ -1830,7 +1830,7 @@ add_demo(
   # RESEARCH_PIPELINE_IR.md.
   DEFINES N_EMBD=96 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=384 MLP_DIM=384
           NUM_STEPS=5000 LEARNING_RATE=0.001 BATCH_SIZE=16
-          MAX_VOCAB=1200 MAX_DOCS=5000 MAX_DOC_LEN=4096
+          MAX_VOCAB=1500 MAX_DOCS=5000 MAX_DOC_LEN=4096
 )
 # Phase 6 — register wiring native primitives (~40 C functions matching
 # w_vm_functions.txt) as the dispatch backend for pipeline_execute().
@@ -1853,6 +1853,11 @@ add_custom_command(TARGET wiring_organelle_demo POST_BUILD
           ${CMAKE_CURRENT_SOURCE_DIR}/demos/wiring_organelle/pipeline_corpus_held_out.txt
   COMMENT "Generating Pipeline IR corpus (wiring + planner) and copying Phase 4 held-out NL prompts"
 )
+# Phase 16 attempted family-prefixed wiring training (--prefix-family arg)
+# but regressed 80% → 75% — vocab grew 1051 → 1211 tokens, distribution
+# shift hurt verify rate. Reverted; canonical baseline = Phase 15. The
+# CLI-side --prefix-family option in pipeline_corpus_gen.c is kept
+# (additive flag, no-op when not passed) for future experiments.
 
 add_executable(test_microgpt_turboquant tests/test_microgpt_turboquant.c)
 target_link_libraries(test_microgpt_turboquant PRIVATE microgpt_lib)
