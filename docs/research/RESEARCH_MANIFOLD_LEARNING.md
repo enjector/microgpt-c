@@ -463,7 +463,101 @@ This document is a feasibility sketch. Implementation, if pursued, is a separate
 - `src/microgpt_pipeline.{h,c}` — the IR + verifier + repair + executor stack that manifold composition would reuse unchanged.
 - `tools/pipeline_corpus_gen.c` — the corpus generator producing the 408-example training set; would extend to also emit `(prompt, anchor_id)` triples.
 
-## 13. References to EnX-cpp
+## 13. Phase 1 lift plan: bootstrap from a sibling branch
+
+**Update (April 2026)**: a sibling checkout at `/Users/user/dev/projects/microgpt-c` (different branch) already implements all three engines **as C99 headers**, fully tested and wired into CMake. This dissolves two of §10's critical risks:
+
+- **The C99/C++17 mixing risk is gone.** All three engines are pure C99 in `src/`, not vendored C++17 from EnX-cpp.
+- **The 2-3 week Phase 1 estimate compresses to ~5 days.** Drop-in lift, adapt layer dimensions, build a small training corpus, retrain, eval.
+
+### 13.1 What exists in the sibling
+
+| Component | Sibling path | LOC | Lift quality | Notes |
+|---|---|---|---|---|
+| EKAN B-spline basis | `src/microgpt_ekan.h` | 132 | ★★★★★ | Fixed-point cubic B-spline, knot binary search, zero-allocation |
+| EKAN autoencoder network | `src/microgpt_ekan_network.h` | 650 | ★★★★★ | Multi-layer, Fourier activations, SiLU dual gates, residual gating, Adam optimiser |
+| Geodesic solver | `src/microgpt_geodesic.{h,c}` | 127+489 | ★★★★☆ | 4th-order RK4, Christoffel symbols, Cholesky inversion. **Hardcoded 12D — needs a generic-D macro pass.** |
+| VR persistent cohomology | `src/microgpt_vr.{h,c}` | 84+506 | ★★★★☆ | L2 distance matrix, flag complex filtration, F₂ cohomology with apparent-pairs + clearing, Betti extraction. **Max 64 points, fixed 12D.** |
+| V31 BTC manifold table | `src/V31_BTC_Manifold_Table.h` | 80 | ★★★★★ | Pre-computed graduated B-spline knot/control-point table — concrete *real-world* example of an EKAN-parameterised risk manifold, proves the design pattern in production at 28ns execution. |
+| Tests | `tests/test_ekan*.c`, `test_microgpt_geodesic.c`, `test_microgpt_vr.c` | ~1100 | ★★★★★ | All three engines have RK4-convergence, Betti-extraction, and benchmark coverage. Lift these so the new module ships with the same green-bar invariant. |
+| Composition POC | `experiments/organelles/c_compose/` | — | ★★☆☆☆ | Hit 96% format-parse on 512-example training; v2 scaled regressed on aggressive LR. **Negative result for the POC, useful as a cautionary tale.** |
+
+### 13.2 The sibling's own counter-point (worth heeding)
+
+`docs/research/geometry/RESEARCH_GEOMETRIC_ORGANELLES.md` in the sibling is a critical-assessment document that pushes back on full Riemannian manifolds:
+
+> *"Full Riemannian manifold embedding is overkill for board games... you don't need genus to count connected components — BFS does it in O(V+E) deterministically in 20 lines of C."*
+
+The sibling's diagnosis:
+- **Representation is the bottleneck**, not solver sophistication.
+- Topological feature extraction (Betti-0 via BFS, path existence, connectivity metrics) injected into organelle prompts gives most of the lift.
+- Full geodesic-on-manifold reasoning is exploratory; the 60-79% improvement claims they originally projected are *unfounded* without empirical validation.
+
+This sharpens our Phase 1 design: **don't start with the full EKAN+Geodesic+VR pipeline**. Start with the simplest geometric Judge that addresses the diffuse-prior problem, measure, then add complexity only if the simple version doesn't lift past 80%.
+
+### 13.3 The phased lift plan
+
+#### Phase 1a — minimal geometric Judge (≤2 days, target: 80% headline)
+
+Lift only the **VR persistent cohomology engine** + a tiny **anchor-table lookup**, using the existing Wiring Organelle's 16 candidates as the source. After verify-and-repair, embed each candidate's @graph structure as a 12D point (one coordinate per template family, one-hot at the candidate's family); run VR to detect the *expected topology* of the candidate cluster (β₀ = number of distinct families, β₁ = 0 if expecting DAG, etc.). Re-rank: candidates whose presence improves the cluster's Betti signature toward the expected score get a +10 bonus, beyond the existing planner-family bonus.
+
+**Files to copy**:
+- `src/microgpt_vr.h`, `src/microgpt_vr.c` (590 LOC)
+- `tests/test_microgpt_vr.c` (lift the 6 most relevant tests)
+
+**Adaptations**: minimal — VR is dimension-fixed at 12D; we adapt by mapping template-family indices to one-hot 12D coordinates.
+
+**Predicted lift**: 75% → 80%. Catches one or two of the diffuse-prior failures (#17 likely) by topology-validating the candidate set itself.
+
+#### Phase 1b — geodesic distance over an EKAN surface (≤3 more days, target: 85%)
+
+Lift **EKAN B-spline basis + autoencoder** and the **geodesic solver**. Train EKAN on the existing 408-prompt corpus (no chemistry bootstrap yet) to produce a 12D anchor coordinate per template family. Train a small embedder (re-uses MicroGPT-C's existing word-level tokeniser + a 2-layer MLP) to project prompts to the same 12D space. At held-out eval, run Geodesic to find the K=8 nearest anchors; combine with VR validation from Phase 1a.
+
+**Files to copy**:
+- `src/microgpt_ekan.h` (132 LOC)
+- `src/microgpt_ekan_network.h` (650 LOC)
+- `src/microgpt_geodesic.{h,c}` (616 LOC)
+- `src/V31_BTC_Manifold_Table.h` (80 LOC, as a *design-pattern reference*; not directly used, but copy it as `docs/research/V31_manifold_pattern.h` for design-doc value)
+- Their respective tests.
+
+**Adaptations**:
+- Generic-D macro pass on Geodesic to support 12D-or-other (current is 12D-fixed; we need to confirm that's enough for ~150 anchors or generalise).
+- Anchor table — emit from `pipeline_corpus_gen.c` via the FAMILY tracking infrastructure already in place (Phase 15).
+- Embedder — small MLP, training reusing existing `organelle_train_words` infrastructure.
+
+**Predicted lift**: 80% → 85%. Closes mode-collapse cases (#1, #2, #6) by replacing softmax-over-graph-names with single-valued geodesic retrieval.
+
+#### Phase 1c — chemistry bootstrap (optional, +1 week, target: 90%)
+
+Only if Phase 1b stalls below 85%. Pre-train EKAN's parametric surface on a chemistry-style synthetic corpus where scaffold-distance and substituent-distance are known by construction (no real ChEMBL data needed for the prototype — use a small synthetic generator that emits ~10k molecule-pair distances with known ground truth). Fine-tune on the 408 Wiring corpus.
+
+**Predicted lift**: 85% → 88-92%. Closes the remaining drift cases by giving the manifold the *right shape* before fine-tuning.
+
+### 13.4 Total effort and timeline
+
+| Phase | Days | Files | Predicted lift |
+|---|---|---|---|
+| 1a (VR re-rank only) | 1-2 | ~600 LOC + tests | 75% → 80% |
+| 1b (EKAN + Geodesic + VR) | 3-4 | ~2000 LOC + tests | 80% → 85% |
+| 1c (chemistry bootstrap) | 5-7 | new corpus generator + pretrain | 85% → 88-92% |
+
+**Total**: 5-7 days for Phase 1a+1b (no chemistry); +1 week for 1c. **Compressed from the §6 estimate of 2-3 weeks (no bootstrap) and 4-6 weeks (with bootstrap).**
+
+### 13.5 Skip-for-now from the sibling
+
+- **`experiments/organelles/c_compose/`** — the v2-scaled regression is informative but not lift-ready. Note as a cautionary tale in §10 (LR tuning matters when scaling) but don't lift the code.
+- **The book chapters in `book.2nd/`** — they treat geometry as a feature encoder, not as primary reasoning. Useful narrative but not headline-driving.
+- **The 12D-fixed assumption** — works for now (~150 anchors fit in 12D), but Phase 2 will need generic-D macro support if we expand to the full 192-primitive `w_vm_functions.txt` library.
+
+### 13.6 Updated recommendation
+
+The §10 verdict's "2-3 weeks Phase 1, 4-6 weeks with chemistry" estimate compresses to **5-7 days Phase 1a+1b** by lifting the sibling's tested C99 engine implementations. **Phase 1a alone (the minimum viable geometric Judge using only VR re-ranking) is a 1-2 day effort** with a plausible +5pp lift, and serves as a useful first-cut measurement of whether topology-aware re-ranking helps at all before investing in the full EKAN+Geodesic stack.
+
+The sibling's `RESEARCH_GEOMETRIC_ORGANELLES.md` counter-point is genuine — start small, measure, escalate only on evidence. If Phase 1a gets to 80%, that's a win even without the manifold composition module. If it stalls at 75%, Phase 1b's Geodesic over EKAN is the next test before assuming the architecture is at fault.
+
+---
+
+## 14. References to EnX-cpp
 
 - `engines/ekan/include/enx/ekan/ekan_engine.hpp` — Entangled KAN engine, lines 1142-1210 for main API surface.
 - `engines/geodesic/include/enx/geodesic/geodesic_engine.hpp` — Riemannian solver, lines 434-640 for `GeodesicSolver`.
