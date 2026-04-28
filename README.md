@@ -129,7 +129,7 @@ Key technical contributions shipped in this engine:
 | 🔀 **Block Attention Residuals** | Learned depth-attention replaces additive residuals — preserves prompt signal through deep layers | Opt-in via `-DMICROGPT_ATTN_RES=ON` ([paper](https://github.com/MoonshotAI/Attention-Residuals)) |
 | 🎯 **Negative Control Methodology** | Lottery experiment proves engine learns patterns, not artefacts | Entropy floor at 0.50 (theoretical maximum) |
 | 🧭 **DeepSeek-V4 Port Stack** | Active-attention triumvirate (Partial RoPE + Attention Sink + Q/K RMSNorm) ported from DeepSeek-V4 §2.3.3 onto a CPU-first C99 engine. Rope-aware MSA pool/recency injection makes long-context inference relative-position-correct. All four flags off by default; combined stack opt-in. | **−8.7% held-out PPL** on deep config (4-layer 138K-param), 0 new params, ~1% extra runtime. See [V4 port roadmap](docs/research/RESEARCH_DEEPSEEK_V4_PORTING.md). |
-| 🔌 **Pipeline IR + Wiring Organelle** | Typed graph IR (DAG + verifier + text round-trip + DOT) emitted by a 540K-param word-level organelle trained on 368 (prompt, graph) pairs of real `w_vm_functions` primitives (bmi, compound, sigmoid, gcd, apply_tax …). Best-of-16 + verify-as-judge + `pipeline_repair()` + 40-primitive C-native dispatch + 5-input reference-answer correctness suite + self-consistency vote re-ranking + structural-diversity templates + lexical-anchoring + held-out-phrase paraphrases closes the loop **end-to-end with robust verified correctness**. | **95% strict-verified** + **85% executed** + **75% correct on all 5 input sets** on 20 held-out natural-English prompts (15/17 = 88% accuracy among executing graphs). 100% on synthetic templates. See [RESEARCH_PIPELINE_IR](docs/research/RESEARCH_PIPELINE_IR.md). |
+| 🔌 **Pipeline IR + Wiring Organelle** | Typed graph IR (DAG + verifier + text round-trip + DOT) emitted by a 540K-param word-level organelle trained on 368 (prompt, graph) pairs of real `w_vm_functions` primitives (bmi, compound, sigmoid, gcd, apply_tax …). Best-of-16 + verify-as-judge + `pipeline_repair()` + 40-primitive C-native dispatch + 5-input reference-answer correctness suite + self-consistency vote re-ranking + structural-diversity templates + lexical-anchoring closes the loop **end-to-end with robust verified correctness**. | **95% strict-verified** + **85% executed** + **75% correct on all 5 input sets** on 20 held-out natural-English prompts (15/17 = 88% accuracy among executing graphs). 100% on synthetic templates. See [the standalone paper](docs/research/RESEARCH_WIRING_ORGANELLE_PAPER.md) or the [13-phase development log](docs/research/RESEARCH_PIPELINE_IR.md). |
 
 ## Explore Further
 
@@ -145,7 +145,8 @@ Key technical contributions shipped in this engine:
 | 🎲 **Lottery experiment** (entropy baseline) | [lottery/README.md](demos/character-level/lottery/README.md) |
 | 🔬 **Pipeline architecture** (white paper) | [RESEARCH_ORGANELLE_PIPELINE](docs/research/RESEARCH_ORGANELLE_PIPELINE.md) |
 | 🧠 **Reasoning conclusion** | [RESEARCH_ORGANELLE_REASONING](docs/research/RESEARCH_ORGANELLE_REASONING.md) |
-| 🔌 **Pipeline IR + Wiring Organelle** | [RESEARCH_PIPELINE_IR](docs/research/RESEARCH_PIPELINE_IR.md) |
+| 🔌 **Pipeline IR + Wiring Organelle (paper)** | [RESEARCH_WIRING_ORGANELLE_PAPER](docs/research/RESEARCH_WIRING_ORGANELLE_PAPER.md) |
+| 🔬 **Pipeline IR + Wiring Organelle (13-phase log)** | [RESEARCH_PIPELINE_IR](docs/research/RESEARCH_PIPELINE_IR.md) |
 | 📚 **Using as a library** | [FUNCTIONAL_SPEC](docs/FUNCTIONAL_SPEC.md) |
 | ⚡ **Performance & benchmarks** | [PERFORMANCE](docs/testing/PERFORMANCE.md) |
 | 🚀 **SSD inference optimisations** | [RESEARCH_SSD](docs/research/RESEARCH_SSD.md) |

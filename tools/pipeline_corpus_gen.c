@@ -1963,68 +1963,17 @@ static CorpusEntry *build_catalog(int *out_count) {
     ADD3("// discounted price then tax on it",
          w_seed, (void *)(SeedFn)seed_discounted_tax, NULL, NULL);
 
-    /* ============================================================
-     *  Phase 14 — Aggressive oversampling for the last 5 wrong prompts.
-     *
-     *  Phase 13 lifted the headline 50% → 75% but 5 prompts still fail:
-     *  #1, #2, #6, #17 (#3 skipped — reference mismatch). Phase 14
-     *  adds ~30 more paraphrases at 5-6× density per failing prompt to
-     *  see if lexical anchoring still scales linearly past Phase 13's
-     *  saturation point.
-     * ============================================================ */
-
-    /* #17 — fib_fact_op add: 5 more "adding" / "by adding" gerund forms
-     * to overweight against the dominant subtract co-occurrence. */
-    ADD3("// add fibonacci of n and factorial of n together",
-         w_fib_fact_op, (void *)"add", NULL, NULL);
-    ADD3("// fibonacci and factorial of n added",
-         w_fib_fact_op, (void *)"add", NULL, NULL);
-    ADD3("// adding the fib of n result and the fact of n result",
-         w_fib_fact_op, (void *)"add", NULL, NULL);
-    ADD3("// fib n plus fact n by adding",
-         w_fib_fact_op, (void *)"add", NULL, NULL);
-    ADD3("// addition of fibonacci of n and factorial of n",
-         w_fib_fact_op, (void *)"add", NULL, NULL);
-
-    /* #1 — bmi_classified: 5 more "body mass index" + "limit it inside"
-     * variations to break the mode collapse. */
-    ADD3("// compute body mass index from weight and height limit it inside lo and hi",
-         w_seed, (void *)(SeedFn)seed_bmi_classified, NULL, NULL);
-    ADD3("// body mass index limit it inside bounds lo hi",
-         w_seed, (void *)(SeedFn)seed_bmi_classified, NULL, NULL);
-    ADD3("// the body mass index from weight and height limit it inside lo and hi bounds",
-         w_seed, (void *)(SeedFn)seed_bmi_classified, NULL, NULL);
-    ADD3("// body mass index of weight and height limit inside lo and hi",
-         w_seed, (void *)(SeedFn)seed_bmi_classified, NULL, NULL);
-    ADD3("// derive body mass index limit it inside",
-         w_seed, (void *)(SeedFn)seed_bmi_classified, NULL, NULL);
-
-    /* #2 — compound_interest: 5 more "interest gained" + "compounds at"
-     * variations to drown out competing compound-related templates. */
-    ADD3("// interest gained on investment when principal compounds at rate over years",
-         w_seed, (void *)(SeedFn)seed_compound_interest, NULL, NULL);
-    ADD3("// interest gained when principal compounds at rate r over n years",
-         w_seed, (void *)(SeedFn)seed_compound_interest, NULL, NULL);
-    ADD3("// the interest gained on a principal that compounds at rate over years",
-         w_seed, (void *)(SeedFn)seed_compound_interest, NULL, NULL);
-    ADD3("// interest gained on principal compounding at rate r over years",
-         w_seed, (void *)(SeedFn)seed_compound_interest, NULL, NULL);
-    ADD3("// principal compounds at rate over years interest gained",
-         w_seed, (void *)(SeedFn)seed_compound_interest, NULL, NULL);
-
-    /* #6 — net_pay: 5 more "take home pay" + "federal tax rate" anchors.
-     * Phase 13 already added 3; bring total to 8 to overweight against
-     * the model's tendency to emit percentage-style graphs. */
-    ADD3("// take home pay from gross income at federal tax rate is apply tax",
-         w_seed, (void *)(SeedFn)seed_net_pay, NULL, NULL);
-    ADD3("// federal take home pay from gross at tax rate via apply tax",
-         w_seed, (void *)(SeedFn)seed_net_pay, NULL, NULL);
-    ADD3("// take home pay equals apply tax of gross at federal rate",
-         w_seed, (void *)(SeedFn)seed_net_pay, NULL, NULL);
-    ADD3("// gross income at federal tax rate yields take home pay",
-         w_seed, (void *)(SeedFn)seed_net_pay, NULL, NULL);
-    ADD3("// from gross income at federal tax rate the take home pay",
-         w_seed, (void *)(SeedFn)seed_net_pay, NULL, NULL);
+    /* Phase 14's aggressive 5x oversampling for #1/#2/#6/#17 was tested
+     * and reverted: the corpus growth (408 → 428 examples) regressed
+     * the headline 75% → 70% by destabilising prompt #9 to sampling
+     * variance, while leaving the four targeted prompts wrong (just in
+     * different ways — #17 rolled multiply instead of subtract). The
+     * 20 paraphrases are documented in RESEARCH_PIPELINE_IR.md §28 as
+     * the lexical-anchoring saturation finding. They are NOT included
+     * in the canonical Phase 13 baseline (75%, 408 examples). Future
+     * work should escalate to a multi-organelle pipeline (planner →
+     * wiring) per §28's Path B — corpus paraphrasing has converged.
+     */
 
     /* ============================================================
      *  Phase 4 — Micro examples (single-primitive 1-node graphs).
