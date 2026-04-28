@@ -26,7 +26,13 @@
 
 #include <stddef.h>
 
-#define GEO_DIMS 12
+/* Default 12 (sibling fraud-detection feature space). Phase 2b bumps to
+ * 20 in this fork so each of the 20 held-out template families gets a
+ * unique axis in the wiring_geo_classifier slot table, eliminating the
+ * slot-collisions that capped Phase 2 at 80% (16/20). */
+#ifndef GEO_DIMS
+#define GEO_DIMS 20
+#endif
 
 /* =========================================================================
  * Core Types

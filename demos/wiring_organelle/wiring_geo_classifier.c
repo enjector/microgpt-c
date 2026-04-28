@@ -27,29 +27,37 @@ typedef struct {
     const char *keywords[MAX_KEYWORDS];
 } FamilyAnchor;
 
-/* Same table as manifold_classifier_demo. Keep these two in sync;
- * they encode the same per-family hypothesis.  */
+/* Phase 2b table: each family gets a UNIQUE slot in the now-20D
+ * Geodesic space. The Phase 2 (12D) table had 4 collisions: slot 5
+ * stacked apply_tax / gross_minus_tax / discounted_tax / savings_rate,
+ * and slot 9 stacked clamped_average / distance_midpoint. Those
+ * collisions caused 3 of the 4 Phase 2 failures (#8, #13, #15).
+ *
+ * GEO_DIMS bumped from 12 to 20 in microgpt_geodesic.h so we have one
+ * axis per held-out reference family. Keyword bags also tightened to
+ * remove generic words ("price", "due") that caused false-positive
+ * cross-family matches. */
 static const FamilyAnchor FAMILIES[] = {
-    { "bmi_clamped",       0, { "body", "mass", "index", "bmi", "weight", "height", "limit", NULL } },
-    { "compound_interest", 1, { "interest", "gained", "investment", "compounds", "principal", "rate", "years", NULL } },
-    { "compound_minus_p",  1, { "final", "balance", "compound", "growth", "principal", "minus", "original", NULL } },
-    { "weighted_three",    2, { "weighted", "combination", "measurements", "scaled", "weights", NULL } },
-    { "clamped_sigmoid",   3, { "sigmoid", "neuron", "limit", "output", "low", "high", "range", NULL } },
-    { "sigmoid_clamped",   3, { "sigmoid", "normalised", "normalized", "clamping", "bounded", "range", NULL } },
-    { "gcd_scaled",        4, { "gcd", "greatest", "common", "divisor", "scaled", "coefficient", "times", NULL } },
-    { "apply_tax",         5, { "take", "home", "pay", "gross", "income", "federal", "tax", NULL } },
-    { "gross_minus_tax",   5, { "gross", "income", "reduced", "tax", "liability", NULL } },
-    { "discounted_tax",    5, { "tax", "due", "price", "discount", "applied", NULL } },
-    { "fib_fact_mul",      6, { "fibonacci", "factorial", "multiplied", "times", NULL } },
-    { "fib_fact_add",      7, { "fibonacci", "factorial", "combined", "adding", "sum", "added", NULL } },
-    { "invoice_total",     8, { "invoice", "total", "price", "quantity", NULL } },
-    { "clamped_average",   9, { "average", "bounded", "between", "minimum", "maximum", NULL } },
-    { "abs_diff",         10, { "magnitude", "difference", "between", "two", "forecasts", NULL } },
-    { "pv_of_fv",         11, { "future", "cashflow", "discounted", "back", "present", "worth", NULL } },
-    { "distance_metrics", 11, { "total", "distances", "axes", "squared", "across", NULL } },
-    { "distance_midpoint", 9, { "distance", "readings", "combined", "midpoint", NULL } },
-    { "savings_rate",      5, { "fraction", "income", "saved", "subtracting", "expenses", NULL } },
-    { "scaled_relu",       3, { "rectified", "scaled", "gain", "factor", NULL } },
+    { "bmi_clamped",        0, { "body", "mass", "index", "bmi", "weight", "height", NULL } },
+    { "compound_interest",  1, { "interest", "gained", "investment", "compounds", NULL } },
+    { "compound_minus_p",   2, { "final", "balance", "compound", "growth", "minus", "original", NULL } },
+    { "weighted_three",     3, { "weighted", "combination", "measurements", "weights", NULL } },
+    { "clamped_sigmoid",    4, { "sigmoid", "neuron", "low", "high", NULL } },
+    { "sigmoid_clamped",    5, { "sigmoid", "normalised", "normalized", "clamping", NULL } },
+    { "gcd_scaled",         6, { "gcd", "greatest", "common", "divisor", "coefficient", NULL } },
+    { "apply_tax",          7, { "take", "home", "pay", "federal", NULL } },
+    { "gross_minus_tax",    8, { "reduced", "liability", NULL } },
+    { "discounted_tax",     9, { "discount", "applied", NULL } },
+    { "fib_fact_mul",      10, { "fibonacci", "factorial", "multiplied", NULL } },
+    { "fib_fact_add",      11, { "fibonacci", "factorial", "combined", "adding", "added", NULL } },
+    { "invoice_total",     12, { "invoice", "total", "quantity", "plus", NULL } },
+    { "clamped_average",   13, { "average", "bounded", "between", "minimum", "maximum", NULL } },
+    { "abs_diff",          14, { "magnitude", "difference", "forecasts", NULL } },
+    { "pv_of_fv",          15, { "future", "cashflow", "back", "present", "worth", NULL } },
+    { "distance_metrics",  16, { "axes", "squared", "across", "coordinate", NULL } },
+    { "distance_midpoint", 17, { "distance", "readings", "midpoint", NULL } },
+    { "savings_rate",      18, { "fraction", "saved", "subtracting", "expenses", NULL } },
+    { "scaled_relu",       19, { "rectified", "gain", NULL } },
 };
 static const int N_FAMILIES = (int)(sizeof(FAMILIES) / sizeof(FAMILIES[0]));
 

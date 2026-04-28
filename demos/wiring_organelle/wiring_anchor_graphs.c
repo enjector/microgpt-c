@@ -174,16 +174,17 @@ static const AnchorEntry ANCHORS[] = {
       "  y <- s.out\n"
       "@end\n" },
 
-    /* #12 — discounted_tax: tax_amount(price - price*rate/100, tax_rate)
-     *      Inputs: S[0]=price, S[1]=disc_rate, S[2]=tax_rate */
+    /* #12 — discounted_tax: tax_amount(discount(price, disc_rate), tax_rate)
+     *      Inputs: S[0]=price, S[1]=disc_rate, S[2]=tax_rate
+     *      Uses the native `discount` primitive (price - price*rate/100),
+     *      avoiding the inverse-direction bug from chaining percentage. */
     { "discounted_tax",
       "@graph discounted_tax\n"
       "  : in price -> int\n"
       "  : in disc -> int\n"
       "  : in trate -> int\n"
       "  : out y -> int\n"
-      "  | dpct = percentage(part: <price>, whole: <disc>) :: part:int, whole:int -> out:int\n"
-      "  | red = subtract(x: <price>, y: dpct.out) :: x:int, y:int -> out:int\n"
+      "  | red = discount(price: <price>, rate: <disc>) :: price:int, rate:int -> out:int\n"
       "  | t = tax_amount(amount: red.out, rate: <trate>) :: amount:int, rate:int -> out:int\n"
       "  y <- t.out\n"
       "@end\n" },
