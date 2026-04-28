@@ -3176,6 +3176,89 @@ The eval logs underlying this section: `docs/research/leakage_clean_anchor.log` 
 
 ---
 
+## 40. Phase 3 — pre-registered predictions for the four-axis boundary work
+
+This section is written **before** the Phase 3 experiments are run. The predictions, success criteria, and acceptance/rejection conditions are locked in here so that whatever happens, the post-hoc writeup can be compared against what we expected.
+
+The architectural diagnosis from §38 + §39: the system has the wrong-share-of-credit framing (most work is done by the deterministic Judge stack and the anchor mechanism, not the wiring transformer), and four boundary axes were named where the system fails. Phase 3 splits into three sub-experiments that each target a specific axis or pair of axes.
+
+### 40.1 Predictions before the experiment
+
+| Phase | Sub-experiment | Targets which axis | What I predict |
+|---|---|---|---|
+| 3a | Train EKAN-Network as a (prompt → 12D coordinate) classifier on the 408-example corpus | Axis 2 (weak keyword overlap) | Strong benefit |
+| 3b | Decompose 6–8 anchors into reusable fragments + composition retrieval | Axis 3 (multi-stage compositions) | Genuinely opens new capability |
+| 3c | Sentence-embedding RAG fallback over training corpus | Axis 2 + Axis 4 (modest, corpus-bounded) | Modest |
+| — | Axis 1 (novel families) | Not addressed by Phase 3 | (You add a family by adding an anchor entry, period.) |
+
+### 40.2 Phase 3a — EKAN-trained encoder
+
+**Mechanism.** Replace `wiring_geo_classifier.c::embed_prompt` (handcoded keyword bag → 20D one-hot) with a small EKAN-Network (`src/microgpt_ekan_network.h`, already lifted, ~510 LOC, currently unused) trained as a classifier mapping (prompt → 12D anchor coordinate). Training data: 408-example corpus (the wiring training corpus, with each prompt's family inferred from its `@graph <name>` header). Eval: held-out file (40 prompts) and a new adversarial axis-2 test set (20 prompts).
+
+**Success criteria, locked in:**
+
+- **No-regression test.** Eval on the 20 Phase 2c clean paraphrases must hold at **≥18/20 numeric correctness** (allowing one slip from the current 20/20). If we drop below 18, EKAN training is *worse than handcoded* on in-distribution prompts and we don't ship.
+- **Adversarial axis-2 test.** Build a 20-prompt test set where every existing keyword from the family's bag is deliberately replaced with a synonym not in any keyword bag (e.g. "Quetelet index" instead of "BMI", "geometric mean" instead of "average"). Eval the existing handcoded classifier *and* the EKAN-trained classifier on this set. **Predicted EKAN performance: 12–16 of 20** (predicted handcoded baseline: 2–5 of 20).
+- **Time budget.** Training ≤15 min wall clock at the existing 540K-class scale (the EKAN-Network is much smaller than the wiring organelle, so this is conservative).
+
+**What I predict each outcome means:**
+
+| Outcome | Interpretation |
+|---|---|
+| 18-20 on no-regression AND 12-16 on adversarial | Both targets met. Ship EKAN as the production embedder; keep handcoded as fallback. |
+| 18-20 on no-regression AND 5-11 on adversarial | EKAN partially helps but the corpus is too small to learn rich semantic similarity. The next step is corpus expansion (Phase 4), not architecture change. |
+| 18-20 on no-regression AND <5 on adversarial | EKAN learned to recognise the training prompts but didn't generalise word semantics. The handcoded keyword bag is doing more than I thought. Don't ship. |
+| <18 on no-regression | EKAN training is destabilising the existing 20/20 path. The handcoded bag is genuinely better at this scale. Don't ship; keep handcoded forever. |
+
+### 40.3 Phase 3b — fragment-anchor library + composition retrieval
+
+**Mechanism.** Decompose 6–8 of the 20 existing canonical anchors into reusable fragments (e.g. `tax_step`, `discount_step`, `markup_step`, `clamp_step`, `compound_step`). Each fragment is a typed input/output graph snippet. A composition operator retrieves K=2–3 fragments by geodesic distance to a prompt embedding, then chains them by output-type matching using the existing pipeline IR.
+
+**Success criteria, locked in:**
+
+- **Composition test set.** Build 10 prompts that explicitly require multi-stage compositions outside any single existing anchor (e.g. "discount the tax on a price after markup of x"). Eval current architecture (will fail all 10 — current Phase 2c data shows the architecture has no composition path) vs Phase 3b. **Predicted Phase 3b performance: 5-7 of 10.**
+- **No-regression test.** Eval on 20 Phase 2c clean paraphrases must hold at ≥18/20. If composition retrieval is incorrectly invoked when a single anchor would suffice, we regress; we need a confidence gate (single-anchor preferred when high-confidence).
+
+**What I predict each outcome means:**
+
+| Outcome | Interpretation |
+|---|---|
+| 5-7 of 10 composition + 18-20 no-regression | Architecture genuinely composes; ship as the production composition path. |
+| 1-4 of 10 composition + 18-20 no-regression | Fragment retrieval picks fragments but composition operator (type matching, primitive selection) is too brittle. Diagnose specific failures, iterate. |
+| 0 of 10 composition | Fragment embeddings don't form a useful similarity space at this scale. Try fragment-classification-via-EKAN before retrieval. |
+| <18 no-regression | Composition path interferes with single-anchor path. Tighten confidence gate. |
+
+### 40.4 Phase 3c — RAG fallback over training corpus
+
+**Mechanism.** When no anchor in top-K passes a confidence threshold (e.g. geodesic top-1 distance > 0.6), embed the prompt with EKAN, retrieve K=5 nearest training prompts from the 408-example corpus, prepend them as in-context examples to the wiring transformer's input, regenerate.
+
+**Success criteria, locked in:**
+
+- **OOD test set.** Reuse the adversarial axis-2 set from Phase 3a (where keyword overlap is intentionally weak), but evaluate via the wiring transformer with RAG fallback rather than via EKAN classification. **Predicted lift: wiring-only 35% → wiring+RAG 50-60%.**
+- **Confidence-gate calibration.** RAG should not fire on prompts where the anchor mechanism is confident (would be pure overhead). Confirm RAG fires on ≤20% of in-distribution prompts.
+
+**What I predict each outcome means:**
+
+| Outcome | Interpretation |
+|---|---|
+| 50-60% on adversarial via wiring+RAG | RAG fallback is a useful layer for OOD prompts. Ship it. |
+| 35-45% on adversarial via wiring+RAG | RAG retrieves prompts but in-context examples don't help the wiring transformer enough. The wiring layer is the limiter. |
+| <35% (regression) | RAG context is *confusing* the wiring transformer. Drop RAG; not the right intervention at this scale. |
+
+### 40.5 What we won't claim regardless of outcome
+
+- That Phase 3 closes the Wiring Organelle's natural-English generalisation. The wiring transformer's 35% ceiling is documented through 17 phases — we're not pushing that.
+- That Phase 3 makes the wiring transformer "good". The architecture's value lives in the retrieval layer; Phase 3 is about making that layer broader and more robust, not the transformer better.
+- That EKAN training validates "manifold learning". EKAN is a small autoencoder. It's a learned encoder, not a manifold-learning method in the geometric-deep-learning sense. The framing in `RESEARCH_MANIFOLD_LEARNING.md` is about retrieval over a low-dimensional metric space; that framing survives whether or not EKAN is the encoder.
+
+### 40.6 The disciplined commitment
+
+This section is committed to the repository **before** the Phase 3a/3b/3c experiments are run. After running each phase, a §41/§42/§43 section will be added with the actual results, compared row-by-row against the predictions in this section. Predictions that beat actual results, predictions that miss, and post-hoc surprises will all be documented honestly. The intent is to produce a research record where the *forecasting* is auditable, not just the outcomes.
+
+If a prediction is materially wrong (e.g. EKAN scores <5 on adversarial vs predicted 12-16), this section stays untouched and the post-eval section explains the gap. Under no circumstances does this prediction section get retroactively edited.
+
+---
+
 ## 16. Closing Remark
 
 The IR ships. 24 tests pass. The header has detailed doc-comments. The DOT renderer makes graphs human-readable. The text format is small enough for a tiny model to emit.
