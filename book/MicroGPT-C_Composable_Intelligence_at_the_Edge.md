@@ -21,7 +21,7 @@
     
     {\large \today\par}
     \vspace{0.3cm}
-    {\normalsize\texttt{Version 1.2.1}\par}
+    {\normalsize\texttt{Version 1.6.1}\par}
 \end{titlepage}
 
 % --- Copyright Page ---
@@ -32,7 +32,7 @@
 \noindent
 \textbf{MicroGPT-C: Composable Intelligence at the Edge}\\
 From Stem Cell Models to Real-World AI Pipelines \textendash{} Architecture, Implementation, and Research\\
-\textit{Version 1.2.1}\\[2em]
+\textit{Version 1.6.1}\\[2em]
 
 \noindent
 \textbf{Research Team}\\
@@ -2031,14 +2031,16 @@ The honest wiring-layer headline: **80% peak / 75% median correct on all 5 input
 
 ### Breaking the ceiling: the manifold-retrieval addendum (Phase 2)
 
-The standalone paper's §16 predicted that *replacing the generation step with retrieval over a continuous manifold* would push past the 75% structural ceiling. A four-phase addendum (Phases 1a/1b/1c/2) tested this prediction directly:
+§16 of the standalone paper predicted that *replacing the generation step with retrieval over a continuous manifold* would push past the 75% structural ceiling. A four-phase addendum (Phases 1a/1b/1c/2) tested this prediction directly:
 
 - **Phase 1a (VR cluster re-rank)** — 70%, flat. Re-ranking can't help when 16/16 candidates are unanimous on the wrong family.
-- **Phase 1b (geodesic-classifier diagnostic)** — A 250-LOC handcoded keyword bag + 12D Geodesic distance correctly classifies **5/6 of the wiring-failing prompts**. The bottleneck is generation, not classification.
-- **Phase 1c (geodesic hint-prefix + top-K re-rank)** — 70%, flat at the headline but with a positive layer-decomposition: the hint shifted the family-name token correctly for #17 (`fib_fact_op_subtract` → `fib_fact_op_add`) but the body still autoregressively emitted `max` instead of `add`. The 70-80% ceiling is three independent failure layers; 1c broke layer 2 but not layer 3.
-- **Phase 2 (anchor-retrieval generation, 12D)** — **80% (16/20) deterministic on every retrain.** A 20-entry canonical @graph table indexed by 12D Geodesic top-1 family prediction is injected as a 17th candidate alongside the 16 wiring votes, with planner+geodesic agreement-gating triggering a +60 score boost. All three failure layers are sidestepped because the entire graph DAG comes from the table — no token-by-token generation.
-- **Phase 2b (20D unique-slot + corrected anchor)** — **🎯 100% (20/20) deterministic.** GEO_DIMS bumped 12→20 to give each held-out family a unique axis (eliminating slot-collisions); discounted_tax anchor rewritten to use the native `discount` primitive. No learned encoder needed — a tightened handcoded keyword bag in unique 20D slots was sufficient.
-- **Phase 2c (doubled paraphrase-stressed test set)** — **🎯 100% (40/40) deterministic.** Held-out file doubled with 20 new paraphrases (one per family). Anchor unconditional bonus bumped +10→+30 to break alias-neighbour ties. Headline holds.
+- **Phase 1b (geodesic-classifier diagnostic)** — A 250-LOC handcoded keyword bag + 12D Geodesic distance correctly classifies **5/6 of the wiring-failing prompts**, including the canonical fib_fact_add diffuse-prior failure. **The bottleneck is generation, not classification.**
+- **Phase 1c (geodesic hint-prefix + top-K re-rank)** — 70%, flat at the headline but with a positive layer-decomposition: the hint shifted the family-name token correctly for #17 (`fib_fact_op_subtract` -> `fib_fact_op_add`) but the body still autoregressively emitted `max` instead of `add`. The 70-80% ceiling is three independent failure layers (modal-cluster re-rank, family-name selection, primitive selection); 1c broke layer 2 but not layer 3.
+- **Phase 2 (anchor-retrieval generation, 12D)** — **80% (16/20) deterministic.** A 20-entry canonical @graph table indexed by 12D Geodesic top-1 family prediction is injected as a 17th candidate alongside the 16 wiring votes, with planner+geodesic agreement-gating triggering a +60 score boost. All three failure layers are sidestepped because the entire graph DAG comes from the table — no token-by-token generation is involved.
+- **Phase 2b (20D unique-slot embedder + corrected discount anchor)** — **🎯 100% (20/20) deterministic.** GEO_DIMS bumped 12->20 in `microgpt_geodesic.h` so each held-out family gets a unique axis (eliminates slot-collisions). The discounted_tax anchor was rewritten to use the native `discount` primitive. The §10.4 prediction "learned EKAN encoder pushes the headline to 90%+" was cashed in *without* a learned encoder — a tightened handcoded keyword bag in unique 20D slots was sufficient.
+- **Phase 2c (doubled held-out test set under lexical paraphrase)** — **🎯 100% (40/40) deterministic.** 20 new paraphrases, one per family, with deliberately different surface wording (e.g. "clipped" vs "limited", "after-tax" vs "take home pay", "n-th fibonacci multiplied by n-th factorial" vs "fibonacci of n times factorial of n"). Anchor unconditional bonus bumped from +10 to +30 to break tiebreakers on alias-family neighbours like `clamped_sigmoid` ↔ `sigmoid_clamped`. The headline holds at 100% under doubled lexical variation.
+
+Phase 2 fixed the 5 prompts the Phase 1b classifier recovered (#1, #2, #3, #6, #17). Phase 2b cleared the remaining 4 (#8, #9, #12, #13, #15 — slot-collisions + discount-anchor bug). Phase 2c doubled the test set without losing a single prompt.
 
 ### Where the thesis bounds itself, and where it extends
 
@@ -2048,19 +2050,19 @@ The 17-phase arc validates the thesis (*organelles retrieve; pipelines compose*)
 
 - Standalone paper (v3.0, closes both the 17-phase arc and the four-phase manifold-retrieval addendum): `docs/research/RESEARCH_WIRING_ORGANELLE_PAPER.md`
 - Full development log (35 sections including the addendum's §32–§35, with 7 documented negative results): `docs/research/RESEARCH_PIPELINE_IR.md`
-- Manifold-learning research note: `docs/research/RESEARCH_MANIFOLD_LEARNING.md`
+- Manifold-learning research note with the architectural map and feasibility costing: `docs/research/RESEARCH_MANIFOLD_LEARNING.md`
 - Pure C99, single-laptop, ~50-minute training (3-seed ensemble + planner), 51 pipeline tests + 39 manifold-engine tests all passing.
-- `main` reproduces the post-leakage-audit honest headlines: **🎯 100% (20/20) anchor-retrieval mechanism on leakage-free paraphrases**, **35% (7/20) wiring transformer alone** on the same clean set. Reproduce with `./wiring_organelle_demo --no-anchor --clean-only`. The 17-phase corpus-engineering 35→75% lift was largely Phase 13 training-on-test contamination (13 of 20 originals in `pipeline_corpus_train.txt`); see `RESEARCH_PIPELINE_IR.md` §38 for the audit and §39 for concrete per-prompt examples of where the system works versus where it doesn't.
+- `main` reproduces the post-leakage-audit honest headlines: **🎯 100% (20/20) anchor-retrieval mechanism on leakage-free paraphrases**, **35% (7/20) wiring transformer alone** on the same clean set. Reproduce with `./wiring_organelle_demo --no-anchor --clean-only`. The 17-phase corpus-engineering 35->75% lift was largely Phase 13 training-on-test contamination (13 of 20 originals in `pipeline_corpus_train.txt`); see `RESEARCH_PIPELINE_IR.md` §38 for the audit and §39 for concrete per-prompt examples of where the system works versus where it doesn't.
 
 ### Where this works in practice
 
 The boundary, in plain terms (full per-prompt audit in `RESEARCH_PIPELINE_IR.md` §39, post-Phase-3b state in §44):
 
-- **Works (100% deterministic):** any natural-English request whose semantics map to one of the 20 anchored families — robust to lexical variation: synonyms ("clipped"/"limited"), word reordering, articles, ordinal forms ("n-th"), tense shifts.
-- **Works at 60% (6/10):** multi-stage compositions chaining 2-3 fragments from the 15-fragment library (Phase 3b, §43).
-- **Doesn't work, in three remaining ways:** (1) novel families the anchor table doesn't encode; (2) weak keyword overlap where the paraphrase strips every family-discriminating keyword; (3) domain-vocabulary drift that translates the operation into a vocabulary the keyword bag doesn't model.
+- **Works (100% deterministic):** any natural-English request whose semantics map to one of the 20 anchored families (BMI clamp, compound interest, weighted three, sigmoid clamp, GCD scaled, take-home pay, fib × fact mul/add, invoice, clamped average, abs diff, scaled ReLU, discount tax, savings rate, distance metrics, distance midpoint, PV of FV, gross minus tax, compound minus principal, sigmoid clamped) — robust to lexical variation: synonyms ("clipped"/"limited"), word reordering, articles, ordinal forms ("n-th"), tense shifts.
+- **Works at 60% (6/10):** multi-stage compositions chaining 2-3 fragments from the 15-fragment library (Phase 3b, §43). E.g. "compound balance bounded between lo and hi" or "discount the tax on a price after markup".
+- **Doesn't work, in three remaining ways:** (1) **novel families** the anchor table doesn't encode (e.g. "standard deviation of three measurements"); (2) **weak keyword overlap** where the paraphrase strips every family-discriminating keyword (constructible adversarially); (3) **domain-vocabulary drift** that translates the operation into a vocabulary the keyword bag doesn't model.
 
-All three remaining failure axes share a single root cause: the curated library and keyword bag are bounded by the curator's hand. None requires a research breakthrough; they require either more curation effort (linear-time scaling) or a paradigm shift to corpus expansion + learned encoder (Phase 4, multi-week investment with empirical risk).
+All three remaining failure axes share a single root cause: the curated library and keyword bag are bounded by the curator's hand. None requires a research breakthrough; they require either more curation effort (linear-time scaling: ~30 min per anchor, ~10 min per fragment) or a paradigm shift to corpus expansion + learned encoder (Phase 4, multi-week investment with empirical risk).
 
 The research arc is **closed at the architecture level** as of Phase 3b. The next chapter is engineering scope, not research.
 
