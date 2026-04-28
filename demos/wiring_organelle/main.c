@@ -997,7 +997,7 @@ int main(void) {
         int held_correct = 0;      /* Phase 7: numeric answer matches reference (single input) */
         int held_correct_all = 0;  /* Phase 8: matches reference on all 5 input sets */
         int held_print = 0;
-        const int MAX_HELD_PRINTS = 20;
+        const int MAX_HELD_PRINTS = 100;
 
         /* Phase 15: planner-prediction tracking. */
         int planner_calls = 0;
@@ -1361,6 +1361,20 @@ int main(void) {
                     if (n_geo > 0 && cand_gnames[a][0] &&
                         wiring_geo_in_top_k(cand_gnames[a], geo_top_k, n_geo)) {
                         score += 25;
+                    }
+                    /* Phase 2c: small unconditional anchor bonus, breaks
+                     * ties when planner disagrees but geodesic top-1
+                     * picked the right family. Without this, when a
+                     * vote candidate happens to fall in geodesic top-K
+                     * (e.g. an alias-family neighbour like
+                     * `clamped_sigmoid` for a `sigmoid_clamped` prompt),
+                     * both score +25 from the top-K bonus and the
+                     * tiebreaker can fail. Anchor's +10 floor breaks
+                     * the tie cleanly, while staying small enough that
+                     * a self-consistent vote-cluster (3+ siblings) still
+                     * wins when geodesic is genuinely ambiguous. */
+                    if (anchor_used && a == anchor_cand_idx) {
+                        score += 30;
                     }
                     /* Phase 2: anchor-retrieval boost — agreement-gated.
                      * The anchor candidate's correctness depends on

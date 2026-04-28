@@ -53,7 +53,7 @@
 #define MAX_FAMILIES   24
 #define MAX_KEYWORDS    8
 #define MAX_KW_LEN     32
-#define MAX_PROMPTS    32
+#define MAX_PROMPTS    96
 #define MAX_PROMPT_LEN 256
 #define MAX_REF_LEN     64
 

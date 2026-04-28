@@ -110,3 +110,110 @@
 # REFERENCE: sigmoid_clamped
 // sigmoid of x normalised by clamping into a bounded range
 ---
+
+# ============================================================
+# Phase 2c — Expanded held-out paraphrases (20 new prompts).
+# Each is a distinct lexical paraphrase of one of the original
+# 20 families, using different surface wording. Stress-tests the
+# 100% Phase 2b headline against vocabulary drift.
+# ============================================================
+
+# EXPECTED: bmi clamp
+# REFERENCE: bmi_clamped
+// bmi of weight and height clipped to a healthy lo hi range
+---
+
+# EXPECTED: compound subtract
+# REFERENCE: compound_interest
+// the interest portion of an investment after principal compounds over years
+---
+
+# EXPECTED: multiply add percentage
+# REFERENCE: weighted_three
+// the weighted average of three measurements using their respective weights
+---
+
+# EXPECTED: sigmoid clamp
+# REFERENCE: clamped_sigmoid
+// sigmoid neuron activation restricted to a low high band
+---
+
+# EXPECTED: gcd multiply
+# REFERENCE: gcd_scaled
+// the gcd of two integers multiplied by a coefficient
+---
+
+# EXPECTED: apply_tax
+# REFERENCE: apply_tax
+// after-tax take home pay from federal taxation
+---
+
+# EXPECTED: fibonacci factorial multiply
+# REFERENCE: fib_fact_mul
+// n-th fibonacci multiplied by n-th factorial
+---
+
+# EXPECTED: multiply tax_amount add
+# REFERENCE: invoice_total
+// invoice combining quantity times unit price plus the applicable tax
+---
+
+# EXPECTED: average_two clamp
+# REFERENCE: clamped_average
+// the average of two values bounded between minimum and maximum
+---
+
+# EXPECTED: subtract abs_val
+# REFERENCE: abs_diff
+// absolute magnitude of the difference between two forecasts
+---
+
+# EXPECTED: relu multiply
+# REFERENCE: scaled_relu
+// rectified output multiplied by a gain factor
+---
+
+# EXPECTED: discount tax_amount
+# REFERENCE: discounted_tax
+// the tax owed once a discount has been applied to the price
+---
+
+# EXPECTED: subtract percentage
+# REFERENCE: savings_rate
+// the fraction of income remaining after subtracting two expenses
+---
+
+# EXPECTED: distance_1d add square
+# REFERENCE: distance_metrics
+// sum of distances across two coordinate axes squared
+---
+
+# EXPECTED: distance_1d midpoint add
+# REFERENCE: distance_midpoint
+// the distance between two readings combined with their midpoint
+---
+
+# EXPECTED: future_value present_value
+# REFERENCE: pv_of_fv
+// present worth of a future cashflow discounted back to today
+---
+
+# EXPECTED: fibonacci factorial add
+# REFERENCE: fib_fact_add
+// the sum of n-th fibonacci and n-th factorial added together
+---
+
+# EXPECTED: tax_amount subtract
+# REFERENCE: gross_minus_tax
+// gross pay reduced by the federal tax liability
+---
+
+# EXPECTED: compound subtract
+# REFERENCE: compound_minus_p
+// final compound balance minus the original principal amount
+---
+
+# EXPECTED: sigmoid clamp
+# REFERENCE: sigmoid_clamped
+// sigmoid x value normalised through clamping
+---
