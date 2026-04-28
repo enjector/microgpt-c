@@ -1381,6 +1381,7 @@ typedef struct {
     void *ctx_a;           /* small int parameters; cast as needed */
     void *ctx_b;
     void *ctx_c;
+    const char *family;    /* Phase 15: template family name for the planner corpus */
 } CorpusEntry;
 
 /* Wrappers so each template can be called via a single-pointer build fn. */
@@ -1408,6 +1409,12 @@ static Pipeline *w_axpy(void *ctx) {
 static Pipeline *w_lerp(void *ctx) { int n = (int)(intptr_t)ctx; return tpl_lerp(n); }
 static Pipeline *w_range(void *ctx) { int n = (int)(intptr_t)ctx; return tpl_range(n); }
 
+/* Phase 15: track the current template family for the planner corpus.
+ * Updated via FAMILY() macro at the head of each region in build_catalog;
+ * captured in CorpusEntry.family by the ADD3() macro. */
+static const char *current_family = NULL;
+#define FAMILY(name) (current_family = (name))
+
 /* Build the entire corpus. Each entry's prompt is heap-allocated; caller frees. */
 static CorpusEntry *build_catalog(int *out_count) {
     int cap = 256;
@@ -1419,10 +1426,12 @@ static CorpusEntry *build_catalog(int *out_count) {
     cat[n].prompt = strdup(prompt_str);                                        \
     cat[n].build = (fn);                                                       \
     cat[n].ctx_a = (a); cat[n].ctx_b = (b); cat[n].ctx_c = (c);                \
+    cat[n].family = current_family ? current_family : "tpl_unknown";           \
     n++;                                                                       \
 } while (0)
 
     /* --- Family 1: chain(prim, n) ---  prim ∈ {add, multiply, max, min}, n ∈ {2..8} */
+    FAMILY("tpl_chain");
     static const char *prim_set[] = { "add", "multiply", "max", "min" };
     for (int p = 0; p < 4; p++) {
         for (int nn = 2; nn <= 8; nn++) {
@@ -1437,6 +1446,7 @@ static CorpusEntry *build_catalog(int *out_count) {
     }
 
     /* --- Family 2: fanout_combine(unary, binary, n) --- */
+    FAMILY("tpl_fanout_combine");
     static const char *unaries[] = { "negate", "abs" };
     static const char *binaries[] = { "add", "multiply" };
     for (int u = 0; u < 2; u++) {
@@ -1455,6 +1465,7 @@ static CorpusEntry *build_catalog(int *out_count) {
     }
 
     /* --- Family 3: polynomial(d) --- d ∈ {1..7} */
+    FAMILY("tpl_polynomial");
     for (int d = 1; d <= 7; d++) {
         char prompt[128];
         snprintf(prompt, sizeof(prompt),
@@ -1463,6 +1474,7 @@ static CorpusEntry *build_catalog(int *out_count) {
     }
 
     /* --- Family 4: distance_squared(dim) --- dim ∈ {1..6} */
+    FAMILY("tpl_distance_squared");
     for (int d = 1; d <= 6; d++) {
         char prompt[128];
         snprintf(prompt, sizeof(prompt),
@@ -1471,6 +1483,7 @@ static CorpusEntry *build_catalog(int *out_count) {
     }
 
     /* --- Family 5: dot_product(dim) --- dim ∈ {2..8} */
+    FAMILY("tpl_dot_product");
     for (int d = 2; d <= 8; d++) {
         char prompt[128];
         snprintf(prompt, sizeof(prompt),
@@ -1479,6 +1492,7 @@ static CorpusEntry *build_catalog(int *out_count) {
     }
 
     /* --- Family 6: mean_n(n) --- n ∈ {2..8} */
+    FAMILY("tpl_mean");
     for (int nn = 2; nn <= 8; nn++) {
         char prompt[128];
         snprintf(prompt, sizeof(prompt), "// arithmetic mean of %d integers", nn);
@@ -1486,6 +1500,7 @@ static CorpusEntry *build_catalog(int *out_count) {
     }
 
     /* --- Family 7: weighted_combine(n) --- n ∈ {2..6} */
+    FAMILY("tpl_weighted_combine");
     for (int nn = 2; nn <= 6; nn++) {
         char prompt[128];
         snprintf(prompt, sizeof(prompt),
@@ -1494,6 +1509,7 @@ static CorpusEntry *build_catalog(int *out_count) {
     }
 
     /* --- Family 8: axpy_then_op(post, depth) --- */
+    FAMILY("tpl_axpy_chain");
     static const char *post_ops[] = { "negate", "abs" };
     for (int p = 0; p < 2; p++) {
         for (int dep = 1; dep <= 3; dep++) {
@@ -1509,6 +1525,7 @@ static CorpusEntry *build_catalog(int *out_count) {
     }
 
     /* --- Family 9: lerp_n(n) --- n ∈ {2..4} */
+    FAMILY("tpl_lerp");
     for (int nn = 2; nn <= 4; nn++) {
         char prompt[128];
         snprintf(prompt, sizeof(prompt),
@@ -1517,6 +1534,7 @@ static CorpusEntry *build_catalog(int *out_count) {
     }
 
     /* --- Family 10: range_n(n) --- n ∈ {2..5} */
+    FAMILY("tpl_range");
     for (int nn = 2; nn <= 5; nn++) {
         char prompt[128];
         snprintf(prompt, sizeof(prompt),
@@ -1535,90 +1553,105 @@ static CorpusEntry *build_catalog(int *out_count) {
     ADD3(p3, w_seed, (void *)(SeedFn)(fn), NULL, NULL);                    \
 } while (0)
 
+    FAMILY("seed_sum_results");
     ADD_SEED3(
         "// double the first value triple the second and add",
         "// sum doubled a and tripled b",
         "// add double of a to triple of b",
         seed_sum_results);
 
+    FAMILY("seed_compound_interest");
     ADD_SEED3(
         "// compute compound interest earned on principal at rate over years",
         "// money compounded at interest rate over years minus principal",
         "// interest amount after compound growth of principal",
         seed_compound_interest);
 
+    FAMILY("seed_analyze_two_points");
     ADD_SEED3(
         "// distance between two points plus their midpoint",
         "// add one dimensional distance and midpoint of a and b",
         "// combine distance and midpoint of two values",
         seed_analyze_two_points);
 
+    FAMILY("seed_clamped_average");
     ADD_SEED3(
         "// average two numbers then clamp between bounds",
         "// clamped mean of a and b within lo and hi",
         "// take average of a and b and limit to range",
         seed_clamped_average);
 
+    FAMILY("seed_abs_difference");
     ADD_SEED3(
         "// absolute difference of a and b",
         "// magnitude of a minus b",
         "// distance from a to b without sign",
         seed_abs_difference);
 
+    FAMILY("seed_discounted_tax");
     ADD_SEED3(
         "// tax on price after applying a discount",
         "// discounted then taxed amount",
         "// compute tax amount on price after a discount rate",
         seed_discounted_tax);
 
+    FAMILY("seed_total_with_tax");
     ADD_SEED3(
         "// total cost of price including tax",
         "// price plus tax amount on price",
         "// gross total after adding sales tax",
         seed_total_with_tax);
 
+    FAMILY("seed_net_pay");
     ADD_SEED3(
         "// take home pay from gross income at tax rate",
         "// net income after applying tax rate",
         "// post tax pay given gross and rate",
         seed_net_pay);
 
+    FAMILY("seed_savings_rate");
     ADD_SEED3(
         "// savings rate as percentage of income",
         "// fraction saved out of income after expenses",
         "// percentage of income left after expenses",
         seed_savings_rate);
 
+    FAMILY("seed_fib_fact_product");
     ADD_SEED3(
         "// fibonacci of n times factorial of n",
         "// product of fibonacci and factorial of n",
         "// multiply fib n by fact n",
         seed_fib_fact_product);
 
+    FAMILY("seed_net_present_value");
     ADD_SEED3(
         "// net present value of cashflow at rate over years",
         "// present value of future value of cashflow",
         "// discount the future value of a cashflow back to present",
         seed_net_present_value);
 
+    FAMILY("seed_clamped_sigmoid");
     ADD_SEED3(
         "// sigmoid of x clamped within lo and hi",
         "// bounded sigmoid output between lo and hi",
         "// clip sigmoid x to range lo hi",
         seed_clamped_sigmoid);
 
+    FAMILY("seed_scaled_relu");
     ADD_SEED3(
         "// relu of x scaled by a factor",
         "// rectified linear unit times scale",
         "// scaled rectified output of x",
         seed_scaled_relu);
 
+    FAMILY("seed_gcd_product");
     ADD_SEED3(
         "// gcd of a and b multiplied by both a and b",
         "// product of gcd a b times a times b",
         "// multiply greatest common divisor by a and b",
         seed_gcd_product);
 
+    FAMILY("seed_bmi_classified");
     ADD_SEED3(
         "// bmi of weight and height clamped between lo and hi",
         "// body mass index limited within bounds",
@@ -1632,6 +1665,7 @@ static CorpusEntry *build_catalog(int *out_count) {
      * ============================================================ */
 
     /* tpl_clamped_op(unary_op): unary then clamp within bounds. */
+    FAMILY("tpl_clamped_op");
     static const char *clamp_ops[] = {
         "sigmoid", "relu", "abs_val", "square", "double_val", "triple_val"
     };
@@ -1644,6 +1678,7 @@ static CorpusEntry *build_catalog(int *out_count) {
     }
 
     /* tpl_taxed_total: invoice total = price * qty + tax. */
+    FAMILY("tpl_taxed_total");
     for (int qf = 0; qf < 2; qf++) {
         char prompt[160];
         snprintf(prompt, sizeof(prompt),
@@ -1659,6 +1694,7 @@ static CorpusEntry *build_catalog(int *out_count) {
     }
 
     /* tpl_savings_pipeline(n_expenses): sum n expenses, subtract from income, percent. */
+    FAMILY("tpl_savings_pipeline");
     for (int n_e = 1; n_e <= 4; n_e++) {
         char prompt[160];
         snprintf(prompt, sizeof(prompt),
@@ -1668,6 +1704,7 @@ static CorpusEntry *build_catalog(int *out_count) {
     }
 
     /* tpl_compound_chain(periods): interest earned. */
+    FAMILY("tpl_compound_chain");
     for (int per = 2; per <= 6; per++) {
         char prompt[160];
         snprintf(prompt, sizeof(prompt),
@@ -1677,6 +1714,7 @@ static CorpusEntry *build_catalog(int *out_count) {
     }
 
     /* tpl_gcd_chain(depth): gcd chain * k. */
+    FAMILY("tpl_gcd_chain");
     for (int dep = 1; dep <= 4; dep++) {
         char prompt[160];
         snprintf(prompt, sizeof(prompt),
@@ -1686,6 +1724,7 @@ static CorpusEntry *build_catalog(int *out_count) {
     }
 
     /* tpl_fib_fact_blend(op): combine fibonacci(n) and factorial(n). */
+    FAMILY("tpl_fib_fact_blend");
     static const char *blend_ops[] = { "add", "multiply", "max", "min" };
     for (size_t op = 0; op < sizeof(blend_ops) / sizeof(blend_ops[0]); op++) {
         char prompt[160];
@@ -1696,6 +1735,7 @@ static CorpusEntry *build_catalog(int *out_count) {
     }
 
     /* tpl_bmi_classified(normalize). */
+    FAMILY("tpl_bmi_classified");
     for (int nor = 0; nor <= 1; nor++) {
         char prompt[160];
         if (nor) {
@@ -1709,6 +1749,7 @@ static CorpusEntry *build_catalog(int *out_count) {
     }
 
     /* tpl_pv_npv_chain(variant). */
+    FAMILY("tpl_pv_npv_chain");
     for (int var = 0; var <= 1; var++) {
         char prompt[160];
         if (var) {
@@ -1722,6 +1763,7 @@ static CorpusEntry *build_catalog(int *out_count) {
     }
 
     /* tpl_distance_metrics(dim). */
+    FAMILY("tpl_distance_metrics");
     for (int d = 1; d <= 4; d++) {
         char prompt[160];
         snprintf(prompt, sizeof(prompt),
@@ -1731,6 +1773,7 @@ static CorpusEntry *build_catalog(int *out_count) {
     }
 
     /* tpl_weighted_real(n). */
+    FAMILY("tpl_weighted_real");
     for (int nn = 2; nn <= 5; nn++) {
         char prompt[160];
         snprintf(prompt, sizeof(prompt),
@@ -1750,6 +1793,7 @@ static CorpusEntry *build_catalog(int *out_count) {
      * ============================================================ */
 
     /* tpl_fib_fact_op(op) — fibonacci(n) op factorial(n). */
+    FAMILY("tpl_fib_fact_op");
     static const char *fib_fact_ops[] = { "add", "multiply", "max", "min", "subtract" };
     static const char *fib_fact_phrases[] = {
         "fibonacci of n combined with factorial of n by",
@@ -1767,6 +1811,7 @@ static CorpusEntry *build_catalog(int *out_count) {
     }
 
     /* tpl_distance_midpoint(op) — distance_1d(a,b) op midpoint(a,b). */
+    FAMILY("tpl_distance_midpoint");
     static const char *dm_ops[] = { "add", "multiply", "subtract" };
     static const char *dm_phrases[] = {
         "distance between two readings combined with their midpoint by",
@@ -1783,6 +1828,7 @@ static CorpusEntry *build_catalog(int *out_count) {
     }
 
     /* tpl_apply_tax_chain(extra) — apply_tax then add/sub/mul a delta. */
+    FAMILY("tpl_apply_tax_chain");
     static const char *atc_ops[] = { "add", "subtract", "multiply" };
     static const char *atc_phrases[] = {
         "take home pay from gross at rate then adjust by delta with",
@@ -1799,6 +1845,7 @@ static CorpusEntry *build_catalog(int *out_count) {
     }
 
     /* tpl_clamped_unary_then_op(unary, op) — unary → clamp → op. */
+    FAMILY("tpl_clamped_unary_then_op");
     static const char *cuto_unaries[] = { "sigmoid", "relu", "abs_val" };
     static const char *cuto_ops[] = { "add", "multiply" };
     for (size_t u = 0; u < sizeof(cuto_unaries) / sizeof(cuto_unaries[0]); u++) {
@@ -1814,6 +1861,7 @@ static CorpusEntry *build_catalog(int *out_count) {
     }
 
     /* tpl_compound_then(op) — compound(P, r, n) op P. */
+    FAMILY("tpl_compound_then");
     static const char *ct_ops[] = { "subtract", "add", "multiply", "divide" };
     static const char *ct_phrases[] = {
         "compound principal at rate over years then",
@@ -1841,6 +1889,7 @@ static CorpusEntry *build_catalog(int *out_count) {
      * ============================================================ */
 
     /* fib_fact_op with held-out exact verb forms. */
+    FAMILY("tpl_fib_fact_op");
     ADD3("// fibonacci of n multiplied by factorial of n",
          w_fib_fact_op, (void *)"multiply", NULL, NULL);
     ADD3("// fibonacci of n times factorial of n",
@@ -1860,6 +1909,7 @@ static CorpusEntry *build_catalog(int *out_count) {
          w_fib_fact_op, (void *)"add", NULL, NULL);
 
     /* distance_midpoint with held-out exact verb forms. */
+    FAMILY("tpl_distance_midpoint");
     ADD3("// distance between two readings combined with their midpoint",
          w_distance_midpoint, (void *)"add", NULL, NULL);
     ADD3("// distance plus midpoint of a and b",
@@ -1870,12 +1920,14 @@ static CorpusEntry *build_catalog(int *out_count) {
          w_distance_midpoint, (void *)"add", NULL, NULL);
 
     /* apply_tax_chain with subtract for "reduced by" / "minus". */
+    FAMILY("tpl_apply_tax_chain");
     ADD3("// take home pay from gross income at federal tax rate then minus delta",
          w_apply_tax_chain, (void *)"subtract", NULL, NULL);
     ADD3("// gross income reduced by tax liability and delta",
          w_apply_tax_chain, (void *)"subtract", NULL, NULL);
 
     /* compound_then with subtract for "minus original" / "interest earned". */
+    FAMILY("tpl_compound_then");
     ADD3("// interest earned by subtracting principal from compounded value",
          w_compound_then, (void *)"subtract", NULL, NULL);
     ADD3("// compound minus original principal yields interest",
@@ -1894,6 +1946,7 @@ static CorpusEntry *build_catalog(int *out_count) {
     /* --- Bucket A: gerund anchoring for #17 ("by adding"). ---
      * Phase 12 added 1 "by adding" paraphrase; bring total to 4 to match
      * the count of "multiply"-form examples (which #7 nailed). */
+    FAMILY("tpl_fib_fact_op");
     ADD3("// fibonacci of n combined with factorial of n by adding them",
          w_fib_fact_op, (void *)"add", NULL, NULL);
     ADD3("// adding fibonacci of n and factorial of n",
@@ -1904,6 +1957,7 @@ static CorpusEntry *build_catalog(int *out_count) {
     /* --- Bucket B: novel vocabulary bridges for #1, #14, #20. --- */
 
     /* #1 "body mass index ... limit it inside lo and hi" — seed_bmi_classified */
+    FAMILY("seed_bmi_classified");
     ADD3("// body mass index from weight and height limit it inside lo and hi bounds",
          w_seed, (void *)(SeedFn)seed_bmi_classified, NULL, NULL);
     ADD3("// body mass index computed from weight and height kept inside lo hi",
@@ -1912,6 +1966,7 @@ static CorpusEntry *build_catalog(int *out_count) {
          w_seed, (void *)(SeedFn)seed_bmi_classified, NULL, NULL);
 
     /* #14 "axes" + "squared" — tpl_distance_metrics(2). */
+    FAMILY("tpl_distance_metrics");
     ADD3("// total of distances across two coordinate axes squared",
          w_distance_metrics, (void *)(intptr_t)2, NULL, NULL);
     ADD3("// sum of distances across two axes then squared",
@@ -1920,6 +1975,7 @@ static CorpusEntry *build_catalog(int *out_count) {
          w_distance_metrics, (void *)(intptr_t)2, NULL, NULL);
 
     /* #20 "normalised by clamping" + "bounded range" — seed_clamped_sigmoid */
+    FAMILY("seed_clamped_sigmoid");
     ADD3("// sigmoid of x normalised by clamping into a bounded range",
          w_seed, (void *)(SeedFn)seed_clamped_sigmoid, NULL, NULL);
     ADD3("// sigmoid output normalised via clamp inside lo and hi",
@@ -1930,24 +1986,28 @@ static CorpusEntry *build_catalog(int *out_count) {
     /* --- Bucket C: held-out exact-phrase paraphrases. --- */
 
     /* #2 "interest gained on an investment" — seed_compound_interest. */
+    FAMILY("seed_compound_interest");
     ADD3("// interest gained on an investment when principal compounds at rate over years",
          w_seed, (void *)(SeedFn)seed_compound_interest, NULL, NULL);
     ADD3("// interest gained on principal compounded at rate r over n years",
          w_seed, (void *)(SeedFn)seed_compound_interest, NULL, NULL);
 
     /* #4 "limit the output of a sigmoid neuron" — seed_clamped_sigmoid. */
+    FAMILY("seed_clamped_sigmoid");
     ADD3("// limit the output of a sigmoid neuron to a low high range",
          w_seed, (void *)(SeedFn)seed_clamped_sigmoid, NULL, NULL);
     ADD3("// limit sigmoid output of x to lo high range",
          w_seed, (void *)(SeedFn)seed_clamped_sigmoid, NULL, NULL);
 
     /* #5 "gcd ... scaled by a coefficient k" — tpl_gcd_chain(1). */
+    FAMILY("tpl_gcd_chain");
     ADD3("// greatest common divisor of two numbers scaled by a coefficient k",
          w_gcd_chain, (void *)(intptr_t)1, NULL, NULL);
     ADD3("// gcd of two numbers times a coefficient k",
          w_gcd_chain, (void *)(intptr_t)1, NULL, NULL);
 
     /* #6 "take home pay from gross income" — seed_net_pay (apply_tax). */
+    FAMILY("seed_net_pay");
     ADD3("// take home pay from gross income at federal tax rate",
          w_seed, (void *)(SeedFn)seed_net_pay, NULL, NULL);
     ADD3("// take home pay equals gross minus federal tax",
@@ -1956,6 +2016,7 @@ static CorpusEntry *build_catalog(int *out_count) {
          w_seed, (void *)(SeedFn)seed_net_pay, NULL, NULL);
 
     /* #12 "tax due on a price after a discount" — seed_discounted_tax. */
+    FAMILY("seed_discounted_tax");
     ADD3("// tax due on a price after a discount has been applied",
          w_seed, (void *)(SeedFn)seed_discounted_tax, NULL, NULL);
     ADD3("// tax due after price has been discounted",
@@ -1986,6 +2047,7 @@ static CorpusEntry *build_catalog(int *out_count) {
      * ============================================================ */
 
     /* Unary primitives — each with multiple paraphrased prompts. */
+    FAMILY("micro_unary");
     struct { const char *prim; const char *p[3]; } unary_set[] = {
         {"sigmoid",     {"// apply sigmoid to x", "// sigmoid activation of x", "// squash x with sigmoid"}},
         {"relu",        {"// apply relu to x", "// rectified linear of x", "// relu activation"}},
@@ -2007,6 +2069,7 @@ static CorpusEntry *build_catalog(int *out_count) {
     }
 
     /* Binary primitives — port_kind chooses naming convention. */
+    FAMILY("micro_binary");
     struct { const char *prim; int kind; const char *p[3]; } binary_set[] = {
         {"add",          0, {"// add x and y", "// sum of x and y", "// x plus y"}},
         {"subtract",     0, {"// subtract y from x", "// x minus y", "// difference between x and y"}},
@@ -2037,6 +2100,7 @@ static CorpusEntry *build_catalog(int *out_count) {
     }
 
     /* Ternary primitives. */
+    FAMILY("micro_ternary");
     struct { const char *prim; int kind; const char *p[3]; } ternary_set[] = {
         {"clamp",         0, {"// clamp x between lo and hi", "// limit x to range lo hi", "// bound x within lo and hi"}},
         {"lerp",          1, {"// lerp from a to b at t", "// linear interpolation a b t", "// blend a and b by t"}},
@@ -2063,6 +2127,7 @@ static CorpusEntry *build_catalog(int *out_count) {
      *  "limit", "bounded between" map to <unk> at inference time.
      * ============================================================ */
     /* Bridge prompts for seed graphs. */
+    FAMILY("seed_bmi_classified");
     ADD3("// compute body mass index then limit inside lo and hi bounds",
          w_seed, (void *)(SeedFn)seed_bmi_classified, NULL, NULL);
     ADD3("// body mass index of weight and height bounded between minimum and maximum",
@@ -2070,6 +2135,7 @@ static CorpusEntry *build_catalog(int *out_count) {
     ADD3("// determine bmi and restrict to range lo and hi",
          w_seed, (void *)(SeedFn)seed_bmi_classified, NULL, NULL);
 
+    FAMILY("seed_compound_interest");
     ADD3("// interest gained on an investment when principal compounds at rate over years",
          w_seed, (void *)(SeedFn)seed_compound_interest, NULL, NULL);
     ADD3("// final balance after compound growth minus the original principal",
@@ -2077,6 +2143,7 @@ static CorpusEntry *build_catalog(int *out_count) {
     ADD3("// total return after compound growth subtract original",
          w_seed, (void *)(SeedFn)seed_compound_interest, NULL, NULL);
 
+    FAMILY("seed_clamped_sigmoid");
     ADD3("// limit the output of sigmoid to lo and hi range",
          w_seed, (void *)(SeedFn)seed_clamped_sigmoid, NULL, NULL);
     ADD3("// sigmoid of x normalised by clamping into bounded range",
@@ -2084,6 +2151,7 @@ static CorpusEntry *build_catalog(int *out_count) {
     ADD3("// bounded sigmoid neuron output",
          w_seed, (void *)(SeedFn)seed_clamped_sigmoid, NULL, NULL);
 
+    FAMILY("seed_net_pay");
     ADD3("// take home pay from gross income at tax rate",
          w_seed, (void *)(SeedFn)seed_net_pay, NULL, NULL);
     ADD3("// gross income reduced by tax liability",
@@ -2091,42 +2159,50 @@ static CorpusEntry *build_catalog(int *out_count) {
     ADD3("// post tax pay from gross at federal rate",
          w_seed, (void *)(SeedFn)seed_net_pay, NULL, NULL);
 
+    FAMILY("seed_abs_difference");
     ADD3("// magnitude of difference between two forecasts",
          w_seed, (void *)(SeedFn)seed_abs_difference, NULL, NULL);
     ADD3("// absolute gap between a and b",
          w_seed, (void *)(SeedFn)seed_abs_difference, NULL, NULL);
 
+    FAMILY("seed_scaled_relu");
     ADD3("// rectified output of x scaled by a gain factor",
          w_seed, (void *)(SeedFn)seed_scaled_relu, NULL, NULL);
     ADD3("// relu of x times a scale coefficient",
          w_seed, (void *)(SeedFn)seed_scaled_relu, NULL, NULL);
 
+    FAMILY("seed_gcd_product");
     ADD3("// greatest common divisor of a b and the result times k",
          w_seed, (void *)(SeedFn)seed_gcd_product, NULL, NULL);
     ADD3("// gcd of a b scaled by both a and b",
          w_seed, (void *)(SeedFn)seed_gcd_product, NULL, NULL);
 
+    FAMILY("seed_clamped_average");
     ADD3("// average a and b bounded between minimum and maximum",
          w_seed, (void *)(SeedFn)seed_clamped_average, NULL, NULL);
     ADD3("// mean of a and b limited within lo and hi",
          w_seed, (void *)(SeedFn)seed_clamped_average, NULL, NULL);
 
+    FAMILY("seed_net_present_value");
     ADD3("// future cashflow discounted back to its present worth",
          w_seed, (void *)(SeedFn)seed_net_present_value, NULL, NULL);
     ADD3("// net present value of cashflow at rate over years",
          w_seed, (void *)(SeedFn)seed_net_present_value, NULL, NULL);
 
+    FAMILY("seed_fib_fact_product");
     ADD3("// fibonacci of n times factorial of n",
          w_seed, (void *)(SeedFn)seed_fib_fact_product, NULL, NULL);
     ADD3("// product of fib n and fact n",
          w_seed, (void *)(SeedFn)seed_fib_fact_product, NULL, NULL);
 
     /* Bridge prompts that name primitives explicitly to anchor them. */
+    FAMILY("tpl_taxed_total");
     ADD3("// invoice total of price times quantity plus tax amount at rate",
          w_taxed_total, (void *)(intptr_t)0, NULL, NULL);
     ADD3("// gross billing including sales tax on units sold",
          w_taxed_total, (void *)(intptr_t)1, NULL, NULL);
 
+    FAMILY("tpl_savings_pipeline");
     ADD3("// fraction of income saved after subtracting expenses",
          w_savings_pipeline, (void *)(intptr_t)2, NULL, NULL);
     ADD3("// percentage of income remaining after deducting expenses",
@@ -2138,6 +2214,7 @@ static CorpusEntry *build_catalog(int *out_count) {
      * the savings_rate (#13) and take_home_pay (#6) drift cases. */
 
     /* percentage(part, whole) — first arg is the numerator. */
+    FAMILY("seed_savings_rate");
     ADD3("// percentage of saved out of income",
          w_seed, (void *)(SeedFn)seed_savings_rate, NULL, NULL);
     ADD3("// what fraction of income did we save",
@@ -2148,6 +2225,7 @@ static CorpusEntry *build_catalog(int *out_count) {
          w_seed, (void *)(SeedFn)seed_savings_rate, NULL, NULL);
 
     /* apply_tax(amount, rate) — first arg is the gross amount. */
+    FAMILY("seed_net_pay");
     ADD3("// take home pay equals apply_tax of gross at rate",
          w_seed, (void *)(SeedFn)seed_net_pay, NULL, NULL);
     ADD3("// net pay from gross income at federal rate",
@@ -2158,6 +2236,7 @@ static CorpusEntry *build_catalog(int *out_count) {
          w_seed, (void *)(SeedFn)seed_net_pay, NULL, NULL);
 
     /* compound(principal, rate, periods) — order locked by paraphrase. */
+    FAMILY("seed_compound_interest");
     ADD3("// principal at rate over years compounded then minus original",
          w_seed, (void *)(SeedFn)seed_compound_interest, NULL, NULL);
     ADD3("// compound principal by rate for years yields total return",
@@ -2212,6 +2291,7 @@ static int count_unique_tokens(const char *buf, int *char_count_out) {
 int main(int argc, char **argv) {
     FILE *out_train = stdout;
     FILE *out_val = NULL;
+    FILE *out_planner = NULL;          /* Phase 15: planner training corpus */
     int split = 0;
     if (argc == 2) {
         out_train = fopen(argv[1], "w");
@@ -2220,6 +2300,12 @@ int main(int argc, char **argv) {
         out_train = fopen(argv[1], "w");
         out_val   = fopen(argv[2], "w");
         if (!out_train || !out_val) { perror("open"); return 1; }
+        split = 1;
+    } else if (argc == 4) {
+        out_train   = fopen(argv[1], "w");
+        out_val     = fopen(argv[2], "w");
+        out_planner = fopen(argv[3], "w");
+        if (!out_train || !out_val || !out_planner) { perror("open"); return 1; }
         split = 1;
     }
 
@@ -2239,6 +2325,12 @@ int main(int argc, char **argv) {
         fprintf(out_val, "# Pipeline IR — templated corpus (Phase 3b) — held-out validation split\n");
         fprintf(out_val, "# every 10th example reserved for validation\n\n");
     }
+    if (out_planner) {
+        fprintf(out_planner, "# Pipeline IR — Phase 15 planner training corpus\n");
+        fprintf(out_planner, "# Format: '// prompt' line followed by 'FAMILY: <name>' line, then ---.\n");
+        fprintf(out_planner, "# Used by the wiring_organelle_demo to train a small planner organelle\n");
+        fprintf(out_planner, "# that emits a template-family hint for re-ranking wiring candidates.\n\n");
+    }
 
     for (int i = 0; i < n; i++) {
         Pipeline *p = cat[i].build(cat[i].ctx_a ? cat[i].ctx_a : (void *)0);
@@ -2254,6 +2346,18 @@ int main(int argc, char **argv) {
         FILE *target = (split && (i % 10 == 9)) ? out_val : out_train;
         if (target == out_val) val_count++; else train_count++;
         fprintf(target, "%s\n%s---\n\n", cat[i].prompt, txt);
+
+        /* Phase 15b: emit (prompt, graph_name) pair to planner corpus.
+         * Using the actual graph name (e.g. "fib_fact_op_add") instead
+         * of the template family (e.g. "tpl_fib_fact_op") lets the
+         * planner discriminate among op variants WITHIN a family —
+         * critical for the held-out cases where the topology is
+         * shared across the 16 candidates but only one op is correct. */
+        if (out_planner) {
+            fprintf(out_planner, "%s\nFAMILY: %s\n---\n\n",
+                    cat[i].prompt,
+                    (p->name && p->name[0]) ? p->name : (cat[i].family ? cat[i].family : "unknown"));
+        }
 
         /* Append to vocab buffer (grow as needed). */
         size_t need = strlen(cat[i].prompt) + strlen(txt) + 8;
@@ -2276,6 +2380,7 @@ int main(int argc, char **argv) {
     fprintf(stderr, "\nGenerated %d / %d examples", ok_count, n);
     if (fail_count) fprintf(stderr, " (%d failed)", fail_count);
     if (split) fprintf(stderr, " | train=%d, val=%d", train_count, val_count);
+    if (out_planner) fprintf(stderr, " | planner=%d", ok_count);
     fprintf(stderr, "\nUnique whitespace-tokens: %d  |  Total characters: %d\n", vocab, chars);
 
     /* Free catalog. ctx_a is sometimes a heap array (multi-param families)
@@ -2289,5 +2394,6 @@ int main(int argc, char **argv) {
 
     if (out_train != stdout) fclose(out_train);
     if (out_val) fclose(out_val);
+    if (out_planner) fclose(out_planner);
     return fail_count == 0 ? 0 : 1;
 }

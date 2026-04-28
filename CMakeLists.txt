@@ -1838,17 +1838,20 @@ add_demo(
 target_sources(wiring_organelle_demo PRIVATE
   demos/wiring_organelle/wiring_natives.c
   demos/wiring_organelle/wiring_references.c)
-# Generate the corpus next to the binary as a POST_BUILD step.
+# Generate the wiring + planner corpus next to the binary as a POST_BUILD step.
+# Phase 15: 4-arg invocation also emits pipeline_corpus_planner.txt for the
+# planner organelle (template-family classifier).
 add_custom_command(TARGET wiring_organelle_demo POST_BUILD
   COMMAND pipeline_corpus_gen
           $<TARGET_FILE_DIR:wiring_organelle_demo>/pipeline_corpus_train.txt
           $<TARGET_FILE_DIR:wiring_organelle_demo>/pipeline_corpus_val.txt
+          $<TARGET_FILE_DIR:wiring_organelle_demo>/pipeline_corpus_planner.txt
   COMMAND ${CMAKE_COMMAND} -E copy
           ${CMAKE_CURRENT_SOURCE_DIR}/demos/wiring_organelle/pipeline_corpus_held_out.txt
           $<TARGET_FILE_DIR:wiring_organelle_demo>/pipeline_corpus_held_out.txt
   DEPENDS pipeline_corpus_gen
           ${CMAKE_CURRENT_SOURCE_DIR}/demos/wiring_organelle/pipeline_corpus_held_out.txt
-  COMMENT "Generating Pipeline IR corpus (train+val) and copying Phase 4 held-out NL prompts"
+  COMMENT "Generating Pipeline IR corpus (wiring + planner) and copying Phase 4 held-out NL prompts"
 )
 
 add_executable(test_microgpt_turboquant tests/test_microgpt_turboquant.c)

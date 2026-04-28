@@ -99,6 +99,11 @@
 #define INLINE_VAL_PATH   "wiring_corpus_inline_val.txt"
 #define CKPT_PATH         "wiring_organelle.ckpt"
 
+/* Phase 15 — planner organelle paths. */
+#define PLANNER_CORPUS_RAW    "pipeline_corpus_planner.txt"
+#define PLANNER_INLINE_PATH   "planner_corpus_inline.txt"
+#define PLANNER_CKPT_PATH     "wiring_planner.ckpt"
+
 /* ============================================================
  *  Corpus preprocessing — inline each example on one line.
  *  Replaces '\n' with ' __NL__ ' inside each example and writes
@@ -187,6 +192,180 @@ static int preprocess_corpus(const char *src_path, const char *dst_path,
     *n_examples_out = n_prompts;
     *val_prompts_out = prompts;
     return 0;
+}
+
+/* ============================================================
+ *  Phase 15 — Planner corpus preprocessing.
+ *
+ *  Planner training data has format:
+ *      // <prompt>
+ *      FAMILY: <family_name>
+ *      ---
+ *
+ *  We inline each pair as a single training line:
+ *      "// <prompt> __NL__ FAMILY: <family_name> __NL__"
+ *  so the word-level tokenizer treats it as one document.
+ *  At inference, the planner is fed "<prompt> __NL__ FAMILY:" and
+ *  greedy-sampled until __NL__ — the predicted family is the words in
+ *  between.
+ * ============================================================ */
+static int preprocess_planner_corpus(const char *src_path, const char *dst_path) {
+    FILE *fin = fopen(src_path, "r");
+    if (!fin) { fprintf(stderr, "preprocess_planner: cannot open %s\n", src_path); return -1; }
+    FILE *fout = fopen(dst_path, "w");
+    if (!fout) { fclose(fin); fprintf(stderr, "preprocess_planner: cannot write %s\n", dst_path); return -1; }
+
+    char line[2048];
+    char prompt[1024] = "";
+    char family[256]  = "";
+    int  in_example = 0;
+    int  n = 0;
+
+    while (fgets(line, sizeof(line), fin)) {
+        size_t l = strlen(line);
+        while (l > 0 && (line[l-1] == '\n' || line[l-1] == '\r')) line[--l] = '\0';
+        if (line[0] == '#') continue;
+        if (!in_example) {
+            if (line[0] == '/' && line[1] == '/') {
+                strncpy(prompt, line, sizeof(prompt) - 1);
+                prompt[sizeof(prompt) - 1] = '\0';
+                in_example = 1;
+                family[0] = '\0';
+            }
+            continue;
+        }
+        if (strncmp(line, "FAMILY:", 7) == 0) {
+            const char *p = line + 7;
+            while (*p == ' ' || *p == '\t') p++;
+            strncpy(family, p, sizeof(family) - 1);
+            family[sizeof(family) - 1] = '\0';
+            continue;
+        }
+        if (strcmp(line, "---") == 0) {
+            if (prompt[0] && family[0]) {
+                fprintf(fout, "%s __NL__ FAMILY: %s __NL__\n\n", prompt, family);
+                n++;
+            }
+            in_example = 0;
+            prompt[0] = '\0';
+            family[0] = '\0';
+            continue;
+        }
+    }
+    fclose(fin);
+    fclose(fout);
+    fprintf(stderr, "planner: preprocessed %d (prompt, family) pairs\n", n);
+    return n;
+}
+
+/* Phase 15 — predict the template family for an arbitrary prompt by
+ * feeding "<prompt> __NL__ FAMILY:" to the planner organelle and
+ * greedy-decoding until __NL__. Writes the predicted family (without
+ * the "FAMILY:" prefix) to out. Returns out length, or 0 on failure. */
+static int planner_predict_family(const Organelle *planner, const MicrogptConfig *cfg,
+                                  const char *prompt, char *out, int max_out_bytes) {
+    if (max_out_bytes <= 0) return 0;
+    out[0] = '\0';
+    const WordVocab *wv = &planner->word_vocab;
+    int nl = cfg->n_layer;
+
+    scalar_t **keys = (scalar_t **)malloc((size_t)nl * sizeof(scalar_t *));
+    scalar_t **values = (scalar_t **)malloc((size_t)nl * sizeof(scalar_t *));
+    size_t *cache_len = (size_t *)calloc((size_t)nl, sizeof(size_t));
+    for (int l = 0; l < nl; l++) {
+        keys[l]   = kv_cache_alloc(cfg);
+        values[l] = kv_cache_alloc(cfg);
+    }
+    scalar_t *logits = (scalar_t *)malloc(wv->vocab_size * sizeof(scalar_t));
+    int pos = 0;
+
+    forward_inference(planner->model, wv->bos_id, pos, keys, values, cache_len, logits);
+    pos++;
+
+    /* Build prompt + " __NL__ FAMILY:" — the conditioning context. */
+    char ctx[2048];
+    snprintf(ctx, sizeof(ctx), "%s __NL__ FAMILY:", prompt);
+    size_t *ids = (size_t *)malloc((size_t)cfg->block_size * sizeof(size_t));
+    size_t n_in = tokenize_words(ctx, strlen(ctx), wv, ids, (size_t)cfg->block_size);
+    for (size_t i = 0; i < n_in && pos < cfg->block_size - 1; i++) {
+        forward_inference(planner->model, ids[i], pos, keys, values, cache_len, logits);
+        pos++;
+    }
+    free(ids);
+
+    /* Look up __NL__ token id. */
+    size_t nl_token_id = wv->unk_id;
+    for (size_t i = 0; i < wv->vocab_size; i++) {
+        if (wv->words[i] && strcmp(wv->words[i], "__NL__") == 0) {
+            nl_token_id = i;
+            break;
+        }
+    }
+
+    /* Greedy decode (low temperature) up to ~6 words until __NL__. */
+    int out_pos = 0;
+    for (int g = 0; g < 6 && pos < cfg->block_size - 1; g++) {
+        size_t token = sample_token(logits, wv->vocab_size, (scalar_t)0.10f);
+        if (token == nl_token_id) break;
+        if (token == wv->bos_id) break;
+        const char *word = (token < wv->vocab_size && wv->words[token])
+                              ? wv->words[token] : "";
+        if (!word[0]) break;
+        if (out_pos > 0 && out_pos < max_out_bytes - 1) out[out_pos++] = '_';
+        size_t wlen = strlen(word);
+        for (size_t c = 0; c < wlen && out_pos < max_out_bytes - 1; c++) {
+            out[out_pos++] = word[c];
+        }
+        out[out_pos] = '\0';
+        forward_inference(planner->model, token, pos, keys, values, cache_len, logits);
+        pos++;
+    }
+
+    free(logits);
+    for (int l = 0; l < nl; l++) {
+        kv_cache_free(keys[l]);
+        kv_cache_free(values[l]);
+    }
+    free(keys); free(values); free(cache_len);
+    return out_pos;
+}
+
+/* Returns a score for how well `family` (planner output) matches
+ * `graph_name` (candidate's @graph name).
+ *   - 2 if family == graph_name exactly (or after stripping tpl_/seed_)
+ *   - 1 if family is a prefix of graph_name (the family-level case)
+ *   - 0 otherwise.
+ *
+ * Phase 15b: Phase 15a emitted family-only ("tpl_fib_fact_op") so all
+ * 16 op-variants matched equally — re-ranking was a no-op within a
+ * family. Phase 15b's planner emits full graph names ("fib_fact_op_add")
+ * which exact-match a single candidate. The graded score lets us prefer
+ * exact matches over prefix matches when both exist. */
+static int family_matches_graph_name(const char *family, const char *graph_name) {
+    if (!family || !graph_name) return 0;
+    const char *fam = family;
+    if (strncmp(fam, "tpl_", 4) == 0) fam += 4;
+    else if (strncmp(fam, "seed_", 5) == 0) fam += 5;
+    if (strcmp(fam, graph_name) == 0) return 2;  /* exact */
+    size_t fl = strlen(fam);
+    return (strncmp(graph_name, fam, fl) == 0) ? 1 : 0;  /* prefix */
+}
+
+/* Extract the @graph name from a generated text. Returns 1 on success
+ * with name written to out (caller buffer ≥64 bytes), 0 otherwise. */
+static int extract_graph_name(const char *txt, char *out, int max_out) {
+    if (!txt || !out || max_out <= 0) return 0;
+    out[0] = '\0';
+    const char *p = strstr(txt, "@graph");
+    if (!p) return 0;
+    p += 6;
+    while (*p == ' ' || *p == '\t') p++;
+    int o = 0;
+    while (*p && *p != ' ' && *p != '\n' && *p != '\t' && o < max_out - 1) {
+        out[o++] = *p++;
+    }
+    out[o] = '\0';
+    return o > 0;
 }
 
 /* ============================================================
@@ -441,6 +620,58 @@ int main(void) {
     printf("\nmodel ready: vocab=%zu params=%zu\n\n",
            org->word_vocab.vocab_size, model_num_params(org->model));
 
+    /* ============================================================
+     *  Phase 15 — Train the planner organelle.
+     *
+     *  Smaller architecture (~80K params): the task is just classifier-
+     *  style "prompt → family token". Same word-level transformer
+     *  infrastructure, smaller everything. Trained on the planner
+     *  corpus emitted by pipeline_corpus_gen's 4-arg invocation.
+     * ============================================================ */
+    printf("================================================================\n");
+    printf("  Phase 15 — PLANNER ORGANELLE\n");
+    printf("================================================================\n\n");
+    int planner_pairs = preprocess_planner_corpus(PLANNER_CORPUS_RAW, PLANNER_INLINE_PATH);
+    if (planner_pairs <= 0) {
+        fprintf(stderr, "Phase 15: planner corpus missing or empty (%s)\n", PLANNER_CORPUS_RAW);
+    }
+
+    /* Compile-time macros enforce a single architecture per binary
+     * (N_EMBD, N_HEAD, etc. constant-fold into the matmul loops). The
+     * planner therefore mirrors the wiring architecture; only training
+     * hyperparameters differ. The planner overfits its tiny corpus
+     * easily — bigger model, same task, just runs in 5 min.            */
+    MicrogptConfig planner_cfg = microgpt_default_config();
+    planner_cfg.n_embd     = N_EMBD;
+    planner_cfg.n_head     = N_HEAD;
+    planner_cfg.n_layer    = N_LAYER;
+    planner_cfg.block_size = BLOCK_SIZE;
+    planner_cfg.mlp_dim    = MLP_DIM;
+    planner_cfg.batch_size = BATCH_SIZE;
+    planner_cfg.num_steps  = 2000;
+    planner_cfg.learning_rate = 0.001;
+    planner_cfg.max_vocab  = MAX_VOCAB;
+    planner_cfg.max_docs   = MAX_DOCS;
+    planner_cfg.max_doc_len = MAX_DOC_LEN;
+    microgpt_print_config("Wiring Planner", &planner_cfg);
+
+    Organelle *planner = NULL;
+    if (planner_pairs > 0) {
+        planner = organelle_train_words("wiring_planner",
+                                        PLANNER_INLINE_PATH,
+                                        PLANNER_CKPT_PATH,
+                                        &planner_cfg,
+                                        planner_cfg.num_steps,
+                                        /*max_words=*/MAX_VOCAB);
+        if (planner && planner->model) {
+            printf("\nplanner ready: vocab=%zu params=%zu\n\n",
+                   planner->word_vocab.vocab_size, model_num_params(planner->model));
+        } else {
+            fprintf(stderr, "Phase 15: planner training failed\n");
+            planner = NULL;
+        }
+    }
+
     /* Step 3: Held-out evaluation. */
     printf("================================================================\n");
     printf("  HELD-OUT VALIDATION — %d prompts\n", n_val);
@@ -611,6 +842,11 @@ int main(void) {
         int held_correct_all = 0;  /* Phase 8: matches reference on all 5 input sets */
         int held_print = 0;
         const int MAX_HELD_PRINTS = 20;
+
+        /* Phase 15: planner-prediction tracking. */
+        int planner_calls = 0;
+        int planner_useful = 0;     /* picked candidate matched the planner family */
+
         for (int i = 0; i < n_held; i++) {
             int well_formed = 0, parsed = 0, verified = 0, fidelity = 0;
             int votes_used = 0;
@@ -618,6 +854,14 @@ int main(void) {
             int have_best = 0;
             int have_verified_with_fidelity = 0;
             int have_verified_any = 0;
+
+            /* Phase 15: ask the planner for a family hint up-front. */
+            char planner_family[128] = "";
+            if (planner) {
+                planner_predict_family(planner, &planner_cfg, held[i].prompt,
+                                       planner_family, sizeof(planner_family));
+                if (planner_family[0]) planner_calls++;
+            }
 
             /* Phase 8 — collect every verified candidate's multi-input
              * execution results so we can pick the self-consistent
@@ -759,7 +1003,9 @@ int main(void) {
             int picked = -1;
             if (n_cands > 0) {
                 /* Vote: each candidate scored by # of siblings with
-                 * identical results vector (only across valid sets). */
+                 * identical results vector (only across valid sets).
+                 * Phase 15 adds a +10 bonus to candidates whose @graph
+                 * name prefix matches the planner's predicted family. */
                 int best_score = -1;
                 for (int a = 0; a < n_cands; a++) {
                     if (!cands[a].has_results) continue;
@@ -773,6 +1019,18 @@ int main(void) {
                             compared++;
                         }
                         if (compared > 0 && agree == compared) score++;
+                    }
+                    /* Phase 15b: graded family-match bonus.
+                     *   exact graph-name match: +20 (dominant)
+                     *   prefix-only match (within family): +5 (mild)
+                     *   no match: 0 */
+                    if (planner_family[0] && cands[a].text) {
+                        char gname[64];
+                        if (extract_graph_name(cands[a].text, gname, sizeof(gname))) {
+                            int match = family_matches_graph_name(planner_family, gname);
+                            if (match == 2) score += 20;
+                            else if (match == 1) score += 5;
+                        }
                     }
                     /* Tiebreaker: fidelity > valid_results > earlier. */
                     int promote = 0;
@@ -801,6 +1059,14 @@ int main(void) {
                     strncpy(best_buf, cands[picked].text, sizeof(best_buf) - 1);
                     best_buf[sizeof(best_buf) - 1] = '\0';
                     have_best = 1;
+                }
+                /* Phase 15: did the planner-predicted family match the picked graph? */
+                if (planner_family[0] && cands[picked].text) {
+                    char gname[64];
+                    if (extract_graph_name(cands[picked].text, gname, sizeof(gname))
+                        && family_matches_graph_name(planner_family, gname)) {
+                        planner_useful++;
+                    }
                 }
             }
             if (executed) held_executed++;
@@ -837,6 +1103,9 @@ int main(void) {
             if (held_print < MAX_HELD_PRINTS) {
                 printf("[%d] %s\n", i + 1, held[i].prompt);
                 printf("    EXPECTED: %s\n", held[i].expected[0] ? held[i].expected : "(none)");
+                if (planner_family[0]) {
+                    printf("    PLANNER:  %s\n", planner_family);
+                }
                 printf("    well=%s parse=%s verify=%s fidelity=%s exec=%s correct=%s correct_all=%s votes=%d/%d cands=%d\n",
                        well_formed ? "Y" : "n",
                        parsed      ? "Y" : "n",
@@ -896,6 +1165,11 @@ int main(void) {
         printf("Best-of-%-2d correct on all %d inputs:   %d/%d (%.0f%%)  [Phase 8: self-consistency + multi-input]\n",
                N_VOTES, WIRING_INPUT_SETS, held_correct_all, n_held,
                n_held > 0 ? 100.0 * held_correct_all / n_held : 0.0);
+        if (planner) {
+            printf("Planner-family hits picked candidate: %d/%d (%.0f%%)  [Phase 15: planner usefulness]\n",
+                   planner_useful, n_held,
+                   n_held > 0 ? 100.0 * planner_useful / n_held : 0.0);
+        }
         printf("\n");
 
         for (int i = 0; i < n_held; i++) {
