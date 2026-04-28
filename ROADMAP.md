@@ -163,15 +163,16 @@ Focus: explore what happens when composable intelligence moves to **real edge ha
 - [ ] ESP32 / STM32 demo: running an organelle on a $5 microcontroller
 - [ ] FPGA acceleration for ultra-low-latency inference
 
-### 5. Manifold-Learning Composition (post-Wiring-Organelle research direction)
-The Wiring Organelle 17-phase arc characterises a structural ceiling at 75% median / 80% peak on natural-English tool composition. Five lever classes (capacity, paraphrasing, structural diversity, multi-organelle re-ranking, multi-seed ensembling) all converge to this band. The remaining failures are *correlated across seeds* — meaning the right interpretation has no preferred mass in the model's learned distribution. Pushing past requires moving composition out of *retrieval* and into *geometry*.
+### 5. Manifold-Learning Composition (Phase 2 shipped; learned-encoder extensions remain)
+The Wiring Organelle 17-phase arc characterises a structural ceiling at 75% median / 80% peak on natural-English tool composition (autoregressive-token regime). The four-phase manifold-retrieval addendum (Phases 1a/1b/1c/2) tested the §16 prediction that *replacing the generation step with retrieval over a continuous manifold* would push past it. **Phase 2 confirmed the prediction empirically: 80% (16/20) deterministic on every retrain.**
 
-- [ ] Embed each `@graph` topology as a point in a low-dimensional manifold (template families define curves, parametrisations define coordinates)
-- [ ] Embed prompts in the same manifold via contrastive learning over (prompt, graph) pairs
-- [ ] Compose by manifold traversal: project prompt → retrieve nearest valid topology by geodesic distance, breaking ties by proximity to unambiguous reference prompts
-- [ ] Interpolate for novel compositions: prompts that don't match any single training graph could be answered by the *interpolated* graph along the geodesic between two nearest references
-- [ ] Preserve the deterministic-infrastructure thesis: the IR + verifier + repair + executor stack remains unchanged; only the wiring/planner organelles get replaced by a geometric composition module
-- See `docs/research/RESEARCH_WIRING_ORGANELLE_PAPER.md` §16 for the research sketch.
+- [x] Lift VR persistent cohomology engine (`src/microgpt_vr.{h,c}`) from sibling C99 implementation; 16/16 tests pass.
+- [x] Lift EKAN B-spline + EKAN-Network + Geodesic engines (`src/microgpt_ekan*.h`, `src/microgpt_geodesic.{h,c}`); 39/39 tests pass.
+- [x] Geodesic family classifier (`wiring_geo_classifier.{h,c}` + `manifold_classifier_demo`) — handcoded keyword bag + 12D anchor distance, recovers 5/6 wiring-failing prompts at the classification level.
+- [x] Anchor-retrieval generation (Phase 2): 20-entry canonical @graph table (`wiring_anchor_graphs.{h,c}`) indexed by Geodesic top-1; injected as 17th candidate alongside 16 wiring votes; planner+geodesic agreement-gating triggers +60 score boost. **80% deterministic headline.**
+- [ ] Replace handcoded keyword bag with a learned EKAN encoder trained on (prompt, family) pairs — addresses the 3-prompt slot-collision regression that prevents the Phase 2 headline from reaching 90%+.
+- [ ] Compositional generalisation: interpolate between anchors along Geodesics to answer prompts that don't exactly match any single training graph (genuine compositional out-of-distribution).
+- See `docs/research/RESEARCH_PIPELINE_IR.md` §32–§35 for the full per-phase audit, `docs/research/RESEARCH_MANIFOLD_LEARNING.md` for the architectural map, and `docs/research/RESEARCH_WIRING_ORGANELLE_PAPER.md` §18 for the empirical break.
 
 ---
 
@@ -187,4 +188,4 @@ The Wiring Organelle 17-phase arc characterises a structural ceiling at 75% medi
 
 ---
 
-*Roadmap updated March 2026. Priorities are flexible and driven by the [stem cell vision](VISION.md).*
+*Roadmap updated April 2026 (post-Phase 2 manifold-retrieval break). Priorities are flexible and driven by the [stem cell vision](VISION.md).*
