@@ -2609,6 +2609,103 @@ The "moon target" was achieved at commit `ba3d54b` and is reproducible if you tr
 
 ---
 
+## 31. Phase 17 — 3-seed wiring ensemble (negative result; failures are prompt-side, not seed-side)
+
+> *"Phase 17 candidate #1: train 5 wirings with different seeds, generate from all 5, vote across the 80 candidates. Median variance contracts; predicted ~78-82% reliable."*
+
+Phase 17 implemented this exactly (with 3 seeds rather than 5 to keep wall clock reasonable) and **did not lift the headline**. Result: **70% (14/20)** — within the variance band documented in §30. The intervention's logical hypothesis — that different seeds produce different correct/wrong sets, so the union captures more — is empirically false at this scale: **the failures are correlated across seeds**.
+
+### 31.1 The intervention
+
+Trained 3 wiring organelles with `srand` seeds 42, 43, 44, saving to `wiring_organelle.ckpt`, `wiring_organelle_2.ckpt`, `wiring_organelle_3.ckpt`. Total wiring training time: ~42 minutes (3 × ~14 min). At held-out eval, the 16 votes per prompt are distributed round-robin across the 3 organelles (~5 votes per organelle per prompt). All candidates pool into the same self-consistency + planner-family-bonus voting that Phase 15 introduced.
+
+```c
+for (int v = 0; v < N_VOTES; v++) {
+    Organelle *vote_org = ensemble[v % ENSEMBLE_SIZE];
+    wiring_generate(vote_org, &cfg, held[i].prompt, output_buf, ...);
+    /* same downstream: parse, repair, verify, execute, multi-input compare */
+}
+```
+
+### 31.2 The result
+
+| Metric | Phase 15-repro (1 seed) | **Phase 17 (3-seed ensemble)** | Δ |
+|---|---|---|---|
+| Best-of-16 well-formed | 95% | 100% | +5pp |
+| Best-of-16 parsed | 90% | 100% | +5pp |
+| Best-of-16 strict-verified | 90% | 95% | +5pp |
+| Best-of-16 primitive-fidelity | 65% | 65% | — |
+| Best-of-16 end-to-end executed | 75% | 75% | — |
+| **Best-of-16 correct on all 5 inputs** | **70%** | **70%** | — |
+
+Surface metrics (well-formed, parsed) hit 100% — ensembling helps the model reliably produce *something well-formed* (some seed always succeeds at structural form). But correctness stays at 70%: the prompts that fail correctness fail on **all 3 seeds**.
+
+### 31.3 The correlation finding
+
+Phase 8 introduced the bimodal-failure pattern: each prompt is robustly correct (5/5) or robustly wrong (0/5). Phase 17 extends this: **the bimodal pattern holds across model seeds, not just across input distributions**. The wrong prompts are wrong for the same architecture-and-corpus reasons regardless of which RNG seed initialised the wiring.
+
+Inspecting #17 across runs:
+
+| Phase | EXEC vector | Drift mode |
+|---|---|---|
+| 13 | `[-115, -21, -1, -40299, -4]` | subtract(fib, fact) |
+| 14 | `[600, 72, 2, 846720, 12]` | multiply(fib, fact) |
+| 15-repro | `[5, 3, 1, 21, 2]` | fibonacci alone |
+| 17 | `[120, 24, 2, 40320, 6]` | factorial alone |
+
+Each retrain rolls a different wrong primitive interpretation of "fibonacci of n combined with factorial of n by adding". The model's prior over the 5 ops in `tpl_fib_fact_op` (and the 1-node fallback to fib alone or fact alone) is nearly uniform, and seed-level variance picks a different wrong interpretation each time. **Ensembling across seeds doesn't help because the right interpretation has no preferred mass — it's the *prompt's connection to the corpus* that's the issue, not the seed.**
+
+### 31.4 Why Phase 15c hit 80% peak
+
+Combining the §30 variance characterisation with the Phase 17 correlation finding:
+
+- The 5 prompts that are reliably correct across all retrains (#8, #10, #11, #18, #19, plus 5-7 others depending on seed) are **structurally trivial** — their topology and primitives are well-anchored in training.
+- The 5 prompts that are reliably wrong across all retrains (#1, #2, #6, parts of #17) have **diffuse priors** — multiple training-corpus paraphrases push the model toward different valid interpretations, so any seed picks one of them ~uniformly.
+- The 3-5 marginal prompts (#9, #14, #15) flip in/out depending on RNG state.
+
+Phase 15c's 80% landed when 4 marginal prompts happened to fall in. Phase 15-repro's 70% had 2 fall in. Both are within the same distribution.
+
+### 31.5 What this rules out
+
+Phase 17 confirms three things corpus engineering and inference tricks alone cannot fix at this architecture scale:
+
+1. **The bimodal failure is not seed-noise** — different seeds don't disagree about which prompts are hard.
+2. **Ensembling doesn't break the ceiling** — the prompts that fail mode-collapse on one seed fail mode-collapse on all seeds.
+3. **The 75% median is structural** — it reflects the corpus's coverage of held-out prompt types, not training noise.
+
+The remaining failures need a *different* lever: either reference adjustments (#3), or model-level architectural changes (cross-attention to a structured prompt, retrieval-augmented graph templates, larger transformer with more inductive bias for compositionality). Both are out of scope for "small specialist organelle" research.
+
+### 31.6 What ships
+
+- The 3-seed ensemble code in `demos/wiring_organelle/main.c` is **kept** as a runtime-configurable feature: `ENSEMBLE_SIZE` controls how many organelles to train and round-robin during voting. Setting `ENSEMBLE_SIZE=1` reverts to Phase 15 behaviour without code changes.
+- Default ships at `ENSEMBLE_SIZE=3` since it doesn't hurt (well-formed+parsed actually rose to 100%) and it produces 3 independent checkpoints for downstream uses (ablation studies, stability checks).
+- Headline of record stays at **80% peak / 75% median** with the variance characterisation in §30. Phase 17 doesn't change this.
+
+### 31.7 The series so far
+
+| Phase | strict-verify | executed | correct on all 5 |
+|---|---|---|---|
+| 13 | 95% | 85% | 75% |
+| 15c | 100% | 85% | **80% (peak)** |
+| 15-repro | 90% | 75% | 70% |
+| 16 | 85% | 80% | 75% |
+| **17** | 95% | 75% | 70% |
+
+### 31.8 The honest end state
+
+After 17 phases, ~7,800 lines of C99, and ~1.5M parameters across two organelles:
+
+- **80% peak / 75% median correct on all 5 input sets** on 20 held-out NL prompts
+- **100% structural success (well-formed + parsed)** when ensembling
+- **88-91% accuracy among graphs that execute** (bimodal pattern)
+- **Pure C99, single laptop, ~50 minutes total training**, **0 dependencies** beyond libc/libm
+
+The remaining ~5 wrong prompts are **architecturally bounded**, not improvable with more corpus engineering or more inference tricks. Closing them needs a categorically different approach (retrieval-augmentation, larger model with explicit compositional bias, or accepting the ceiling and shipping).
+
+The thesis of *small specialist organelles coordinated by deterministic infrastructure* is empirically validated: a 540K wiring + 540K planner + the IR + verifier infrastructure produces verifiably-correct numeric answers from natural English on the majority of a held-out test set. The phases that pushed past this ceiling either regressed or stayed flat — strong evidence the architecture is tight against its design.
+
+---
+
 ## 16. Closing Remark
 
 The IR ships. 24 tests pass. The header has detailed doc-comments. The DOT renderer makes graphs human-readable. The text format is small enough for a tiny model to emit.

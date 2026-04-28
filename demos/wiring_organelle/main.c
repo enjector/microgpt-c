@@ -104,6 +104,24 @@
 #define PLANNER_INLINE_PATH   "planner_corpus_inline.txt"
 #define PLANNER_CKPT_PATH     "wiring_planner.ckpt"
 
+/* Phase 17 — multi-seed wiring ensemble.
+ * 3 wiring organelles with different srand seeds; 16 votes distributed
+ * round-robin across them so the candidate pool draws from 3 distinct
+ * models. Contracts variance and captures the union of correct prompts
+ * across seeds. */
+#define ENSEMBLE_SIZE 3
+static const char *ENSEMBLE_CKPTS[ENSEMBLE_SIZE] = {
+    "wiring_organelle.ckpt",
+    "wiring_organelle_2.ckpt",
+    "wiring_organelle_3.ckpt",
+};
+static const int ENSEMBLE_SEEDS[ENSEMBLE_SIZE] = { 42, 43, 44 };
+static const char *ENSEMBLE_NAMES[ENSEMBLE_SIZE] = {
+    "wiring_organelle",
+    "wiring_organelle_2",
+    "wiring_organelle_3",
+};
+
 /* ============================================================
  *  Corpus preprocessing — inline each example on one line.
  *  Replaces '\n' with ' __NL__ ' inside each example and writes
@@ -607,18 +625,32 @@ int main(void) {
 
     microgpt_print_config("Wiring Organelle", &cfg);
 
-    Organelle *org = organelle_train_words("wiring_organelle",
-                                           INLINE_TRAIN_PATH,
-                                           CKPT_PATH,
-                                           &cfg,
-                                           cfg.num_steps,
-                                           /*max_words=*/MAX_VOCAB);
-    if (!org || !org->model) {
-        fprintf(stderr, "ERROR: training failed\n");
-        return 1;
+    /* Phase 17: train ENSEMBLE_SIZE wiring organelles with different
+     * srand seeds. Each becomes its own checkpoint; reload-on-existing
+     * skips retrain across reruns. The first organelle is the canonical
+     * "wiring_organelle" used by the rest of the existing eval (val
+     * loop, etc.); the others extend the candidate pool at held-out
+     * eval time. */
+    Organelle *ensemble[ENSEMBLE_SIZE] = { NULL };
+    for (int e = 0; e < ENSEMBLE_SIZE; e++) {
+        srand(ENSEMBLE_SEEDS[e]);
+        seed_rng(ENSEMBLE_SEEDS[e]);
+        printf("[ensemble %d/%d] seed=%d ckpt=%s\n",
+               e + 1, ENSEMBLE_SIZE, ENSEMBLE_SEEDS[e], ENSEMBLE_CKPTS[e]);
+        ensemble[e] = organelle_train_words(ENSEMBLE_NAMES[e],
+                                            INLINE_TRAIN_PATH,
+                                            ENSEMBLE_CKPTS[e],
+                                            &cfg,
+                                            cfg.num_steps,
+                                            /*max_words=*/MAX_VOCAB);
+        if (!ensemble[e] || !ensemble[e]->model) {
+            fprintf(stderr, "ERROR: ensemble[%d] training failed\n", e);
+            return 1;
+        }
     }
-    printf("\nmodel ready: vocab=%zu params=%zu\n\n",
-           org->word_vocab.vocab_size, model_num_params(org->model));
+    Organelle *org = ensemble[0];  /* canonical wiring used by val-set eval */
+    printf("\nensemble ready: %d organelles, each ~%zu params\n\n",
+           ENSEMBLE_SIZE, model_num_params(org->model));
 
     /* ============================================================
      *  Phase 15 — Train the planner organelle.
@@ -877,13 +909,14 @@ int main(void) {
             VoteCandidate cands[MAX_VOTE_CAND] = {0};
             int n_cands = 0;
 
-            /* Phase 16 attempted to prefix held-out prompts with the
-             * planner's predicted family ("// [FAMILY: name] <prompt>")
-             * for both training and inference, but the corpus vocab
-             * shift regressed verify rate 100% → 85%. Reverted; the
-             * planner's hint is now used only at re-rank time (Phase 15). */
+            /* Phase 17: distribute the 16 votes across the 3-seed
+             * ensemble round-robin (vote 0 → org[0], vote 1 → org[1],
+             * vote 2 → org[2], vote 3 → org[0], ...). The candidate
+             * pool now draws from 3 distinct models, capturing the
+             * union of their correct compositions. */
             for (int v = 0; v < N_VOTES; v++) {
-                wiring_generate(org, &cfg, held[i].prompt, output_buf, sizeof(output_buf),
+                Organelle *vote_org = ensemble[v % ENSEMBLE_SIZE];
+                wiring_generate(vote_org, &cfg, held[i].prompt, output_buf, sizeof(output_buf),
                                 TEMPS[v], /*max_words=*/360);
                 votes_used = v + 1;
 
