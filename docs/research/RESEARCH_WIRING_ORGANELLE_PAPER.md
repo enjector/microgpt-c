@@ -1,8 +1,8 @@
 # The Wiring Organelle: Tool-Composition by a 540K-Parameter Transformer with Verified End-to-End Correctness
 
-*MicroGPT-C — research paper, April 2026 (v3.2, closes the 17-phase arc + the six-phase manifold-retrieval addendum at 🎯 100% (40/40) headline on the doubled held-out test set)*
+*MicroGPT-C — research paper, April 2026 (v3.3, post-leakage-audit: anchor-retrieval headline 🎯 100% (20/20) on leakage-free paraphrases, wiring transformer headline 35%; full audit in §15 and §38 of the development log)*
 
-> A 540K-parameter word-level transformer plus a 540K-parameter planner organelle, trained on 368 (prompt, graph) pairs of real domain primitives, emits typed dataflow graphs that verify, execute, and produce numeric answers. The 17-phase corpus-and-re-ranking arc converges to a **75% median / 80% peak** stochastic ceiling, characterised in §10–§14. **A six-phase manifold-retrieval addendum (Phases 1a/1b/1c/2/2b/2c) breaks the ceiling and closes it at 🎯 100% (40/40) deterministic** on a held-out test set doubled with 20 lexical paraphrases: anchor-retrieval generation — replacing autoregressive token generation with table lookup over a 20-entry canonical-DAG table indexed by 20D Geodesic family prediction — achieves perfect numeric correctness on every held-out prompt on every retrain, robust under lexical variation. Single laptop, pure C99, zero dependencies, ~50 minutes total training wall clock.
+> A 540K-parameter word-level transformer plus a 540K-parameter planner organelle, trained on 368 (prompt, graph) pairs of real domain primitives, emits typed dataflow graphs that verify, execute, and produce numeric answers. **A leakage audit (§15, §38) found that 13 of 20 original held-out prompts are verbatim in the wiring training corpus** (introduced by Phase 13's "lexical-anchoring corpus expansion"). The honest headlines after the audit: the **anchor-retrieval mechanism achieves 🎯 100% (20/20) on novel held-out paraphrases** that appear in no training corpus, while the **wiring transformer alone gets 35% (7/20)** on the same clean prompts — about half the inflated 75% wiring-layer figure reported in §10–§14. The Phase 1a/1b/1c diagnoses (re-ranking can't recover unanimous failures, classification works, generation is the bottleneck) remain valid, and the manifold-retrieval architecture **closes the bottleneck on genuinely novel inputs**. Single laptop, pure C99, zero dependencies, ~50 minutes total training wall clock.
 
 ---
 
@@ -354,9 +354,27 @@ This validates the original c99_compose finding (book chapter 11): *organelles r
 
 ---
 
-## 15. Acknowledgements and reproducibility
+## 15. Acknowledgements, reproducibility, and the leakage audit
 
-The full development log is in `docs/research/RESEARCH_PIPELINE_IR.md` (35 sections, one per phase plus the four-phase manifold-retrieval addendum). The `main` branch reproduces the Phase 2 **80% (16/20) deterministic** headline. Tag `v1.0-wiring-organelle` (commit `ba3d54b`) ships a Phase-15c checkpoint at the stochastic 80% peak; `v2.0-wiring-organelle` (commit `4fb227d`) closes the 17-phase arc with the variance characterisation; this paper's v3.0 framing reflects Phase 2's deterministic break (commit `96784d3`).
+The full development log is in `docs/research/RESEARCH_PIPELINE_IR.md` (38 sections including the manifold-retrieval addendum and the Phase 2d leakage audit). Tag `v1.0-wiring-organelle` (commit `ba3d54b`) ships a Phase-15c checkpoint at the stochastic 80% peak; `v2.0-wiring-organelle` (commit `4fb227d`) closes the 17-phase arc; this paper's v3.2 framing reflects Phases 2/2b/2c.
+
+**Leakage disclosure (Phase 2d, post-publication audit).** During a leakage audit triggered by a direct user question, we confirmed that **13 of the original 20 held-out prompts appear verbatim in `pipeline_corpus_train.txt` and 15 of 20 in `pipeline_corpus_planner.txt`** — introduced by Phase 13's "three-bucket lexical-anchoring corpus expansion" (lines 1902, 1924, 1950, 1979, 2011, 2167, … of `tools/pipeline_corpus_gen.c`). The 75-80% wiring-transformer headlines reported in §10–§14 were inflated by training-on-test for those prompts.
+
+The Phase 2d audit report (`RESEARCH_PIPELINE_IR.md` §38) ran four eval modes via new `--no-anchor` and `--clean-only` CLI flags:
+
+| Eval mode | Result | What it measures |
+|---|---|---|
+| anchor enabled, clean 20 paraphrases | **20/20 (100%)** | **Anchor mechanism on novel prompts — clean claim** |
+| anchor disabled, clean 20 paraphrases | **7/20 (35%)** | **Wiring transformer true generalisation** |
+| anchor disabled, all 40 (mixed) | 21/40 (52%) | Wiring transformer on mixed contaminated+clean |
+| anchor enabled, all 40 (Phase 2c headline) | 40/40 (100%) | System headline (anchor masks both layers) |
+
+**Restated honest headlines:**
+- The **anchor-retrieval mechanism** achieves **20/20 (100%) on novel held-out paraphrases that don't appear in any training corpus.** This is the genuinely-clean claim that survives the audit.
+- The **wiring transformer alone**, on novel English, achieves **7/20 (35%)** — about half the previously-reported 75%. The 17-phase corpus-engineering lift from 35% → 75% was largely the model memorising prompts that Phase 13 explicitly added to the training corpus.
+- The Phase 1a/1b/1c diagnoses (re-ranking can't help, classification works, generation is the bottleneck) **remain valid** — the failure modes diagnosed were real even on the leaked set, and the manifold-retrieval architecture closes them on truly novel inputs.
+
+**Defensive recommendation now baked into the build**: every commit that touches the corpus generator should run `grep -Fxc` of each held-out prompt against `pipeline_corpus_{train,val,planner}.txt` and fail if any match.
 
 The codebase is at https://github.com/enjector/microgpt-c.
 

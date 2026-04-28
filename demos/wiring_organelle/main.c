@@ -712,12 +712,35 @@ static void wiring_generate(const Organelle *org, const MicrogptConfig *cfg,
  *  Main
  * ============================================================ */
 
-int main(void) {
+/* Phase 2d — leakage-aware eval mode. Set via --no-anchor CLI flag.
+ * When true, the geodesic anchor-retrieval injection is disabled and
+ * the eval reflects the wiring transformer's pure generative output
+ * (which is what most of the headline claims actually require, and
+ * what the Phase 13 training-on-test contamination compromised). */
+static int g_no_anchor = 0;
+/* When true, restrict eval to the 20 Phase 2c paraphrases (file lines
+ * 113+). The original 20 prompts are mostly verbatim in the wiring
+ * training corpus; only the paraphrases give a clean wiring-layer
+ * generalisation number. */
+static int g_clean_only = 0;
+
+int main(int argc, char **argv) {
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--no-anchor") == 0) g_no_anchor = 1;
+        else if (strcmp(argv[i], "--clean-only") == 0) g_clean_only = 1;
+        else {
+            fprintf(stderr, "usage: %s [--no-anchor] [--clean-only]\n", argv[0]);
+            return 1;
+        }
+    }
+
     srand(42);
     seed_rng(42);
 
     printf("================================================================\n");
     printf("  Wiring Organelle Demo (Pipeline IR Phase 3c)\n");
+    if (g_no_anchor)  printf("  [--no-anchor]   anchor retrieval DISABLED (wiring-only baseline)\n");
+    if (g_clean_only) printf("  [--clean-only]  evaluating ONLY the 20 leakage-free paraphrases\n");
     printf("================================================================\n\n");
 
     /* Step 1: Preprocess corpora. */
@@ -1009,7 +1032,17 @@ int main(void) {
         int anchor_injected = 0;    /* prompts where an anchor was injected */
         int anchor_picked = 0;      /* prompts where the anchor was picked as best */
 
-        for (int i = 0; i < n_held; i++) {
+        /* Phase 2d: when --clean-only, skip the first 20 entries (which
+         * are the original held-out file). Only the entries from index
+         * 20 onwards (Phase 2c paraphrases) are leakage-free.
+         * See RESEARCH_PIPELINE_IR.md §38 for the leakage audit. */
+        int eval_start = g_clean_only ? 20 : 0;
+        if (g_clean_only && n_held <= 20) {
+            printf("[note] --clean-only requires >20 held-out prompts; got %d. Skipping eval.\n",
+                   n_held);
+            n_held = 0;
+        }
+        for (int i = eval_start; i < n_held; i++) {
             int well_formed = 0, parsed = 0, verified = 0, fidelity = 0;
             int votes_used = 0;
             best_buf[0] = '\0';
@@ -1207,7 +1240,7 @@ int main(void) {
              * still apply if it matches their predictions. */
             int anchor_used = 0;
             int anchor_cand_idx = -1;
-            if (n_geo > 0 && geo_top_k[0] && n_cands < MAX_VOTE_CAND) {
+            if (!g_no_anchor && n_geo > 0 && geo_top_k[0] && n_cands < MAX_VOTE_CAND) {
                 const char *anchor_text = wiring_anchor_graph_for(geo_top_k[0]);
                 if (anchor_text) {
                     /* Run the same parse/verify/repair/execute pipeline
@@ -1526,10 +1559,23 @@ int main(void) {
             #undef MAX_VOTE_CAND
         }
 
+        /* Phase 2d: when --clean-only restricts to entries 20+, the
+         * denominator is the count of actually-evaluated prompts, not
+         * the full file size. n_held here is shadowed only for the
+         * printf headline block below; the cleanup loop after this
+         * block uses the original n_held via the outer scope. */
+        int n_eval = n_held - eval_start;
+        if (n_eval < 0) n_eval = 0;
         printf("================================================================\n");
         printf("  PHASE 4 HEADLINE METRIC\n");
         printf("================================================================\n");
-        printf("Held-out NL prompts:                  %d\n", n_held);
+        if (g_clean_only) {
+            printf("Held-out NL prompts:                  %d  [Phase 2c paraphrases only — leakage-free]\n", n_eval);
+        } else {
+            printf("Held-out NL prompts:                  %d\n", n_eval);
+        }
+        int n_orig_held = n_held;
+        n_held = n_eval;  /* reuse the existing percentage-formatting code below */
         printf("Best-of-%-2d well-formed:               %d/%d (%.0f%%)\n", N_VOTES, held_well, n_held,
                n_held > 0 ? 100.0 * held_well / n_held : 0.0);
         printf("Best-of-%-2d parsed:                    %d/%d (%.0f%%)\n", N_VOTES, held_parse, n_held,
@@ -1564,6 +1610,7 @@ int main(void) {
                anchor_picked, n_held,
                n_held > 0 ? 100.0 * anchor_picked / n_held : 0.0);
         printf("\n");
+        n_held = n_orig_held;  /* restore for cleanup loop */
 
         for (int i = 0; i < n_held; i++) {
             free(held[i].prompt);

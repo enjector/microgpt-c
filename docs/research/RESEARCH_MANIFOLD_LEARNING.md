@@ -589,7 +589,8 @@ If Path 2 stalls at 75-80%, the issue is the candidate pool itself (no candidate
 4. ✅ Phase 1c: hint-prefix prompt + top-K re-rank → flat (70%); shifted family name but not primitive selection
 5. ✅ Phase 2: anchor-retrieval generation → 80% deterministic, first break of the ceiling (12D Geodesic)
 6. ✅ Phase 2b: 20D Geodesic unique-slot embedder + corrected discount anchor → 🎯 100% (20/20) deterministic
-7. ✅ **Phase 2c: doubled held-out test set with 20 lexical paraphrases → 🎯 100% (40/40) deterministic [HEADLINE LOCKED]**
+7. ✅ Phase 2c: doubled held-out test set with 20 lexical paraphrases → 🎯 100% (40/40) deterministic
+8. ✅ **Phase 2d: leakage audit. 13 of 20 originals verbatim in training (Phase 13 leak). Restated: anchor-retrieval mechanism 🎯 100% (20/20) on novel paraphrases; wiring transformer alone 35% (7/20).** [§38 of `RESEARCH_PIPELINE_IR.md`]
 
 **Phase 2b/2c close the held-out test set under lexical paraphrase.** Phase 2b: GEO_DIMS bumped 12→20 in `microgpt_geodesic.h` to give every held-out family a unique axis (eliminating the apply_tax/savings_rate/gross_minus_tax/discounted_tax slot-5 collision and the clamped_average/distance_midpoint slot-9 collision); discounted_tax anchor rewritten to use the native `discount` primitive. Phase 2c: doubled the held-out file with 20 paraphrases (one per family, deliberately rewritten with different surface words like "clipped"/"clamped", "after-tax"/"take home pay", "n-th fibonacci multiplied by"/"fibonacci of n times"); bumped the unconditional anchor bonus from +10 to +30 to break tiebreakers when alias-family neighbours fall in geodesic top-K (e.g. `clamped_sigmoid` adjacent to `sigmoid_clamped`).
 

@@ -1,0 +1,609 @@
+planner: preprocessed 408 (prompt, family) pairs
+================================================================
+  Wiring Organelle Demo (Pipeline IR Phase 3c)
+  [--no-anchor]   anchor retrieval DISABLED (wiring-only baseline)
+  [--clean-only]  evaluating ONLY the 20 leakage-free paraphrases
+================================================================
+
+preprocessed: 368 train + 40 val examples
+
+================================================================
+  Wiring Organelle
+================================================================
+
+  [Model Architecture]
+    n_embd      = 96
+    n_head       = 4
+    head_dim     = 24
+    mlp_dim      = 384
+    n_layer      = 4
+    block_size   = 384
+
+  [Training]
+    num_steps    = 5000
+    learning_rate= 0.001000
+    batch_size   = 16
+    warmup_steps = 100
+    temperature  = 0.5000
+
+  [Data Limits]
+    max_vocab    = 1500
+    max_docs     = 5000
+    max_doc_len  = 4096
+
+  [Feature Switches]
+    scalar_t     = float  (32-bit)
+    SIMD         = ON
+    INT8 quant   = OFF
+    Metal GPU    = OFF
+    BLAS         = OFF
+    Paged KV     = OFF
+    Head Parallel= OFF
+    AttnRes      = OFF
+    AttnSink     = OFF
+    QK RMSNorm   = OFF
+    Partial RoPE = OFF
+
+================================================================
+
+[ensemble 1/3] seed=42 ckpt=wiring_organelle.ckpt
+
+========================================
+ORGANELLE (word-level): wiring_organelle
+========================================
+corpus: 368 docs | 155904 chars (152.2 KB)
+vocab: 1028 word tokens (max_words=1500, unk_id=1025, nl_id=1026, bos_id=1027)
+loaded checkpoint wiring_organelle.ckpt (step 5000) -- skipping training
+[ensemble 2/3] seed=43 ckpt=wiring_organelle_2.ckpt
+
+========================================
+ORGANELLE (word-level): wiring_organelle_2
+========================================
+corpus: 368 docs | 155904 chars (152.2 KB)
+vocab: 1028 word tokens (max_words=1500, unk_id=1025, nl_id=1026, bos_id=1027)
+loaded checkpoint wiring_organelle_2.ckpt (step 5000) -- skipping training
+[ensemble 3/3] seed=44 ckpt=wiring_organelle_3.ckpt
+
+========================================
+ORGANELLE (word-level): wiring_organelle_3
+========================================
+corpus: 368 docs | 155904 chars (152.2 KB)
+vocab: 1028 word tokens (max_words=1500, unk_id=1025, nl_id=1026, bos_id=1027)
+loaded checkpoint wiring_organelle_3.ckpt (step 5000) -- skipping training
+
+ensemble ready: 3 organelles, each ~676608 params
+
+================================================================
+  Phase 15 — PLANNER ORGANELLE
+================================================================
+
+================================================================
+  Wiring Planner
+================================================================
+
+  [Model Architecture]
+    n_embd      = 96
+    n_head       = 4
+    head_dim     = 24
+    mlp_dim      = 384
+    n_layer      = 4
+    block_size   = 384
+
+  [Training]
+    num_steps    = 2000
+    learning_rate= 0.001000
+    batch_size   = 16
+    warmup_steps = 100
+    temperature  = 0.5000
+
+  [Data Limits]
+    max_vocab    = 1500
+    max_docs     = 5000
+    max_doc_len  = 4096
+
+  [Feature Switches]
+    scalar_t     = float  (32-bit)
+    SIMD         = ON
+    INT8 quant   = OFF
+    Metal GPU    = OFF
+    BLAS         = OFF
+    Paged KV     = OFF
+    Head Parallel= OFF
+    AttnRes      = OFF
+    AttnSink     = OFF
+    QK RMSNorm   = OFF
+    Partial RoPE = OFF
+
+================================================================
+
+
+========================================
+ORGANELLE (word-level): wiring_planner
+========================================
+corpus: 408 docs | 32593 chars (31.8 KB)
+vocab: 510 word tokens (max_words=1500, unk_id=507, nl_id=508, bos_id=509)
+loaded checkpoint wiring_planner.ckpt (step 2000) -- skipping training
+
+planner ready: vocab=510 params=577152
+
+================================================================
+  HELD-OUT VALIDATION — 40 prompts
+================================================================
+
+[1] // multiply of 4 integers
+  well-formed=✅, parse=✅, verify=✅, votes=1/16
+  --- best output ---
+@graph chain_max_4
+: in x1 -> int
+: in x2 -> int
+: in x3 -> int
+: in x4 -> int
+: out y -> int
+| n1 = multiply(x: <x1>, y: <x2>) :: x:int, y:int -> out:int
+| n2 = multiply(x: n1.out, y: <x3>) :: x:int, y:int -> out:int
+| n3 = multiply(x: n2.out, y: <x4>) :: x:int, y:int -> out:int
+y <- n3.out
+@end
+  ---
+
+[2] // max of 7 integers
+  well-formed=✅, parse=✅, verify=✅, votes=1/16
+  --- best output ---
+@graph chain_add_7
+: in x1 -> int
+: in x2 -> int
+: in x3 -> int
+: in x4 -> int
+: in x5 -> int
+: in x6 -> int
+: in x7 -> int
+: out y -> int
+| n1 = add(x: <x1>, y: <x2>) :: x:int, y:int -> out:int
+| n2 = max(x: n1.out, y: <x3>) :: x:int, y:int -> out:int
+| n3 = max(x: n2.out, y: <x4>) :: x:int, y:int -> out:int
+| n4 = add(x: n3.out, y: <x5>) :: x:int, y:int -> out:int
+| n5 = max(x: n4.out, y: <x6>) :: x:int, y:int -> out:int
+| n6 = max(x: n5.out, y: <x7>) :: x:int, y:int -> out:int
+y <- n6.out
+@end
+  ---
+
+[3] // negate each of 3 inputs then add them
+  well-formed=✅, parse=✅, verify=✅, votes=1/16
+  --- best output ---
+@graph fanout_abs_add_3
+: in x1 -> int
+: in x2 -> int
+: in x3 -> int
+: out y -> int
+| u1 = negate(x: <x1>) :: x:int -> out:int
+| u2 = add(x: s1.out, y: <x3>) :: x:int, y:int -> out:int
+| div = add(x: n1.out, y: <x2>) :: x:int, y:int -> out:int
+| r1 = add(x: <w1>, y: <x5>) :: x:int, y:int -> out:int
+| b2 = add(x: b1.out, y: u3.out) :: x:int, y:int -> out:int
+y <- tot.out
+@end
+  ---
+
+[4] // abs each of 4 inputs then multiply them
+  well-formed=✅, parse=✅, verify=✅, votes=1/16
+  --- best output ---
+@graph fanout_abs_multiply_2
+: in x1 -> int
+: in x2 -> int
+: in x3 -> int
+: in x4 -> int
+: out y -> int
+| u1 = negate(x: <x1>) :: x:int -> out:int
+| u2 = negate(x: <x2>) :: x:int -> out:int
+| b1 = multiply(x: u1.out, y: u2.out) :: x:int, y:int -> out:int
+| u3 = abs(x: <x3>) :: x:int -> out:int
+| b2 = multiply(x: b1.out, y: u3.out) :: x:int, y:int -> out:int
+| u4 = abs(x: <x4>) :: x:int -> out:int
+| b3 = multiply(x: b2.out, y: u4.out) :: x:int, y:int -> out:int
+y <- b3.out
+@end
+  ---
+
+[5] // squared euclidean distance in 3 dimensions
+  well-formed=✅, parse=✅, verify=✅, votes=1/16
+  --- best output ---
+@graph distance_squared_2d
+: in a1 -> int
+: in b1 -> int
+: in a2 -> int
+: in b2 -> int
+: in a3 -> int
+: in b3 -> int
+: in a4 -> int
+: in b4 -> int
+: out y -> int
+| d1 = subtract(x: <a1>, y: <b1>) :: x:int, y:int -> out:int
+| d2 = subtract(x: <a2>, y: <b2>) :: x:int, y:int -> out:int
+| d3 = subtract(x: <a3>, y: <b3>) :: x:int, y:int -> out:int
+| d4 = subtract(x: <a4>, y: <b4>) :: x:int, y:int -> out:int
+| sq1 = multiply(x: d1.out, y: d1.out) :: x:int, y:int -> out:int
+| sq2 = multiply(x: d2.out, y: d2.out) :: x:int, y:int -> out:int
+| sq3 = multiply(x: d3.out, y: d3.out) :: x:int, y:int -> out:int
+| sq4 = multiply(x: d4.out, y: d4.out) :: x:int, y:int -> out:int
+| sum1 = add(x: sq1.out, y: sq2.out) :: x:int, y:int -> out:int
+| sum2 = add(x: sum1.out, y: sq3.out) :: x:int, y:int -> out:int
+| sum3 = add(x: sum2.out, y: sq4.out) :: x:int, y:int -> out:int
+y <- sum3.out
+@end
+  ---
+
+================================================================
+  RESULTS
+================================================================
+Held-out prompts:                     40
+Single-shot strict-verified:          27/40 (68%)  [Phase 3d baseline]
+Best-of-16 well-formed:               40/40 (100%)
+Best-of-16 parsed:                    39/40 (98%)
+Best-of-16 strict-verified:           34/40 (85%)  [Phase 3e/f/g]
+
+================================================================
+  PHASE 4 HEADLINE — held-out natural-English prompts (40 total)
+================================================================
+
+[21] // bmi of weight and height clipped to a healthy lo hi range
+    EXPECTED: bmi clamp
+    PLANNER:  bmi_classified
+    well=Y parse=Y verify=Y fidelity=n exec=n correct=n correct_all=n votes=16/16 cands=6
+    --- best output ---
+@graph bmi_classified
+: in weight -> int
+: in height -> int
+: in hi -> int
+: in k -> int
+: out y -> int
+| b = bmi(weight: <weight>, height: <height>) :: weight:int, height:int -> out:int
+| c = clamp(x: b.out, lo: <lo>, hi: <hi>) :: x:int, lo:int, hi:int -> out:int
+y <- c.out
+@end
+    ---
+
+[22] // the interest portion of an investment after principal compounds over years
+    EXPECTED: compound subtract
+    PLANNER:  compound_then_add
+    well=Y parse=Y verify=Y fidelity=n exec=n correct=n correct_all=n votes=16/16 cands=3
+    --- best output ---
+@graph b4 -> int
+: in expenses -> int
+: out y -> int
+| n = multiply(x: <a>, b: <b>) :: x:int -> out:int
+| a_v = add(x: fib.out, y: <scale>) :: x:int, y:int -> out:int
+y <- out_op.out
+@end
+    ---
+
+[23] // the weighted average of three measurements using their respective weights
+    EXPECTED: multiply add percentage
+    PLANNER:  net_pay
+    well=Y parse=Y verify=Y fidelity=n exec=n correct=n correct_all=n votes=16/16 cands=2
+    --- best output ---
+@graph harmonic_n(x: -> int
+: in x2 -> int
+: in k -> int
+: in a3 -> int
+: out y -> int
+| m = add(x: <a0>, y: <exp2>) :: x:int, y:int -> out:int
+| pv = clamp(x: u.out, lo: <lo>, hi: <hi>) :: x:int, y:int -> out:int
+| saved = subtract(x: <income>, y: evaluated at rate = percentage(part: saved.out, whole: <income>) :: x:int -> out:int
+| saved = subtract(x: <income>, y: <x4>) :: x:int, y:int -> out:int
+| rate = percentage(part: saved.out, whole: <income>) :: x:int, y:int -> out:int
+y <- rate.out
+y <- gab.out
+@end
+    ---
+
+[24] // sigmoid neuron activation restricted to a low high band
+    EXPECTED: sigmoid clamp
+    PLANNER:  micro_mse_1
+    well=Y parse=Y verify=Y fidelity=Y exec=Y correct=Y correct_all=Y votes=11/16 cands=4
+    EXEC [3 2 1 4 1]
+    REF  [3 2 1 4 1]  (5/5 match)
+    --- best output ---
+@graph clamped_sigmoid
+: in x -> int
+: in lo -> int
+: in hi -> int
+: out y -> int
+| s = sigmoid(x: <x>) :: x:int -> out:int
+| c = clamp(x: s.out, lo: <lo>, hi: <hi>) :: x:int, lo:int, hi:int -> out:int
+y <- c.out
+@end
+    ---
+
+[25] // the gcd of two integers multiplied by a coefficient
+    EXPECTED: gcd multiply
+    PLANNER:  bmi_classified_1
+    well=Y parse=Y verify=Y fidelity=Y exec=Y correct=n correct_all=n votes=5/16 cands=2
+    EXEC [5 8 2 32 3]
+    REF  [3 4 1 16 1]  (0/5 match)
+    --- best output ---
+@graph clamped_sigmoid
+: in a -> int
+: in b -> int
+: out y -> int
+| g = gcd(a: <a>, b: <b>) :: a:int, b:int -> out:int
+| out_op = multiply(x: g.out, y: <a>) :: x:int, y:int -> out:int
+y <- out_op.out
+@end
+    ---
+
+[26] // after-tax take home pay from federal taxation
+    EXPECTED: apply_tax
+    PLANNER:  net_pay
+    well=Y parse=Y verify=Y fidelity=Y exec=Y correct=Y correct_all=Y votes=6/16 cands=2
+    EXEC [5 4 2 8 3]
+    REF  [5 4 2 8 3]  (5/5 match)
+    --- best output ---
+@graph expenses
+: in gross -> int
+: in tax_rate -> int
+: out y -> int
+| net = apply_tax(amount: <gross>, rate: <tax_rate>) :: amount:int, rate:int -> out:int
+y <- net.out
+@end
+    ---
+
+[27] // n-th fibonacci multiplied by n-th factorial
+    EXPECTED: fibonacci factorial multiply
+    PLANNER:  savings_rate
+    well=Y parse=Y verify=Y fidelity=n exec=n correct=n correct_all=n votes=16/16 cands=10
+    --- best output ---
+@graph fib_fact_op_max
+: in a -> int
+: in b -> int
+: out y -> int
+| n = multiply(x: <a>, b: <b>) :: x:int, y:int -> out:int
+| a_v = multiply(x: fib.out, y: <b>, t: <t>) :: x:int, y:int -> out:int
+y <- out_op.out
+@end
+    ---
+
+[28] // invoice combining quantity times unit price plus the applicable tax
+    EXPECTED: multiply tax_amount add
+    PLANNER:  axpy_then_abs_2
+    well=Y parse=Y verify=Y fidelity=n exec=Y correct=n correct_all=n votes=16/16 cands=4
+    EXEC [-5 -4 -2 -8 -3]
+    REF  [36 24 6 99 12]  (0/5 match)
+    --- best output ---
+@graph micro_discount_5
+: in x -> int
+: out y -> int
+| n = negate(x: <x>) :: x:int -> out:int
+y <- n.out
+@end
+    ---
+
+[29] // the average of two values bounded between minimum and maximum
+    EXPECTED: average_two clamp
+    PLANNER:  micro_circle_area
+    well=Y parse=Y verify=Y fidelity=n exec=n correct=n correct_all=n votes=16/16 cands=4
+    --- best output ---
+@graph analyze_two_points
+: in a -> int
+: in w3 -> int
+: out y -> int
+| dist = out y -> out:int
+| dist = bmi(weight: <weight>, height: <height>) :: present:int, rate:int, periods:int -> out:int
+| comb = multiply(x: <v2>, y: <delta>) :: x:int, y:int -> out:int
+y <- pv.out
+@end
+    ---
+
+[30] // absolute magnitude of the difference between two forecasts
+    EXPECTED: subtract abs_val
+    PLANNER:  axpy_then_abs_2
+    well=Y parse=Y verify=n fidelity=n exec=n correct=n correct_all=n votes=16/16 cands=0
+    --- best output ---
+@graph fanout_abs_add_2
+: in x1 -> int
+: in lo -> int
+: in hi -> int
+: out y -> int
+| s = gcd(a: <x1>, b: <x2>) :: a:int, b:int -> out:int
+| m = add(x: <exp1>, y: <k>) :: x:int, y:int -> out:int
+y <- m.out
+@end
+    ---
+
+[31] // rectified output multiplied by a gain factor
+    EXPECTED: relu multiply
+    PLANNER:  scaled_relu
+    well=Y parse=Y verify=Y fidelity=n exec=Y correct=n correct_all=n votes=16/16 cands=4
+    EXEC [8 7 3 14 4]
+    REF  [35 24 6 96 12]  (0/5 match)
+    --- best output ---
+@graph analyze_two_points
+: in a -> int
+: in b -> int
+: out y -> int
+| dist = distance_1d(a: <a>, b: <b>) :: a:int, b:int -> out:int
+| mid = midpoint(a: <a>, b: <b>) :: a:int, b:int -> out:int
+| s = add(x: dist.out, y: mid.out) :: x:int, y:int -> out:int
+y <- s.out
+@end
+    ---
+
+[32] // the tax owed once a discount has been applied to the price
+    EXPECTED: discount tax_amount
+    PLANNER:  clamped_sigmoid
+    well=Y parse=Y verify=n fidelity=n exec=n correct=n correct_all=n votes=16/16 cands=0
+    --- best output ---
+@graph clamped_sigmoid
+: in x -> int
+: in lo -> int
+: in hi -> int
+: out y -> int
+| y_n = bmi(weight: <weight>, height: <height>) :: present:int, rate:int, periods:int -> out:int
+y <- n.out
+
+clamp(x: u.out, lo: <lo>, hi: <hi>) :: x:int, lo:int, hi:int -> out:int
+
+relu(x: <x>) :: x:int, lo:int, hi:int -> out:int
+
+= distance_1d(a: <a2>, b: <b2>) :: x:int, y:int -> out:int
+@end
+    ---
+
+[33] // the fraction of income remaining after subtracting two expenses
+    EXPECTED: subtract percentage
+    PLANNER:  compound_then_add
+    well=Y parse=Y verify=Y fidelity=n exec=n correct=n correct_all=n votes=16/16 cands=1
+    --- best output ---
+@graph compound_interest
+: in a -> int
+: out y -> int
+| n = power(base: <base>, exp: <exp>) :: -> out:int
+y <- n.out
+| p1 = multiply(x: fib.out, y: <price>) :: x:int, y:int -> out:int
+@end
+    ---
+
+[34] // sum of distances across two coordinate axes squared
+    EXPECTED: distance_1d add square
+    PLANNER:  distance_metrics_2
+    well=Y parse=Y verify=Y fidelity=Y exec=Y correct=Y correct_all=Y votes=1/16 cands=1
+    EXEC [100 100 25 400 64]
+    REF  [100 100 25 400 64]  (5/5 match)
+    --- best output ---
+@graph distance_metrics_2
+: in a1 -> int
+: in b1 -> int
+: in a2 -> int
+: in b2 -> int
+: out y -> int
+| d1 = distance_1d(a: <a1>, b: <b1>) :: a:int, b:int -> out:int
+| d2 = distance_1d(a: <a2>, b: <b2>) :: a:int, b:int -> out:int
+| s1 = add(x: d1.out, y: d2.out) :: x:int, y:int -> out:int
+| sq = square(x: s1.out) :: x:int -> out:int
+y <- sq.out
+@end
+    ---
+
+[35] // the distance between two readings combined with their midpoint
+    EXPECTED: distance_1d midpoint add
+    PLANNER:  distance_midpoint_add
+    well=Y parse=Y verify=Y fidelity=Y exec=Y correct=Y correct_all=Y votes=1/16 cands=1
+    EXEC [8 7 3 14 4]
+    REF  [8 7 3 14 4]  (5/5 match)
+    --- best output ---
+@graph distance_midpoint_add
+: in a -> int
+: in b -> int
+: out y -> int
+| dist = distance_1d(a: <a>, b: <b>) :: x:int -> out:int
+| mid = midpoint(a: <a>, b: <b>) :: a:int, b:int -> out:int
+| comb = add(x: dist.out, y: mid.out) :: x:int, y:int -> out:int
+y <- comb.out
+@end
+    ---
+
+[36] // present worth of a future cashflow discounted back to today
+    EXPECTED: future_value present_value
+    PLANNER:  micro_present_value_4
+    well=Y parse=Y verify=Y fidelity=Y exec=Y correct=Y correct_all=Y votes=11/16 cands=5
+    EXEC [2 2 1 4 2]
+    REF  [2 2 1 4 2]  (5/5 match)
+    --- best output ---
+@graph net_present_value
+: in cashflow -> int
+: in rate -> int
+: in years -> int
+: out y -> int
+| fv = future_value(present: <cashflow>, rate: <rate>, periods: <years>) :: present:int, rate:int, periods:int -> out:int
+| pv = present_value(future: fv.out, rate: <rate>, periods: <years>) :: future:int, rate:int, periods:int -> out:int
+y <- pv.out
+
+= clamp(x: u.out, lo: <lo>, hi: <hi>) :: future:int, rate:int, periods:int -> out:int
+
+y: u3.out) :: x:int, y:int -> out:int
+
+= sigmoid(x: <x>) :: x:int -> out:int
+@end
+    ---
+
+[37] // the sum of n-th fibonacci and n-th factorial added together
+    EXPECTED: fibonacci factorial add
+    PLANNER:  distance_metrics_2
+    well=Y parse=Y verify=Y fidelity=n exec=Y correct=n correct_all=n votes=16/16 cands=8
+    EXEC [1 2 1 4 1]
+    REF  [125 27 3 40341 8]  (0/5 match)
+    --- best output ---
+@graph fib_fact_op_min
+: in a -> int
+: in b -> int
+: out y -> int
+| n = gcd(a: <a>, b: <b>) :: a:int, b:int -> out:int
+y <- n.out
+@end
+    ---
+
+[38] // gross pay reduced by the federal tax liability
+    EXPECTED: tax_amount subtract
+    PLANNER:  micro_kinetic_energy_8
+    well=Y parse=Y verify=Y fidelity=n exec=Y correct=Y correct_all=Y votes=16/16 cands=8
+    EXEC [5 4 2 8 3]
+    REF  [5 4 2 8 3]  (5/5 match)
+    --- best output ---
+@graph net_pay
+: in gross -> int
+: in tax_rate -> int
+: out y -> int
+| net = apply_tax(amount: <gross>, rate: <tax_rate>) :: amount:int, rate:int -> out:int
+y <- net.out
+@end
+    ---
+
+[39] // final compound balance minus the original principal amount
+    EXPECTED: compound subtract
+    PLANNER:  compound_then_subtract
+    well=Y parse=Y verify=Y fidelity=Y exec=Y correct=Y correct_all=Y votes=6/16 cands=2
+    EXEC [0 0 0 0 0]
+    REF  [0 0 0 0 0]  (5/5 match)
+    --- best output ---
+@graph compound_interest
+: in principal -> int
+: in rate -> int
+: in years -> int
+: out y -> int
+| amount = compound(principal: <principal>, rate: <rate>, periods: <years>) :: principal:int, rate:int, periods:int -> out:int
+| diff = subtract(x: amount.out, y: <principal>) :: x:int, y:int -> out:int
+y <- diff.out
+@end
+    ---
+
+[40] // sigmoid x value normalised through clamping
+    EXPECTED: sigmoid clamp
+    PLANNER:  dot_product_7d
+    well=Y parse=Y verify=Y fidelity=n exec=Y correct=n correct_all=n votes=16/16 cands=9
+    EXEC [78 50 12 200 28]
+    REF  [3 2 1 4 1]  (0/5 match)
+    --- best output ---
+@graph clamped_sigmoid
+: in x -> int
+: out y -> int
+| n = circle_area(x: <x>) :: x:int -> out:int
+y <- n.out
+@end
+    ---
+
+================================================================
+  PHASE 4 HEADLINE METRIC
+================================================================
+Held-out NL prompts:                  20  [Phase 2c paraphrases only — leakage-free]
+Best-of-16 well-formed:               20/20 (100%)
+Best-of-16 parsed:                    20/20 (100%)
+Best-of-16 strict-verified:           18/20 (90%)  [HEADLINE]
+Best-of-16 primitive-fidelity:        7/20 (35%)  [verified graph uses expected primitives]
+Best-of-16 end-to-end executed:       12/20 (60%)  [Phase 6: prompt → graph → numeric answer]
+Best-of-16 numerically correct (1×):  7/20 (35%)  [Phase 7: matches single reference]
+Best-of-16 correct on all 5 inputs:   7/20 (35%)  [Phase 8: self-consistency + multi-input]
+Planner-family hits picked candidate: 2/20 (10%)  [Phase 15: planner usefulness]
+Geodesic-top-K hits picked candidate: 3/20 (15%)  [Phase 1c: geo classifier hit-rate]
+Anchor candidates injected:           0/20 (0%)  [Phase 2: anchor coverage]
+Anchor wins the vote:                 0/20 (0%)  [Phase 2: anchor pick-rate]
+

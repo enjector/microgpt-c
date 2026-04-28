@@ -1907,9 +1907,13 @@ add_custom_command(TARGET wiring_organelle_demo POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy
           ${CMAKE_CURRENT_SOURCE_DIR}/demos/wiring_organelle/pipeline_corpus_held_out.txt
           $<TARGET_FILE_DIR:wiring_organelle_demo>/pipeline_corpus_held_out.txt
+  COMMAND sh
+          ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_held_out_leakage.sh
+          $<TARGET_FILE_DIR:wiring_organelle_demo>
   DEPENDS pipeline_corpus_gen
           ${CMAKE_CURRENT_SOURCE_DIR}/demos/wiring_organelle/pipeline_corpus_held_out.txt
-  COMMENT "Generating Pipeline IR corpus (wiring + planner) and copying Phase 4 held-out NL prompts"
+          ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_held_out_leakage.sh
+  COMMENT "Generating Pipeline IR corpus (wiring + planner), copying held-out, and running leakage check"
 )
 # Phase 16 attempted family-prefixed wiring training (--prefix-family arg)
 # but regressed 80% → 75% — vocab grew 1051 → 1211 tokens, distribution
