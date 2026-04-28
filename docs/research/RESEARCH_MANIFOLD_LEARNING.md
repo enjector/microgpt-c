@@ -586,11 +586,23 @@ If Path 2 stalls at 75-80%, the issue is the candidate pool itself (no candidate
 1. ✅ Phase 17: re-rank by seed diversity → flat (correlated failures)
 2. ✅ Phase 1a: re-rank by VR cluster bonus → flat (unanimous failures)
 3. ✅ Phase 1b diagnostic: geodesic *can* classify → bottleneck is generation
-4. → Phase 1c: anchor-conditional sampling constraint (the cheap test)
-5. → Phase 1d (if 1c stalls): `<HINT>` token wiring retraining
-6. → Phase 2 (if 1c+1d insufficient): full EKAN anchor-retrieval generation
+4. ✅ Phase 1c: hint-prefix prompt + top-K re-rank → flat (70%); shifted family name but not primitive selection
+5. → Phase 1d (next): retrain wiring on `<HINT>` token corpus so model learns to condition primitives on hint
+6. → Phase 2 (if 1c+1d insufficient): full EKAN anchor-retrieval generation, replaces token-level generation
 
-The sibling's `RESEARCH_GEOMETRIC_ORGANELLES.md` counter-point ("representation > solver sophistication") aligns with the finding: a 250-LOC handcoded classifier matches what the 540K planner does for the failing prompts. Representation matters; learned representation is not strictly necessary at this scale.
+**Phase 1c outcome — the architectural map.** The 70-80% ceiling decomposed into three independent failure layers (see `RESEARCH_PIPELINE_IR.md` §34 for the full audit):
+
+| Layer | Mechanism | Phase that addresses it |
+|---|---|---|
+| 1 — Modal-cluster re-rank | 16/16 candidates unanimous wrong | (impossible at this layer) |
+| 2 — Family-name selection at `@graph` token | Hint-prefix shifts the next-token distribution | **Phase 1c (partial)** — hint worked: #17 emitted `fib_fact_op_add` not `fib_fact_op_subtract` |
+| 3 — Primitive selection at body tokens | Autoregressive over prompt word co-occurrences, ignores prior `@graph` emission | (still open: Phase 1d retrains, Phase 2 replaces generation) |
+
+The hint-prefix successfully biased layer 2 — the model emitted the right family name 4/16 times for #17. But layer 3 broke: the body used `max` instead of `add` as the binary op, even though the graph header said `_add`. The autoregressive softmax has no mechanism to condition position-M tokens on earlier-emitted position-N tokens beyond standard attention, and the attention learned in training doesn't enforce family-primitive coherence.
+
+**Implication for Phase 2 design.** The full manifold-composition pipeline (anchor-retrieval generation) bypasses all three layers because it doesn't generate token-by-token at all — it retrieves a complete graph DAG by 12D distance and emits it whole. Layers 1, 2, and 3 are all sidestepped; the only failure mode is anchor-table coverage (does the right graph exist as an anchor?) and embedding accuracy (does the prompt embed close enough to the right anchor?). Phase 1b's positive diagnostic suggests embedding accuracy is high enough with even handcoded keywords. Phase 2 becomes a question of anchor-table construction — every reachable graph topology needs to exist as an anchor.
+
+The sibling's `RESEARCH_GEOMETRIC_ORGANELLES.md` counter-point ("representation > solver sophistication") aligns with the finding: a 250-LOC handcoded classifier matches what the 540K planner does for the failing prompts. Representation matters; learned representation is not strictly necessary at this scale. **And the corollary from Phase 1c: representation that classifies correctly does not automatically generate correctly — the generation step must be redesigned, not patched.**
 
 ---
 

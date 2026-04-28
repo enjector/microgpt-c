@@ -2794,6 +2794,62 @@ The next experiment should be Path 2 (sampling-constraint), since it's the small
 
 ---
 
+## 34. Phase 1c — Geodesic top-K hint-prefix + re-rank bonus (negative result; bottleneck migrates from family-name to primitive selection)
+
+**The hypothesis.** Phase 1b proved geodesic distance over a 12D anchor manifold correctly classifies 5/6 wiring-failing prompts. If we feed that prediction back into the wiring system at inference (no retraining), can it lift past the 70% ceiling?
+
+**The intervention.** Two independent layers in `demos/wiring_organelle/main.c`, both gated on the geodesic top-K predicted family set computed from `wiring_geo_classifier.{h,c}` (the lifted-and-packaged classifier from Phase 1b):
+
+1. **Hint-prefix prompt biasing**: split the 16 votes between the original prompt (8 votes, even-indexed) and a hinted prompt (8 votes, odd-indexed) where the geodesic top-1 family name is prepended as a lead token. E.g. "// fibonacci of n combined with factorial of n by adding" becomes "// fib_fact_add fibonacci of n combined with factorial of n by adding". The wiring organelle never saw this format in training, so the bias is purely via word co-occurrence — the model has seen `fib_fact_op_add` in graph headers and may shift its next-token distribution toward emitting the matching `@graph` body.
+
+2. **Top-K re-rank bonus**: in the candidate scoring loop, candidates whose `@graph` name's family is in the geodesic top-K get a +25 bonus, larger than the planner's +20 exact-match bonus. When geodesic and planner disagree, geodesic dominates — the right behaviour given Phase 1b's 83% recovery rate on the failing prompts.
+
+A subtle bug surfaced and was fixed mid-run: the geodesic classifier predicts held-out names like `fib_fact_add`, but the corpus emits `fib_fact_op_add`. The first matcher was too strict; v2 introduced a `family_match()` that bridges `<prefix>_op_<suffix>` ↔ `<prefix>_<suffix>` naming.
+
+**The result.** **70% correct on all 5 inputs (14/20)** — flat with Phase 1a, within Phase 17's 75% ±5pp variance. Sub-metrics:
+
+|                          | Phase 1a | Phase 1c v1 | Phase 1c v2 |
+|--------------------------|----------|-------------|-------------|
+| strict-verified          | 95%      | 100%        | 100%        |
+| primitive-fidelity       | 65%      | 75%         | 75%         |
+| end-to-end executed      | 75%      | 80%         | 80%         |
+| correct on all 5 inputs  | **70%**  | **70%**     | **70%**     |
+| planner-family hits      | 75%      | 75%         | 75%         |
+| **geodesic-top-K hits**  | —        | **30%**     | **35%**     |
+
+Sub-metrics improved: +5pp strict-verified, +10pp primitive-fidelity, +5pp end-to-end. But the **numeric-correctness headline didn't move** — exactly the same 6 prompts (#1, #2, #3, #6, #9, #17) failed.
+
+**Why the hint-prefix and re-rank bonus didn't lift.** Audit of #17 (the canonical diffuse-prior failure):
+
+- **Phase 1a**: 16/16 votes emit `@graph fib_fact_op_subtract`, body uses `subtract` as binary op → unanimous wrong family + wrong primitive.
+- **Phase 1c**: 4/16 votes emit `@graph fib_fact_op_add` (hint-prefix worked at the *family-name level*), but the body uses `max` instead of `add` as binary op → right family name, **wrong primitive**.
+
+The hint-prefix successfully shifted the next-token distribution at the `@graph <name>` position. But the binary-op selection downstream — at the `out_op = <primitive>(...)` position — is generated from the prompt's natural-English content, not from the graph name that was emitted earlier. **The model's primitive selection is independent of the family hint.**
+
+This is the architectural insight. The 70-80% ceiling decomposes into three failure layers, each independent:
+
+| Layer | Phase that breaks it | Mechanism | Phases blocked at this layer |
+|---|---|---|---|
+| 1. Re-rank bias toward modal cluster | (impossible) | 16/16 unanimous wrong | Phase 17, Phase 1a |
+| 2. Family-name selection | Phase 1c | Hint-prefix shifts `@graph <name>` token | (this phase, partially) |
+| 3. Primitive selection | (still open) | Autoregressive over word-token co-occurrences | Phase 1c, all earlier |
+
+**The implication.** The text-token autoregressive generation in MicroGPT-C's word-level transformer is structurally not aligned with composition: the family choice and the primitive choices are made by *separate* token-position decisions, with no enforced coherence between them. A hint that nudges position N (graph name) does not propagate to position M (operator at line 5), because the attention has no mechanism to make "the family name I just emitted" a constraint on future token logits.
+
+Three architectural fixes remain open:
+
+- **Phase 1d — retrain wiring on hint-prefixed corpus**: emit the hint inside the training corpus (e.g. `# HINT: fib_fact_add\n@graph fib_fact_op_add\n...`) so the model learns to treat the hint as conditioning. Requires retraining (~12 min wall clock), and Phase 16 showed this risks vocab inflation; the right design is a single `<HINT>` token rather than family-named tokens.
+
+- **Phase 1e — constrained sampling over primitive tokens**: at each generation step where a primitive name is being emitted, mask the logits to disallow tokens not in the family's allowed primitive set (e.g. `fib_fact_op_add` → only `add` allowed in the binary-op position). Requires sampler-internal modifications.
+
+- **Phase 2 — anchor-retrieval generation**: replace token-level generation entirely with anchor-graph retrieval. Embed the prompt to 12D, retrieve the K nearest *complete graph DAGs* from a precomputed anchor table, emit the top-1 as the answer. This is the §3 manifold-composition pipeline in full force, and bypasses all three failure layers.
+
+**Phase 1c status: negative result on the headline; positive on the *layer decomposition*; the architectural map is now resolved.**
+
+The cheap-test programme (Phases 17, 1a, 1c) has fully characterised what the existing text-token architecture can and can't do. The next experiments are necessarily heavier: Phase 1d retrains; Phase 2 redesigns generation. Both are research-program steps, not session-scale interventions.
+
+---
+
 ## 16. Closing Remark
 
 The IR ships. 24 tests pass. The header has detailed doc-comments. The DOT renderer makes graphs human-readable. The text format is small enough for a tiny model to emit.
