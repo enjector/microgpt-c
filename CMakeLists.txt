@@ -34,7 +34,7 @@ option(ENABLE_ROTORQUANT       "Enable RotorQuant for memory compression (MSA)" 
 #  Core library  (single OBJECT library shared by all targets)
 # ==================================================================
 
-add_library(microgpt_lib STATIC src/microgpt.c src/microgpt_organelle.c src/microgpt_msa.c src/microgpt_turboquant.c src/microgpt_rotorquant.c src/microgpt_pipeline.c)
+add_library(microgpt_lib STATIC src/microgpt.c src/microgpt_organelle.c src/microgpt_msa.c src/microgpt_turboquant.c src/microgpt_rotorquant.c src/microgpt_pipeline.c src/microgpt_vr.c)
 target_include_directories(microgpt_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 # --- Compile-time feature flags ---
@@ -147,7 +147,7 @@ function(_microgpt_lib_for_defines OUT_VAR)
   endif()
 
   # Create a new STATIC library with the same sources + features
-  add_library(${_tgt} STATIC src/microgpt.c src/microgpt_organelle.c src/microgpt_msa.c src/microgpt_turboquant.c src/microgpt_rotorquant.c src/microgpt_pipeline.c)
+  add_library(${_tgt} STATIC src/microgpt.c src/microgpt_organelle.c src/microgpt_msa.c src/microgpt_turboquant.c src/microgpt_rotorquant.c src/microgpt_pipeline.c src/microgpt_vr.c)
   target_include_directories(${_tgt} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
   # Propagate all feature flags from the base target
@@ -1786,6 +1786,17 @@ if(NOT MSVC)
   target_link_libraries(test_microgpt_pipeline PRIVATE m)
 endif()
 add_test(NAME microgpt_pipeline_tests COMMAND test_microgpt_pipeline WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+# Vietoris-Rips persistent cohomology engine — Phase 1a manifold-learning lift.
+# Lifted from sibling /Users/user/dev/projects/microgpt-c (C99 implementation,
+# fixed-point at VR_MAX_DIMS=12, VR_MAX_PTS=64).
+add_executable(test_microgpt_vr tests/test_microgpt_vr.c)
+target_link_libraries(test_microgpt_vr PRIVATE microgpt_lib)
+target_include_directories(test_microgpt_vr PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests ${CMAKE_CURRENT_SOURCE_DIR}/src)
+if(NOT MSVC)
+  target_link_libraries(test_microgpt_vr PRIVATE m)
+endif()
+add_test(NAME microgpt_vr_tests COMMAND test_microgpt_vr WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
 # Pipeline IR corpus generator (Phase 3a) — produces hand-curated
 # (prompt, graph) training pairs by building Pipeline IR objects
