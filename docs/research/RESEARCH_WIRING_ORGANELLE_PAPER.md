@@ -376,6 +376,8 @@ The Phase 2d audit report (`RESEARCH_PIPELINE_IR.md` §38) ran four eval modes v
 
 **Defensive recommendation now baked into the build**: every commit that touches the corpus generator should run `grep -Fxc` of each held-out prompt against `pipeline_corpus_{train,val,planner}.txt` and fail if any match.
 
+**For practical "where it works / doesn't work" examples**, see `RESEARCH_PIPELINE_IR.md` §39 — a per-prompt walkthrough of the 7 wiring-only successes and the 13 failures the anchor mechanism rescues, plus the four-axis architectural boundary (novel families, weak keyword overlap, multi-stage compositions, domain-vocabulary drift).
+
 The codebase is at https://github.com/enjector/microgpt-c.
 
 — Ajay Soni, Enjector Software Ltd. April 2026.

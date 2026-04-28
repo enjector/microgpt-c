@@ -3106,6 +3106,76 @@ The thesis — *small specialist models coordinated by deterministic Judges, wit
 
 ---
 
+## 39. Phase 2e — Concrete examples: what works, what doesn't, and why
+
+§38 reported the headline numbers but left the *failure modes* implicit. This section walks through real per-prompt outcomes from `docs/research/leakage_clean_noanchor.log` so a reader can map a real-world prompt to whether the system will succeed.
+
+### 39.1 Where the wiring transformer works alone (7 of 20 clean paraphrases)
+
+The wiring transformer's natural-English generalisation kicks in when the paraphrase preserves enough of the corpus's surface form. From `--no-anchor --clean-only` eval:
+
+| Prompt (clean paraphrase) | Family | Why the wiring transformer succeeds |
+|---|---|---|
+| `// sigmoid neuron activation restricted to a low high band` | clamped_sigmoid | "low" and "high" are direct training keywords; 11/16 votes converged on the right primitives. |
+| `// after-tax take home pay from federal taxation` | apply_tax | "take home pay" and "federal" are explicit corpus phrases; 6/16 votes. |
+| `// sum of distances across two coordinate axes squared` | distance_metrics | Phrase pattern matches a training paraphrase exactly. |
+| `// the distance between two readings combined with their midpoint` | distance_midpoint | Near-verbatim of training prompt. |
+| `// present worth of a future cashflow discounted back to today` | pv_of_fv | "present" + "future" + "cashflow" all corpus keywords; 11/16 votes. |
+| `// gross pay reduced by the federal tax liability` | gross_minus_tax | "reduced" + "tax liability" + "federal" overlap with multiple training prompts. |
+| `// final compound balance minus the original principal amount` | compound_minus_p | "compound balance minus original" near-verbatim. |
+
+### 39.2 Where the wiring transformer fails alone (13 of 20 clean paraphrases)
+
+These are the prompts the manifold-retrieval architecture rescues. Without anchor injection, the wiring transformer hallucinates wrong primitives, wrong topology, or unparseable graphs:
+
+| Prompt (clean paraphrase) | Wiring failure mode |
+|---|---|
+| `// bmi of weight and height clipped to a healthy lo hi range` | Generates `@graph` but emits a fragmented body that fails to execute. "Clipped" and "healthy lo hi range" weren't in training paraphrases. |
+| `// the interest portion of an investment after principal compounds over years` | Verifies but doesn't execute. Model omits the `subtract` step that turns total compound balance into "interest portion". |
+| `// the weighted average of three measurements using their respective weights` | Only 2 verifying candidates — model can't construct a "weighted average" graph. Training has "weighted combination"; surface drift breaks it. |
+| `// the gcd of two integers multiplied by a coefficient` | Verifies and executes but wrong number. Picks wrong follow-up primitive instead of `multiply(gcd, k)`. |
+| `// n-th fibonacci multiplied by n-th factorial` | 16/16 unanimous wrong. Canonical "1 token away from training data, total collapse" failure. |
+| `// invoice combining quantity times unit price plus the applicable tax` | Executes to wrong number. "Combining" and "applicable tax" are novel; model picks wrong primitives. |
+| `// the average of two values bounded between minimum and maximum` | Doesn't execute. "Of two values" diverges enough from "average a and b" to fail. |
+| `// absolute magnitude of the difference between two forecasts` | **0 verified candidates out of 16.** "Absolute magnitude" → unparseable graph. |
+| `// rectified output multiplied by a gain factor` | Executes to wrong number. Losing "of x" and "scaled by" from training breaks primitive selection. |
+| `// the tax owed once a discount has been applied to the price` | **0 verified candidates.** Surface form too far from "tax due on a price after a discount has been applied". |
+| `// the fraction of income remaining after subtracting two expenses` | 1 candidate, doesn't execute. "Remaining" instead of "saved" breaks it. |
+| `// the sum of n-th fibonacci and n-th factorial added together` | Executes wrong. Picks `subtract` or `max` instead of `add` — the canonical diffuse-prior failure from Phase 17. |
+| `// sigmoid x value normalised through clamping` | Executes to wrong number. Body emits `circle_area` — no robust association from prompt to the right primitive sequence. |
+
+### 39.3 Where the anchor-retrieval mechanism saves these (13 of 13)
+
+Run the same 13 prompts with the anchor mechanism enabled (`--clean-only` without `--no-anchor`): all 13 produce the right numeric answer on all 5 input distributions. The mechanism per failure case:
+
+1. **Keyword embedder** maps each prompt to a 20D coordinate. E.g. for "bmi of weight and height clipped to a healthy lo hi range", `bmi` + `weight` + `height` hits put weight on slot 0 (bmi_clamped).
+2. **Geodesic top-1** picks the nearest anchor: bmi_clamped at slot 0.
+3. **Anchor injection** parses the canonical `@graph bmi_clamped { bmi(weight, height) → clamp(_, lo, hi) }` DAG and runs it through the same parse → verify → repair → execute pipeline as the votes.
+4. **Anchor scoring** — the +30 unconditional anchor bonus + +60 planner-agreement boost (when both classifiers agree) makes the anchor win the vote regardless of how badly the wiring transformer hallucinates.
+5. **Numeric output** matches the canonical reference on all 5 input sets, every time.
+
+### 39.4 The architectural boundary in plain terms
+
+**Works (deterministic 100% on the 20 anchored families):** any natural-English request whose meaning maps to one of the 20 anchored families (BMI clamp, compound interest, weighted three, sigmoid clamp, GCD scaled, take-home pay, fib × fact mul/add, invoice, clamped average, abs diff, scaled ReLU, discount tax, savings rate, distance metrics, distance midpoint, PV of FV, gross minus tax, compound minus principal, sigmoid clamped) — robust to substantial lexical variation: synonyms, word reordering, added articles ("the", "an"), genitive phrasing changes, ordinal forms ("n-th"), tense shifts.
+
+**Doesn't work, in four distinct ways:**
+
+1. **Novel families.** Prompts whose semantics map to a family the anchor table doesn't encode (e.g. "the standard deviation of three measurements", "the geometric mean of a and b", "the variance of two readings"). The geodesic classifier picks the wrong family by similarity to its closest anchor; the wrong canonical DAG is injected and either won't verify or produces a wrong number. Mitigation: add the family to `wiring_anchor_graphs.c` (1 entry, ~15 lines) plus a keyword bag entry to `wiring_geo_classifier.c` (1 line) and bump GEO_DIMS if past 20 families.
+
+2. **Weak keyword overlap.** Prompts where none of the family's keywords survive the paraphrase. Currently: zero documented cases on the 40-prompt test set, but easy to construct adversarially (e.g. paraphrase "BMI" to "Quetelet index" — no keyword bag matches).
+
+3. **Multi-stage compositions outside the 20 anchored families.** E.g. "discount the tax on a price after a markup of x" requires `markup → price → discount → tax`, which composes four primitives across two existing families (markup/discount/tax). The current architecture can't compose anchors — each prompt resolves to exactly one anchor or fails.
+
+4. **Domain-vocabulary drift.** Prompts that translate the anchored mathematical operation into a domain the keyword bag doesn't model (e.g. asking for "gcd scaled by k" in a medical-dosing context rather than mathematical wording). The keyword bag is pure surface-word matching — semantically identical operations in unfamiliar wording slip through.
+
+### 39.5 The honest one-liner
+
+**On the 20 anchored families, lexical robustness is 100% on novel paraphrases. Outside those families, you fall back to the 35% wiring transformer with no safety net.** The right next development direction is not to push the wiring transformer harder — it has demonstrated its ceiling — but to (a) expand the anchor table with more families and (b) generalise the architecture so anchors can be *composed* (Phase 2 closes single-family retrieval; multi-family composition is the open problem).
+
+The eval logs underlying this section: `docs/research/leakage_clean_anchor.log` (anchor on, 20/20), `docs/research/leakage_clean_noanchor.log` (wiring only, 7/20), reproducible via `./wiring_organelle_demo --clean-only` and `./wiring_organelle_demo --no-anchor --clean-only`.
+
+---
+
 ## 16. Closing Remark
 
 The IR ships. 24 tests pass. The header has detailed doc-comments. The DOT renderer makes graphs human-readable. The text format is small enough for a tiny model to emit.
