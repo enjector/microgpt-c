@@ -51,7 +51,7 @@ A living roadmap for MicroGPT-C — a zero-dependency C99 GPT engine designed fo
 - [x] **shakespeare** — character-level Shakespeare (840K params, multi-threaded, zero `<unk>`)
 - [x] **c_codegen** — C code generation from prompts (875K params, byte-perfect recall of 2,081 functions)
 - [x] **c_wiringgen** — C function composition grammar (875K params, training in progress)
-- [x] **Wiring Organelle (Pipeline IR, multi-organelle)** — graph-based tool composition (540K-param wiring + 540K-param planner, 368 train examples, **80% peak / 75% median correct on all 5 distinct input sets on natural-English transfer** (Phase 15 planner+graded-family-match re-ranking; ±5pp retrain variance documented in §30), 100% on synthetic templates). The 6-phase diagnostic-prescription arc 8→13 lifted 35% → 75% via corpus engineering; Phase 15 multi-organelle hit the 80% moon target. Best-of-16 + verify-as-judge + tolerant parser + post-parse `pipeline_repair()` + 40-primitive C-native execution + 20-prompt × 5-input reference suite. See [RESEARCH_PIPELINE_IR](docs/research/RESEARCH_PIPELINE_IR.md).
+- [x] **Wiring Organelle (Pipeline IR, multi-organelle)** — graph-based tool composition (540K-param wiring + 540K-param planner, 368 train examples, **80% peak / 75% median correct on all 5 distinct input sets on natural-English transfer** (17-phase arc closed; tag `v2.0-wiring-organelle`; future direction: manifold-learning composition over a continuous topology manifold). 100% on synthetic templates). The 6-phase diagnostic-prescription arc 8→13 lifted 35% → 75% via corpus engineering; Phase 15 multi-organelle hit the 80% moon target. Best-of-16 + verify-as-judge + tolerant parser + post-parse `pipeline_repair()` + 40-primitive C-native execution + 20-prompt × 5-input reference suite. See [RESEARCH_PIPELINE_IR](docs/research/RESEARCH_PIPELINE_IR.md).
 - [x] **c99_compose** — C function composition pipeline: Planner → Judge (**98% parse**, **83% exact match**, 1.2M params with LR scheduling)
 - [x] **tic-tac-toe** — 2-organelle pipeline: Planner → Player (**87% win+draw** vs random, zero invalid moves, 460K params)
 - [x] **8-puzzle** — 5-organelle pipeline: Strategist → Mover → Judge → Detector → DetourMover with kanban + cycle breaking (**90% solve rate**: 100% easy, 100% med, 70% hard, 460K params)
@@ -162,6 +162,16 @@ Focus: explore what happens when composable intelligence moves to **real edge ha
 - [ ] RISC-V embedded support (no FPU fallback for INT8 organelles)
 - [ ] ESP32 / STM32 demo: running an organelle on a $5 microcontroller
 - [ ] FPGA acceleration for ultra-low-latency inference
+
+### 5. Manifold-Learning Composition (post-Wiring-Organelle research direction)
+The Wiring Organelle 17-phase arc characterises a structural ceiling at 75% median / 80% peak on natural-English tool composition. Five lever classes (capacity, paraphrasing, structural diversity, multi-organelle re-ranking, multi-seed ensembling) all converge to this band. The remaining failures are *correlated across seeds* — meaning the right interpretation has no preferred mass in the model's learned distribution. Pushing past requires moving composition out of *retrieval* and into *geometry*.
+
+- [ ] Embed each `@graph` topology as a point in a low-dimensional manifold (template families define curves, parametrisations define coordinates)
+- [ ] Embed prompts in the same manifold via contrastive learning over (prompt, graph) pairs
+- [ ] Compose by manifold traversal: project prompt → retrieve nearest valid topology by geodesic distance, breaking ties by proximity to unambiguous reference prompts
+- [ ] Interpolate for novel compositions: prompts that don't match any single training graph could be answered by the *interpolated* graph along the geodesic between two nearest references
+- [ ] Preserve the deterministic-infrastructure thesis: the IR + verifier + repair + executor stack remains unchanged; only the wiring/planner organelles get replaced by a geometric composition module
+- See `docs/research/RESEARCH_WIRING_ORGANELLE_PAPER.md` §16 for the research sketch.
 
 ---
 

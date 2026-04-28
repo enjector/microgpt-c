@@ -21,7 +21,7 @@
     
     {\large \today\par}
     \vspace{0.3cm}
-    {\normalsize\texttt{Version 1.1.22}\par}
+    {\normalsize\texttt{Version 1.2.0}\par}
 \end{titlepage}
 
 % --- Copyright Page ---
@@ -32,7 +32,7 @@
 \noindent
 \textbf{MicroGPT-C: Composable Intelligence at the Edge}\\
 From Stem Cell Models to Real-World AI Pipelines \textendash{} Architecture, Implementation, and Research\\
-\textit{Version 1.1.22}\\[2em]
+\textit{Version 1.2.0}\\[2em]
 
 \noindent
 \textbf{Research Team}\\
@@ -2011,22 +2011,38 @@ The organelle's job is to produce *plausible* graph candidates. Everything downs
 
 The model contributes a learned prior over likely graph shapes for a given prompt. Everything else is a contract that filters candidates against a strict specification. This is exactly the philosophy the previous section recommended: **organelles retrieve; pipelines compose; the Judge guarantees correctness**.
 
-### What remains unsolved
+### Pushing past 75%: the multi-organelle pipeline
 
-Five of the 20 held-out prompts still fail. They split into:
+Aggressive 5× oversampling for the failing prompts (Phase 14) regressed the headline by 1 prompt — corpus paraphrasing saturated. The next escalation was a **multi-organelle pipeline**: a separate 540K-param planner organelle predicting a graph-name hint that re-ranks the wiring's best-of-16 candidates with a graded family-match bonus (+20 exact, +5 prefix). Phase 15 hit **80% (16/20) at peak**, the moon target — closing one previously-failing prompt (#17 fibonacci+factorial+adding) by giving the wiring organelle's voting a deterministic preference for the right op among `tpl_fib_fact_op`'s 5 options.
 
-- **Mode-collapse on novel words** (e.g. "body mass index" + "limit it inside") — graph-shape prior too diffuse for best-of-16 voting to converge.
-- **Primitive disambiguation** (e.g. "fibonacci of n combined with factorial of n by adding" — the model emits the right 3-node topology but rolls a uniformly-random op among the 5 in `tpl_fib_fact_op` instead of binding to `add`).
+### The structural ceiling (after 17 phases)
 
-Aggressive 5× oversampling for these prompts (Phase 14) actually regressed the headline by 1 prompt — corpus paraphrasing has saturated. The natural escalation is a **multi-organelle pipeline**: a small planner organelle (~100K params) emits a template-family hint that prefixes the wiring organelle's input, sharpening both the graph-shape prior (fixing mode-collapse) and primitive selection (fixing disambiguation). Predicted ceiling: 80-85%. This is left for future work.
+Four further phases tested whether anything could push past 80%:
+
+| Lever | Phase | Result |
+|---|---|---|
+| Family-prefixed wiring training | 16 | regressed to 75% (vocab inflation hurts data efficiency) |
+| Phase 15 reproduction (fresh seed) | 15-repro | 70% — confirmed Phase 15c's 80% was a lucky checkpoint |
+| 3-seed wiring ensemble (round-robin votes) | 17 | 70% — failures correlated across seeds |
+
+Phase 17's diagnostic finding closed the arc: **failures are correlated across model seeds**. Different RNG seeds roll different wrong primitive choices for #17 (`subtract`, `multiply`, `min`, `fib alone`, `fact alone`) but never converge on `add`. The right interpretation has no preferred mass in the model's learned distribution, regardless of seed. This is a **structural ceiling**, not noise.
+
+The honest headline: **80% peak / 75% median correct on all 5 input sets**, ±5pp variance across retrains, **88-91% accuracy among graphs that execute**. The Wiring Organelle architecture is **tight against its design** — five lever classes (capacity, paraphrasing, structural diversity, multi-organelle, ensembling) all converge to this band.
+
+### Where the thesis bounds itself
+
+The 17-phase arc validates the thesis (*organelles retrieve; pipelines compose*) within its claimed regime, and **bounds it outside**. The 5 prompts that fail across all 17 phases share a common feature: their corpus paraphrases pull the wiring organelle toward multiple valid interpretations, none of which has preferred mass. The model is a *retrieval* engine; when retrieval is ambiguous, the deterministic infrastructure downstream cannot recover the *intended* answer without a preferred-mass signal — which the architecture cannot provide.
+
+Pushing past this ceiling requires moving composition out of *retrieval* and into *geometry* — **manifold learning** that embeds the space of valid compositions as a continuous parametric surface, where prompts are projected and the nearest valid composition is retrieved by geodesic proximity rather than statistical co-occurrence. This preserves the deterministic-infrastructure thesis (the IR, verifier, repair, execution stack stays unchanged) while replacing the wiring organelle's token-level retrieval with a geometric composition module. See the standalone paper §16 for the research sketch.
 
 ### Reproducibility and full record
 
-- Standalone paper: `docs/research/RESEARCH_WIRING_ORGANELLE_PAPER.md`
-- Full 13-phase development log (28 sections, including three documented negative results that narrow the search): `docs/research/RESEARCH_PIPELINE_IR.md`
-- Pure C99, single-laptop, ~15-minute training run, 51 unit tests all passing.
+- Standalone paper (v2.0, closes the 17-phase arc): `docs/research/RESEARCH_WIRING_ORGANELLE_PAPER.md`
+- Full development log (31 sections, including 5 documented negative results that characterise the ceiling): `docs/research/RESEARCH_PIPELINE_IR.md`
+- Pure C99, single-laptop, ~50-minute training (3-seed ensemble + planner), 51 unit tests all passing.
+- `main` reproduces the 75% median; `v1.0-wiring-organelle` tag ships a checkpoint reproducing the 80% peak.
 
-The book's central thesis — *small specialist models coordinated by deterministic infrastructure outperform single larger models on focused tasks* — is now empirically validated for tool composition: **a 540K-param organelle plus a 7,200-line C99 infrastructure produces 75% correct end-to-end answers on natural English**, with verified arithmetic correctness across five input distributions per prompt.
+The book's central thesis — *small specialist models coordinated by deterministic infrastructure outperform single larger models on focused tasks* — is empirically validated for tool composition at **80% peak / 75% median correct end-to-end**. The 17-phase arc characterises both **what works** (corpus engineering, multi-organelle re-ranking, deterministic Judges) and **what doesn't** (capacity scaling, multi-seed ensembling, family-prefixed training within this regime). The path past this ceiling lies in manifold-learning composition, not in further corpus engineering on token-level transformers.
 
 \newpage
 

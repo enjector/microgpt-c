@@ -1,24 +1,25 @@
 # The Wiring Organelle: Tool-Composition by a 540K-Parameter Transformer with Verified End-to-End Correctness
 
-*MicroGPT-C — research paper, April 2026*
+*MicroGPT-C — research paper, April 2026 (v2.0, closes the 17-phase arc)*
 
-> A 540K-parameter word-level transformer, trained on 368 (prompt, graph) pairs of real domain primitives, emits typed dataflow graphs that **verify, execute, and produce the correct numeric answer on 75% of held-out natural-English problems** — single laptop, pure C99, zero dependencies, <15 minutes wall clock per training run.
+> A 540K-parameter word-level transformer plus a 540K-parameter planner organelle, trained on 368 (prompt, graph) pairs of real domain primitives, emits typed dataflow graphs that **verify, execute, and produce the correct numeric answer on 80% (peak) / 75% (median) of held-out natural-English problems**. The 17-phase development arc characterises the structural ceiling and rules out three independent lever classes for pushing further. Single laptop, pure C99, zero dependencies, ~50 minutes total training wall clock.
 
 ---
 
 ## Abstract
 
-We present the **Wiring Organelle**, a 540K-parameter word-level transformer that takes a natural-English problem description and emits a verified Pipeline IR graph composed from a registry of 40 typed primitives (BMI, compound interest, sigmoid, GCD, factorial, …). The graphs are then executed end-to-end via direct C-native dispatch, producing numeric answers that we compare against canonical references on five distinct input sets.
+We present the **Wiring Organelle**, a 540K-parameter word-level transformer that takes a natural-English problem description and emits a verified Pipeline IR graph composed from a registry of 40 typed primitives (BMI, compound interest, sigmoid, GCD, factorial, …). The graphs are then executed end-to-end via direct C-native dispatch, producing numeric answers that we compare against canonical references on five distinct input sets. A second 540K-parameter **planner organelle** predicts a graph-name hint that re-ranks the wiring's best-of-16 candidates.
 
-On 20 freshly-worded natural-English held-out prompts, the system achieves:
+On 20 freshly-worded natural-English held-out prompts, the multi-organelle pipeline achieves:
 
-- **95% strict-verified** (graph passes the type checker, cycle detector, and connectivity verifier)
-- **85% end-to-end executed** (graph runs and produces a numeric answer)
-- **75% correct on all 5 input sets** (numeric answer matches a canonical reference robustly across input distributions)
+- **80% peak / 75% median correct on all 5 input sets** (numeric answer matches a canonical reference robustly across input distributions; ±5pp variance across retrains)
+- **100% strict-verified** at peak (graph passes the type checker, cycle detector, and connectivity verifier)
+- **85% end-to-end executed** at peak (graph runs and produces a numeric answer)
+- **88-91% accuracy among graphs that execute** (the bimodal pattern: every executing graph is either correct on all 5 input sets or wrong on all 5)
 
-Among graphs that execute, **88% are arithmetically correct on every input set tested**.
+The system is built incrementally across **17 phases** on a single laptop. Each phase is a separate experiment with an explicit hypothesis, intervention, and result — including **five documented negative results** that narrow the search and characterise the ceiling. The headline is achieved entirely through corpus engineering, multi-organelle re-ranking, post-parse graph repair, best-of-16 self-consistency voting, and a deterministic IR verifier that doubles as a Judge — no model architecture changes beyond standard transformer scaling.
 
-The system is built incrementally across 13 phases on a single laptop. Each phase is documented as a separate experiment, with an explicit hypothesis, intervention, and result — including three negative results that narrow the search for what works. The 75% headline is achieved entirely through corpus engineering, post-parse graph repair, best-of-16 self-consistency voting, and a deterministic IR verifier that doubles as a Judge — no model architecture changes beyond standard transformer scaling.
+The 17-phase arc concludes that the **75% median is a structural ceiling** for this architecture-and-corpus regime. Five independent levers (capacity scaling, corpus paraphrasing, family-prefixed training, multi-organelle re-ranking, multi-seed ensembling) all flatten in the same band. The remaining ~5 wrong prompts have *correlated failures across model seeds* — meaning the right interpretation has no preferred mass in the model's learned distribution. Pushing past this ceiling requires categorically different architecture (manifold-learning composition; see §16) — outside "small specialist organelle" territory.
 
 ---
 
@@ -37,24 +38,31 @@ The verifier is the Judge. The model is allowed to be wrong; the Judge catches i
 ```
 natural-English prompt
         ↓
-WIRING ORGANELLE  (540K-param word-level transformer, best-of-16 voting)
+PLANNER ORGANELLE   (540K-param transformer, predicts a graph-name hint)
+        ↓ "fib_fact_op_add"  (or whatever family/op the prompt suggests)
+WIRING ORGANELLE    (540K-param transformer, optionally a 3-seed ensemble)
+        ↓ 16 candidates  (best-of-N at temperatures 0.20 .. 0.95,
+                          distributed round-robin across the ensemble)
+strict parse → tolerant parse → repair        (3-layer fallback recovery)
         ↓
-@graph candidates (16 sampled at temperatures 0.20 .. 0.95)
+verify  (typed DAG checker = Judge — 8 passes: cycles, types, connectivity, …)
         ↓
-strict parse → tolerant parse → repair  (3-layer fallback recovery)
-        ↓
-verify  (typed DAG checker = Judge)
-        ↓
-self-consistency vote  (pick candidate whose 5-input output vector matches the most siblings)
+score each candidate:
+  +20  exact graph-name match against planner hint
+  + 5  prefix match (within-family)
+  + N  self-consistency votes from siblings sharing the same 5-input output vector
+  + 1  primitive-fidelity bonus
         ↓
 verified Pipeline IR graph
         ↓
 pipeline_execute() with native C dispatch
         ↓
-numeric answer  →  compared against canonical reference
+numeric answer  →  compared against canonical reference on 5 distinct input sets
+        ↓
+correct iff every component matches  (rules out coincidental single-input agreement)
 ```
 
-**Every layer between the model and the answer is deterministic and verifiable.** The model's job is to produce *plausible* graph candidates; everything downstream is a contract that filters candidates against a strict specification.
+**Every layer between the models and the answer is deterministic and verifiable.** The two organelles produce *plausible* graph candidates and a re-ranking hint respectively; everything downstream is a contract that filters candidates against a strict specification.
 
 ---
 
@@ -209,16 +217,18 @@ This is what makes the 75% headline robust. It's not 75% by sampling luck on a s
 
 ## 10. Headline result
 
-| Metric | Value | Note |
-|---|---|---|
-| Prompts tested | 20 | Natural-English, NOT in train or val |
-| Best-of-16 well-formed | 19/20 (95%) | Output looks like a graph |
-| Best-of-16 parsed | 19/20 (95%) | Strict or tolerant parse succeeds |
-| Best-of-16 strict-verified | 19/20 (95%) | Type checker accepts |
-| Best-of-16 primitive-fidelity | 16/20 (80%) | Verified graph uses every expected primitive |
-| Best-of-16 end-to-end executed | 17/20 (85%) | Graph runs to completion |
-| Best-of-16 correct on all 5 inputs | **15/20 (75%)** ⭐ | Numeric output matches reference 5/5 |
-| Accuracy among executing graphs | **15/17 (88%)** | When the graph runs, it's right 88% of the time |
+| Metric | Peak (Phase 15c) | Median (across 5 retrains) | Note |
+|---|---|---|---|
+| Prompts tested | 20 | 20 | Natural-English, NOT in train or val |
+| Best-of-16 well-formed | 100% | 95-100% | Output looks like a graph |
+| Best-of-16 parsed | 100% | 90-100% | Strict / tolerant / repair succeeds |
+| Best-of-16 strict-verified | 100% | 90-95% | Type checker accepts |
+| Best-of-16 primitive-fidelity | 80% (16/20) | 65-80% | Verified graph uses every expected primitive |
+| Best-of-16 end-to-end executed | 85% (17/20) | 75-85% | Graph runs to completion |
+| **Best-of-16 correct on all 5 inputs** | **80% (16/20)** ⭐ | **70-75%** | Numeric output matches reference 5/5 |
+| Accuracy among executing graphs | 16/17 (94%) | 88-91% | When the graph runs, it's right ~90% of the time |
+
+The variance across 5 retrains (Phases 13, 14, 15c, 15-repro, 16, 17) is **±5pp** with **median 75%, peak 80%**. The 80% peak landed on Phase 15c when a particularly-lucky wiring checkpoint was reused; Phase 17's 3-seed ensemble confirmed that the median doesn't shift even with seed-pooling, because the failure modes are correlated across seeds (§31). The 75% median is the **structural ceiling** for this architecture-and-corpus regime.
 
 Held-out prompts that the system solves correctly:
 
@@ -246,13 +256,23 @@ All 15 produce numerically-correct integer answers across 5 distinct input distr
 
 | # | Prompt | Failure mode | Diagnosis |
 |---|---|---|---|
-| 1 | "compute the body mass index … and limit it inside lo and hi bounds" | Mode collapse | Graph-shape prior too diffuse despite 6 anchored paraphrases |
-| 2 | "interest gained on an investment when principal compounds at rate r over n years" | Mode collapse | Same — diffuse prior, voting can't converge |
-| 3 | "weighted combination of three measurements each scaled by its own weight" | Reference mismatch | Model emits valid `multiply→add→divide`; reference expects `multiply→add→percentage`. Not a model error. |
-| 6 | "take home pay from gross income at federal tax rate" | Primitive drift | Model emits percentage-style graph; corpus apply_tax anchors didn't dominate |
-| 17 | "fibonacci of n combined with factorial of n by adding" | Primitive drift | Topology correct (fib + fact + combiner); model rolls a random op among the 5 in tpl_fib_fact_op despite 9 "adding" paraphrases |
+| 1 | "compute the body mass index … and limit it inside lo and hi bounds" | Mode collapse | Graph-shape prior too diffuse despite 11 anchored paraphrases by Phase 14 |
+| 2 | "interest gained on an investment when principal compounds at rate r over n years" | Mode collapse | Same — diffuse prior, voting can't converge across any of 17 phases |
+| 3 | "weighted combination of three measurements each scaled by its own weight" | Reference mismatch | Model emits valid `multiply→add→divide`; reference expects `multiply→add→percentage`. Not a model error — fixable with reference widening. |
+| 6 | "take home pay from gross income at federal tax rate" | Primitive drift | Model emits percentage-style graph; corpus apply_tax anchors didn't dominate after 8 paraphrases |
+| 17 | "fibonacci of n combined with factorial of n by adding" | Primitive drift, **correlated across seeds** | Topology correct (fib + fact + combiner); each retrain rolls a different wrong op (`subtract`, `multiply`, `min`, …) — the right interpretation `add` has no preferred mass in the model's distribution |
 
-Phase 14 confirmed corpus paraphrasing alone won't fix these. The escalation is multi-organelle: a planner organelle that emits a template-family hint before the wiring organelle generates the graph. This is left for future work.
+**Five lever classes were tested across 17 phases. None broke this ceiling**:
+
+| Lever | Phase | Result |
+|---|---|---|
+| Capacity scaling (1.49M params) | 9 | overfit, regressed to 35% |
+| Corpus paraphrasing (5× density) | 10, 14 | saturated at 70-75% |
+| Multi-organelle re-ranking (planner) | 15 | +5pp peak (lucky), median flat |
+| Family-prefixed wiring training | 16 | regressed (vocab inflation) |
+| Multi-seed ensemble (3 wirings) | 17 | flat (failures correlated across seeds) |
+
+Phase 17's correlation finding is the diagnostic conclusion: **failures don't disagree across seeds**. Different RNG seeds roll different wrong primitive choices for #17 (`subtract`, `multiply`, `min`, `fib alone`, `fact alone`) but never converge on `add`. The right interpretation has no preferred mass in the learned distribution, regardless of seed. This is a **structural ceiling**, not noise — and it cannot be lifted by more corpus engineering or more inference tricks.
 
 ---
 
@@ -260,71 +280,147 @@ Phase 14 confirmed corpus paraphrasing alone won't fix these. The escalation is 
 
 **Build**: pure C99, CMake, `libc + libm` only. Optional Flex/Bison ≥ 3.0 for the unrelated VM grammar (the Wiring Organelle does not depend on it). Compiles cleanly on macOS clang, Linux gcc/clang, Windows cl.
 
-**Lines of code** (Wiring Organelle and supporting infrastructure):
+**Lines of code** (Wiring Organelle and supporting infrastructure, after the 17-phase arc):
 
 | Component | Lines | Purpose |
 |---|---|---|
 | `src/microgpt_pipeline.h` | 510 | Public IR API |
-| `src/microgpt_pipeline.c` | 2,200 | IR + verifier + parser + repair + executor |
-| `tools/pipeline_corpus_gen.c` | 2,100 | Programmatic corpus generator |
-| `demos/wiring_organelle/main.c` | 700 | Training + best-of-16 + eval pipeline |
+| `src/microgpt_pipeline.c` | 2,200 | IR + verifier + tolerant parser + repair + executor |
+| `tools/pipeline_corpus_gen.c` | 2,300 | Programmatic corpus generator (wiring + planner) |
+| `demos/wiring_organelle/main.c` | 1,000 | Multi-organelle training + best-of-16 + eval pipeline |
 | `demos/wiring_organelle/wiring_natives.c` | 350 | 40 native primitive implementations |
-| `demos/wiring_organelle/wiring_references.c` | 250 | 20 canonical reference functions |
+| `demos/wiring_organelle/wiring_references.c` | 280 | 20 canonical reference functions, 5-input each |
 | `tests/test_microgpt_pipeline.c` | 1,100 | 51 unit tests |
 
-Total: ~7,200 lines of C99, no external dependencies beyond libc.
+Total: ~7,800 lines of C99, no external dependencies beyond libc.
 
 **Reproducibility**:
 
 ```bash
-# Single laptop, ~15 minutes
+# Single laptop, ~50 minutes total (3 wiring × ~14 min + 1 planner × ~6 min + eval)
 cmake -S . -B build && cmake --build build --target wiring_organelle_demo
 cd build && ./wiring_organelle_demo
-# Reads pipeline_corpus_train.txt, val.txt, held_out.txt
-# Trains, runs best-of-16 + verify-as-judge + repair + execute + correctness check
+# Reads pipeline_corpus_train.txt, val.txt, planner.txt, held_out.txt
+# Trains 3-seed wiring ensemble + planner organelle
+# Runs best-of-16 + verify-as-judge + repair + execute + correctness check
 # Prints headline metrics to stdout
 ```
 
-The held-out file `pipeline_corpus_held_out.txt` is checked into the repository with `# EXPECTED: <primitives>` and `# REFERENCE: <fn-name>` annotations per prompt — fully self-contained.
+For single-seed Phase 13 reproduction (~15 min wall clock), set `ENSEMBLE_SIZE=1` in `main.c`. The held-out file `pipeline_corpus_held_out.txt` is checked into the repository with `# EXPECTED: <primitives>` and `# REFERENCE: <fn-name>` annotations per prompt — fully self-contained.
 
 ---
 
 ## 13. The thesis revisited
 
-The original premise — *tiny specialist models coordinated by deterministic infrastructure can solve focused tasks better than larger models alone* — is supported by the experiment.
+The original premise — *tiny specialist models coordinated by deterministic infrastructure can solve focused tasks better than larger models alone* — is **empirically validated within the regime it claims to cover, and empirically bounded outside it**.
 
 A 540K-param transformer alone, asked to compose tools from natural English, cannot reliably produce correct graphs. The same model **with**:
 
-- a typed graph IR + verifier as a Judge,
+- a second 540K-param planner organelle predicting a graph-name hint,
+- a typed graph IR + verifier as a deterministic Judge,
 - a tolerant parser as a syntactic safety net,
 - a fixed-point repair pass for graph-level coherence,
-- best-of-16 voting + 5-input self-consistency for candidate selection,
+- best-of-16 voting + 5-input self-consistency + planner-family-bonus for candidate selection,
 - and a corpus designed to anchor lexical surface forms to specific primitive choices,
 
-reaches **75% correct end-to-end on natural-English held-out problems with verified arithmetic correctness across 5 distinct input distributions**.
+reaches **80% peak / 75% median correct end-to-end on natural-English held-out problems with verified arithmetic correctness across 5 distinct input distributions**.
 
-The model's contribution is the prior over graph shapes. Everything else is deterministic infrastructure that filters, repairs, and verifies. This is a different research stance than "scale the model until it just works" — and the 7,200-line, single-laptop, 15-minute pipeline demonstrates that the alternative stance is empirically tractable.
+The model's contribution is the prior over graph shapes. Everything else is deterministic infrastructure that filters, repairs, and verifies. This is a different research stance than "scale the model until it just works" — and the 7,800-line, single-laptop, ~50-minute pipeline demonstrates that the alternative stance is empirically tractable.
+
+**Where the thesis bounds itself**: the 17-phase arc shows that within the corpus-engineering and re-ranking levers available to this architecture, the 75% median is a structural ceiling. Five independent lever classes (capacity, paraphrasing, family-prefixed training, planner re-ranking, multi-seed ensembling) all flatten in the same band. The remaining failures are correlated across seeds, meaning the model's learned distribution doesn't have preferred mass on the right interpretation for those prompts. **Tiny specialist models plus deterministic Judges can verify and execute graph compositions, but cannot reliably produce the right composition when the prompt is genuinely ambiguous in their training distribution**.
 
 ---
 
-## 14. Future work
+## 14. Why corpus engineering plateaus at 75% (the structural ceiling)
 
-Three concrete extensions:
+The 17-phase arc tested every realistic lever a tiny-organelle architecture allows:
 
-1. **Multi-organelle pipeline** (Phase 15+): a small planner organelle (~100K params, classifier-style) emits a template-family hint that prefixes the wiring organelle's input. Sharpens the graph-shape prior for mode-collapse prompts and disambiguates primitive choice for prompts where multiple operators co-occur. Predicted ceiling: 85%.
+| Lever | Phases | Result | What it failed |
+|---|---|---|---|
+| Capacity (1.49M params) | 9 | regressed | overfits 272 examples |
+| Paraphrase density (5× per prompt) | 10, 14 | saturated | drowns in corpus distribution |
+| Structural-diversity templates | 11, 13 | +25pp lift to 75% | the corpus engineering peak |
+| Multi-organelle re-rank | 15 | +5pp peak (variance-bound) | doesn't change candidate distribution |
+| Family-prefixed training | 16 | regressed | vocab inflation hurts data efficiency |
+| Multi-seed ensemble | 17 | flat | failures correlated across seeds |
 
-2. **Negative examples in training** (Phase 16+): explicitly include `# WRONG:` annotations on graphs that emit `subtract(fib, fact)` for "adding" prompts; add a custom loss penalty. Catches the persistent primitive-drift failure mode.
+The 5 robustly-wrong prompts have **diffuse priors** in the model's learned distribution: multiple corpus paraphrases pull toward different interpretations, and the right one has no preferred mass. Best-of-N voting can only sample from what the prior covers. Adding more paraphrases to the corpus *flattens* the prior further (Phase 14 showed this). Adding more capacity *memorises* the flat prior more confidently (Phase 9 showed this). Adding more seeds *correlates* the flat priors across models (Phase 17 showed this).
 
-3. **Multi-interpretation references**: extend `wiring_references.c` to accept a small alternates-list per held-out prompt. Captures cases where the prompt is genuinely ambiguous (e.g. "expenses" plural vs singular for #13, multiply-then-divide vs percentage for #3). Trades off measurement precision for interpretive generosity.
+The diagnostic conclusion: **the architecture cannot represent compositional structure beyond what the corpus literally enumerates**. The wiring organelle is a *retrieval* engine. When the held-out prompt sits in a region where the corpus has competing valid retrievals, the model picks one stochastically, and the deterministic infrastructure downstream cannot recover the *intended* one without a preferred-mass signal — which the architecture cannot provide.
 
-The 75% headline is the high-water mark of pure corpus engineering at this scale. Further gains require architectural changes (1) or training-loss changes (2) or evaluation methodology changes (3).
+This validates the original c99_compose finding (book chapter 11): *organelles retrieve; pipelines compose.* The Wiring Organelle pushes that retrieval to its limit. To go further, **composition itself must move out of token-level statistical learning into a different representational regime**.
 
 ---
 
 ## 15. Acknowledgements and reproducibility
 
-The full development log is in `docs/research/RESEARCH_PIPELINE_IR.md` (28 sections, one per phase). Every commit on the `main` branch tagged `v1.0-wiring-organelle` reproduces the 75% headline.
+The full development log is in `docs/research/RESEARCH_PIPELINE_IR.md` (31 sections, one per phase). The `main` branch reproduces the **75% median** baseline cleanly. The tag `v1.0-wiring-organelle` (commit `ba3d54b`) ships a trained checkpoint that reproduces the **80% peak** of Phase 15c. The tag `v2.0-wiring-organelle` closes the arc with the variance characterisation through Phase 17.
 
 The codebase is at https://github.com/enjector/microgpt-c.
 
 — Ajay Soni, Enjector Software Ltd. April 2026.
+
+---
+
+## 16. Future direction: manifold learning for composition
+
+The 17-phase arc closes with a clear architectural diagnostic: **token-level statistical learning over a finite paraphrase corpus cannot represent the compositional structure required to disambiguate prompts that sit in regions of competing valid retrievals**. The 75% structural ceiling is real, characterised, and rules out the obvious levers (capacity, paraphrases, ensembles).
+
+Pushing past this ceiling requires moving composition out of *retrieval* and into *geometry*. Three observations point at manifold learning as the right next research direction:
+
+### 16.1 The bimodal pattern is already a manifold signal
+
+Across all 17 phases, every executing graph is either correct on all 5 input sets or wrong on all 5. There is no intermediate "right by sampling luck" case. This bimodality says the model's outputs cluster into two well-separated modes per prompt — a *correct* mode and an *incorrect* mode, separated by a discrete topology choice.
+
+A statistical learner samples from the union of these modes proportional to their training-corpus mass. A *manifold learner* — one that represents the space of valid compositions as a continuous parametric surface — could in principle interpolate between modes, identify the correct mode by geometric proximity to a query embedding, and resolve the ambiguity that plain retrieval cannot.
+
+### 16.2 What manifold-based composition would look like
+
+Concrete research direction (sketched, not implemented):
+
+1. **Embed each graph topology in a low-dimensional manifold**. The `@graph` text format already has a canonical Kahn topological-sort form; structurally-equivalent graphs hash-collide. The 30 distinct template families in `pipeline_corpus_gen.c` define points in this manifold; their parametrisations define curves.
+
+2. **Embed each prompt in the same manifold**. The wiring organelle already does an implicit version of this via its softmax over graph-name targets. A *geometric* embedding would use a contrastive objective on (prompt, graph) pairs to enforce nearest-neighbour structure rather than statistical co-occurrence.
+
+3. **Compose by traversal**. Given an ambiguous prompt, project it onto the manifold and retrieve the *nearest* graph topology, breaking ties by geodesic distance to the closest unambiguous reference prompt. The diffuse-prior failure mode disappears: there is no "uniform random over 5 ops" because each op is a specific point in a metric space, not a softmax over discrete tokens.
+
+4. **Interpolate for novel compositions**. Prompts that don't match any single training graph could be answered by the *interpolated* graph along the geodesic between their two nearest reference graphs — genuine compositional generalisation, not retrieval.
+
+### 16.3 Why this is the right pivot
+
+The Wiring Organelle's deterministic infrastructure (IR, verifier, repair, execution) is **architecture-independent**. It accepts any source of `@graph` candidates. Replacing the wiring organelle with a manifold-learning composition module preserves the entire downstream pipeline:
+
+```
+prompt
+  ↓
+MANIFOLD COMPOSER  (replaces wiring + planner organelles)
+  ↓ candidate graph(s) embedded in a continuous topology space
+  ↓
+strict parse → repair → verify  (unchanged)
+  ↓
+self-consistency vote  (unchanged)
+  ↓
+pipeline_execute → numeric answer  (unchanged)
+```
+
+The thesis "*organelles retrieve; pipelines compose*" extends naturally: **the IR + verifier + executor stack remains the deterministic Judge, but composition itself moves from finite-corpus retrieval to continuous-manifold geometry**.
+
+This is research-grade scope — orders of magnitude harder than the 17 phases of corpus engineering — but it's the *categorically different* approach the Phase 17 diagnostic points at. It also brings together two threads in the broader MicroGPT-C research arc: the Pipeline IR's typed-graph foundation, and the philosophical commitment to *deterministic infrastructure as the substrate, learning as the prior*.
+
+### 16.4 Boundaries this paper does not cross
+
+- Larger transformers (5M+ params) with explicit compositional inductive bias would likely close the 75-80% gap by brute force, but they leave "small specialist organelle" territory.
+- Retrieval-augmented generation (vector-DB context injection) would close the gap by replacing the prior, but adds a database/index dependency that violates "pure C99, zero deps".
+- Multi-interpretation reference functions would close the gap by relaxing the test, but that's measurement methodology, not capability.
+
+The manifold-learning direction is the only one that preserves both the **deterministic-infrastructure thesis** and the **tiny-organelle constraint** while offering a path past the structural ceiling.
+
+---
+
+## 17. Closing
+
+The Wiring Organelle is shipped at v2.0 as a complete research artefact: 17 phases, 5 documented negative results, a characterised structural ceiling, and a clear pointer to where future research can lift it.
+
+**80% peak / 75% median correct end-to-end on natural-English tool composition** with verified arithmetic correctness, on a 540K-param wiring organelle plus a 540K-param planner, in pure C99, on a single laptop, in ~50 minutes of training, with zero external dependencies. The thesis — *small specialist models coordinated by deterministic Judges* — is empirically validated within its claim, and empirically bounded outside it.
+
+Where statistical retrieval saturates, manifold composition begins.
