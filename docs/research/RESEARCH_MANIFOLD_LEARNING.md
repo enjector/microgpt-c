@@ -371,7 +371,72 @@ The deterministic-infrastructure thesis ("organelles retrieve; pipelines compose
 
 ---
 
-## 10. Recommendation
+## 10. Expert assessment and verdict
+
+This section is an independent expert review of the Wiring Organelle's structural ceiling and the manifold-learning pivot, written to scrutinise whether the proposal in §§1-9 is a scientifically sound evolution of the project rather than a speculative direction.
+
+### 10.1 Analysis of the current compositional problem
+
+The Wiring Organelle (a 540K-parameter word-level transformer) is, on the evidence of the 17-phase arc, **not a creative composer but a statistical retrieval engine** that has hit a structural ceiling of 75-80% accuracy. Three findings frame the diagnosis:
+
+- **The structural ceiling.** Five different lever classes — capacity scaling (Phase 9), corpus paraphrasing (Phases 10/14), structural-diversity templates (Phase 11), multi-organelle re-ranking (Phase 15), multi-seed ensembling (Phase 17) — all converge at the same ~75% median. This indicates the problem is **not a lack of data or parameters, but a fundamental limitation of the token-level retrieval architecture**.
+- **Diffuse priors.** When a prompt is ambiguous, the current model sees multiple "equally likely" paths in its training distribution. Because it uses a softmax over a finite vocabulary of graph names, it effectively *guesses uniformly* between competing valid interpretations. Phase 14's saturation analysis showed that adding more paraphrases of the right interpretation only flattens the distribution further — the wrong interpretations don't lose mass, they just stay equally available.
+- **Correlated failures (the most telling result).** Phase 17 confirmed that **failures are seed-invariant**: even with different random initialisations, the same prompts fail. The "right" answer has no preferred mass in the learned distribution, so no amount of seed-pooling, voting, or ensembling can prefer it. This is the conclusive evidence that the ceiling is architectural, not stochastic.
+
+### 10.2 Assessment of the manifold-learning solution
+
+The proposed manifold-learning composition replaces discrete token guessing with **geometric proximity**. Three reasons it should solve the problem:
+
+#### 10.2.1 Resolution of ambiguity via metric space
+
+In the current system, "adding" and "multiplying" are just different tokens in a softmax bucket — categorical, with no relationship to each other beyond their respective probabilities. In a manifold approach using the **Geodesic engine**, every operation is a *coordinate* on a continuous surface.
+
+> By representing the space of tool compositions as a Riemannian manifold, you transform the problem from *"what is the next most likely token?"* to *"which known graph anchor is physically closest to this prompt's location on the surface?"*. **Geodesic distance is single-valued** — for any two points on a manifold there is exactly one shortest-path length — so the "diffuse prior" problem is replaced by a clear nearest-neighbour winner.
+
+This single observation is why the bimodal-failure pattern from Phase 8 becomes a *feature* rather than a bug: the manifold is built around the assumption that valid compositions cluster discretely, and metric-space retrieval identifies the *intended* cluster by spatial proximity.
+
+#### 10.2.2 The three-engine stack as a "geometric Judge"
+
+The three EnX-cpp engines provide a mathematical substrate that mirrors the "deterministic infrastructure" philosophy of MicroGPT-C:
+
+- **EKAN (Surface)** parameterises the manifold using Fourier-basis or B-spline functions, allowing for smooth, differentiable representations of how prompts bend toward specific graph types. The entanglement matrix mixes per-edge spline contributions into a higher-dimensional surface — a *learned* parametric topology rather than a fixed embedding lookup.
+- **Geodesic (Distance)** measures the true shortest path on the EKAN-learned curved surface, ensuring that "semantic similarity" is calculated based on the actual geometry of valid compositions, not Euclidean distance in a flat embedding space. Curvature carries information.
+- **VR (Topology)** acts as a high-level validator by detecting the *shape* of the candidate clusters via persistent Betti numbers — for example, ensuring β₁=0 (no loops) for a Directed Acyclic Graph, or β₁≥1 for a metabolic pathway with feedback. **VR is to the manifold what `pipeline_verify()` is to the IR**: a deterministic structural check on the geometric output.
+
+Together, the three engines form a **geometric Judge** — a multi-stage deterministic filter that catches errors not at the token level (where the Wiring Organelle is blind to ambiguity) but at the geometric and topological levels (where the right answer has a single coordinate, and the surface's shape is verifiable).
+
+#### 10.2.3 Overcoming data scarcity through bootstrapping
+
+A major risk in this project is the small size of the Wiring corpus (408 examples). Manifold learners are typically data-hungry — geometric structure needs many examples to be inferred from sparse points.
+
+The proposal to **bootstrap from Chemistry or Biology** addresses this directly with structural priors. Molecular structures and metabolic pathways provide massive, existing datasets (ChEMBL: ~2M molecules; KEGG/Reactome: ~10k pathways) that follow strict compositional rules — atoms and enzymes are primitives, bonds and reactions are edges, scaffolds and pathways are template families. The manifold learns the **geometry of composition** from millions of natural examples *before* it ever sees a Wiring-Organelle prompt.
+
+This is the move that turns a hard-but-tractable problem (learning geometry from 408 examples) into a tractable one (fine-tuning a pre-learned geometry on 408 examples). It also offers a side benefit: VR's topology validator gets pre-calibrated against known molecular features (aromatic rings → β₁=1, fused bicyclic systems → β₁=2), so its expected-feature thresholds are grounded in real data before being applied to Pipeline IR graphs.
+
+### 10.3 Critical risks
+
+While the approach is theoretically superior, it introduces new challenges that must be designed against, not assumed away:
+
+- **Projection errors.** The project's failure mode shifts from *"token accuracy"* to *"embedding accuracy"*. If the embedder projects a query to the wrong neighbourhood on the manifold, the system fails just as completely as the Wiring Organelle does today — only the failure is now in a different layer. Phase 1's headline test will measure how well the embedder generalises from 408 prompts; if it doesn't, the chemistry bootstrap (§8) becomes mandatory rather than optional.
+- **Complexity and dependency thesis.** Integrating C++17 engines (`ekan`, `geodesic`, `vr`) into a strict C99 codebase requires a vendor strategy (`vendor/enx/`) and breaks the *strict* "zero-dependency, pure C99" claim. The manifold module becomes C++17; the rest of MicroGPT-C stays C99. This is a defensible architectural split — the IR + verifier + repair + executor stack remains pure C99 — but the project's marketing language about "pure C99, libc + libm only" needs qualification.
+- **Anchor-count scaling.** ~150 anchors are tractable for direct nearest-neighbour search via Geodesic. Real tool libraries (e.g. all 192 primitives in `w_vm_functions.txt` × multiple compositions each) push toward 1000-10000 anchors. Geodesic's O(D⁵) Christoffel cost rules out high-dim, but a 12D-indexed structure (k-d tree or FAISS-like) handles 100k+ points in <1ms. We'd need to add an index layer between EKAN's surface and Geodesic's batch evaluation.
+- **Failure-mode characterisation deficit.** The Wiring Organelle's bimodal-failure pattern is a clean diagnostic. The manifold-composition pipeline's failure modes are *unknown* until Phase 1 ships and gets measured. Phase 2 of the research would need to characterise these failures with the same rigour the 17-phase arc applied to the Wiring Organelle.
+
+### 10.4 Verdict
+
+The manifold-learning approach is the only path identified in this research that offers a **categorical leap** beyond the 75-80% ceiling. Capacity scaling, corpus paraphrasing, multi-organelle re-ranking, and multi-seed ensembling all flatten in the same band because they're all variants of the same architecture — token-level retrieval over a finite paraphrase corpus. Manifold composition is a *different* architecture, addressing the diagnostic ("the right interpretation has no preferred mass in the learned distribution") at its root by giving each interpretation a *coordinate* rather than a softmax probability.
+
+Critically, it aligns with the project's "small organelles + deterministic Judges" philosophy: the IR + verifier + repair + executor stack is preserved unchanged, and the new front-end (EKAN parametric surface + Geodesic distance + VR topology validator) replaces the noisy statistical prior with a mathematically verifiable geometric one. The Judge, in spirit, is now layered: the IR verifier guards the graph; VR guards the manifold's shape; Geodesic guards the candidate's distance.
+
+If implemented with the suggested chemistry bootstrap, the proposal has a **high probability of reaching the ~90% accuracy range** on the existing held-out NL prompts — closing 4 of the 5 persistent Wiring failures (#1, #2, #6, #17) by replacing diffuse-prior softmax sampling with single-valued geodesic retrieval, and leaving only the genuine reference-mismatch case (#3) as a measurement-methodology question.
+
+Without the chemistry bootstrap, the same proposal could plausibly reach **80-85%** — a meaningful but bounded improvement that also tests whether the bottleneck was retrieval-vs-geometry alone, or retrieval-vs-geometry combined with corpus-data scarcity. Either result is publishable: the former validates the manifold thesis, the latter sharpens the data-regime claim.
+
+**Recommendation**: proceed with the Phase 1 prototype as scoped in §11 below, treating chemistry bootstrap as a Phase 2 escalation conditional on Phase 1's headline lift. The architectural pivot is sound; the implementation cost (2-3 weeks single-developer) is bounded; and even a null result has scientific value.
+
+---
+
+## 11. Recommendation
 
 **Build a Phase-1 prototype** (without chemistry bootstrap, single-developer, 2-3 weeks):
 
@@ -391,14 +456,14 @@ This document is a feasibility sketch. Implementation, if pursued, is a separate
 
 ---
 
-## 11. References within this repository
+## 12. References within this repository
 
 - `docs/research/RESEARCH_WIRING_ORGANELLE_PAPER.md` — the standalone paper for the v2.0 Wiring Organelle, including the §16 manifold-learning forward pointer that this document expands.
 - `docs/research/RESEARCH_PIPELINE_IR.md` — the 31-section development log with all 17 phases, 5 documented negative results, and the variance characterisation that diagnoses the structural ceiling.
 - `src/microgpt_pipeline.{h,c}` — the IR + verifier + repair + executor stack that manifold composition would reuse unchanged.
 - `tools/pipeline_corpus_gen.c` — the corpus generator producing the 408-example training set; would extend to also emit `(prompt, anchor_id)` triples.
 
-## 12. References to EnX-cpp
+## 13. References to EnX-cpp
 
 - `engines/ekan/include/enx/ekan/ekan_engine.hpp` — Entangled KAN engine, lines 1142-1210 for main API surface.
 - `engines/geodesic/include/enx/geodesic/geodesic_engine.hpp` — Riemannian solver, lines 434-640 for `GeodesicSolver`.
