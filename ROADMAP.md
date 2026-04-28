@@ -170,8 +170,10 @@ The Wiring Organelle 17-phase arc characterises a structural ceiling at 75% medi
 - [x] Lift EKAN B-spline + EKAN-Network + Geodesic engines (`src/microgpt_ekan*.h`, `src/microgpt_geodesic.{h,c}`); 39/39 tests pass.
 - [x] Geodesic family classifier (`wiring_geo_classifier.{h,c}` + `manifold_classifier_demo`) — handcoded keyword bag + 12D anchor distance, recovers 5/6 wiring-failing prompts at the classification level.
 - [x] Anchor-retrieval generation (Phase 2): 20-entry canonical @graph table (`wiring_anchor_graphs.{h,c}`) indexed by Geodesic top-1; injected as 17th candidate alongside 16 wiring votes; planner+geodesic agreement-gating triggers +60 score boost. **80% deterministic headline.**
-- [ ] Replace handcoded keyword bag with a learned EKAN encoder trained on (prompt, family) pairs — addresses the 3-prompt slot-collision regression that prevents the Phase 2 headline from reaching 90%+.
-- [ ] Compositional generalisation: interpolate between anchors along Geodesics to answer prompts that don't exactly match any single training graph (genuine compositional out-of-distribution).
+- [x] **Phase 3a — TF-IDF learned encoder** (negative result; falsified per pre-registered §40 prediction). At the 408-example corpus scale, no learned encoder beats the handcoded keyword bag. EKAN-Network classifier follow-up cancelled per §40.7 skip condition. Adversarial axis-2 stress: TF-IDF 4/20 (vs pre-registered 12-16/20). The handcoded keyword bag is the right component for this regime; corpus expansion (Phase 4) is the right corrective if scaling beyond 408.
+- [ ] **Phase 3b — fragment composition** (in flight; see `RESEARCH_PIPELINE_IR.md` §42). Decompose existing 20 anchors into reusable fragments + composition retrieval. Pre-registered target: 5-7/10 on multi-stage composition prompts (current architecture: 0/10). Independent of corpus size.
+- [ ] **Phase 4 — corpus expansion** (5k–50k (prompt, family) pairs via synonym substitution, back-translation, LLM paraphrases). Only worth running if a learned encoder is desired AND 3b shows the architecture handles composition.
+- [ ] Compositional generalisation beyond 2-anchor chaining: interpolate between anchors along Geodesics for genuine compositional out-of-distribution.
 - See `docs/research/RESEARCH_PIPELINE_IR.md` §32–§35 for the full per-phase audit, `docs/research/RESEARCH_MANIFOLD_LEARNING.md` for the architectural map, and `docs/research/RESEARCH_WIRING_ORGANELLE_PAPER.md` §18 for the empirical break.
 
 ---

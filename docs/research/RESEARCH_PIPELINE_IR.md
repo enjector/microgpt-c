@@ -3361,6 +3361,74 @@ Phase 3a-lite's outcome is itself a useful empirical finding: *the handcoded key
 
 ---
 
+## 42. Phase 3b — Fragment composition: pre-registration (axis 3 multi-stage chains)
+
+This section is committed **before** the Phase 3b experiment runs. The §40.3 predictions are reproduced here in focused form so the §43 post-eval can compare directly.
+
+### 42.1 Mechanism
+
+The 20 existing anchors in `wiring_anchor_graphs.c` each describe a *complete* graph for a single family. Phase 3b decomposes a subset of them into **reusable fragments** (typed sub-DAGs) and adds a **composition operator** that retrieves K=2-3 fragments from a prompt and chains them by output→input linkage.
+
+Fragments identified from the existing 20 anchors:
+
+| Fragment | Pattern | Source anchors |
+|---|---|---|
+| `clamp_step` | `(x, lo, hi) → clamp(x, lo, hi)` | bmi_clamped, clamped_sigmoid, clamped_average, sigmoid_clamped |
+| `tax_step` | `(amount, rate) → tax_amount(amount, rate)` | invoice_total, gross_minus_tax, discounted_tax |
+| `discount_step` | `(price, rate) → discount(price, rate)` | discounted_tax |
+| `markup_step` | `(price, rate) → markup(price, rate)` | (native primitive, not in any current anchor) |
+| `compound_step` | `(P, r, n) → compound(P, r, n)` | compound_interest, compound_minus_p |
+| `subtract_principal` | `(amount, P) → subtract(amount, P)` | compound_interest, compound_minus_p |
+| `percentage_step` | `(part, whole) → percentage(part, whole)` | savings_rate, weighted_three |
+| `multiply_step` | `(a, b) → multiply(a, b)` | gcd_scaled, scaled_relu, fib_fact_mul |
+
+Composition operator: from a prompt, predict K=2 fragment IDs via geodesic top-K over a fragment-level keyword bag (independent from the anchor-level bag), then chain by typed linkage — fragment A's `out` becomes fragment B's first `<input>`. The composed graph is parsed/verified/repaired/executed through the same pipeline as anchor candidates.
+
+### 42.2 Test set
+
+10 held-out multi-stage composition prompts in `pipeline_corpus_composition.txt` (to be created). Each requires chaining 2 fragments, none directly matches a single existing anchor. Examples:
+
+1. "discount the tax on a price after markup of x" — markup → discount → tax (3 fragments)
+2. "compound balance bounded between lo and hi" — compound_step → clamp_step
+3. "average of a and b then taxed at rate" — average_two → tax_step
+4. "absolute difference between two readings then scaled" — abs_diff fragment → multiply_step
+5. "gcd of a and b bounded inside lo hi" — gcd → clamp_step
+6. "rectified output of x then bounded inside lo hi" — relu → clamp_step
+7. "sigmoid of x scaled by gain factor" — sigmoid → multiply_step
+8. "compound interest as a percentage of principal" — compound_step → subtract_principal → percentage(_, P)
+9. "tax due on the price after discount and markup" — markup → discount → tax
+10. "fibonacci of n times factorial of n then bounded" — fib_fact_mul → clamp_step
+
+Each prompt has a `# REFERENCE: <fn_name>` annotation pointing to a corresponding C reference function in `wiring_references.c`, computing the canonical numeric answer from the demo's 5 standard input distributions.
+
+### 42.3 Pre-registered predictions (locked, copying §40.3)
+
+| Test | Pre-registered target | Outcome interpretation |
+|---|---|---|
+| 10 multi-stage composition prompts | **5-7 of 10** | Architecture genuinely composes; ship as production composition path |
+| Same, lower outcome | **1-4 of 10** | Fragment retrieval picks fragments but composition operator (linkage, primitive selection) too brittle. Iterate |
+| Same, zero outcome | **0 of 10** | Fragment embeddings don't form a useful similarity space at this scale. Try fragment-classification-via-handcoded-bag (no learned encoder) before retrieval |
+| No-regression on Phase 2c clean (40 prompts, anchor on, --clean-only) | **≥18/20** | Composition path doesn't interfere with single-anchor path |
+| Same, lower | **<18** | Confidence gate misfires — single anchor should be preferred when high-confidence; fix gate, re-eval |
+
+### 42.4 Baseline check (current architecture on the composition test set)
+
+Pre-registered prediction: **0/10**. The current architecture has no composition path — geodesic top-1 returns one family, anchor injection retrieves one anchor, no chaining. The 10 composition prompts must fail in the current system to be a meaningful test for Phase 3b.
+
+The baseline check will be the first thing the Phase 3b implementation runs. If by some accident the current system gets >0/10 (e.g. one of the 10 prompts happens to be classifiable to a single anchor that semi-handles the composition), that prompt is removed from the test set and replaced.
+
+### 42.5 What Phase 3b cannot do (committed in advance)
+
+- **No new families.** Fragment composition is restricted to the primitives already in the 20 existing anchors and the native primitive registry. Prompts requiring genuinely novel primitives (e.g. matrix inverse, sort) are out of scope.
+- **No corpus expansion.** Phase 3b uses the existing 408 wiring training examples for keyword discovery in the fragment-level bag; no new training pairs. (This is what makes 3b independent of the 408-example bottleneck that killed 3a.)
+- **No EKAN training.** Fragment retrieval uses the same handcoded keyword-bag pattern as the existing anchor-level classifier, just at fragment granularity.
+
+### 42.6 Disciplined commitment
+
+This §42 is committed **before** the Phase 3b implementation lands. If predictions are wrong (e.g. 0/10 with the 3b implementation), §43 will document the gap honestly and §42 stays untouched. No retroactive editing.
+
+---
+
 ## 16. Closing Remark
 
 ---

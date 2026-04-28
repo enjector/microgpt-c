@@ -378,6 +378,8 @@ The Phase 2d audit report (`RESEARCH_PIPELINE_IR.md` §38) ran four eval modes v
 
 **For practical "where it works / doesn't work" examples**, see `RESEARCH_PIPELINE_IR.md` §39 — a per-prompt walkthrough of the 7 wiring-only successes and the 13 failures the anchor mechanism rescues, plus the four-axis architectural boundary (novel families, weak keyword overlap, multi-stage compositions, domain-vocabulary drift).
 
+**Phase 3 pre-registered predictions (§40)** and **Phase 3a falsification (§41)**: a TF-IDF centroid classifier — the simplest learned encoder — scored 4/20 on the pre-registered adversarial axis-2 target of 12-16/20, and ~8/20 on the no-regression target of ≥18/20. Per the pre-registered §40.7 skip condition, Phase 3a-full (EKAN-Network classifier) and Phase 3c (RAG fallback) are cancelled. The handcoded keyword bag is the right encoder for the 408-example regime, full stop. Phase 3b (fragment composition, §42) survives the falsification because it doesn't depend on corpus size; Phase 4 (corpus expansion to 5k–50k examples) is the right corrective if scaling beyond 408 is desired. The discipline-of-pre-registration result: §40 was committed *before* results, dictating the response unambiguously when 3a missed.
+
 The codebase is at https://github.com/enjector/microgpt-c.
 
 — Ajay Soni, Enjector Software Ltd. April 2026.
