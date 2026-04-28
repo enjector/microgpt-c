@@ -1,0 +1,52 @@
+================================================================
+  MicroGPT-C — Manifold Classifier Diagnostic (Phase 1b)
+================================================================
+
+Loaded 20 held-out prompts from pipeline_corpus_held_out.txt
+Anchor table: 20 families, 12-D Geodesic flat metric
+
+#   REFERENCE              PREDICTED              MATCH   PROMPT (truncated)
+--------------------------------------------------------------------------------------------------------------------
+1   bmi_clamped            bmi_clamped            EXACT   compute the body mass index from weight and height and li...
+2   compound_interest      compound_interest      EXACT   interest gained on an investment when principal compounds...
+3   weighted_three         weighted_three         EXACT   weighted combination of three measurements each scaled by...
+4   clamped_sigmoid        clamped_sigmoid        EXACT   limit the output of a sigmoid neuron to a low high range
+5   gcd_scaled             gcd_scaled             EXACT   greatest common divisor of two numbers scaled by a coeffi...
+6   apply_tax              apply_tax              EXACT   take home pay from gross income at federal tax rate
+7   fib_fact_mul           fib_fact_mul           EXACT   fibonacci of n multiplied by factorial of n
+8   invoice_total          apply_tax              no      invoice total of price times quantity plus tax due at rate
+9   clamped_average        distance_midpoint      SLOT    average of a and b bounded between minimum and maximum
+10  abs_diff               abs_diff               EXACT   magnitude of difference between two forecasts
+11  scaled_relu            clamped_sigmoid        SLOT    rectified output of x scaled by a gain factor
+12  discounted_tax         apply_tax              SLOT    tax due on a price after a discount has been applied
+13  savings_rate           apply_tax              SLOT    fraction of income saved after subtracting expenses
+14  distance_metrics       pv_of_fv               SLOT    total of distances across two coordinate axes squared
+15  distance_midpoint      clamped_average        SLOT    distance between two readings combined with their midpoint
+16  pv_of_fv               pv_of_fv               EXACT   future cashflow discounted back to its present worth
+17  fib_fact_add           fib_fact_add           EXACT   fibonacci of n combined with factorial of n by adding
+18  gross_minus_tax        apply_tax              SLOT    gross income reduced by tax liability
+19  compound_minus_p       compound_interest      SLOT    final balance after compound growth minus the original pr...
+20  sigmoid_clamped        sigmoid_clamped        EXACT   sigmoid of x normalised by clamping into a bounded range
+
+================================================================
+  HEADLINE
+================================================================
+Total held-out prompts: 20
+References in anchor table: 20
+Top-1 EXACT family match:   11/20 (55%)
+
+Wiring-system-failing prompts (per Phase 1a audit):
+  [1] ref=bmi_clamped             pred=bmi_clamped             CORRECTLY classified
+  [2] ref=compound_interest       pred=compound_interest       CORRECTLY classified
+  [3] ref=weighted_three          pred=weighted_three          CORRECTLY classified
+  [6] ref=apply_tax               pred=apply_tax               CORRECTLY classified
+  [9] ref=clamped_average         pred=distance_midpoint       miss
+  [17] ref=fib_fact_add            pred=fib_fact_add            CORRECTLY classified
+
+Geodesic correctly classified 5/6 wiring-failing prompts.
+
+Interpretation:
+  POSITIVE: manifold-based classification recovers most/all prompts
+  the wiring system fails on. The bottleneck IS generation, not
+  classification. Anchor-conditional generation is the right next step.
+

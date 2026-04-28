@@ -1759,6 +1759,21 @@ add_demo(
 )
 
 # ==================================================================
+#  Manifold Classifier Diagnostic — Phase 1b
+#  Standalone demo testing whether geodesic-based family classification
+#  can predict the right family for the prompts where the wiring
+#  system unanimously fails. Confirms whether the bottleneck is
+#  generation (manifold thesis valid) or classification (manifold
+#  thesis weak).
+# ==================================================================
+
+add_demo(
+  NAME   manifold_classifier_demo
+  SOURCE demos/manifold_classifier/main.c
+  COPY   demos/wiring_organelle/pipeline_corpus_held_out.txt
+)
+
+# ==================================================================
 #  Tests
 # ==================================================================
 

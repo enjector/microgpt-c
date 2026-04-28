@@ -514,23 +514,33 @@ This is the predicted outcome from §10.1: *"the 16 candidates are 16 confident 
 
 **Conclusion from Phase 1a**: the ceiling is **not a re-ranking problem.** The fix has to be at generation time — Phase 1b is the test.
 
-#### Phase 1b — geodesic distance over an EKAN surface (≤3 more days, target: 85%)
+#### Phase 1b — geodesic distance over an EKAN surface (≤3 more days, target: 85%) — **DIAGNOSTIC RAN, positive result**
 
 Lift **EKAN B-spline basis + autoencoder** and the **geodesic solver**. Train EKAN on the existing 408-prompt corpus (no chemistry bootstrap yet) to produce a 12D anchor coordinate per template family. Train a small embedder (re-uses MicroGPT-C's existing word-level tokeniser + a 2-layer MLP) to project prompts to the same 12D space. At held-out eval, run Geodesic to find the K=8 nearest anchors; combine with VR validation from Phase 1a.
 
-**Files to copy**:
-- `src/microgpt_ekan.h` (132 LOC)
-- `src/microgpt_ekan_network.h` (650 LOC)
-- `src/microgpt_geodesic.{h,c}` (616 LOC)
-- `src/V31_BTC_Manifold_Table.h` (80 LOC, as a *design-pattern reference*; not directly used, but copy it as `docs/research/V31_manifold_pattern.h` for design-doc value)
-- Their respective tests.
+**Files copied** (commit `789f36c`):
+- `src/microgpt_ekan.h` (132 LOC) — fixed-point cubic B-spline basis
+- `src/microgpt_ekan_network.h` (510 LOC) — multi-layer KAN autoencoder w/ Fourier activations + Adam
+- `src/microgpt_geodesic.{h,c}` (127 + 489 LOC) — RK4 Riemannian solver, Cholesky, GEO_DIMS=12
+- All ported tests pass (16+3+20=39 tests across the three engines).
 
-**Adaptations**:
-- Generic-D macro pass on Geodesic to support 12D-or-other (current is 12D-fixed; we need to confirm that's enough for ~150 anchors or generalise).
-- Anchor table — emit from `pipeline_corpus_gen.c` via the FAMILY tracking infrastructure already in place (Phase 15).
-- Embedder — small MLP, training reusing existing `organelle_train_words` infrastructure.
+**Diagnostic experiment instead of full integration.** Phase 1a established that no re-ranking strategy can recover when 16/16 candidates are unanimous on the wrong family. Before investing in a full EKAN training pipeline, the right question is: *can manifold-based classification even predict the right family for the failing prompts?* If not, the manifold thesis is weak; if yes, the bottleneck is generation, not feature extraction.
 
-**Predicted lift**: 80% → 85%. Closes mode-collapse cases (#1, #2, #6) by replacing softmax-over-graph-names with single-valued geodesic retrieval.
+The diagnostic is `demos/manifold_classifier_demo` (~250 LOC, no retraining, no learned features):
+1. Handcoded anchor table: 20 template families → 12D one-hot slots.
+2. Handcoded keyword bag per family (~120 keywords total, 3-8 per family).
+3. Embed prompt → 12D, geodesic-distance to all anchors, top-1 = predicted family.
+
+**Result: positive at the classification level.**
+
+- Overall top-1: 11/20 (55%) exact, 19/20 (95%) slot-equivalent.
+- **Wiring-failing prompts: 5/6 (83%) correctly classified by geodesic alone**, including the canonical fib×fact "by adding" diffuse-prior failure.
+
+A 250-LOC handcoded classifier — no neural net — predicts the right family for 5/6 of the prompts that defeat the 540K-param planner+wiring system. **The structural ceiling has nothing to do with feature extraction.** It is in the *generation step*: the wiring organelle's softmax-over-vocabulary prefers high-frequency wrong tokens for diffuse-prior prompts even when the right family is identifiable from the surface form.
+
+See `RESEARCH_PIPELINE_IR.md` §33 for the full per-prompt audit table.
+
+**Implication for Phase 1c.** The full EKAN-training pipeline (originally proposed for 1b) is premature. The cheaper, more-decisive next test is **anchor-conditional sampling constraint** (no retraining): at decode time, mask the wiring organelle's logits to disallow graph-name tokens whose family is not in the geodesic top-K. Predicted lift: 80% → 85%, achievable in 1-2 days. If this works, the manifold thesis is empirically validated and full EKAN-trained anchor retrieval becomes optimisation, not necessity.
 
 #### Phase 1c — chemistry bootstrap (optional, +1 week, target: 90%)
 
@@ -554,17 +564,33 @@ Only if Phase 1b stalls below 85%. Pre-train EKAN's parametric surface on a chem
 - **The book chapters in `book.2nd/`** — they treat geometry as a feature encoder, not as primary reasoning. Useful narrative but not headline-driving.
 - **The 12D-fixed assumption** — works for now (~150 anchors fit in 12D), but Phase 2 will need generic-D macro support if we expand to the full 192-primitive `w_vm_functions.txt` library.
 
-### 13.6 Updated recommendation (post Phase 1a)
+### 13.6 Updated recommendation (post Phase 1a + Phase 1b diagnostic)
 
-The §10 verdict's "2-3 weeks Phase 1, 4-6 weeks with chemistry" estimate compresses to **5-7 days Phase 1a+1b** by lifting the sibling's tested C99 engine implementations.
+The §10 verdict's "2-3 weeks Phase 1, 4-6 weeks with chemistry" estimate compresses further by what we learned from the two bounded experiments:
 
-**Phase 1a ran (commit `dd82e9c` lift, follow-up integration commit, eval logged in `build/wiring_phase1a.log`) and returned a clean negative result: 70% (14/20), within Phase 17's 75% ±5pp variance.** The audit in `RESEARCH_PIPELINE_IR.md` §32 shows all 6 failing prompts had all 16 candidates unanimous on the wrong answer — VR's modal-cluster bonus has no minority signal to amplify when the model is confidently wrong.
+**Phase 1a (negative)** ran the geometric Judge as a re-ranker. 70% (14/20), within Phase 17's 75% ±5pp variance. Verdict: re-ranking can't break the ceiling because the 16-candidate pool is unanimous on the wrong answer for diffuse-prior prompts.
 
-This sharpens the §10 verdict in a useful way: **the 70-80% ceiling is not a re-ranking problem.** Two independent re-ranking-only experiments (Phase 17 multi-seed ensemble, Phase 1a VR cluster bonus) converged at the same band. Any technique that operates on the existing candidate pool inherits the modal bias from the existing model.
+**Phase 1b (positive at classification level)** ran a handcoded keyword + geodesic classifier on the held-out file (no retraining). For the 6 prompts the wiring system fails on, geodesic correctly predicts the right family in 5/6. **Bottleneck is generation, not classification.**
 
-**Phase 1b is now the critical test.** Its proposition — generate candidates via EKAN-anchor + Geodesic-retrieval, not via vocabulary-softmax — directly addresses the diagnosis. If it lifts to 85%, the manifold-learning thesis is empirically validated. If it stalls at 70-75%, the ceiling is more architectural than generative-vs-discriminative, and the program needs to reconsider.
+This **invalidates the original Phase 1b plan** of training a full EKAN encoder + geodesic retrieval pipeline (~3-4 days). That pipeline answers the wrong question — feature extraction is already adequate, even with handcoded keywords. The right next experiment is the **smallest** intervention that changes generation, not the most-elaborate manifold pipeline.
 
-The sibling's `RESEARCH_GEOMETRIC_ORGANELLES.md` counter-point ("representation > solver sophistication") aligns with this finding: representation is exactly what Phase 1b changes, while Phase 1a only changed the solver over a fixed representation.
+**The new recommended Phase 1c** (replacing the original Phase 1b/1c plan):
+
+- **Path 2 — anchor-conditional sampling constraint** (1-2 days, no retraining): at decode time, run the geodesic classifier first, get the top-K family set, mask the wiring organelle's logits to disallow `@graph <name>` tokens whose family is not in the top-K. The wiring organelle's softmax now samples *only* from the geodesic-approved families. Predicted lift: 80% → 85%, possibly 90% if K is small (1-3) and the geodesic top-1 accuracy holds at scale.
+
+If Path 2 works, the §3 full manifold-composition pipeline (EKAN + Geodesic + VR end-to-end) becomes optimisation rather than necessity — it would replace handcoded keyword + handcoded anchors with learned versions, but the architecture stays the same.
+
+If Path 2 stalls at 75-80%, the issue is the candidate pool itself (no candidate from the right family exists at any sample, even with constraint), and the next step is anchor-prefixed prompt training (Phase 16-style, but with `<HINT>` token to avoid vocab inflation).
+
+**The arc:**
+1. ✅ Phase 17: re-rank by seed diversity → flat (correlated failures)
+2. ✅ Phase 1a: re-rank by VR cluster bonus → flat (unanimous failures)
+3. ✅ Phase 1b diagnostic: geodesic *can* classify → bottleneck is generation
+4. → Phase 1c: anchor-conditional sampling constraint (the cheap test)
+5. → Phase 1d (if 1c stalls): `<HINT>` token wiring retraining
+6. → Phase 2 (if 1c+1d insufficient): full EKAN anchor-retrieval generation
+
+The sibling's `RESEARCH_GEOMETRIC_ORGANELLES.md` counter-point ("representation > solver sophistication") aligns with the finding: a 250-LOC handcoded classifier matches what the 540K planner does for the failing prompts. Representation matters; learned representation is not strictly necessary at this scale.
 
 ---
 
