@@ -520,18 +520,27 @@ See `RESEARCH_PIPELINE_IR.md` §32–§35 for the full per-prompt audit of each 
 
 ## 19. Closing
 
-The Wiring Organelle is shipped at v3.4 as a complete research artefact: **17 corpus-and-re-ranking phases plus eight manifold-retrieval phases** (1a, 1b, 1c, 2, 2b, 2c, 2d, 3a, 3b), seven documented negative results, a characterised structural ceiling at the autoregressive-token layer, a deterministic break of that ceiling via anchor retrieval, a leakage audit (§38) that retracted the inflated wiring-layer headline, two pre-registered Phase 3 sub-experiments (3a falsified per skip condition, 3b shipped within the 5-7/10 target), and a clean four-axis architectural-boundary characterisation that locates the remaining open work as engineering, not research.
+The Wiring Organelle is shipped at v3.5 as a complete research artefact: **17 corpus-and-re-ranking phases plus nine manifold-retrieval phases** (1a, 1b, 1c, 2, 2b, 2c, 2d, 3a, 3b, 4), seven documented negative results, a characterised structural ceiling at the autoregressive-token layer, a deterministic break of that ceiling via anchor retrieval, a leakage audit (§38) that retracted the inflated wiring-layer headline, three pre-registered sub-experiments (3a falsified per skip condition, 3b shipped within the 5-7/10 target, 4 shipped exceeding the 8-12/20 target at 18/20), and a clean four-axis architectural-boundary characterisation in which Phase 4 soft-closed two more axes.
 
 **Headlines as of arc close, leakage-audited and pre-registered:**
 - 🎯 **100% (20/20)** on novel held-out paraphrases via single-anchor retrieval (the genuinely-clean claim)
 - **6/10** on novel multi-stage composition prompts via fragment composition (within pre-registered 5-7/10)
+- **🎯 18/20 (90%)** on adversarial-paraphrase axis-2 stress test via TF-IDF over the Phase 4 expanded corpus (vs pre-registered 8-12/20)
+- **20/20 no-regression** on Phase 2c clean paraphrases under the Phase 4 encoder
 - **35% (7/20)** wiring transformer alone on novel paraphrases (true generalisation; the previously-reported 75-80% wiring-layer figure was Phase 13 training-on-test contamination)
 
-The thesis — *small specialist models coordinated by deterministic Judges, with manifold retrieval where retrieval saturates, and fragment composition where retrieval doesn't reach* — is empirically validated within the regime tested.
+The thesis — *small specialist models coordinated by deterministic Judges, with manifold retrieval where retrieval saturates, fragment composition where retrieval doesn't reach, and a learned encoder where the curator's keyword bag runs short* — is empirically validated within the regime tested.
+
+**The four-axis architectural boundary, post-Phase 4:**
+- Axis 1 (novel families): open, anchor-table extension
+- Axis 2 (weak keyword overlap): **soft-closed** by Phase 4 within the curator's synonym range
+- Axis 3 (multi-stage compositions): closed by Phase 3b at 60%
+- Axis 4 (domain-vocabulary drift): **soft-closed** by Phase 4 within the curator's synonym range
 
 The remaining frontier is **engineering scope and ambition**, not research:
-- *How big does the curated library grow?* — Linear effort: ~30 min per anchor entry, ~10 min per fragment entry. Bounded by deployment scope.
-- *Is corpus expansion (Phase 4) worth a multi-week investment to enable a learned encoder?* — Empirically unsettled, bounded bet. The only research question still open at the architecture level: does a 5k–50k-pair learned encoder beat handcoded curation on adversarial paraphrases?
-- *Should the wiring transformer be retired in favour of a frontier LLM in the same Judge stack?* — Architecturally compatible (the IR + verifier + executor + anchor-retrieval stack accepts any candidate source), but out of scope for the project's central tiny-organelle thesis.
+- *How big does the curated library grow?* — Linear effort: ~30 min per anchor entry, ~10 min per fragment entry, ~5 min per family per synonym extension. Bounded by deployment scope.
+- *Should the wiring transformer be retired in favour of a frontier LLM in the same Judge stack?* — Architecturally compatible (the IR + verifier + executor + anchor-retrieval + composition + Phase-4 encoder stack accepts any candidate source), but out of scope for the project's central tiny-organelle thesis.
 
-See `RESEARCH_PIPELINE_IR.md` §44 for the consolidated state-of-the-arc snapshot, including §44.3 the four-axis boundary table (axis 3 closed by Phase 3b, axes 1, 2, 4 still open and corpus-bounded), and §44.6 for the practical reproducibility surface (CLI flags + commit hashes for each headline number).
+The Phase 4 architectural lesson (§46.2): **vocabulary expansion is a function of the curator's synonym table, not of the corpus size in prompts.** A 50k-prompt corpus from the same synonym tables would have the same realised vocabulary as a 4k-prompt corpus. The curator's hand is the bottleneck at every layer: keyword bag, synonym table, anchor table, fragment table.
+
+See `RESEARCH_PIPELINE_IR.md` §44 for the consolidated state-of-the-arc snapshot, §45 for the Phase 4 pre-registration, §46 for the post-eval writeup with row-by-row prediction comparison, and §44.6 / §46.6 for the practical reproducibility surface.
