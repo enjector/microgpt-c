@@ -28,12 +28,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define MAX_VOCAB    2048
+#define MAX_VOCAB    4096
 #define MAX_WORD_LEN   32
 #define MAX_FAMILIES   24
 #define MAX_FAM_NAME_LEN 64
 #define MAX_PROMPT_LEN 256
-#define MAX_TRAIN_PROMPTS 1024
+#define MAX_TRAIN_PROMPTS 8192
 #define MAX_TEST_PROMPTS  64
 
 /* ---------- Vocabulary (hash-table-free, linear-search) ---------- */
@@ -341,8 +341,8 @@ static int load_test(const char *path, TestItem *items, int max) {
 
 /* ---------- Main ---------- */
 int main(int argc, char **argv) {
-    const char *test_path = (argc > 1) ? argv[1] : "pipeline_corpus_held_out.txt";
-    const char *train_path = "pipeline_corpus_train.txt";
+    const char *test_path  = (argc > 1) ? argv[1] : "pipeline_corpus_held_out.txt";
+    const char *train_path = (argc > 2) ? argv[2] : "pipeline_corpus_train.txt";
 
     printf("================================================================\n");
     printf("  MicroGPT-C — Phase 3a-lite TF-IDF Centroid Classifier\n");

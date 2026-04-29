@@ -1863,6 +1863,14 @@ if(NOT MSVC)
   target_link_libraries(pipeline_corpus_gen PRIVATE m)
 endif()
 
+# Phase 4a — expanded corpus generator (synonym multiplication +
+# template variation + word-order permutations). See
+# RESEARCH_PIPELINE_IR.md §45 for the pre-registered design.
+add_executable(corpus_expand tools/corpus_expand.c)
+if(NOT MSVC)
+  target_link_libraries(corpus_expand PRIVATE m)
+endif()
+
 # Phase 5a — parser re-eval tool. Reads a wiring_organelle_demo log and
 # re-parses each "best output" graph through both strict and tolerant
 # parsers; reports the verify/fidelity delta. No retrain needed.

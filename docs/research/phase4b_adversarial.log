@@ -1,0 +1,59 @@
+[tfidf] loaded 4102 (prompt, family) training pairs (0 unmapped graph names skipped)
+[tfidf] vocabulary: 341 unique words across 4102 training prompts
+[tfidf] family centroids built. Per-family training counts:
+  bmi_clamped           n=250
+  compound_interest     n=250
+  compound_minus_p      n=250
+  weighted_three        n=250
+  clamped_sigmoid       n=250
+  sigmoid_clamped       n=216
+  gcd_scaled            n=250
+  apply_tax             n=250
+  gross_minus_tax       n=250
+  discounted_tax        n=250
+  fib_fact_mul          n=224
+  fib_fact_add          n=192
+  invoice_total         n=250
+  clamped_average       n=75
+  abs_diff              n=240
+  pv_of_fv              n=190
+  distance_metrics      n=108
+  distance_midpoint     n=60
+  savings_rate          n=250
+  scaled_relu           n=47
+================================================================
+  MicroGPT-C — Phase 3a-lite TF-IDF Centroid Classifier
+================================================================
+
+
+Loaded 20 test prompts from /Users/user/dev/projects.github/microgpt-c/build/pipeline_corpus_adversarial.txt
+Trained on 4102 (prompt, family) pairs from /Users/user/dev/projects.github/microgpt-c/build/pipeline_corpus_phase4_train.txt
+Vocabulary: 341 unique words
+
+#   REFERENCE            PREDICTED            MATCH   PROMPT (truncated)
+------------------------------------------------------------------------------------------------
+1   bmi_clamped          bmi_clamped          EXACT   Quetelet ratio from kilograms and centimetres constrained...
+2   compound_interest    compound_interest    EXACT   the yield earned on a deposit accumulating annually for s...
+3   weighted_three       weighted_three       EXACT   blend three observations each amplified by its own factor
+4   clamped_sigmoid      clamped_sigmoid      EXACT   logistic activation pinned within a permissible window
+5   gcd_scaled           gcd_scaled           EXACT   the largest shared divisor of two integers magnified by a...
+6   apply_tax            apply_tax            EXACT   disposable earnings remaining after government withholding
+7   fib_fact_mul         fib_fact_mul         EXACT   product of the recursive Leonardo series and the descendi...
+8   invoice_total        invoice_total        EXACT   receipt sum of unit cost by units bought along with the d...
+9   clamped_average      clamped_average      EXACT   the median of two values held inside lower and upper limits
+10  abs_diff             abs_diff             EXACT   unsigned gap separating two estimates
+11  scaled_relu          scaled_relu          EXACT   thresholded activation amplified by an amplification term
+12  discounted_tax       discounted_tax       EXACT   the duty owed on a marked-down listing
+13  savings_rate         savings_rate         EXACT   portion of earnings preserved after deducting two outlays
+14  distance_metrics     distance_metrics     EXACT   aggregate gap along a pair of dimensional projections rai...
+15  distance_midpoint    distance_midpoint    EXACT   the displacement from one observation to another together...
+16  pv_of_fv             pv_of_fv             EXACT   today's equivalent of a later sum after temporal correction
+17  fib_fact_add         fib_fact_mul         no      summation of the recursive Leonardo series and the descen...
+18  gross_minus_tax      gross_minus_tax      EXACT   earnings less what is owed in withholding
+19  compound_minus_p     compound_minus_p     EXACT   surplus remaining after accumulation strips the initial d...
+20  sigmoid_clamped      clamped_sigmoid      no      logistic value pinned within a permissible interval
+
+================================================================
+  HEADLINE
+================================================================
+Top-1 EXACT family match: 18/20 (90%)
