@@ -3626,6 +3626,74 @@ All numbers above reproduce on `main`. Tag `v3.3-wiring-organelle` (post-Phase-3
 
 ---
 
+## 45. Phase 4 — Corpus expansion: pre-registration (testing the §41 corpus-size hypothesis)
+
+This section is committed **before** the Phase 4 experiment runs. The §41 falsification of Phase 3a (TF-IDF at 408 examples) named corpus expansion as the conditional path forward: *"if the corpus is too small for any learned encoder, expand it and retry."* §45 makes that experiment concrete with locked predictions.
+
+### 45.1 Mechanism
+
+Two-step expansion + retrain:
+
+**Phase 4a — corpus generation.** Extend `tools/pipeline_corpus_gen.c` to emit a target ~5,000 (prompt, family) pairs across the 20 reference families. Three combined techniques:
+
+1. **Synonym multiplication.** Build a curated synonym table per family (~10–20 synonyms per discriminating word: e.g. `bmi → {bmi, body mass index, Quetelet ratio, mass/height index}`, `compound → {compounds, accumulates, grows, accrues}`, `clamp → {clamp, clip, bound, constrain, pin, limit}`). Each synonym choice produces a new training prompt.
+2. **Structural template variation.** For each family, write 5–8 sentence templates (e.g. "X of Y", "Y after X", "X applied to Y", "the Y-th X"). Cross with the synonym table.
+3. **Word-order permutations.** For two-clause families (e.g. clamped_average, weighted_three), permute the canonical clause order ("average then clamp" / "clamp the average" / "the bounded average").
+
+Target: 5,000 ± 1,000 (prompt, family) pairs, 1.5k–2.5k unique vocabulary words across the new corpus (vs 123 today).
+
+**Phase 4a leakage discipline.** The existing build-time leakage check (`tools/check_held_out_leakage.sh`) runs on the new corpus. It currently exits 0 (the Phase 13 leakage is documented and intentional). For Phase 4a we tighten it: **fail the build if any of the 20 Phase 2c clean paraphrases or any of the 20 adversarial axis-2 prompts appear verbatim in the expanded corpus.** The 20 leaked originals from Phase 13 are grandfathered (they're documented in §38 and removing them would break a separate experiment), but no NEW leakage is permitted.
+
+**Phase 4b — train a learned encoder on the expanded corpus.** Two candidate encoders, ranked by simplicity-first:
+
+- **4b-lite — TF-IDF centroid classifier on the 5k corpus.** Same code path as Phase 3a-lite (`demos/manifold_classifier/tfidf_main.c`); just trained on the expanded corpus. Vocabulary grows from 123 to ~1.5k–2.5k words. Decision criterion: if 4b-lite hits the targets, ship it; if not, escalate to 4b-full.
+- **4b-full — EKAN-Network classifier on the 5k corpus.** Bump `EKAN_NET_MAX_DIM` from 16 to 32 in `microgpt_ekan_network.h`. Build a small training pipeline mapping TF-IDF features → EKAN → 20-class softmax. Engineering effort: 1–2 days.
+
+Eval: adversarial axis-2 set (20 prompts; current handcoded baseline 2/20, current TF-IDF on 408 examples 4/20) + Phase 2c clean (20 prompts; must hold ≥18/20 no-regression).
+
+### 45.2 Pre-registered predictions (locked)
+
+| Test | Pre-registered target | Outcome interpretation |
+|---|---|---|
+| **Phase 4a corpus generation** | **5,000 ± 1,000 pairs**, 1.5k–2.5k unique vocab, leakage check passes | Mechanism shippable for 4b training |
+| **Phase 4b-lite — TF-IDF on adversarial axis-2** | **8–12 of 20** | Modest but meaningful lift over the 408-example 4/20 baseline. If hit: ship. If 4-7: 4b-full might still help. If <4: corpus expansion alone doesn't fix it (handcoded curator is irreplaceable at this task class). |
+| **Phase 4b-lite — TF-IDF on Phase 2c clean (no-regression)** | **≥18 of 20** | If <18, the expanded corpus distribution is hurting more than helping; don't ship. |
+| **Phase 4b-full — EKAN-Network on adversarial axis-2** (only run if 4b-lite hits 8–11/20) | **12–16 of 20** | If hit: ship EKAN as the production encoder; retire handcoded keyword bag. If <12: EKAN doesn't add over TF-IDF at this corpus scale; ship 4b-lite. If <8: corpus-size hypothesis falsified at 5k; pivot to library-extension (Phase 5). |
+
+### 45.3 Skip conditions (locked)
+
+| Condition | Action |
+|---|---|
+| Phase 4a corpus generation produces <3,000 prompts (templates+synonyms don't combine richly enough) | **Skip 4b**, restate corpus-too-bounded, document. |
+| Phase 4a leakage check fails (any clean paraphrase or adversarial prompt verbatim in new corpus) | **Skip 4b**, rebuild generator with explicit blocklist. |
+| Phase 4b-lite scores <18 on Phase 2c no-regression | **Don't ship 4b-lite, skip 4b-full**, document corpus-distribution-shift hypothesis. |
+| Phase 4b-lite scores <4 on adversarial axis-2 (worse than current 4/20 on 408 examples) | **Skip 4b-full**, falsification of corpus-scale hypothesis. Pivot to Phase 5 (library extension) as the only remaining engineering option. |
+| Phase 4b-full scores <8 on adversarial axis-2 | EKAN doesn't help at this corpus scale; ship 4b-lite (if it qualifies) or document as "no improvement available at this scale." |
+
+### 45.4 What Phase 4 does NOT test (committed in advance)
+
+- **Whether word-embedding pre-training would help.** Real semantic similarity (Quetelet ↔ BMI, logistic ↔ sigmoid) requires word embeddings from a larger natural-language corpus, which 5k task-specific prompts can't train. Phase 4 tests "more *task* data" — not "more *language* data."
+- **Whether the architecture itself can do more.** Phase 4 keeps the IR + verifier + executor + anchor retrieval + composition + fidelity-trumps gate exactly as in Phase 3b. Only the encoder changes.
+- **Whether 50k pairs would close it.** §45 commits to 5k. If 5k results say "modest lift, not enough," 50k might or might not help; that's a separate experiment that would be Phase 4-bis.
+
+### 45.5 Honest priors before running
+
+- **Most likely outcome (probability-weighted):** 4b-lite scores 6–10 on adversarial axis-2 (i.e. partial lift over 4/20 baseline but doesn't reach the pre-registered 8-12 lower bound) and 18–20 on no-regression. Interpretation: corpus expansion helps modestly but the handcoded synonym curator is still doing most of the work.
+- **Optimistic case:** 4b-lite hits 10/20 adversarial; 4b-full pushes to 13/20. Architecture validated; learned encoder ships.
+- **Pessimistic case:** 4b-lite hits 4/20 adversarial (no improvement) because synthetic paraphrases overfit to template patterns and don't generalise to the adversarial vocabulary. Falsification of the corpus-scale-helps hypothesis at 5k.
+
+The pessimistic case is genuinely possible. Synthetic paraphrases from a fixed template + synonym pool can't introduce vocabulary that wasn't in the curator's hand. Without word embeddings from a larger corpus (which would itself be a paradigm shift outside Phase 4's scope), the 5k corpus may have the same fundamental limitation as 408. The point of running 4b-lite is to settle this empirically — pre-registering 8-12 as the success target makes the falsification clean.
+
+### 45.6 Disciplined commitment
+
+This §45 is committed **before** the Phase 4 implementation lands. §46 (post-eval) will compare row-by-row honestly against §45's predictions. §45 stays untouched even if results are wildly different. No retroactive rationalisation.
+
+If Phase 4 lands well (4b-lite hits target), the architecture has a learned encoder option for the curator's roadmap. If Phase 4 falsifies, we have empirical evidence that the soft wall isn't moved by 5k-scale corpus alone, and the path forward is library-extension (Phase 5, no research, just curation labour) or a paradigm shift (frontier LLM in the same Judge stack, outside the project's tiny-organelle thesis).
+
+Either way: the experiment is bounded, its success criteria are public, its skip conditions auto-decide the response.
+
+---
+
 ## 16. Closing Remark
 
 ---
