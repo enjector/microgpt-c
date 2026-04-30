@@ -58,6 +58,15 @@ static const FamilyAnchor FAMILIES[] = {
     { "distance_midpoint", 17, { "distance", "readings", "midpoint", NULL } },
     { "savings_rate",      18, { "fraction", "saved", "subtracting", "expenses", NULL } },
     { "scaled_relu",       19, { "rectified", "gain", NULL } },
+    /* ====================================================================
+     * Scaling-curve experiment — Batch 1 (geometry, slots 20-24)
+     * Keywords picked to be lexically distinct from the existing 20.
+     * ==================================================================== */
+    { "circle_area_ratio",      20, { "ratio", "circle", "circles", "areas", "radii", NULL } },
+    { "square_of_sum",          21, { "square", "sum", "summed", NULL } },
+    { "triangle_area",          22, { "triangle", "base", NULL } },
+    { "rectangle_perimeter",    23, { "perimeter", "rectangle", "width", NULL } },
+    { "hypotenuse_squared",     24, { "hypotenuse", "legs", "squares", "pythagoras", NULL } },
 };
 static const int N_FAMILIES = (int)(sizeof(FAMILIES) / sizeof(FAMILIES[0]));
 

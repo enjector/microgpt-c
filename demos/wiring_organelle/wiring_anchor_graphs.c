@@ -294,6 +294,62 @@ static const AnchorEntry ANCHORS[] = {
       "  | c = clamp(x: s.out, lo: <lo>, hi: <hi>) :: x:int, lo:int, hi:int -> out:int\n"
       "  y <- c.out\n"
       "@end\n" },
+
+    /* ====================================================================
+     * Scaling-curve experiment — Batch 1 (geometry, slots 20-24)
+     * ==================================================================== */
+    { "circle_area_ratio",
+      "@graph circle_area_ratio\n"
+      "  : in r1 -> int\n"
+      "  : in r2 -> int\n"
+      "  : out y -> int\n"
+      "  | a1 = circle_area(r: <r1>) :: r:int -> out:int\n"
+      "  | a2 = circle_area(r: <r2>) :: r:int -> out:int\n"
+      "  | ratio = divide(x: a1.out, y: a2.out) :: x:int, y:int -> out:int\n"
+      "  y <- ratio.out\n"
+      "@end\n" },
+
+    { "square_of_sum",
+      "@graph square_of_sum\n"
+      "  : in a -> int\n"
+      "  : in b -> int\n"
+      "  : out y -> int\n"
+      "  | s = add(x: <a>, y: <b>) :: x:int, y:int -> out:int\n"
+      "  | sq = square(x: s.out) :: x:int -> out:int\n"
+      "  y <- sq.out\n"
+      "@end\n" },
+
+    { "triangle_area",
+      "@graph triangle_area\n"
+      "  : in base -> int\n"
+      "  : in height -> int\n"
+      "  : in two -> int\n"
+      "  : out y -> int\n"
+      "  | bh = multiply(x: <base>, y: <height>) :: x:int, y:int -> out:int\n"
+      "  | a = divide(x: bh.out, y: <two>) :: x:int, y:int -> out:int\n"
+      "  y <- a.out\n"
+      "@end\n" },
+
+    { "rectangle_perimeter",
+      "@graph rectangle_perimeter\n"
+      "  : in width -> int\n"
+      "  : in height -> int\n"
+      "  : out y -> int\n"
+      "  | s = add(x: <width>, y: <height>) :: x:int, y:int -> out:int\n"
+      "  | p = double_val(x: s.out) :: x:int -> out:int\n"
+      "  y <- p.out\n"
+      "@end\n" },
+
+    { "hypotenuse_squared",
+      "@graph hypotenuse_squared\n"
+      "  : in a -> int\n"
+      "  : in b -> int\n"
+      "  : out y -> int\n"
+      "  | sa = square(x: <a>) :: x:int -> out:int\n"
+      "  | sb = square(x: <b>) :: x:int -> out:int\n"
+      "  | s = add(x: sa.out, y: sb.out) :: x:int, y:int -> out:int\n"
+      "  y <- s.out\n"
+      "@end\n" },
 };
 
 static const int N_ANCHORS = (int)(sizeof(ANCHORS) / sizeof(ANCHORS[0]));

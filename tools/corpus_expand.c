@@ -359,6 +359,94 @@ static const Family FAMILIES[] = {
         "%0% amplified by a %1%",
         NULL
       } },
+
+    /* ====================================================================
+     * Scaling-curve experiment — Batch 1 (geometry, slots 20-24)
+     * ==================================================================== */
+
+    /* ---- circle_area_ratio: divide(circle_area(r1), circle_area(r2)) ----
+     * groups: 0=ratio-noun, 1=circle-noun, 2=area-noun, 3=radii-noun */
+    { "circle_area_ratio",
+      {
+        { "ratio", "fraction", "proportion", "quotient", "comparison", NULL },
+        { "circle", "circular shape", "disk", "round shape", NULL },
+        { "areas", "surface areas", "regions", "footprints", NULL },
+        { "radii", "radius values", "radius pair", "two radii", NULL },
+      },
+      {
+        "%0% of two %1% %2% given their %3%",
+        "the %0% between two %1% %2% from their %3%",
+        "%0% comparing two %1% %2% by %3%",
+        "%2% %0% of two %1% with %3%",
+        NULL
+      } },
+
+    /* ---- square_of_sum: square(add(a,b)) = (a+b)^2 ----
+     * groups: 0=square-verb, 1=sum-noun, 2=elements-noun */
+    { "square_of_sum",
+      {
+        { "square", "raise to second power", "square up", "squared value of", NULL },
+        { "sum", "total", "addition", "combined value", "aggregate", NULL },
+        { "two values", "a and b", "two terms", "two operands", "a pair", NULL },
+        { "second power", "power of two", "squared form", NULL },
+      },
+      {
+        "%0% the %1% of %2%",
+        "%1% of %2% raised to the %3%",
+        "the %1% of %2% squared",
+        "%0% the combined value of %2%",
+        NULL
+      } },
+
+    /* ---- triangle_area: multiply(base, height) / 2 ----
+     * groups: 0=area-noun, 1=triangle-noun, 2=dims-noun */
+    { "triangle_area",
+      {
+        { "area", "surface area", "region size", "interior area", NULL },
+        { "triangle", "triangular shape", "trigon", NULL },
+        { "base and height", "base length and height", "side and altitude", NULL },
+        { "halved product", "half-product", NULL },
+      },
+      {
+        "%0% of a %1% from its %2%",
+        "%1% %0% computed from %2%",
+        "the %0% of a %1% using %2%",
+        "%1% interior %0% from %2%",
+        NULL
+      } },
+
+    /* ---- rectangle_perimeter: 2*(width+height) ----
+     * groups: 0=perimeter-noun, 1=rectangle-noun, 2=dims-noun */
+    { "rectangle_perimeter",
+      {
+        { "perimeter", "boundary length", "edge total", "outline length", NULL },
+        { "rectangle", "rectangular shape", "oblong", NULL },
+        { "width and height", "width and length", "two side lengths", "the two sides", NULL },
+      },
+      {
+        "%0% of a %1% from %2%",
+        "the %0% of a %1% computed from %2%",
+        "%1% %0% calculated from %2%",
+        "%1% outline length from %2%",
+        NULL
+      } },
+
+    /* ---- hypotenuse_squared: a^2 + b^2 ----
+     * groups: 0=sum-noun, 1=squares-of, 2=legs-noun */
+    { "hypotenuse_squared",
+      {
+        { "sum", "total", "summation", "combined value", NULL },
+        { "squares", "second powers", "squared values", NULL },
+        { "two legs", "the legs", "two cathetus", "two right-triangle sides", NULL },
+        { "Pythagoras", "Pythagorean form", NULL },
+      },
+      {
+        "%0% of the %1% of %2%",
+        "%1% of %2% summed",
+        "%2% squared and added together",
+        "%3% style %0% of %1% of %2%",
+        NULL
+      } },
 };
 
 static const int N_FAMILIES = (int)(sizeof(FAMILIES) / sizeof(FAMILIES[0]));
@@ -407,6 +495,12 @@ static const char *FORBIDDEN[] = {
     "earnings less what is owed in withholding",
     "surplus remaining after accumulation strips the initial deposit",
     "logistic value pinned within a permissible interval",
+    /* Scaling-curve experiment held-out (Batch 1: geometry). */
+    "ratio of two circle areas given their radii",
+    "square the sum of a and b",
+    "area of a triangle from its base and height",
+    "perimeter of a rectangle from width and height",
+    "sum of the squares of two legs",
     NULL
 };
 
