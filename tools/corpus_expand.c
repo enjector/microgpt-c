@@ -775,6 +775,27 @@ static const char *FORBIDDEN[] = {
     "greatest common divisor of a and b plus c",
     "harmonic number for n bounded between lo and hi",
     "percentage value relative to the average of a and b",
+    /* Scaling v2 clean held-out — disjoint vocabulary from synonym tables. */
+    "comparing the surface coverage of two disks based on radial measurements",
+    "raise the addition of two operands to the second exponent",
+    "the enclosed region of a three-sided polygon from its foot length and altitude",
+    "boundary distance around an oblong shape using its two side extents",
+    "Pythagorean expression combining each cathetus raised to power two",
+    "translational motion quantity restricted within permitted limits",
+    "linear conservation quantity from object weight and rate of motion",
+    "physical exertion result obtained from a push acting over a path",
+    "iterated multiplication of base by index restricted within a span",
+    "cumulative reciprocal series running total up to an upper bound",
+    "statistical scatter computed for a pair of measurements",
+    "unsigned displacement of an observation away from its central tendency",
+    "the gap separating the largest and smallest of two observations",
+    "central position of a pair restricted within a defined window",
+    "expected quadratic loss between a model estimate and an actual value",
+    "weighted blend of two endpoints at a given fraction kept inside an allowed window",
+    "third exponent of an input restricted within a defined window",
+    "highest shared factor of two integers shifted by an additional constant",
+    "reciprocal series partial total restricted within a defined window",
+    "share figure computed against the central tendency of two values",
     NULL
 };
 

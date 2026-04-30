@@ -1,118 +1,139 @@
 # Scaling-curve experiment — does linear-effort family expansion translate 1:1 to held-out coverage?
 
-Branch: `investigation/scaling-curve-experiment`. Commits 1363753 → 4b83db1.
+Branch (initial): `investigation/scaling-curve-experiment` (merged to main, commits 1363753 → 06575f2).
+Branch (validation): `investigation/scaling-curve-validation` (commits bbfebfa → present).
+
+## ⚠️ Correction notice — read before quoting any number from this document
+
+The original headline of this experiment was "1:1 scaling, 20/20 retrieval". A post-experiment leakage audit (`tools/scaling_leakage_audit.sh`, log at `wiring_scaling_leakage_audit.log`) revealed that **19/20 of the v1 held-out prompts had Jaccard ≥ 0.7 against a training prompt; two had Jaccard = 1.0** (bag-of-words clones, just word-order shuffled). The FORBIDDEN[] guard in `corpus_expand.c` only blocks verbatim matches; word-shuffled near-duplicates passed through.
+
+Root cause: the held-out paraphrases and the `corpus_expand.c` synonym tables were both written by me, so they shared content vocabulary. TF-IDF (a bag-of-words model) measured "find the near-clone of yourself in your own training set" rather than "generalise from synonyms to genuinely novel paraphrases."
+
+A v2 clean held-out set (`pipeline_corpus_scaling_heldout_v2.txt`) was built with vocabulary deliberately disjoint from the synonym tables. **The honest scaling number is 15/20 = 75%**, not 20/20. Both numbers are reported below; the 20/20 v1 number is preserved for honest record-keeping but should not be quoted as the scaling result.
 
 ## The question
 
-`docs/research/RESEARCH_PIPELINE_IR.md` §44.5 left exactly one open *engineering scope* question after the research arc closed: **how big to grow the curated library, and does the cost actually scale linearly with capability?** The earlier planning conversation framed it concretely: if a curator spends 30 min/family, do held-out paraphrases of that family get retrieved correctly?
-
-This experiment answers that with measured data.
+`docs/research/RESEARCH_PIPELINE_IR.md` §44.5 left exactly one open *engineering scope* question after the research arc closed: **how big to grow the curated library, and does the cost actually scale linearly with capability?**
 
 ## Pre-registered hypotheses (locked before any new family was added)
 
 | ID | Hypothesis | Threshold |
 |---|---|---|
-| H_main | TF-IDF Top-1 EXACT match on a 20-prompt held-out set (one paraphrase per new family, leakage-guarded) | ≥ 18/20 |
+| H_main | TF-IDF Top-1 EXACT match on a 20-prompt held-out set | ≥ 18/20 |
 | H_no_regression | TF-IDF on the existing 40-prompt no-regression set holds steady | ≥ 38/40 |
-| H_adversarial_floor | TF-IDF adversarial axis-2 stays within tolerance of the prior 18/20 baseline | ≥ 16/20 |
-
-Skip conditions:
-- If the first 5-family batch hit < 4/5 on its own held-out subset, halt and root-cause before continuing.
-- If GEO_DIMS bump broke any existing test, halt and redesign the embedder.
-
-Falsification clause: any of the three H_* failing = scaling is NOT 1:1; document the negative result honestly.
+| H_adversarial_floor | TF-IDF adversarial axis-2 stays within tolerance of prior 18/20 | ≥ 16/20 |
 
 ## What was added
 
-20 new families across 4 disjoint domains, each using only existing primitives in `wiring_natives.c`:
+20 new families across 4 disjoint domains (geometry / physics / statistics / math chains), slots 20-39, all using only existing primitives in `wiring_natives.c`. Three-file integration (anchor_graphs + geo_classifier + corpus_expand). `GEO_DIMS` bumped 20 → 40 in `src/microgpt_geodesic.h`; 16/16 geodesic tests still pass.
 
-| Domain | Families | Slots |
-|---|---|---|
-| Geometry | circle_area_ratio, square_of_sum, triangle_area, rectangle_perimeter, hypotenuse_squared | 20-24 |
-| Physics | kinetic_energy_clamped, momentum, work_done, power_clamped, harmonic_sum | 25-29 |
-| Statistics | variance_two, abs_z_score, range_two, midpoint_clamped, mse_simple | 30-34 |
-| Math chains | lerp_clamped, cube_then_clamp, gcd_with_offset, harmonic_clamped, percentage_of_average | 35-39 |
+## v1 (contaminated) scaling curve — DO NOT QUOTE
 
-Each family received entries in three places:
-1. `demos/wiring_organelle/wiring_anchor_graphs.c` — canonical `@graph` DAG
-2. `demos/wiring_organelle/wiring_geo_classifier.c` — slot + keywords
-3. `tools/corpus_expand.c` — synonym groups + sentence templates
-
-Plus a held-out paraphrase per family in `demos/wiring_organelle/pipeline_corpus_scaling_heldout.txt`, with each prompt added to `corpus_expand.c FORBIDDEN[]` to prevent training-on-test leakage.
-
-Prerequisite: `GEO_DIMS` bumped 20 → 40 in `src/microgpt_geodesic.h` (16/16 geodesic tests still pass).
-
-## Scaling curve
-
-| Batch | Families curated | Corpus prompts | Vocab | Scaling held-out (Top-1 EXACT) | Per-family hit rate |
-|---|---|---|---|---|---|
-| 0 (baseline) | 0 | 4,102 | 341 | **0/20** (0%) | — |
-| 1 (geometry) | 5 | 5,007 | 393 | **5/20** (25%) | 5/5 = 100% |
-| 2 (physics) | 10 | 5,973 | 424 | **10/20** (50%) | 5/5 = 100% |
-| 3 (statistics) | 15 | 6,874 | 447 | **15/20** (75%) | 5/5 = 100% |
-| 4 (math chains) | 20 | 8,124 | 467 | **20/20** (100%) | 5/5 = 100% |
-
-**Slope: exactly +1 hit per +1 family curated.** Every single curated family was retrieved correctly on its held-out paraphrase. No false negatives, no batch-level rate decay.
-
-## No-regression bookkeeping
-
-| Eval | Pre-experiment | Post-experiment | Pre-reg threshold | Verdict |
-|---|---|---|---|---|
-| Existing 40-prompt no-regression (Phase 2c clean originals + paraphrases) | 40/40 (100%) | 39/40 (98%) | ≥ 38/40 | PASS — single cross-family interference (`gross_minus_tax` → `apply_tax` on prompt #38) appeared in Batch 1 and persisted. Within tolerance. |
-| TF-IDF adversarial axis-2 | 18/20 (90%) | 17/20 (85%) | ≥ 16/20 | PASS — single drop (one prompt that was previously borderline became misclassified after corpus growth shifted IDF weights). Within tolerance. |
-| Geodesic test suite (`test_microgpt_geodesic`) | 16/16 | 16/16 | no regression | PASS |
-| Wiring Phase 2c clean (`--clean-only` end-to-end) | 20/20 strict-verified, 20/20 correct on all inputs | unchanged after FAMILY_NAMES extension | no regression | PASS |
-
-## Verdict against the pre-registration
-
-| Hypothesis | Threshold | Result | Verdict |
+| Batch | Curated | TF-IDF Top-1 (v1) | Per-batch hit-rate |
 |---|---|---|---|
-| H_main | ≥ 18/20 | **20/20** | **PASS** (exceeded — no false negatives) |
-| H_no_regression | ≥ 38/40 | 39/40 | **PASS** |
-| H_adversarial_floor | ≥ 16/20 | 17/20 | **PASS** |
+| 0 (baseline) | 0 | 0/20 | — |
+| 1 (geometry) | 5 | 5/20 | 5/5 = 100% |
+| 2 (physics) | 10 | 10/20 | 5/5 = 100% |
+| 3 (statistics) | 15 | 15/20 | 5/5 = 100% |
+| 4 (math chains) | 20 | 20/20 | 5/5 = 100% |
 
-**Conclusion: linear-effort family expansion translates 1:1 to held-out TF-IDF retrieval coverage in the 0-to-20 family expansion regime tested.** Every curated family was retrievable; no batch-level decay; the no-regression and adversarial-floor budgets were both honoured.
+**This curve is invalid as a generalisation claim.** See "Correction notice" above.
 
-## Honest caveats
+## v2 (clean) scaling result — the honest number
 
-1. **Curated synonyms test the curator, not the system.** The held-out paraphrases were written by me before any family was added, but my synonym tables were also written by me. There's a risk that the synonym tables and held-out paraphrases share my idiomatic vocabulary in ways a different curator wouldn't reproduce. The TF-IDF hit-rate is bounded by the *intersection* of curator-vocabulary and held-out-vocabulary. A second, independent curator should rebuild Batch 1 from scratch to verify reproducibility.
+Single measurement on the v2 held-out set (built after all 20 families were already curated, so per-batch reconstruction was not done):
 
-2. **The 1:1 slope held in this 0-20 regime; nothing here predicts 20-40 or 40-100.** The §44.3 axis-2 (weak keyword overlap) and axis-4 (domain-vocabulary drift) frontiers were "soft-closed" at 20 families per Phase 4. Adding 20 more pushed cross-family interference from 0 to 1 mismatched prompt on the no-regression set. Extrapolating: each additional 20-family batch may cost ~1 cross-family mismatch. At 100 families that's ~5 mismatches — soft scaling, not catastrophic, but non-zero.
+| Eval | v2 result | v1 (contaminated) | Pre-reg threshold |
+|---|---|---|---|
+| **Scaling held-out (TF-IDF Top-1, clean v2)** | **15/20 (75%)** | 20/20 (100%) | ≥ 18/20 — **FAIL** |
+| No-regression (Phase 2c clean originals + paraphrases) | 39/40 (98%) | 39/40 | ≥ 38/40 — PASS |
+| Adversarial axis-2 | 17/20 (85%) | 17/20 | ≥ 16/20 — PASS |
 
-3. **TF-IDF measures retrieval, not execution.** The wiring binary's end-to-end correctness depends on more than retrieval: graph parsing, primitive availability, reference-function comparison. The end-to-end metric for the new families would require writing per-family reference functions in `wiring_references.c`. That's an additional curator surface this experiment did NOT measure.
+**H_main FAILS at 15/20 < 18/20.** The remaining two pre-registered thresholds still PASS.
 
-4. **The "30 min/family" cost is the human-curator estimate.** The actual machine-time cost (3-file edits + corpus regen + measurement) was negligible. The bottleneck in real deployment is curator judgement (which families to add, how to write synonym tables that generalise), not the typing.
+The 5 v2 failures (with their predicted-but-wrong family):
 
-5. **Curated families overlap with existing 20 in primitive composition.** All 20 new families use existing primitives in `wiring_natives.c` (no new natives added). The experiment validated *vocabulary-level* scaling, not *primitive-level*. Adding families that require new primitives (e.g., `circumference` requires a `pi` constant the natives don't have) is a separate axis.
+| Held-out | Predicted | Why it failed |
+|---|---|---|
+| hypotenuse_squared | power_clamped | "raised to" / "power" weighed toward power_clamped centroid |
+| work_done | compound_interest | No shared technical word; "result" + "from" too generic |
+| range_two | abs_diff | Semantically related (both differences); generic words leaned toward abs_diff |
+| midpoint_clamped | clamped_sigmoid | Generic clamp phrasing ("restricted within a defined window") matched clamped_sigmoid centroid |
+| harmonic_clamped | clamped_sigmoid | Same clamp-confusion pattern |
+
+**Pattern:** four of five failures are *clamp-family confusion*. The TF-IDF centroid for any "_clamped" family heavily weights "bounded/restricted/within"; when held-out uses those generic words too, classification flips to whichever family has the most generic supplementary vocabulary. This is a structural limitation of bag-of-words TF-IDF, not a curation gap.
+
+## v2 audit — Jaccard discipline
+
+`pipeline_corpus_scaling_heldout_v2.txt` was built with vocabulary deliberately disjoint from `corpus_expand.c` synonym tables. Audit results (`wiring_scaling_v2_audit.log`):
+
+| Audit | v1 contaminated | v2 clean |
+|---|---|---|
+| A: verbatim leaks | 0/20 | 0/20 |
+| B: Jaccard ≥ 0.7 | 19/20 | **1/20** (gcd_with_offset at 0.667) |
+| B: Jaccard = 1.0 | 2/20 | 0/20 |
+| C: ≥ 50% lexical anchors | 2/20 | 0/20 |
+
+The v2 set is honestly novel relative to the training distribution.
+
+## Honest verdict against pre-registration
+
+| Hypothesis | Threshold | v1 (contaminated) | **v2 (clean, authoritative)** |
+|---|---|---|---|
+| H_main | ≥ 18/20 | 20/20 PASS (invalid) | **15/20 FAIL** |
+| H_no_regression | ≥ 38/40 | 39/40 PASS | 39/40 PASS |
+| H_adversarial_floor | ≥ 16/20 | 17/20 PASS | 17/20 PASS |
+
+**Pre-registered H_main is FALSIFIED on the clean held-out set.** The original 1:1 scaling claim does not survive a vocabulary-disjoint test.
+
+## What this actually demonstrates
+
+1. **Curating a family delivers ~75% retrieval on genuinely novel paraphrases of that family**, not 100%. The remaining 25% gap is structural to TF-IDF on small synonym tables, not a curator-skill gap.
+
+2. **The Phase 4 mechanism works, but with a real ceiling.** Adding families helps; the gain per family is non-zero; but it's not 1:1 in the strict sense of the original claim.
+
+3. **The leakage trap is easy to fall into and hard to see without an audit.** FORBIDDEN[] catching verbatim matches is necessary but insufficient; bag-of-words near-duplicates pass through. Future curated held-out sets should be audited via `tools/scaling_leakage_audit.sh` *before* the experiment, not after.
+
+4. **The structural failure mode is family-aliasing on generic words.** The five v2 failures all cluster around clamp-family confusion. Fixing this requires either (a) sharper, more domain-distinct synonym tables for the clamp families, or (b) a richer feature representation than bag-of-words (e.g. character n-grams, ordered bigrams).
 
 ## Where this leaves the §44.5 question
 
-§44.5's "how big does the curated library grow?" question was framed as "an engineering decision, scales with intended deployment scope." This experiment converts that hand-wave into a measured rate: **+1 retrieval hit per +1 curated family for at least the first 20 expansions, with the cross-family interference budget burning at ~1/20 prompts per batch.**
+§44.5's "how big does the curated library grow?" question still has a useful but more modest answer: **adding a curated family delivers ~75% probability that the family is retrievable on genuinely novel paraphrases, with cross-family interference burning at ~1/20 no-regression prompts per 5-family batch.** A 100-family library projects to ~75 retrievable on novel-paraphrase tests, plus ~5 cross-family mismatches on the no-regression set.
 
-For deployment scoping:
-- A 50-family library: predicted ~50/50 retrievable, with ~2-3 cross-family mismatches on the no-regression set. Likely fine for most domains.
-- A 100-family library: predicted ~100/100 retrievable, with ~5 cross-family mismatches. Worth re-measuring at the 50-family checkpoint to confirm the slope holds.
-- Beyond 100: extrapolation gets thin. A genuine cross-talk knee may emerge as the synonym tables grow into each other's vocabulary.
+For deployment: the curator's effort is meaningful, but expecting 100% per family was wrong. A 75% baseline is still well above the 0/20 baseline before any curation, and it's actionable.
 
-The architecture handled the bump cleanly. No research breakthrough needed — just the curator's hand and the existing TF-IDF + corpus-expansion pipeline.
+## Caveats (unchanged from v1, plus one new)
+
+1. **Curated synonyms test the curator, not the system.** v1 demonstrated this in the worst possible way — same curator wrote both sides. v2 mitigates by enforcing vocabulary disjointness, but a third-party curator's held-out set would be the true reproducibility test.
+
+2. **The slope was measured per-batch in v1 (clean 5-for-5 each batch) but only as a single endpoint in v2.** A proper v2 per-batch curve would need to re-add families incrementally and measure at each step — not done because the v1 commits already shipped the full 20-family integration. A future tier could re-build the curve cleanly.
+
+3. **TF-IDF measures retrieval, not execution.** No end-to-end correctness measured for the new families.
+
+4. **Soft cross-family interference is real**: 1 mismatch on the no-regression set after 20 family adds. Linear extrapolation suggests ~5 mismatches at 100 families.
+
+5. **NEW caveat from the v2 audit**: any future scaling claim must include a Jaccard audit before the result is reported. Verbatim-only leakage checks are insufficient for bag-of-words classifiers.
 
 ## Reproducibility
 
 ```sh
-git checkout investigation/scaling-curve-experiment
-./bootstrap.sh
+git checkout main          # contains the integration + v1 result
+# Re-run the v1 (contaminated) measurement:
 cd build
-
-# Reproduce the curve at any batch by checking out that batch's commit:
-git checkout 5444fa2  # Batch 1 (geometry only)
-git checkout 96fe5a1  # Batch 2 (physics added)
-git checkout 77ad867  # Batch 3 (statistics added)
-git checkout 4b83db1  # Batch 4 (final, all 20)
-
-# Then for any checkout:
-cmake --build . --target wiring_organelle_demo manifold_tfidf_demo corpus_expand --config Release
-./corpus_expand pipeline_corpus_phase4_train.txt 1234   # regenerate corpus
 ./manifold_tfidf_demo pipeline_corpus_scaling_heldout.txt pipeline_corpus_phase4_train.txt | tail -3
-```
+# → 20/20 (the inflated number — do not quote)
 
-The corpus is regenerated deterministically (seed=1234) so the curve reproduces byte-stably.
+git checkout investigation/scaling-curve-validation
+cmake --build . --target wiring_organelle_demo manifold_tfidf_demo corpus_expand --config Release
+./corpus_expand pipeline_corpus_phase4_train.txt 1234
+
+# v2 clean measurement:
+./manifold_tfidf_demo pipeline_corpus_scaling_heldout_v2.txt pipeline_corpus_phase4_train.txt | tail -3
+# → 15/20 (the honest number)
+
+# Re-run the leakage audits:
+bash ../tools/scaling_leakage_audit.sh pipeline_corpus_scaling_heldout.txt pipeline_corpus_phase4_train.txt
+# → Audit B: 19/20 ≥ 0.7
+bash ../tools/scaling_leakage_audit.sh pipeline_corpus_scaling_heldout_v2.txt pipeline_corpus_phase4_train.txt
+# → Audit B: 1/20 ≥ 0.7
+```

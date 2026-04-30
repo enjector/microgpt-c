@@ -1,0 +1,63 @@
+============================================================
+Scaling-curve leakage audit
+============================================================
+Held-out prompts: 20
+Train prompts:    8124
+
+--- Audit A: verbatim leakage ---
+Audit A total: 0 / 20 verbatim leaks
+
+--- Audit B: near-duplicate (Jaccard) leakage ---
+For each held-out prompt, max Jaccard against any training prompt:
+  [ok  ] 0.214  circle_area_ratio ← train:abs_diff  "the magnitude of magnitude separating two readings"
+  [WARN] 0.800  square_of_sum ← train:square_of_sum  "raise to second power the addition of two operands"
+  [ok  ] 0.375  triangle_area ← train:triangle_area  "region size of a triangle from its side and altitude"
+  [ok  ] 0.267  rectangle_perimeter ← train:rectangle_perimeter  "boundary length of a oblong from two side lengths"
+  [ok  ] 0.308  hypotenuse_squared ← train:distance_metrics  "gap across two axes raised to second power"
+  [ok  ] 0.273  kinetic_energy_clamped ← train:clamped_sigmoid  "logistic function result restricted within a permitted window"
+  [ok  ] 0.308  momentum ← train:momentum  "linear momentum from object mass and velocity"
+  [ok  ] 0.231  work_done ← train:work_done  "applied work from applied force over path length"
+  [ok  ] 0.250  power_clamped ← train:power_clamped  "constrained the power of base raised to power index within permitted bounds"
+  [ok  ] 0.333  harmonic_sum ← train:harmonic_sum  "total of 1/k series terms up to n"
+  [ok  ] 0.333  variance_two ← train:variance_two  "variance computed for the pair"
+  [ok  ] 0.308  abs_z_score ← train:abs_z_score  "unsigned z-score of observation from the average"
+  [ok  ] 0.455  range_two ← train:abs_diff  "the magnitude of gap separating two readings"
+  [ok  ] 0.273  midpoint_clamped ← train:clamped_sigmoid  "logistic value restricted within a permissible window"
+  [ok  ] 0.333  mse_simple ← train:mse_simple  "mse between estimate and true value"
+  [ok  ] 0.389  lerp_clamped ← train:lerp_clamped  "linear blend of two endpoints using t then bounded inside an allowed range"
+  [ok  ] 0.357  cube_then_clamp ← train:cube_then_clamp  "clamped the third power of input within an allowed range"
+  [med ] 0.667  gcd_with_offset ← train:gcd_with_offset  "highest common factor of two integers shifted by constant"
+  [ok  ] 0.273  harmonic_clamped ← train:clamped_sigmoid  "logistic value restricted within a permissible window"
+  [med ] 0.500  percentage_of_average ← train:percentage_of_average  "fractional share against the mean of two values"
+Audit B total: 1 / 20 held-out prompts with max-Jaccard ≥ 0.7
+
+--- Audit C: lexical anchoring (vocabulary exclusivity) ---
+For each held-out prompt, how many of its content words appear in
+ONLY its own family's training data (= 'lexical anchors').
+  [low ]   0% anchors (0/9, 4 unseen)  circle_area_ratio  anchors=[]
+  [med ]  43% anchors (3/7, 0 unseen)  square_of_sum  anchors=[addition,operands,raise]
+  [low ]  17% anchors (2/12, 4 unseen)  triangle_area  anchors=[altitude,region]
+  [low ]  20% anchors (2/10, 2 unseen)  rectangle_perimeter  anchors=[boundary,oblong]
+  [med ]  25% anchors (2/8, 1 unseen)  hypotenuse_squared  anchors=[pythagorean,cathetus]
+  [low ]   0% anchors (0/7, 1 unseen)  kinetic_energy_clamped  anchors=[]
+  [low ]  11% anchors (1/9, 2 unseen)  momentum  anchors=[object]
+  [low ]  11% anchors (1/9, 5 unseen)  work_done  anchors=[path]
+  [low ]   0% anchors (0/7, 2 unseen)  power_clamped  anchors=[]
+  [med ]  29% anchors (2/7, 2 unseen)  harmonic_sum  anchors=[cumulative,series]
+  [low ]   0% anchors (0/6, 2 unseen)  variance_two  anchors=[]
+  [low ]   0% anchors (0/8, 2 unseen)  abs_z_score  anchors=[]
+  [low ]   0% anchors (0/8, 1 unseen)  range_two  anchors=[]
+  [low ]   0% anchors (0/7, 2 unseen)  midpoint_clamped  anchors=[]
+  [low ]  22% anchors (2/9, 3 unseen)  mse_simple  anchors=[estimate,model]
+  [low ]  10% anchors (1/10, 0 unseen)  lerp_clamped  anchors=[endpoints]
+  [low ]  14% anchors (1/7, 1 unseen)  cube_then_clamp  anchors=[third]
+  [med ]  25% anchors (2/8, 1 unseen)  gcd_with_offset  anchors=[shifted,constant]
+  [low ]   0% anchors (0/8, 3 unseen)  harmonic_clamped  anchors=[]
+  [low ]  11% anchors (1/9, 2 unseen)  percentage_of_average  anchors=[against]
+
+============================================================
+Audit complete. Three signals to interpret:
+  Audit A > 0  → strict verbatim leakage (FORBIDDEN[] failed)
+  Audit B ≥ 0.7 → near-duplicate; TF-IDF can win on overlap alone
+  Audit C ≥ 50% anchors → TF-IDF wins via single-word distinctness
+============================================================

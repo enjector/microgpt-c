@@ -1,0 +1,89 @@
+# Pipeline IR — Scaling-curve experiment v2 held-out (clean)
+#
+# Designed AFTER the leakage audit found 19/20 v1 prompts had Jaccard ≥ 0.7
+# against training (curator self-overlap from synonym tables matching held-out
+# vocabulary). v2 deliberately uses content vocabulary disjoint from the
+# corpus_expand.c synonym tables for each family.
+#
+# Each prompt MUST be added to corpus_expand.c FORBIDDEN[] before regenerating
+# the Phase 4 corpus. Audit target: max-Jaccard < 0.4.
+
+# REFERENCE: circle_area_ratio
+// comparing the surface coverage of two disks based on radial measurements
+---
+
+# REFERENCE: square_of_sum
+// raise the addition of two operands to the second exponent
+---
+
+# REFERENCE: triangle_area
+// the enclosed region of a three-sided polygon from its foot length and altitude
+---
+
+# REFERENCE: rectangle_perimeter
+// boundary distance around an oblong shape using its two side extents
+---
+
+# REFERENCE: hypotenuse_squared
+// Pythagorean expression combining each cathetus raised to power two
+---
+
+# REFERENCE: kinetic_energy_clamped
+// translational motion quantity restricted within permitted limits
+---
+
+# REFERENCE: momentum
+// linear conservation quantity from object weight and rate of motion
+---
+
+# REFERENCE: work_done
+// physical exertion result obtained from a push acting over a path
+---
+
+# REFERENCE: power_clamped
+// iterated multiplication of base by index restricted within a span
+---
+
+# REFERENCE: harmonic_sum
+// cumulative reciprocal series running total up to an upper bound
+---
+
+# REFERENCE: variance_two
+// statistical scatter computed for a pair of measurements
+---
+
+# REFERENCE: abs_z_score
+// unsigned displacement of an observation away from its central tendency
+---
+
+# REFERENCE: range_two
+// the gap separating the largest and smallest of two observations
+---
+
+# REFERENCE: midpoint_clamped
+// central position of a pair restricted within a defined window
+---
+
+# REFERENCE: mse_simple
+// expected quadratic loss between a model estimate and an actual value
+---
+
+# REFERENCE: lerp_clamped
+// weighted blend of two endpoints at a given fraction kept inside an allowed window
+---
+
+# REFERENCE: cube_then_clamp
+// third exponent of an input restricted within a defined window
+---
+
+# REFERENCE: gcd_with_offset
+// highest shared factor of two integers shifted by an additional constant
+---
+
+# REFERENCE: harmonic_clamped
+// reciprocal series partial total restricted within a defined window
+---
+
+# REFERENCE: percentage_of_average
+// share figure computed against the central tendency of two values
+---

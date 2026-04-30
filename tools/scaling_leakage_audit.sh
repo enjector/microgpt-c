@@ -11,8 +11,8 @@
 # Usage: cd build && bash ../tools/scaling_leakage_audit.sh
 
 set -u
-HELDOUT="pipeline_corpus_scaling_heldout.txt"
-TRAIN="pipeline_corpus_phase4_train.txt"
+HELDOUT="${1:-pipeline_corpus_scaling_heldout.txt}"
+TRAIN="${2:-pipeline_corpus_phase4_train.txt}"
 
 for f in "$HELDOUT" "$TRAIN"; do
     [[ -e "$f" ]] || { echo "ERROR: $f not found in $(pwd)" >&2; exit 1; }
