@@ -1,0 +1,88 @@
+# Pipeline IR — Phase 3 broad expansion held-out (v3)
+#
+# 20 paraphrases for the 20 new families (slots 40-59) added in Phase 3.
+# Vocabulary deliberately disjoint from corpus_expand.c synonym tables
+# (audited via tools/scaling_leakage_audit.sh BEFORE any measurement).
+#
+# Each prompt added to corpus_expand.c FORBIDDEN[] before regenerating
+# the Phase 4 corpus.
+
+# REFERENCE: molarity
+// concentration of dissolved substance per unit liquid quantity
+---
+
+# REFERENCE: mole_ratio
+// comparative balance between two reactant amounts in a chemical equation
+---
+
+# REFERENCE: yield_percentage
+// fraction of intended chemical output achieved versus the maximum possible
+---
+
+# REFERENCE: dilute_volume
+// diluted-down strength after spreading a solute across a larger liquid quantity
+---
+
+# REFERENCE: molar_mass_x_moles
+// weight of a chemical sample obtained from quantity and per-mole weight
+---
+
+# REFERENCE: minutes_to_hours
+// translate a span measured in minutes into the equivalent in clock hours
+---
+
+# REFERENCE: hours_to_seconds
+// stretch an hour-based span into the equivalent in tick-level units
+---
+
+# REFERENCE: elapsed_seconds
+// second-level interval that has passed between two clock points
+---
+
+# REFERENCE: seconds_remaining
+// second-level countdown still available before a deadline expires
+---
+
+# REFERENCE: average_two_durations
+// the typical value across two recorded time spans
+---
+
+# REFERENCE: celsius_to_kelvin
+// thermodynamic-scale temperature derived from a centigrade observation
+---
+
+# REFERENCE: meters_to_centimeters
+// small-unit length representation of a metre-scale distance
+---
+
+# REFERENCE: kg_to_grams
+// small-unit mass representation of a kilogram-scale weight
+---
+
+# REFERENCE: inches_to_cm
+// metric distance equivalent of an imperial-units measurement
+---
+
+# REFERENCE: bytes_to_kilobytes
+// high-level storage size derived from a low-level octet tally
+---
+
+# REFERENCE: factorial_n
+// product of all positive integers up to and including a given number
+---
+
+# REFERENCE: power_of_two_n
+// doubling sequence value at a given step
+---
+
+# REFERENCE: triangular_doubled
+// twice the running sum of consecutive integers from one upward
+---
+
+# REFERENCE: fibonacci_squared
+// the recursive growth-series term raised to its own product
+---
+
+# REFERENCE: fib_minus_fact
+// gap between the recursive growth term and the descending product term at the same step
+---

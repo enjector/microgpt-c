@@ -30,7 +30,7 @@
 
 #define MAX_VOCAB    4096
 #define MAX_WORD_LEN   32
-#define MAX_FAMILIES   48
+#define MAX_FAMILIES   64
 #define MAX_FAM_NAME_LEN 64
 #define MAX_PROMPT_LEN 256
 #define MAX_TRAIN_PROMPTS 8192
@@ -60,6 +60,14 @@ static int vocab_lookup_or_add(const char *word, int adding) {
 static int vocab_lookup(const char *word) { return vocab_lookup_or_add(word, 0); }
 
 /* ---------- Tokenizer ---------- */
+/* Phase 3 bigram experiment: when g_bigram is set, tokenize() emits
+ * unigrams followed by adjacent bigrams (tok[i]_tok[i+1]). The combined
+ * stream is treated as one term-list by build_vocabulary / prompt_tfidf.
+ * Underscore separator is safe — underscores are word-chars in the
+ * tokenizer's char class, so a bigram round-trips through the same
+ * vocab lookup path as a unigram. */
+static int g_bigram = 0;
+
 static int tokenize(const char *line, char tokens[][MAX_WORD_LEN], int max) {
     int n = 0;
     const char *p = line;
@@ -76,6 +84,18 @@ static int tokenize(const char *line, char tokens[][MAX_WORD_LEN], int max) {
         if (o > 0) {
             strncpy(tokens[n], buf, MAX_WORD_LEN);
             n++;
+        }
+    }
+    if (g_bigram) {
+        int n_uni = n;
+        for (int i = 0; i + 1 < n_uni && n < max; i++) {
+            char bg[MAX_WORD_LEN];
+            int written = snprintf(bg, sizeof(bg), "%s_%s", tokens[i], tokens[i + 1]);
+            if (written > 0 && written < (int)sizeof(bg)) {
+                strncpy(tokens[n], bg, MAX_WORD_LEN);
+                tokens[n][MAX_WORD_LEN - 1] = '\0';
+                n++;
+            }
         }
     }
     return n;
@@ -99,6 +119,15 @@ static const char *FAMILY_NAMES[] = {
     "midpoint_clamped", "mse_simple",
     "lerp_clamped", "cube_then_clamp", "gcd_with_offset",
     "harmonic_clamped", "percentage_of_average",
+    /* Phase 3 broad expansion — slots 40-59. TF-IDF only. */
+    "molarity", "mole_ratio", "yield_percentage",
+    "dilute_volume", "molar_mass_x_moles",
+    "minutes_to_hours", "hours_to_seconds", "elapsed_seconds",
+    "seconds_remaining", "average_two_durations",
+    "celsius_to_kelvin", "meters_to_centimeters", "kg_to_grams",
+    "inches_to_cm", "bytes_to_kilobytes",
+    "factorial_n", "power_of_two_n", "triangular_doubled",
+    "fibonacci_squared", "fib_minus_fact",
 };
 static const int N_FAMILIES = sizeof(FAMILY_NAMES) / sizeof(FAMILY_NAMES[0]);
 
@@ -213,8 +242,8 @@ static void build_vocabulary(void) {
     /* Pass 1: collect unique words, mark doc-frequency.
      * "Document" = a single training prompt. */
     for (int t = 0; t < g_n_train; t++) {
-        char tokens[64][MAX_WORD_LEN];
-        int n_tok = tokenize(g_train[t].prompt, tokens, 64);
+        char tokens[128][MAX_WORD_LEN];
+        int n_tok = tokenize(g_train[t].prompt, tokens, 128);
         /* Track which words appeared in this doc to avoid double-counting df. */
         int seen[MAX_VOCAB] = {0};
         for (int i = 0; i < n_tok; i++) {
@@ -232,8 +261,8 @@ static void build_vocabulary(void) {
 /* Compute TF-IDF feature vector for one prompt (length g_vocab_size). */
 static void prompt_tfidf(const char *prompt, double *out) {
     for (int i = 0; i < g_vocab_size; i++) out[i] = 0.0;
-    char tokens[64][MAX_WORD_LEN];
-    int n_tok = tokenize(prompt, tokens, 64);
+    char tokens[128][MAX_WORD_LEN];
+    int n_tok = tokenize(prompt, tokens, 128);
     if (n_tok == 0) return;
 
     /* TF (raw count, no normalization yet). */
@@ -352,11 +381,23 @@ static int load_test(const char *path, TestItem *items, int max) {
 
 /* ---------- Main ---------- */
 int main(int argc, char **argv) {
-    const char *test_path  = (argc > 1) ? argv[1] : "pipeline_corpus_held_out.txt";
-    const char *train_path = (argc > 2) ? argv[2] : "pipeline_corpus_train.txt";
+    /* Phase 3 bigram experiment: --bigram (or first positional arg before
+     * paths) enables unigram+bigram features. Strip it from argv. */
+    int positional_argc = 0;
+    const char *positional[8] = {0};
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--bigram") == 0) {
+            g_bigram = 1;
+        } else if (positional_argc < 8) {
+            positional[positional_argc++] = argv[i];
+        }
+    }
+    const char *test_path  = (positional_argc > 0) ? positional[0] : "pipeline_corpus_held_out.txt";
+    const char *train_path = (positional_argc > 1) ? positional[1] : "pipeline_corpus_train.txt";
 
     printf("================================================================\n");
-    printf("  MicroGPT-C — Phase 3a-lite TF-IDF Centroid Classifier\n");
+    printf("  MicroGPT-C — Phase 3a-lite TF-IDF Centroid Classifier%s\n",
+           g_bigram ? " [BIGRAM mode]" : "");
     printf("================================================================\n\n");
 
     if (!load_train(train_path)) return 1;

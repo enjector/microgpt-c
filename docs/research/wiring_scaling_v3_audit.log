@@ -1,0 +1,63 @@
+============================================================
+Scaling-curve leakage audit
+============================================================
+Held-out prompts: 20
+Train prompts:    12440
+
+--- Audit A: verbatim leakage ---
+Audit A total: 0 / 20 verbatim leaks
+
+--- Audit B: near-duplicate (Jaccard) leakage ---
+For each held-out prompt, max Jaccard against any training prompt:
+  [ok  ] 0.286  molarity ← train:molarity  "moles per litre concentration from amount of substance and volume"
+  [ok  ] 0.182  mole_ratio ← train:variance_two  "the dispersion between the two"
+  [ok  ] 0.231  yield_percentage ← train:mse_simple  "mse of model output versus target"
+  [ok  ] 0.143  dilute_volume ← train:discounted_tax  "tax on a marked price after a marked-down"
+  [ok  ] 0.429  molar_mass_x_moles ← train:molar_mass_x_moles  "grams of substance from mole count and atomic-weight per mole"
+  [ok  ] 0.231  minutes_to_hours ← train:minutes_to_hours  "convert duration in minutes to duration in hours"
+  [ok  ] 0.125  hours_to_seconds ← train:molarity  "the molarity given moles in volume"
+  [ok  ] 0.200  elapsed_seconds ← train:distance_midpoint  "interval between two readings combined with their midpoint"
+  [ok  ] 0.091  seconds_remaining ← train:fibonacci_squared  "n-indexed fibonacci-second-power"
+  [ok  ] 0.308  average_two_durations ← train:percentage_of_average  "the percent value taken against the midpoint across two values"
+  [ok  ] 0.250  celsius_to_kelvin ← train:celsius_to_kelvin  "kelvin temperature from centigrade reading via kelvin offset constant"
+  [ok  ] 0.154  meters_to_centimeters ← train:rectangle_perimeter  "perimeter of a oblong from width and length"
+  [ok  ] 0.188  kg_to_grams ← train:bmi_clamped  "body mass index of weight and centimetres confineed to a permitted span"
+  [ok  ] 0.214  inches_to_cm ← train:inches_to_cm  "centimetre measurement from inch measurement via imperial-to-metric scale"
+  [ok  ] 0.200  bytes_to_kilobytes ← train:bytes_to_kilobytes  "kilobyte tally from size in bytes via binary kilobyte factor"
+  [ok  ] 0.308  factorial_n ← train:fib_fact_mul  "the product of leonardo number and n!"
+  [ok  ] 0.250  power_of_two_n ← train:power_of_two_n  "binary exponent value at n"
+  [ok  ] 0.250  triangular_doubled ← train:fib_fact_add  "the sum of fibonacci(n) and n!"
+  [ok  ] 0.200  fibonacci_squared ← train:square_of_sum  "addition of two operands raised to the power of two"
+  [ok  ] 0.357  fib_minus_fact ← train:fib_fact_mul  "the product of fibonacci of n and descending product at n"
+Audit B total: 0 / 20 held-out prompts with max-Jaccard ≥ 0.7
+
+--- Audit C: lexical anchoring (vocabulary exclusivity) ---
+For each held-out prompt, how many of its content words appear in
+ONLY its own family's training data (= 'lexical anchors').
+  [low ]   0% anchors (0/7, 2 unseen)  molarity  anchors=[]
+  [low ]  12% anchors (1/8, 4 unseen)  mole_ratio  anchors=[reactant]
+  [low ]  11% anchors (1/9, 4 unseen)  yield_percentage  anchors=[maximum]
+  [low ]   0% anchors (0/10, 6 unseen)  dilute_volume  anchors=[]
+  [low ]   0% anchors (0/9, 1 unseen)  molar_mass_x_moles  anchors=[]
+  [low ]  11% anchors (1/9, 3 unseen)  minutes_to_hours  anchors=[minutes]
+  [low ]   0% anchors (0/10, 4 unseen)  hours_to_seconds  anchors=[]
+  [low ]   0% anchors (0/10, 3 unseen)  elapsed_seconds  anchors=[]
+  [low ]  12% anchors (1/8, 6 unseen)  seconds_remaining  anchors=[deadline]
+  [low ]   0% anchors (0/8, 3 unseen)  average_two_durations  anchors=[]
+  [med ]  29% anchors (2/7, 1 unseen)  celsius_to_kelvin  anchors=[centigrade,temperature]
+  [low ]  14% anchors (1/7, 2 unseen)  meters_to_centimeters  anchors=[metre]
+  [low ]  14% anchors (1/7, 2 unseen)  kg_to_grams  anchors=[kilogram]
+  [HIGH]  50% anchors (3/6, 0 unseen)  inches_to_cm  anchors=[measurement,imperial,metric]
+  [low ]  11% anchors (1/9, 3 unseen)  bytes_to_kilobytes  anchors=[tally]
+  [low ]   0% anchors (0/8, 2 unseen)  factorial_n  anchors=[]
+  [low ]   0% anchors (0/5, 3 unseen)  power_of_two_n  anchors=[]
+  [low ]  11% anchors (1/9, 3 unseen)  triangular_doubled  anchors=[twice]
+  [low ]   0% anchors (0/9, 1 unseen)  fibonacci_squared  anchors=[]
+  [low ]   0% anchors (0/11, 3 unseen)  fib_minus_fact  anchors=[]
+
+============================================================
+Audit complete. Three signals to interpret:
+  Audit A > 0  → strict verbatim leakage (FORBIDDEN[] failed)
+  Audit B ≥ 0.7 → near-duplicate; TF-IDF can win on overlap alone
+  Audit C ≥ 50% anchors → TF-IDF wins via single-word distinctness
+============================================================

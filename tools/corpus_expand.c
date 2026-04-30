@@ -715,6 +715,277 @@ static const Family FAMILIES[] = {
         "the %0% taken %1% the %2% across %3%",
         NULL
       } },
+
+    /* ====================================================================
+     * Phase 3 broad expansion — 20 new families, slots 40-59.
+     * Domains: chemistry / time / conversions / combinatorics.
+     * TF-IDF-only integration (not in anchor_graphs.c / geo_classifier.c)
+     * to avoid worsening the wiring binary vote-loop regression
+     * (see docs/research/wiring_binary_phase8_regression.md).
+     * ==================================================================== */
+
+    /* --- Chemistry (slots 40-44) --- */
+
+    { "molarity",
+      {
+        { "molarity", "molar concentration", "moles per litre concentration", NULL },
+        { "moles", "mole count", "amount of substance", NULL },
+        { "volume", "solution volume", "litres of solvent", NULL },
+      },
+      {
+        "%0% from %1% and %2%",
+        "%0% computed as %1% over %2%",
+        "the %0% given %1% in %2%",
+        NULL
+      } },
+
+    { "mole_ratio",
+      {
+        { "mole ratio", "stoichiometric proportion", "molar proportion", NULL },
+        { "first mole quantity", "reactant moles", NULL },
+        { "second mole quantity", "product moles", NULL },
+      },
+      {
+        "%0% between %1% and %2%",
+        "the %0% from %1% to %2%",
+        "%0% comparing %1% with %2%",
+        NULL
+      } },
+
+    { "yield_percentage",
+      {
+        { "yield percentage", "reaction yield", "experimental yield", NULL },
+        { "actual product", "obtained product", "observed amount", NULL },
+        { "theoretical product", "predicted maximum", "stoichiometric maximum", NULL },
+      },
+      {
+        "%0% from %1% and %2%",
+        "%0% comparing %1% to %2%",
+        "the %0% as %1% over %2%",
+        NULL
+      } },
+
+    { "dilute_volume",
+      {
+        { "dilution result", "dilution outcome", "dilute concentration", NULL },
+        { "initial product", "stock molarity times stock volume", "starting amount", NULL },
+        { "final volume", "dilute solution volume", NULL },
+      },
+      {
+        "%0% from %1% over %2%",
+        "%0% computed as %1% per %2%",
+        "the %0% taking %1% spread into %2%",
+        NULL
+      } },
+
+    { "molar_mass_x_moles",
+      {
+        { "grams of substance", "total grams", "substance mass total", NULL },
+        { "moles", "mole count", "amount of substance", NULL },
+        { "molar mass", "atomic-weight per mole", "grams per mole", NULL },
+      },
+      {
+        "%0% from %1% and %2%",
+        "%0% as %1% times %2%",
+        "the %0% given %1% multiplied by %2%",
+        NULL
+      } },
+
+    /* --- Time (slots 45-49) --- */
+
+    { "minutes_to_hours",
+      {
+        { "duration in hours", "hour count", "hours value", NULL },
+        { "minute count", "duration in minutes", "minutes amount", NULL },
+        { "sixty minutes per hour conversion", "sixty divisor", NULL },
+      },
+      {
+        "%0% from %1% via %2%",
+        "%0% derived from %1%",
+        "convert %1% to %0%",
+        NULL
+      } },
+
+    { "hours_to_seconds",
+      {
+        { "duration in seconds", "second count", NULL },
+        { "hour count", "duration in hours", NULL },
+        { "thirty-six-hundred multiplier", "seconds per hour factor", NULL },
+      },
+      {
+        "%0% from %1% via %2%",
+        "%0% derived from %1%",
+        "convert %1% to %0%",
+        NULL
+      } },
+
+    { "elapsed_seconds",
+      {
+        { "elapsed seconds", "elapsed duration", "time elapsed", NULL },
+        { "end timestamp", "end second", NULL },
+        { "start timestamp", "start second", NULL },
+      },
+      {
+        "%0% from %1% and %2%",
+        "%0% as difference of %1% and %2%",
+        "the %0% between %2% and %1%",
+        NULL
+      } },
+
+    { "seconds_remaining",
+      {
+        { "seconds remaining", "remaining duration", "time left", NULL },
+        { "total seconds", "deadline duration", NULL },
+        { "elapsed seconds", "consumed seconds", NULL },
+      },
+      {
+        "%0% from %1% and %2%",
+        "%0% as %1% minus %2%",
+        "the %0% after subtracting %2% from %1%",
+        NULL
+      } },
+
+    { "average_two_durations",
+      {
+        { "average duration", "mean duration", NULL },
+        { "first duration", "duration one", NULL },
+        { "second duration", "duration two", NULL },
+      },
+      {
+        "%0% from %1% and %2%",
+        "%0% computed across %1% and %2%",
+        "the %0% over %1% with %2%",
+        NULL
+      } },
+
+    /* --- Conversions (slots 50-54) --- */
+
+    { "celsius_to_kelvin",
+      {
+        { "kelvin temperature", "absolute temperature", "kelvin reading", NULL },
+        { "celsius reading", "centigrade reading", NULL },
+        { "two-seventy-three offset", "kelvin offset constant", NULL },
+      },
+      {
+        "%0% from %1% via %2%",
+        "%0% derived by adding %2% to %1%",
+        "convert %1% to %0%",
+        NULL
+      } },
+
+    { "meters_to_centimeters",
+      {
+        { "centimetre count", "length in centimetres", NULL },
+        { "metre count", "length in metres", NULL },
+        { "hundred multiplier", "centimetres per metre factor", NULL },
+      },
+      {
+        "%0% from %1% via %2%",
+        "%0% derived from %1% scaled by %2%",
+        "convert %1% to %0%",
+        NULL
+      } },
+
+    { "kg_to_grams",
+      {
+        { "gram count", "mass in grams", NULL },
+        { "kilogram count", "mass in kilograms", NULL },
+        { "thousand multiplier", "grams per kilogram factor", NULL },
+      },
+      {
+        "%0% from %1% via %2%",
+        "%0% derived from %1% scaled by %2%",
+        "convert %1% to %0%",
+        NULL
+      } },
+
+    { "inches_to_cm",
+      {
+        { "centimetre length", "centimetre measurement", NULL },
+        { "inch length", "inch measurement", NULL },
+        { "two-five-four conversion", "imperial-to-metric scale", NULL },
+      },
+      {
+        "%0% from %1% via %2%",
+        "%0% derived from %1% by %2%",
+        "convert %1% to %0%",
+        NULL
+      } },
+
+    { "bytes_to_kilobytes",
+      {
+        { "kilobyte count", "size in kilobytes", "kilobyte tally", NULL },
+        { "byte count", "size in bytes", "byte tally", NULL },
+        { "ten-twenty-four divisor", "binary kilobyte factor", NULL },
+      },
+      {
+        "%0% from %1% via %2%",
+        "%0% derived by dividing %1% by %2%",
+        "convert %1% to %0%",
+        NULL
+      } },
+
+    /* --- Combinatorics (slots 55-59) --- */
+
+    { "factorial_n",
+      {
+        { "factorial value", "n-factorial", "descending product", NULL },
+        { "n", "input integer", "index n", NULL },
+      },
+      {
+        "%0% of %1%",
+        "the %0% computed at %1%",
+        "%1%-th %0%",
+        NULL
+      } },
+
+    { "power_of_two_n",
+      {
+        { "power of two", "binary exponent value", "two-to-the-n", NULL },
+        { "n", "exponent index", "binary order", NULL },
+      },
+      {
+        "%0% at %1%",
+        "the %0% indexed by %1%",
+        "%0% with exponent %1%",
+        NULL
+      } },
+
+    { "triangular_doubled",
+      {
+        { "twice triangular number", "two-triangular value", "n-times-n-plus-one product", NULL },
+        { "n", "index integer", NULL },
+      },
+      {
+        "%0% at %1%",
+        "the %0% computed for %1%",
+        "%0% indexed by %1%",
+        NULL
+      } },
+
+    { "fibonacci_squared",
+      {
+        { "squared fibonacci value", "fibonacci-second-power", NULL },
+        { "n", "fibonacci index", NULL },
+      },
+      {
+        "%0% at %1%",
+        "the %0% computed for %1%",
+        "%1%-indexed %0%",
+        NULL
+      } },
+
+    { "fib_minus_fact",
+      {
+        { "fibonacci minus factorial", "fib-fact difference", NULL },
+        { "n", "shared index", NULL },
+      },
+      {
+        "%0% at %1%",
+        "the %0% computed for %1%",
+        "%1%-indexed %0%",
+        NULL
+      } },
 };
 
 static const int N_FAMILIES = (int)(sizeof(FAMILIES) / sizeof(FAMILIES[0]));
@@ -787,6 +1058,27 @@ static const char *FORBIDDEN[] = {
     "greatest common divisor of a and b plus c",
     "harmonic number for n bounded between lo and hi",
     "percentage value relative to the average of a and b",
+    /* Scaling v3 broad-expansion held-out — disjoint vocabulary. */
+    "concentration of dissolved substance per unit liquid quantity",
+    "comparative balance between two reactant amounts in a chemical equation",
+    "fraction of intended chemical output achieved versus the maximum possible",
+    "diluted-down strength after spreading a solute across a larger liquid quantity",
+    "weight of a chemical sample obtained from quantity and per-mole weight",
+    "translate a span measured in minutes into the equivalent in clock hours",
+    "stretch an hour-based span into the equivalent in tick-level units",
+    "second-level interval that has passed between two clock points",
+    "second-level countdown still available before a deadline expires",
+    "the typical value across two recorded time spans",
+    "thermodynamic-scale temperature derived from a centigrade observation",
+    "small-unit length representation of a metre-scale distance",
+    "small-unit mass representation of a kilogram-scale weight",
+    "metric distance equivalent of an imperial-units measurement",
+    "high-level storage size derived from a low-level octet tally",
+    "product of all positive integers up to and including a given number",
+    "doubling sequence value at a given step",
+    "twice the running sum of consecutive integers from one upward",
+    "the recursive growth-series term raised to its own product",
+    "gap between the recursive growth term and the descending product term at the same step",
     /* Scaling v2 clean held-out — disjoint vocabulary from synonym tables. */
     "comparing the surface coverage of two disks based on radial measurements",
     "raise the addition of two operands to the second exponent",
