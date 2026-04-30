@@ -28,7 +28,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define MAX_VOCAB    4096
+#define MAX_VOCAB   16384
 #define MAX_WORD_LEN   32
 #define MAX_FAMILIES   64
 #define MAX_FAM_NAME_LEN 64
@@ -65,8 +65,16 @@ static int vocab_lookup(const char *word) { return vocab_lookup_or_add(word, 0);
  * stream is treated as one term-list by build_vocabulary / prompt_tfidf.
  * Underscore separator is safe — underscores are word-chars in the
  * tokenizer's char class, so a bigram round-trips through the same
- * vocab lookup path as a unigram. */
-static int g_bigram = 0;
+ * vocab lookup path as a unigram.
+ *
+ * Post-Phase-3 #3 experiment: when g_char_ngram is set, tokenize()
+ * also emits character trigrams from each token, prefixed with "_t_"
+ * to avoid colliding with unigram/bigram namespace. Tests whether
+ * morphological surface similarity (e.g. "molar" / "molarity" share
+ * "mola"/"olar" trigrams) bridges the bag-of-features ceiling for
+ * novel-paraphrase generalization. */
+static int g_bigram     = 0;
+static int g_char_ngram = 0;
 
 static int tokenize(const char *line, char tokens[][MAX_WORD_LEN], int max) {
     int n = 0;
@@ -86,8 +94,8 @@ static int tokenize(const char *line, char tokens[][MAX_WORD_LEN], int max) {
             n++;
         }
     }
+    int n_uni = n;
     if (g_bigram) {
-        int n_uni = n;
         for (int i = 0; i + 1 < n_uni && n < max; i++) {
             char bg[MAX_WORD_LEN];
             int written = snprintf(bg, sizeof(bg), "%s_%s", tokens[i], tokens[i + 1]);
@@ -95,6 +103,26 @@ static int tokenize(const char *line, char tokens[][MAX_WORD_LEN], int max) {
                 strncpy(tokens[n], bg, MAX_WORD_LEN);
                 tokens[n][MAX_WORD_LEN - 1] = '\0';
                 n++;
+            }
+        }
+    }
+    if (g_char_ngram) {
+        /* Emit length-3 char n-grams from each unigram token. The "_t_"
+         * prefix separates the trigram namespace from word/bigram
+         * namespace so vocab_lookup won't collide. */
+        for (int i = 0; i < n_uni && n < max; i++) {
+            const char *w = tokens[i];
+            int wlen = (int)strlen(w);
+            if (wlen < 3) continue;
+            for (int s = 0; s + 3 <= wlen && n < max; s++) {
+                char tg[MAX_WORD_LEN];
+                int written = snprintf(tg, sizeof(tg), "_t_%c%c%c",
+                                       w[s], w[s + 1], w[s + 2]);
+                if (written > 0 && written < (int)sizeof(tg)) {
+                    strncpy(tokens[n], tg, MAX_WORD_LEN);
+                    tokens[n][MAX_WORD_LEN - 1] = '\0';
+                    n++;
+                }
             }
         }
     }
@@ -242,8 +270,8 @@ static void build_vocabulary(void) {
     /* Pass 1: collect unique words, mark doc-frequency.
      * "Document" = a single training prompt. */
     for (int t = 0; t < g_n_train; t++) {
-        char tokens[128][MAX_WORD_LEN];
-        int n_tok = tokenize(g_train[t].prompt, tokens, 128);
+        char tokens[512][MAX_WORD_LEN];
+        int n_tok = tokenize(g_train[t].prompt, tokens, 512);
         /* Track which words appeared in this doc to avoid double-counting df. */
         int seen[MAX_VOCAB] = {0};
         for (int i = 0; i < n_tok; i++) {
@@ -261,8 +289,8 @@ static void build_vocabulary(void) {
 /* Compute TF-IDF feature vector for one prompt (length g_vocab_size). */
 static void prompt_tfidf(const char *prompt, double *out) {
     for (int i = 0; i < g_vocab_size; i++) out[i] = 0.0;
-    char tokens[128][MAX_WORD_LEN];
-    int n_tok = tokenize(prompt, tokens, 128);
+    char tokens[512][MAX_WORD_LEN];
+    int n_tok = tokenize(prompt, tokens, 512);
     if (n_tok == 0) return;
 
     /* TF (raw count, no normalization yet). */
@@ -388,6 +416,8 @@ int main(int argc, char **argv) {
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--bigram") == 0) {
             g_bigram = 1;
+        } else if (strcmp(argv[i], "--char-ngram") == 0) {
+            g_char_ngram = 1;
         } else if (positional_argc < 8) {
             positional[positional_argc++] = argv[i];
         }
@@ -396,8 +426,9 @@ int main(int argc, char **argv) {
     const char *train_path = (positional_argc > 1) ? positional[1] : "pipeline_corpus_train.txt";
 
     printf("================================================================\n");
-    printf("  MicroGPT-C — Phase 3a-lite TF-IDF Centroid Classifier%s\n",
-           g_bigram ? " [BIGRAM mode]" : "");
+    printf("  MicroGPT-C — Phase 3a-lite TF-IDF Centroid Classifier%s%s\n",
+           g_bigram ? " [BIGRAM]" : "",
+           g_char_ngram ? " [CHAR-NGRAM]" : "");
     printf("================================================================\n\n");
 
     if (!load_train(train_path)) return 1;
