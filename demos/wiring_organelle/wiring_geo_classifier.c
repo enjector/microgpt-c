@@ -58,39 +58,6 @@ static const FamilyAnchor FAMILIES[] = {
     { "distance_midpoint", 17, { "distance", "readings", "midpoint", NULL } },
     { "savings_rate",      18, { "fraction", "saved", "subtracting", "expenses", NULL } },
     { "scaled_relu",       19, { "rectified", "gain", NULL } },
-    /* ====================================================================
-     * Scaling-curve experiment — Batch 1 (geometry, slots 20-24)
-     * Keywords picked to be lexically distinct from the existing 20.
-     * ==================================================================== */
-    { "circle_area_ratio",      20, { "ratio", "circle", "circles", "areas", "radii", NULL } },
-    { "square_of_sum",          21, { "square", "sum", "summed", NULL } },
-    { "triangle_area",          22, { "triangle", "base", NULL } },
-    { "rectangle_perimeter",    23, { "perimeter", "rectangle", "width", NULL } },
-    { "hypotenuse_squared",     24, { "hypotenuse", "legs", "squares", "pythagoras", NULL } },
-    /* ====================================================================
-     * Scaling-curve experiment — Batch 2 (physics, slots 25-29)
-     * ==================================================================== */
-    { "kinetic_energy_clamped", 25, { "kinetic", "energy", "joules", NULL } },
-    { "momentum",               26, { "momentum", "mass", "velocity", NULL } },
-    { "work_done",              27, { "work", "performed", "force", "distance", NULL } },
-    { "power_clamped",          28, { "power", "exponent", NULL } },
-    { "harmonic_sum",           29, { "harmonic", "harmonics", "terms", NULL } },
-    /* ====================================================================
-     * Scaling-curve experiment — Batch 3 (statistics, slots 30-34)
-     * ==================================================================== */
-    { "variance_two",           30, { "variance", "samples", "spread", NULL } },
-    { "abs_z_score",            31, { "z-score", "z", "deviation", NULL } },
-    { "range_two",              32, { "range", "max", "min", "readings", NULL } },
-    { "midpoint_clamped",       33, { "midpoint", "median", "halfway", NULL } },
-    { "mse_simple",             34, { "mean", "squared", "error", "prediction", "target", NULL } },
-    /* ====================================================================
-     * Scaling-curve experiment — Batch 4 (math chains, slots 35-39)
-     * ==================================================================== */
-    { "lerp_clamped",           35, { "linear", "interpolation", "interpolated", "lerp", NULL } },
-    { "cube_then_clamp",        36, { "cube", "cubed", NULL } },
-    { "gcd_with_offset",        37, { "plus", "offset", NULL } },
-    { "harmonic_clamped",       38, { "harmonic", "number", NULL } },
-    { "percentage_of_average",  39, { "percentage", "relative", "average", NULL } },
 };
 static const int N_FAMILIES = (int)(sizeof(FAMILIES) / sizeof(FAMILIES[0]));
 
