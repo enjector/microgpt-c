@@ -1,0 +1,91 @@
+# Pipeline IR — Scaling-curve experiment held-out test set
+#
+# Pre-registered before any new families were added to the library.
+# One paraphrase per new family. Used to measure whether linear-effort
+# curation (~30 min/family) translates 1:1 to TF-IDF retrieval coverage.
+#
+# Pre-registration: see investigation/scaling-curve-experiment branch
+# commit message + tier1 scoreboard. H_main: ≥ 18/20 Top-1 EXACT match.
+#
+# Each prompt MUST be added to corpus_expand.c forbidden_prompts[] before
+# regenerating the Phase 4 corpus, to prevent training-on-test leakage.
+
+# REFERENCE: circle_area_ratio
+// ratio of two circle areas given their radii
+---
+
+# REFERENCE: square_of_sum
+// square the sum of a and b
+---
+
+# REFERENCE: triangle_area
+// area of a triangle from its base and height
+---
+
+# REFERENCE: rectangle_perimeter
+// perimeter of a rectangle from width and height
+---
+
+# REFERENCE: hypotenuse_squared
+// sum of the squares of two legs
+---
+
+# REFERENCE: kinetic_energy_clamped
+// kinetic energy bounded between lo and hi
+---
+
+# REFERENCE: momentum
+// momentum from mass and velocity
+---
+
+# REFERENCE: work_done
+// work performed given force and distance
+---
+
+# REFERENCE: power_clamped
+// power of x to n bounded inside lo hi
+---
+
+# REFERENCE: harmonic_sum
+// sum of the first n harmonic terms
+---
+
+# REFERENCE: variance_two
+// variance across two samples a and b
+---
+
+# REFERENCE: abs_z_score
+// absolute z-score given x and the mean
+---
+
+# REFERENCE: range_two
+// range between max and min of two readings
+---
+
+# REFERENCE: midpoint_clamped
+// midpoint of a and b clamped between lo and hi
+---
+
+# REFERENCE: mse_simple
+// mean squared error from prediction and target
+---
+
+# REFERENCE: lerp_clamped
+// linear interpolation between a and b at t bounded by lo hi
+---
+
+# REFERENCE: cube_then_clamp
+// cube of x bounded inside lo hi
+---
+
+# REFERENCE: gcd_with_offset
+// greatest common divisor of a and b plus c
+---
+
+# REFERENCE: harmonic_clamped
+// harmonic number for n bounded between lo and hi
+---
+
+# REFERENCE: percentage_of_average
+// percentage value relative to the average of a and b
+---

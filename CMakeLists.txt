@@ -1928,12 +1928,16 @@ add_custom_command(TARGET wiring_organelle_demo POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy
           ${CMAKE_CURRENT_SOURCE_DIR}/demos/wiring_organelle/pipeline_corpus_composition.txt
           $<TARGET_FILE_DIR:wiring_organelle_demo>/pipeline_corpus_composition.txt
+  COMMAND ${CMAKE_COMMAND} -E copy
+          ${CMAKE_CURRENT_SOURCE_DIR}/demos/wiring_organelle/pipeline_corpus_scaling_heldout.txt
+          $<TARGET_FILE_DIR:wiring_organelle_demo>/pipeline_corpus_scaling_heldout.txt
   COMMAND sh
           ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_held_out_leakage.sh
           $<TARGET_FILE_DIR:wiring_organelle_demo>
   DEPENDS pipeline_corpus_gen
           ${CMAKE_CURRENT_SOURCE_DIR}/demos/wiring_organelle/pipeline_corpus_held_out.txt
           ${CMAKE_CURRENT_SOURCE_DIR}/demos/wiring_organelle/pipeline_corpus_composition.txt
+          ${CMAKE_CURRENT_SOURCE_DIR}/demos/wiring_organelle/pipeline_corpus_scaling_heldout.txt
           ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_held_out_leakage.sh
   COMMENT "Generating Pipeline IR corpus (wiring + planner), copying held-out + composition, leakage check"
 )

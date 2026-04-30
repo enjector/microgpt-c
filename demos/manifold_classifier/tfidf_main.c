@@ -30,7 +30,7 @@
 
 #define MAX_VOCAB    4096
 #define MAX_WORD_LEN   32
-#define MAX_FAMILIES   24
+#define MAX_FAMILIES   48
 #define MAX_FAM_NAME_LEN 64
 #define MAX_PROMPT_LEN 256
 #define MAX_TRAIN_PROMPTS 8192
@@ -88,6 +88,17 @@ static const char *FAMILY_NAMES[] = {
     "gross_minus_tax", "discounted_tax", "fib_fact_mul", "fib_fact_add",
     "invoice_total", "clamped_average", "abs_diff", "pv_of_fv",
     "distance_metrics", "distance_midpoint", "savings_rate", "scaled_relu",
+    /* Scaling-curve experiment, slots 20-39 — denominator stable at 40
+     * across all measurement batches. Centroids materialize only when
+     * the family has corpus_expand.c entries and the corpus is regenerated. */
+    "circle_area_ratio", "square_of_sum", "triangle_area",
+    "rectangle_perimeter", "hypotenuse_squared",
+    "kinetic_energy_clamped", "momentum", "work_done",
+    "power_clamped", "harmonic_sum",
+    "variance_two", "abs_z_score", "range_two",
+    "midpoint_clamped", "mse_simple",
+    "lerp_clamped", "cube_then_clamp", "gcd_with_offset",
+    "harmonic_clamped", "percentage_of_average",
 };
 static const int N_FAMILIES = sizeof(FAMILY_NAMES) / sizeof(FAMILY_NAMES[0]);
 
