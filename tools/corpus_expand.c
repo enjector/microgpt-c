@@ -618,6 +618,91 @@ static const Family FAMILIES[] = {
         "%0% of %1% versus %2%",
         NULL
       } },
+
+    /* ====================================================================
+     * Scaling-curve experiment — Batch 4 (math chains, slots 35-39)
+     * ==================================================================== */
+
+    /* ---- lerp_clamped: clamp(lerp(a, b, t), lo, hi) ----
+     * groups: 0=lerp-verb, 1=endpoints-noun, 2=t-noun, 3=clamp-verb */
+    { "lerp_clamped",
+      {
+        { "linear interpolation", "lerp", "linear blend", "interp", NULL },
+        { "a and b", "two endpoints", "two values", "endpoint pair", NULL },
+        { "t", "interpolation factor", "blend factor", "weight", NULL },
+        { "bounded", "clamped", "constrained", "pinned", NULL },
+        { "lo hi", "low high range", "an allowed range", NULL },
+      },
+      {
+        "%0% between %1% at %2% %3% by %4%",
+        "%3% the %0% of %1% with factor %2%",
+        "%0% of %1% using %2% then %3% inside %4%",
+        NULL
+      } },
+
+    /* ---- cube_then_clamp: clamp(cube(x), lo, hi) ----
+     * groups: 0=cube-noun, 1=clamp-verb, 2=range-phrase */
+    { "cube_then_clamp",
+      {
+        { "cube", "third power", "x cubed", "raised to three", NULL },
+        { "bounded", "clamped", "pinned", "constrained", NULL },
+        { "lo hi", "low high range", "an allowed range", NULL },
+        { "x", "input", "value", NULL },
+      },
+      {
+        "%0% of %3% %1% inside %2%",
+        "%1% the %0% of %3% within %2%",
+        "the %0% of %3% kept inside %2%",
+        NULL
+      } },
+
+    /* ---- gcd_with_offset: gcd(a, b) + c ----
+     * groups: 0=gcd-noun, 1=plus-word, 2=offset-noun */
+    { "gcd_with_offset",
+      {
+        { "greatest common divisor", "gcd", "highest common factor", NULL },
+        { "plus", "added to", "shifted by", "with an added", NULL },
+        { "c", "offset", "constant", "shift", NULL },
+        { "a and b", "two integers", "the pair", NULL },
+      },
+      {
+        "%0% of %3% %1% %2%",
+        "the %0% of %3% with %1% %2%",
+        "%0% of %3% then %1% %2%",
+        NULL
+      } },
+
+    /* ---- harmonic_clamped: clamp(harmonic_n(n), lo, hi) ----
+     * groups: 0=harmonic-noun, 1=clamp-verb, 2=range-phrase */
+    { "harmonic_clamped",
+      {
+        { "harmonic number", "harmonic value", "Hn", "n-th harmonic", NULL },
+        { "bounded", "clamped", "constrained", "pinned", NULL },
+        { "lo and hi", "low and high", "an allowed range", "permitted bounds", NULL },
+        { "n", "index n", NULL },
+      },
+      {
+        "%0% for %3% %1% between %2%",
+        "%1% the %0% for %3% inside %2%",
+        "the %0% of %3% kept within %2%",
+        NULL
+      } },
+
+    /* ---- percentage_of_average: percentage(part, average_two(a, b)) ----
+     * groups: 0=percentage-noun, 1=relative-word, 2=average-noun */
+    { "percentage_of_average",
+      {
+        { "percentage", "percent value", "fractional share", NULL },
+        { "relative to", "with respect to", "compared with", "against", NULL },
+        { "average", "mean", "midpoint", NULL },
+        { "a and b", "two values", "the pair", NULL },
+      },
+      {
+        "%0% %1% the %2% of %3%",
+        "%0% %1% %2% of %3%",
+        "the %0% taken %1% the %2% across %3%",
+        NULL
+      } },
 };
 
 static const int N_FAMILIES = (int)(sizeof(FAMILIES) / sizeof(FAMILIES[0]));
@@ -684,6 +769,12 @@ static const char *FORBIDDEN[] = {
     "range between max and min of two readings",
     "midpoint of a and b clamped between lo and hi",
     "mean squared error from prediction and target",
+    /* Scaling-curve experiment held-out (Batch 4: math chains). */
+    "linear interpolation between a and b at t bounded by lo hi",
+    "cube of x bounded inside lo hi",
+    "greatest common divisor of a and b plus c",
+    "harmonic number for n bounded between lo and hi",
+    "percentage value relative to the average of a and b",
     NULL
 };
 

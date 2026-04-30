@@ -83,6 +83,14 @@ static const FamilyAnchor FAMILIES[] = {
     { "range_two",              32, { "range", "max", "min", "readings", NULL } },
     { "midpoint_clamped",       33, { "midpoint", "median", "halfway", NULL } },
     { "mse_simple",             34, { "mean", "squared", "error", "prediction", "target", NULL } },
+    /* ====================================================================
+     * Scaling-curve experiment — Batch 4 (math chains, slots 35-39)
+     * ==================================================================== */
+    { "lerp_clamped",           35, { "linear", "interpolation", "interpolated", "lerp", NULL } },
+    { "cube_then_clamp",        36, { "cube", "cubed", NULL } },
+    { "gcd_with_offset",        37, { "plus", "offset", NULL } },
+    { "harmonic_clamped",       38, { "harmonic", "number", NULL } },
+    { "percentage_of_average",  39, { "percentage", "relative", "average", NULL } },
 };
 static const int N_FAMILIES = (int)(sizeof(FAMILIES) / sizeof(FAMILIES[0]));
 

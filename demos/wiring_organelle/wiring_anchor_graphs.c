@@ -457,6 +457,66 @@ static const AnchorEntry ANCHORS[] = {
       "  | e = mse(x: <pred>, y: <target>) :: x:int, y:int -> out:int\n"
       "  y <- e.out\n"
       "@end\n" },
+
+    /* ====================================================================
+     * Scaling-curve experiment — Batch 4 (math chains, slots 35-39)
+     * ==================================================================== */
+    { "lerp_clamped",
+      "@graph lerp_clamped\n"
+      "  : in a -> int\n"
+      "  : in b -> int\n"
+      "  : in t -> int\n"
+      "  : in lo -> int\n"
+      "  : in hi -> int\n"
+      "  : out y -> int\n"
+      "  | l = lerp(a: <a>, b: <b>, t: <t>) :: a:int, b:int, t:int -> out:int\n"
+      "  | c = clamp(x: l.out, lo: <lo>, hi: <hi>) :: x:int, lo:int, hi:int -> out:int\n"
+      "  y <- c.out\n"
+      "@end\n" },
+
+    { "cube_then_clamp",
+      "@graph cube_then_clamp\n"
+      "  : in x -> int\n"
+      "  : in lo -> int\n"
+      "  : in hi -> int\n"
+      "  : out y -> int\n"
+      "  | k = cube(x: <x>) :: x:int -> out:int\n"
+      "  | c = clamp(x: k.out, lo: <lo>, hi: <hi>) :: x:int, lo:int, hi:int -> out:int\n"
+      "  y <- c.out\n"
+      "@end\n" },
+
+    { "gcd_with_offset",
+      "@graph gcd_with_offset\n"
+      "  : in a -> int\n"
+      "  : in b -> int\n"
+      "  : in c -> int\n"
+      "  : out y -> int\n"
+      "  | g = gcd(a: <a>, b: <b>) :: a:int, b:int -> out:int\n"
+      "  | s = add(x: g.out, y: <c>) :: x:int, y:int -> out:int\n"
+      "  y <- s.out\n"
+      "@end\n" },
+
+    { "harmonic_clamped",
+      "@graph harmonic_clamped\n"
+      "  : in n -> int\n"
+      "  : in lo -> int\n"
+      "  : in hi -> int\n"
+      "  : out y -> int\n"
+      "  | h = harmonic_n(n: <n>) :: n:int -> out:int\n"
+      "  | c = clamp(x: h.out, lo: <lo>, hi: <hi>) :: x:int, lo:int, hi:int -> out:int\n"
+      "  y <- c.out\n"
+      "@end\n" },
+
+    { "percentage_of_average",
+      "@graph percentage_of_average\n"
+      "  : in part -> int\n"
+      "  : in a -> int\n"
+      "  : in b -> int\n"
+      "  : out y -> int\n"
+      "  | avg = average_two(a: <a>, b: <b>) :: a:int, b:int -> out:int\n"
+      "  | p = percentage(part: <part>, whole: avg.out) :: part:int, whole:int -> out:int\n"
+      "  y <- p.out\n"
+      "@end\n" },
 };
 
 static const int N_ANCHORS = (int)(sizeof(ANCHORS) / sizeof(ANCHORS[0]));
