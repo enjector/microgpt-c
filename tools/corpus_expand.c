@@ -118,13 +118,18 @@ static const Family FAMILIES[] = {
       } },
 
     /* ---- clamped_sigmoid: clamp(sigmoid(x), lo, hi) ----
-     * groups: 0=sigmoid-noun, 1=output-noun, 2=clamp-verb, 3=range-phrase */
+     * groups: 0=sigmoid-noun, 1=output-noun, 2=clamp-verb, 3=range-phrase
+     * Phase 2 subtractive sharpening: remove generic clamp words
+     * ("restrict") and window-style ranges that wrongly steal
+     * matches from midpoint_clamped / harmonic_clamped on prompts
+     * about "restricted within a defined window". The remaining
+     * sigmoid-distinctive vocabulary still anchors the family. */
     { "clamped_sigmoid",
       {
         { "sigmoid", "logistic", "logistic function", "sigmoid neuron", "sigmoid activation", NULL },
         { "output", "activation", "value", "response", "result", NULL },
-        { "clamp", "clip", "constrain", "restrict", "pin", "bound", "hold", NULL },
-        { "lo high range", "low high band", "permitted window", "lo hi limits", "permissible window", NULL },
+        { "clamp", "clip", "constrain", "pin", "bound", "hold", NULL },
+        { "lo high range", "low high band", "lo hi limits", NULL },
       },
       {
         "%2% the %0% %1% to a %3%",
@@ -274,11 +279,15 @@ static const Family FAMILIES[] = {
 
     /* ---- abs_diff: abs(a - b) ----
      * groups: 0=abs-adj, 1=diff-noun, 2=between-phrase */
+    /* Phase 2 subtractive sharpening: remove "gap" + "spread" +
+     * "separating two readings" so range_two can win on its own
+     * distinctive max-min vocabulary without competing on these
+     * words. abs_diff still owns absolute/magnitude/difference. */
     { "abs_diff",
       {
         { "absolute", "unsigned", "positive-only", "magnitude of", NULL },
-        { "magnitude", "difference", "gap", "deviation", "spread", NULL },
-        { "between two forecasts", "between two estimates", "separating two readings", "across two predictions", NULL },
+        { "magnitude", "difference", "deviation", NULL },
+        { "between two forecasts", "between two estimates", "across two predictions", NULL },
       },
       {
         "%0% %1% %2%",
@@ -503,9 +512,12 @@ static const Family FAMILIES[] = {
 
     /* ---- power_clamped: clamp(power(x, n), lo, hi) ----
      * groups: 0=power-noun, 1=base-noun, 2=exp-noun, 3=clamp-verb */
+    /* Phase 2 subtractive sharpening: drop "raised to"-style templates
+     * so hypotenuse_squared (which legitimately uses "raised to power")
+     * isn't outweighted by power_clamped on Pythagorean prompts. */
     { "power_clamped",
       {
-        { "power", "exponentiation", "raised value", NULL },
+        { "power", "exponentiation", NULL },
         { "x", "base", "base value", NULL },
         { "n", "exponent", "power index", NULL },
         { "bounded", "clamped", "constrained", "limited", "pinned", NULL },
@@ -513,7 +525,7 @@ static const Family FAMILIES[] = {
       },
       {
         "%0% of %1% to %2% %3% inside %4%",
-        "%3% the %0% of %1% raised to %2% within %4%",
+        "the %0% of %1% with %2% %3% within %4%",
         "%1% to the %2% %3% by %4%",
         NULL
       } },
