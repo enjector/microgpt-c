@@ -24,7 +24,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define MAX_FRAGMENTS    16
+#define MAX_FRAGMENTS    24
 #define MAX_KEYWORDS     12
 #define MAX_ARGS          4
 
@@ -135,6 +135,24 @@ static const Fragment FRAGMENTS[] = {
         { "fibonacci", "factorial", "Leonardo", NULL },
         "_fib_fact_mul",  /* Composer special-cases this fused step. */
         { "n" }, 1, 0
+    },
+    {
+        "divide_step",
+        { "divide", "divided", "quotient", "split", NULL },
+        "divide",
+        { "x", "y" }, 2, 0
+    },
+    {
+        "square_step",
+        { "square", "squared", NULL },
+        "square",
+        { "x" }, 1, 0
+    },
+    {
+        "lerp_step",
+        { "lerp", "interpolate", "interpolated", "interpolation", NULL },
+        "lerp",
+        { "a", "b", "t" }, 3, 0
     },
 };
 static const int N_FRAGMENTS = (int)(sizeof(FRAGMENTS) / sizeof(FRAGMENTS[0]));
@@ -308,6 +326,30 @@ int wiring_compose_for_prompt(const char *prompt, char *out_buf, size_t out_size
     /* Defensive: cap at 3 and require each of the top-K to have ≥1 hit. */
     if (K > 3) K = 3;
     if (K > n_hits) K = n_hits;
+
+    /* Phase 3b chain-direction fix: "after"-connective handling.
+     * English clauses like "X after Y" (and "X after Y and Z") mean Y (and Z)
+     * happen BEFORE X in the pipeline. The default position-based ordering
+     * would chain X→Y→Z. Detect " after " and pull every fragment whose
+     * keyword sits to the right of " after " to the front of the chain,
+     * preserving relative order among the pulled fragments. */
+    {
+        char lc[512];
+        size_t plen = strnlen(prompt, sizeof(lc) - 1);
+        for (size_t i = 0; i < plen; i++) {
+            lc[i] = (char)tolower((unsigned char)prompt[i]);
+        }
+        lc[plen] = '\0';
+        const char *after = strstr(lc, " after ");
+        if (after != NULL) {
+            int after_pos = (int)(after - lc);
+            for (int i = 0; i < K; i++) {
+                if (hits[i].first_pos > after_pos) {
+                    hits[i].first_pos -= 100000;
+                }
+            }
+        }
+    }
 
     /* Order the chosen fragments by prompt position (earlier first). */
     qsort(hits, (size_t)K, sizeof(FragHit), cmp_by_pos_asc);
