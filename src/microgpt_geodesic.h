@@ -31,7 +31,7 @@
  * unique axis in the wiring_geo_classifier slot table, eliminating the
  * slot-collisions that capped Phase 2 at 80% (16/20). */
 #ifndef GEO_DIMS
-#define GEO_DIMS 20
+#define GEO_DIMS 40
 #endif
 
 /* =========================================================================
