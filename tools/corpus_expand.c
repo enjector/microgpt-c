@@ -447,6 +447,93 @@ static const Family FAMILIES[] = {
         "%3% style %0% of %1% of %2%",
         NULL
       } },
+
+    /* ====================================================================
+     * Scaling-curve experiment — Batch 2 (physics, slots 25-29)
+     * ==================================================================== */
+
+    /* ---- kinetic_energy_clamped: clamp(kinetic_energy(m,v), lo, hi) ----
+     * groups: 0=energy-noun, 1=clamp-verb, 2=range-phrase */
+    { "kinetic_energy_clamped",
+      {
+        { "kinetic energy", "translational energy", "movement energy", "moving-mass energy", NULL },
+        { "bounded", "clamped", "constrained", "pinned", "limited", "kept", NULL },
+        { "lo and hi", "low and high limits", "an allowed range", "permitted bounds", NULL },
+        { "joules", "energy joules", "kinetic value", NULL },
+      },
+      {
+        "%0% %1% between %2%",
+        "%1% the %0% within %2%",
+        "the %3% %1% inside %2%",
+        "%0% of moving mass %1% to %2%",
+        NULL
+      } },
+
+    /* ---- momentum: multiply(mass, velocity) ----
+     * groups: 0=momentum-noun, 1=mass-noun, 2=velocity-noun */
+    { "momentum",
+      {
+        { "momentum", "linear momentum", "mass-velocity product", "p value", NULL },
+        { "mass", "object mass", "body mass", NULL },
+        { "velocity", "speed", "translational velocity", NULL },
+      },
+      {
+        "%0% from %1% and %2%",
+        "%0% of an object given %1% and %2%",
+        "the %0% computed as %1% times %2%",
+        "%1% multiplied by %2% giving %0%",
+        NULL
+      } },
+
+    /* ---- work_done: multiply(force, distance) ----
+     * groups: 0=work-noun, 1=force-noun, 2=distance-noun */
+    { "work_done",
+      {
+        { "work performed", "work done", "mechanical work", "applied work", NULL },
+        { "force", "applied force", "exerted force", NULL },
+        { "distance", "displacement", "travel distance", "path length", NULL },
+      },
+      {
+        "%0% given %1% and %2%",
+        "%0% from %1% over %2%",
+        "the %0% calculated as %1% times %2%",
+        "%1% over %2% giving %0%",
+        NULL
+      } },
+
+    /* ---- power_clamped: clamp(power(x, n), lo, hi) ----
+     * groups: 0=power-noun, 1=base-noun, 2=exp-noun, 3=clamp-verb */
+    { "power_clamped",
+      {
+        { "power", "exponentiation", "raised value", NULL },
+        { "x", "base", "base value", NULL },
+        { "n", "exponent", "power index", NULL },
+        { "bounded", "clamped", "constrained", "limited", "pinned", NULL },
+        { "lo hi", "an allowed range", "permitted bounds", NULL },
+      },
+      {
+        "%0% of %1% to %2% %3% inside %4%",
+        "%3% the %0% of %1% raised to %2% within %4%",
+        "%1% to the %2% %3% by %4%",
+        NULL
+      } },
+
+    /* ---- harmonic_sum: harmonic_n(n) ----
+     * groups: 0=sum-noun, 1=harmonic-adj, 2=terms-noun */
+    { "harmonic_sum",
+      {
+        { "sum", "summation", "total", "cumulative value", NULL },
+        { "harmonic", "harmonic-series", "1/k series", NULL },
+        { "first n terms", "first n entries", "n leading terms", NULL },
+        { "n", "first-n", NULL },
+      },
+      {
+        "%0% of the %2% of the %1% series",
+        "%0% of the %1% %2%",
+        "the %1% %0% over %2%",
+        "%0% of %1% terms up to %3%",
+        NULL
+      } },
 };
 
 static const int N_FAMILIES = (int)(sizeof(FAMILIES) / sizeof(FAMILIES[0]));
@@ -501,6 +588,12 @@ static const char *FORBIDDEN[] = {
     "area of a triangle from its base and height",
     "perimeter of a rectangle from width and height",
     "sum of the squares of two legs",
+    /* Scaling-curve experiment held-out (Batch 2: physics). */
+    "kinetic energy bounded between lo and hi",
+    "momentum from mass and velocity",
+    "work performed given force and distance",
+    "power of x to n bounded inside lo hi",
+    "sum of the first n harmonic terms",
     NULL
 };
 

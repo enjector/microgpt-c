@@ -67,6 +67,14 @@ static const FamilyAnchor FAMILIES[] = {
     { "triangle_area",          22, { "triangle", "base", NULL } },
     { "rectangle_perimeter",    23, { "perimeter", "rectangle", "width", NULL } },
     { "hypotenuse_squared",     24, { "hypotenuse", "legs", "squares", "pythagoras", NULL } },
+    /* ====================================================================
+     * Scaling-curve experiment — Batch 2 (physics, slots 25-29)
+     * ==================================================================== */
+    { "kinetic_energy_clamped", 25, { "kinetic", "energy", "joules", NULL } },
+    { "momentum",               26, { "momentum", "mass", "velocity", NULL } },
+    { "work_done",              27, { "work", "performed", "force", "distance", NULL } },
+    { "power_clamped",          28, { "power", "exponent", NULL } },
+    { "harmonic_sum",           29, { "harmonic", "harmonics", "terms", NULL } },
 };
 static const int N_FAMILIES = (int)(sizeof(FAMILIES) / sizeof(FAMILIES[0]));
 

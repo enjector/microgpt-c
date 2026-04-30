@@ -350,6 +350,59 @@ static const AnchorEntry ANCHORS[] = {
       "  | s = add(x: sa.out, y: sb.out) :: x:int, y:int -> out:int\n"
       "  y <- s.out\n"
       "@end\n" },
+
+    /* ====================================================================
+     * Scaling-curve experiment — Batch 2 (physics, slots 25-29)
+     * ==================================================================== */
+    { "kinetic_energy_clamped",
+      "@graph kinetic_energy_clamped\n"
+      "  : in m -> int\n"
+      "  : in v -> int\n"
+      "  : in lo -> int\n"
+      "  : in hi -> int\n"
+      "  : out y -> int\n"
+      "  | k = kinetic_energy(m: <m>, v: <v>) :: m:int, v:int -> out:int\n"
+      "  | c = clamp(x: k.out, lo: <lo>, hi: <hi>) :: x:int, lo:int, hi:int -> out:int\n"
+      "  y <- c.out\n"
+      "@end\n" },
+
+    { "momentum",
+      "@graph momentum\n"
+      "  : in m -> int\n"
+      "  : in v -> int\n"
+      "  : out y -> int\n"
+      "  | p = multiply(x: <m>, y: <v>) :: x:int, y:int -> out:int\n"
+      "  y <- p.out\n"
+      "@end\n" },
+
+    { "work_done",
+      "@graph work_done\n"
+      "  : in force -> int\n"
+      "  : in distance -> int\n"
+      "  : out y -> int\n"
+      "  | w = multiply(x: <force>, y: <distance>) :: x:int, y:int -> out:int\n"
+      "  y <- w.out\n"
+      "@end\n" },
+
+    { "power_clamped",
+      "@graph power_clamped\n"
+      "  : in x -> int\n"
+      "  : in n -> int\n"
+      "  : in lo -> int\n"
+      "  : in hi -> int\n"
+      "  : out y -> int\n"
+      "  | p = power(b: <x>, e: <n>) :: b:int, e:int -> out:int\n"
+      "  | c = clamp(x: p.out, lo: <lo>, hi: <hi>) :: x:int, lo:int, hi:int -> out:int\n"
+      "  y <- c.out\n"
+      "@end\n" },
+
+    { "harmonic_sum",
+      "@graph harmonic_sum\n"
+      "  : in n -> int\n"
+      "  : out y -> int\n"
+      "  | h = harmonic_n(n: <n>) :: n:int -> out:int\n"
+      "  y <- h.out\n"
+      "@end\n" },
 };
 
 static const int N_ANCHORS = (int)(sizeof(ANCHORS) / sizeof(ANCHORS[0]));
