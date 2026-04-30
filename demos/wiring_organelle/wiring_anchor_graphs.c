@@ -403,6 +403,60 @@ static const AnchorEntry ANCHORS[] = {
       "  | h = harmonic_n(n: <n>) :: n:int -> out:int\n"
       "  y <- h.out\n"
       "@end\n" },
+
+    /* ====================================================================
+     * Scaling-curve experiment — Batch 3 (statistics, slots 30-34)
+     * ==================================================================== */
+    { "variance_two",
+      "@graph variance_two\n"
+      "  : in a -> int\n"
+      "  : in b -> int\n"
+      "  : out y -> int\n"
+      "  | v = mse(x: <a>, y: <b>) :: x:int, y:int -> out:int\n"
+      "  y <- v.out\n"
+      "@end\n" },
+
+    { "abs_z_score",
+      "@graph abs_z_score\n"
+      "  : in x -> int\n"
+      "  : in mean -> int\n"
+      "  : out y -> int\n"
+      "  | d = subtract(x: <x>, y: <mean>) :: x:int, y:int -> out:int\n"
+      "  | z = abs_val(x: d.out) :: x:int -> out:int\n"
+      "  y <- z.out\n"
+      "@end\n" },
+
+    { "range_two",
+      "@graph range_two\n"
+      "  : in a -> int\n"
+      "  : in b -> int\n"
+      "  : out y -> int\n"
+      "  | hi = max_two(x: <a>, y: <b>) :: x:int, y:int -> out:int\n"
+      "  | lo = min_two(x: <a>, y: <b>) :: x:int, y:int -> out:int\n"
+      "  | r = subtract(x: hi.out, y: lo.out) :: x:int, y:int -> out:int\n"
+      "  y <- r.out\n"
+      "@end\n" },
+
+    { "midpoint_clamped",
+      "@graph midpoint_clamped\n"
+      "  : in a -> int\n"
+      "  : in b -> int\n"
+      "  : in lo -> int\n"
+      "  : in hi -> int\n"
+      "  : out y -> int\n"
+      "  | m = midpoint(x: <a>, y: <b>) :: x:int, y:int -> out:int\n"
+      "  | c = clamp(x: m.out, lo: <lo>, hi: <hi>) :: x:int, lo:int, hi:int -> out:int\n"
+      "  y <- c.out\n"
+      "@end\n" },
+
+    { "mse_simple",
+      "@graph mse_simple\n"
+      "  : in pred -> int\n"
+      "  : in target -> int\n"
+      "  : out y -> int\n"
+      "  | e = mse(x: <pred>, y: <target>) :: x:int, y:int -> out:int\n"
+      "  y <- e.out\n"
+      "@end\n" },
 };
 
 static const int N_ANCHORS = (int)(sizeof(ANCHORS) / sizeof(ANCHORS[0]));

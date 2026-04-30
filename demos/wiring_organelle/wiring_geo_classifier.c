@@ -75,6 +75,14 @@ static const FamilyAnchor FAMILIES[] = {
     { "work_done",              27, { "work", "performed", "force", "distance", NULL } },
     { "power_clamped",          28, { "power", "exponent", NULL } },
     { "harmonic_sum",           29, { "harmonic", "harmonics", "terms", NULL } },
+    /* ====================================================================
+     * Scaling-curve experiment — Batch 3 (statistics, slots 30-34)
+     * ==================================================================== */
+    { "variance_two",           30, { "variance", "samples", "spread", NULL } },
+    { "abs_z_score",            31, { "z-score", "z", "deviation", NULL } },
+    { "range_two",              32, { "range", "max", "min", "readings", NULL } },
+    { "midpoint_clamped",       33, { "midpoint", "median", "halfway", NULL } },
+    { "mse_simple",             34, { "mean", "squared", "error", "prediction", "target", NULL } },
 };
 static const int N_FAMILIES = (int)(sizeof(FAMILIES) / sizeof(FAMILIES[0]));
 

@@ -534,6 +534,90 @@ static const Family FAMILIES[] = {
         "%0% of %1% terms up to %3%",
         NULL
       } },
+
+    /* ====================================================================
+     * Scaling-curve experiment — Batch 3 (statistics, slots 30-34)
+     * ==================================================================== */
+
+    /* ---- variance_two: mse(a, b) ----
+     * groups: 0=variance-noun, 1=samples-noun */
+    { "variance_two",
+      {
+        { "variance", "spread", "dispersion", "variability", NULL },
+        { "two samples", "two observations", "a pair of samples", "two readings", NULL },
+        { "a and b", "the pair", "the two", NULL },
+      },
+      {
+        "%0% across %1% %2%",
+        "%0% of %1%",
+        "%0% computed for %2%",
+        "the %0% between %2%",
+        NULL
+      } },
+
+    /* ---- abs_z_score: abs(x - mean) ----
+     * groups: 0=zscore-noun, 1=value-noun, 2=mean-noun */
+    { "abs_z_score",
+      {
+        { "absolute z-score", "absolute deviation", "magnitude of deviation", "unsigned z-score", NULL },
+        { "x", "observation", "data point", "sample value", NULL },
+        { "mean", "average", "centre", "expected value", NULL },
+      },
+      {
+        "%0% given %1% and the %2%",
+        "%0% of %1% from the %2%",
+        "the %0% relative to the %2%",
+        "magnitude of %1% minus the %2%",
+        NULL
+      } },
+
+    /* ---- range_two: max(a,b) - min(a,b) ----
+     * groups: 0=range-noun, 1=extrema-noun, 2=readings-noun */
+    { "range_two",
+      {
+        { "range", "spread", "extent", "max-min span", NULL },
+        { "max and min", "highest and lowest", "extrema", NULL },
+        { "two readings", "two observations", "a pair of readings", "the pair", NULL },
+      },
+      {
+        "%0% between %1% of %2%",
+        "%0% across %2% as %1%",
+        "the %0% from %1% over %2%",
+        "%1% gap of %2%",
+        NULL
+      } },
+
+    /* ---- midpoint_clamped: clamp(midpoint(a,b), lo, hi) ----
+     * groups: 0=midpoint-noun, 1=clamp-verb, 2=range-phrase */
+    { "midpoint_clamped",
+      {
+        { "midpoint", "halfway point", "centre", "median value", NULL },
+        { "clamped", "bounded", "constrained", "pinned", "limited", NULL },
+        { "lo and hi", "low and high", "an allowed range", "permitted bounds", NULL },
+        { "a and b", "the pair", "two values", NULL },
+      },
+      {
+        "%0% of %3% %1% between %2%",
+        "%1% the %0% of %3% within %2%",
+        "the %0% of %3% kept inside %2%",
+        NULL
+      } },
+
+    /* ---- mse_simple: mse(pred, target) ----
+     * groups: 0=mse-noun, 1=pred-noun, 2=target-noun */
+    { "mse_simple",
+      {
+        { "mean squared error", "MSE", "squared error", "squared deviation", NULL },
+        { "prediction", "predicted value", "estimate", "model output", NULL },
+        { "target", "true value", "ground truth", "label", NULL },
+      },
+      {
+        "%0% from %1% and %2%",
+        "%0% between %1% and %2%",
+        "the %0% comparing %1% to %2%",
+        "%0% of %1% versus %2%",
+        NULL
+      } },
 };
 
 static const int N_FAMILIES = (int)(sizeof(FAMILIES) / sizeof(FAMILIES[0]));
@@ -594,6 +678,12 @@ static const char *FORBIDDEN[] = {
     "work performed given force and distance",
     "power of x to n bounded inside lo hi",
     "sum of the first n harmonic terms",
+    /* Scaling-curve experiment held-out (Batch 3: statistics). */
+    "variance across two samples a and b",
+    "absolute z-score given x and the mean",
+    "range between max and min of two readings",
+    "midpoint of a and b clamped between lo and hi",
+    "mean squared error from prediction and target",
     NULL
 };
 
