@@ -32,7 +32,9 @@ We also explored applying OPA to continuous-valued domains like financial time-s
 
 Same engine. Same architecture. One learns game patterns, one hits an entropy floor on random data, and one maps the boundary between pattern matching and temporal prediction. **That's three kinds of proof.**
 
-The full research journey — from character-level Transformer to VM-based code generation — is documented in [*Composable Intelligence at the Edge*](book/MicroGPT-C_Composable_Intelligence_at_the_Edge.pdf) (16 chapters, [online version](book/MicroGPT-C_Composable_Intelligence_at_the_Edge.md)).
+The full research journey — from character-level Transformer to VM-based code generation through the calibrated three-bound scaling-curve closure — is documented in [*Composable Intelligence at the Edge*](book/MicroGPT-C_Composable_Intelligence_at_the_Edge.pdf) (21 chapters + appendix, [online version](book/MicroGPT-C_Composable_Intelligence_at_the_Edge.md)).
+
+> **Honest-claim note (May 2026):** the project's headline numbers were re-audited after the closing scaling-curve experiment caught a curator-self-overlap leakage incident. The restated calibrated claim — *~75-80 % retrieval on novel-paraphrase tests in distinctive-noun domains, three documented structural bounds (curator-, model-, domain-bounded), audit infrastructure baked in via `tools/scaling_leakage_audit.sh`* — replaces earlier inflated retrieval claims. See [`docs/research/ORGANELLE_STATE.md`](docs/research/ORGANELLE_STATE.md) for the synthesis and `docs/engineering/CLEAN_ROOM_IMPLEMENTATION/RESEARCH_DISCLOSURE.md` for the regulator-friendly disclosure register. **This repository is research-only**; the productisation strategy and per-vertical implementation plans were migrated to a private companion repo (`organelles.bio`) on 2026-05-01 — see [`docs/MIGRATED_TO_ORGANELLES_BIO.md`](docs/MIGRATED_TO_ORGANELLES_BIO.md) for the index.
 
 ---
 
@@ -135,26 +137,31 @@ Key technical contributions shipped in this engine:
 
 | Topic | Link |
 |-------|------|
+| 🧭 **Where the research stands today (start here)** | [ORGANELLE_STATE](docs/research/ORGANELLE_STATE.md) |
+| 📖 **Book: Composable Intelligence at the Edge** | [PDF](book/MicroGPT-C_Composable_Intelligence_at_the_Edge.pdf) · [Online](book/MicroGPT-C_Composable_Intelligence_at_the_Edge.md) · [Chapters](book/0.md) |
 | ❓ **FAQ** | [FAQ.md](FAQ.md) |
 | 🧬 **The stem cell philosophy** | [VISION.md](VISION.md) |
-| 💡 **Why this matters** | [VALUE_PROPOSITION.md](VALUE_PROPOSITION.md) |
-| 🗺️ **Roadmap** | [ROADMAP.md](ROADMAP.md) |
-| 📖 **Book: Composable Intelligence at the Edge** | [PDF](book/MicroGPT-C_Composable_Intelligence_at_the_Edge.pdf) · [Online](book/MicroGPT-C_Composable_Intelligence_at_the_Edge.md) · [Chapters](book/0.md) |
 | 🏆 **Game leaderboard** (11 games) | [RESEARCH_ORGANELLE_GAMES](docs/research/RESEARCH_ORGANELLE_GAMES.md) |
-
 | 🎲 **Lottery experiment** (entropy baseline) | [lottery/README.md](demos/character-level/lottery/README.md) |
 | 🔬 **Pipeline architecture** (white paper) | [RESEARCH_ORGANELLE_PIPELINE](docs/research/RESEARCH_ORGANELLE_PIPELINE.md) |
 | 🧠 **Reasoning conclusion** | [RESEARCH_ORGANELLE_REASONING](docs/research/RESEARCH_ORGANELLE_REASONING.md) |
-| 🔌 **Pipeline IR + Wiring Organelle (paper, v2.0)** | [RESEARCH_WIRING_ORGANELLE_PAPER](docs/research/RESEARCH_WIRING_ORGANELLE_PAPER.md) |
-| 🔬 **Pipeline IR + Wiring Organelle (17-phase log)** | [RESEARCH_PIPELINE_IR](docs/research/RESEARCH_PIPELINE_IR.md) |
+| 🔌 **Pipeline IR + Wiring Organelle (paper)** | [RESEARCH_WIRING_ORGANELLE_PAPER](docs/research/RESEARCH_WIRING_ORGANELLE_PAPER.md) |
+| 🔬 **Pipeline IR + Wiring Organelle (full development log)** | [RESEARCH_PIPELINE_IR](docs/research/RESEARCH_PIPELINE_IR.md) |
+| 📐 **Calibrated three-bound scaling claim (post-Phase-3)** | [wiring_scaling_post_phase3](docs/research/wiring_scaling_post_phase3.md) |
+| 🛡️ **Standing leakage-audit protection** | [tools/scaling_leakage_audit.sh](tools/scaling_leakage_audit.sh) |
+| 📑 **Honest disclosure register (cancelled phases, restated headlines)** | [RESEARCH_DISCLOSURE](docs/engineering/CLEAN_ROOM_IMPLEMENTATION/RESEARCH_DISCLOSURE.md) |
+| 🏛️ **Clean-room rebuild-test corpus** (BS / TDD / FS / BRD / FRD / NFRD / TRACEABILITY) | [docs/engineering/CLEAN_ROOM_IMPLEMENTATION/](docs/engineering/CLEAN_ROOM_IMPLEMENTATION/README.md) |
 | 🌐 **Manifold-learning composition (research sketch)** | [RESEARCH_MANIFOLD_LEARNING](docs/research/RESEARCH_MANIFOLD_LEARNING.md) |
 | 📚 **Using as a library** | [FUNCTIONAL_SPEC](docs/FUNCTIONAL_SPEC.md) |
 | ⚡ **Performance & benchmarks** | [PERFORMANCE](docs/testing/PERFORMANCE.md) |
 | 🚀 **SSD inference optimisations** | [RESEARCH_SSD](docs/research/RESEARCH_SSD.md) |
 | 🔀 **Attention Residuals research** | [RESEARCH_ATTN_RES](docs/research/RESEARCH_ATTN_RES.md) |
 | 🔧 **Build options** (Metal, BLAS, INT8, SIMD) | [BUILD_OPTIONS](docs/BUILD_OPTIONS.md) |
+| 🛠️ **Extending the Wiring Organelle** | [EXTENDING_WIRING_ORGANELLE](docs/EXTENDING_WIRING_ORGANELLE.md) |
+| 🌳 **Project as a Node-style runtime (analysis)** | [NODE_ANALYSIS](docs/NODE_ANALYSIS.md) |
 | 🤝 **Contributing** | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | 📋 **Data licensing** | [DATA_LICENSE.md](DATA_LICENSE.md) |
+| 🔒 **Productisation artefacts** (migrated to private companion repo) | [MIGRATED_TO_ORGANELLES_BIO](docs/MIGRATED_TO_ORGANELLES_BIO.md) |
 
 ---
 
