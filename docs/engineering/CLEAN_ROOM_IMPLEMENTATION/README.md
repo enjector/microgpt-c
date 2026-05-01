@@ -81,9 +81,9 @@ Threat models (`TSM_*.md`), per-framework compliance mappings (`COMPLIANCE_*.md`
 - `docs/research/RESEARCH_*.md` — topical research notes and pre-registered experiment outcomes (these are *experimental* artefacts, not normative).
 - `docs/research/wiring_scaling_*.md` — the post-Phase-3 cleanup arc (v1 leakage discovery → v2 clean baseline → Phase 2 sharpening → Phase 3 broad expansion + bigram/char-ngram falsification → post-Phase-3 #1-3 cleanup); consolidated as `RESEARCH_DISCLOSURE.md` §7.
 - `RESEARCH_DISCLOSURE.md` — pre-registered cancellations and honest headline restatements (regulator-friendly distillation of the research log).
-- `docs/STRATEGY_ONE_PAGER.md` — the executive summary of the productisation strategy.
-- `docs/PRODUCT_*.md` — vertical sketches (fraud, finance, defence).
-- `docs/DEPENDENCY_POLICY.md` — the dependency-boundary policy (gating decision for Phase 1 productisation; tracked as `GAP-DEP-001`).
+- `MIGRATED:STRATEGY_ONE_PAGER.md → see docs/MIGRATED_TO_ORGANELLES_BIO.md` — the executive summary of the productisation strategy.
+- `MIGRATED:PRODUCT_*.md → see docs/MIGRATED_TO_ORGANELLES_BIO.md` — vertical sketches (fraud, finance, defence).
+- `MIGRATED:DEPENDENCY_POLICY.md → see docs/MIGRATED_TO_ORGANELLES_BIO.md` — the dependency-boundary policy (gating decision for Phase 1 productisation; tracked as `GAP-DEP-001`).
 
 ## Diagram cross-references
 

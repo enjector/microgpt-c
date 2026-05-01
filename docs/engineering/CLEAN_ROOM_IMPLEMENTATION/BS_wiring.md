@@ -18,17 +18,17 @@ The wiring layer composes novel graphs through **four** complementary mechanisms
 
 1. **Anchor retrieval** over the 20-entry curated library (100 % on Phase 2c clean — `SLO-WIRE-001`).
 2. **Fragment-chaining** over the same library for multi-stage prompts (60 % on a 10-prompt test set — `SLO-WIRE-003`).
-3. **Type-directed compositional search** (V1.0.4 mechanism + V1.0.7 Phase-6b improvements: argument-to-port binder + per-port keyword manifest + `INPUT_ORDER:` annotation + manifest-driven prior + earliest-keyword-position tie-break). **V1.0.7 achieved baseline: 100 % verified, 40 % correct** on the leakage-audited 30-prompt compositional set (`SLO-WIRE-005`). Lifted from V1.0.5 30 % via the four-root-cause fix in `COMPOSITIONAL_GENERATOR_FIX_PLAN.md` v2.0; the 50 % design target persists in `GAP-WIRE-006` (PARTIALLY-RESOLVED). Per-prompt analysis in `RESEARCH_DISCLOSURE.md` §5.5.
+3. **Type-directed compositional search** (V1.0.4 mechanism + Phase-6b/6c improvements: argument-to-port binder + per-port keyword manifest + `INPUT_ORDER:` annotation + manifest-driven prior + earliest-keyword-position tie-break + branched-project synonym lift + connective re-ordering + legacy-geo-bump disabled). **V1.0.9 achieved baseline: 100 % verified, 50 % correct** on the leakage-audited 30-prompt compositional set (`SLO-WIRE-005`). The original §3.2 pre-registered design goal of ≥ 50 % is **met at the achievement level** (V1.0.5 30 % → V1.0.7 40 % → V1.0.9 50 %). The §6.3 60 % full-RESOLUTION gate is open (`GAP-WIRE-006`, `PARTIALLY-RESOLVED`); residual failure mode is structural (3+ arity outers + duplicate inner primitives) — Phase 6d candidate, not scheduled (`GAP-WIRE-009`). Per-prompt analysis in `RESEARCH_DISCLOSURE.md` §6.5; pre-registered next-iteration plan in `COMPOSITIONAL_GENERATOR_PHASE_6D_PLAN.md`.
 4. **Wiring transformer fallback** when (1)–(3) miss (35 % on Phase 2c clean — `SLO-WIRE-002`).
 
 The V1.0 corpus's "no generative compositionality" caveat is **superseded** by mechanism (3): the platform now has a path to genuinely-novel compositions through type-directed search over the primitive manifest. Honest disclosure of mechanisms (1)–(4)'s respective coverage remains in `RESEARCH_DISCLOSURE.md`.
 
 **End-to-end execution** of a generated graph through the shipped VM is now supported via `pipeline_execute_vm` (V1.0.4 — `GAP-PIPE-003` RESOLVED). Demos / tests link `src/microgpt_pipeline_vm.c` + the VM library; the host registers natives via `vm_engine_register_fn` and the dispatcher resolves them via `vm_engine_find_fn`.
 
-What downstream products SHOULD do (per `docs/STRATEGY_ONE_PAGER.md` §"What we are not claiming"):
+What downstream products SHOULD do (per `MIGRATED:STRATEGY_ONE_PAGER.md → see docs/MIGRATED_TO_ORGANELLES_BIO.md` §"What we are not claiming"):
 
 - Treat anchor retrieval over a curated library as the front-line mechanism for prompts in well-curated domains.
-- Curate the anchor library per vertical (the "20-family fraud anchor library" in `docs/PRODUCT_FRAUD_DETECTION.md` is the worked example).
+- Curate the anchor library per vertical (the "20-family fraud anchor library" in `MIGRATED:PRODUCT_FRAUD_DETECTION.md → see docs/MIGRATED_TO_ORGANELLES_BIO.md` is the worked example).
 - Use the V1.0.4 compositional search for prompts whose primitive set is in the manifest but the combination is not in any anchor.
 - Plan for external semantic embeddings if the vertical needs broad-domain coverage beyond the manifest's 36 primitives (per the Post-Phase-3 #3 finding).
 

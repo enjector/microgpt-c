@@ -4,7 +4,7 @@
 **Version:** 1.0
 **Status:** DRAFT
 **Last updated:** 2026-04-30
-**Authors:** Extracted from `VISION.md`, `VALUE_PROPOSITION.md`, `ROADMAP.md`, `docs/STRATEGY_ONE_PAGER.md`, `docs/PRODUCT_*.md`.
+**Authors:** Extracted from `VISION.md`, `VALUE_PROPOSITION.md`, `ROADMAP.md`, `MIGRATED:STRATEGY_ONE_PAGER.md → see docs/MIGRATED_TO_ORGANELLES_BIO.md`, `MIGRATED:PRODUCT_*.md → see docs/MIGRATED_TO_ORGANELLES_BIO.md`.
 **Owner:** Ajay Soni, Enjector Software Ltd.
 
 ---
@@ -75,7 +75,7 @@ The platform's claim of usefulness rests on a documented, reproducible evidence 
 
 ### 5.3 Productisation strategy
 
-The platform's productisation thesis (per `docs/STRATEGY_ONE_PAGER.md`) identifies three verticals in priority order. These are *strategic* business requirements: each names what the platform must support to ship the corresponding product.
+The platform's productisation thesis (per `MIGRATED:STRATEGY_ONE_PAGER.md → see docs/MIGRATED_TO_ORGANELLES_BIO.md`) identifies three verticals in priority order. These are *strategic* business requirements: each names what the platform must support to ship the corresponding product.
 
 | ID | Vertical | Time-to-revenue | Capability the platform must add |
 |---|---|---|---|
@@ -91,7 +91,7 @@ These are stated for completeness; per the strategy one-pager the project MAY ac
 |---|---|
 | BREQ-030 | The **core engine** (`microgpt.{h,c}`) SHALL remain pure C99, libc + libm only. |
 | BREQ-031 | Platform accelerators (Metal, BLAS, INT8, MSA, TurboQuant, RotorQuant, paged KV, attention residuals, DeepSeek-V4 ports) MAY add link-time dependencies (Apple frameworks, BLAS implementations) but MUST be opt-in via CMake flags and MUST default OFF when in conflict with the zero-deps baseline. |
-| BREQ-032 | A **dependency policy** (`docs/DEPENDENCY_POLICY.md`) SHALL govern the addition of new dependencies, with three categories — Allowed (Category A), Conditionally-allowed (Category B), Forbidden (Category C). The categories are listed in §5.4 of that document. |
+| BREQ-032 | A **dependency policy** (`MIGRATED:DEPENDENCY_POLICY.md → see docs/MIGRATED_TO_ORGANELLES_BIO.md`) SHALL govern the addition of new dependencies, with three categories — Allowed (Category A), Conditionally-allowed (Category B), Forbidden (Category C). The categories are listed in §5.4 of that document. |
 | BREQ-033 | **Cloud-only ML APIs** (OpenAI, Anthropic, Cohere, etc.) are FORBIDDEN as dependencies of the core engine; they may only enter as customer-explicit opt-in on a per-deployment basis. |
 
 ### 5.5 Responsible-use posture
@@ -137,9 +137,9 @@ The following are explicitly out of scope for this corpus's V1.0:
 - `FRD.md` — functional surface that satisfies these business requirements.
 - `NFRD.md` — non-functional qualities (performance SLOs, portability, reproducibility).
 - `BS_*.md` — per-subsystem behaviour specs.
-- `docs/STRATEGY_ONE_PAGER.md` — the one-page version of the strategic story.
-- `docs/PRODUCTIZATION_VERTICALS.md` — the longer-form productisation analysis.
-- `docs/DEPENDENCY_POLICY.md` — dependency boundary policy.
+- `MIGRATED:STRATEGY_ONE_PAGER.md → see docs/MIGRATED_TO_ORGANELLES_BIO.md` — the one-page version of the strategic story.
+- `MIGRATED:PRODUCTIZATION_VERTICALS.md → see docs/MIGRATED_TO_ORGANELLES_BIO.md` — the longer-form productisation analysis.
+- `MIGRATED:DEPENDENCY_POLICY.md → see docs/MIGRATED_TO_ORGANELLES_BIO.md` — dependency boundary policy.
 - `book/MicroGPT-C_Composable_Intelligence_at_the_Edge.md` — the project book.
 
 ## 10. Revision history
