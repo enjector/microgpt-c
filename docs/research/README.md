@@ -15,6 +15,7 @@ After that, choose by audience:
 | Engineer reproducing a calibrated number | `wiring_scoreboard_tier0.md` → `wiring_scoreboard_tier1.md` → `wiring_scaling_curve.md` → `wiring_scaling_curve_phase3.md` → `wiring_scaling_v3_deep_negative.md` → `wiring_scaling_post_phase3.md` |
 | Curious about non-wiring applications | `RESEARCH_ORGANELLE_GAMES.md`, `RESEARCH_ORGANELLE_VISION.md`, `RESEARCH_ORGANELLE_PLANNER.md` |
 | Looking for cancelled-phase / leakage-audit history | `wiring_scaling_leakage_audit.log` (this dir's `audit_logs/`) and the regulator-friendly distillation in `docs/engineering/CLEAN_ROOM_IMPLEMENTATION/RESEARCH_DISCLOSURE.md` |
+| Evaluating cross-architecture borrowings (e.g. OpenMythos / RDT) | `RESEARCH_OPENMYTHOS_CROSS_POLLINATION.md` — three pre-registered experiments + six rejected techniques with reasons |
 
 ## Subdirectory layout
 
