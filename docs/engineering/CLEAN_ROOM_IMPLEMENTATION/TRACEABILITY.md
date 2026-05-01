@@ -35,12 +35,12 @@
 | TRIAGED | 0 |
 | BLOCKED | 0 |
 | DEFERRED | 6 |
-| OPEN | 1 |
-| **Total** | **34** |
+| OPEN | 2 |
+| **Total** | **35** |
 
-By severity: P0 = 0, P1 = 4, P2 = 16, P3 = 12, INFO = 2.
+By severity: P0 = 0, P1 = 4, P2 = 17, P3 = 12, INFO = 2.
 
-Updated 2026-05-01 after the V1.0 self-audit pass, the V1.0.2 gap-fill pass, the V1.0.3 compositionality-honesty pass, the V1.0.4 compositional-fix pass, the V1.0.5 honest-outcome pass, the V1.0.6 Phase 6 falsification pass, and the V1.0.7 scaling-curve consolidation pass (§§9, 10, 11, 12, 13, 14 below).
+Updated 2026-05-01 after the V1.0 self-audit pass, the V1.0.2 gap-fill pass, the V1.0.3 compositionality-honesty pass, the V1.0.4 compositional-fix pass, the V1.0.5 honest-outcome pass, the V1.0.6 Phase 6 falsification pass, the V1.0.7 scaling-curve consolidation pass, the V1.0.8 Phase-6b implementation pass, and the V1.0.9 Phase-6c branched-mining pass (§§9, 10, 11, 12, 13, 14, 15 below).
 
 The corpus is V1.0 — `DRAFT` status. It has been authored in a single archaeological-extraction pass and has not yet been independently rebuild-tested. The pillar scoreboard is therefore in §5 below as `PASS WITH NOTES`.
 
@@ -117,6 +117,7 @@ Detailed per-ID rows (one per `INV-*`, `ERR-*`, `SLO-*`, `ACC-*`) live in the pe
 | GAP-WIRE-007 | research | P2 | TF-IDF retrieval (`demos/manifold_classifier/tfidf_main.c`) | RESOLVED | corpus-author | 2026-05-01 | 2026-05-01 | **Bag-of-features ceiling confirmed structural.** Post-Phase-3 #3 (`docs/research/wiring_scaling_post_phase3.md`) tested three feature variants (unigram / word-bigram / character-trigram) on the v2 vocabulary-disjoint held-out: 16/15/15 — converge within ±1 prompt. Confirms the ~75-80 % retrieval ceiling is **model-bound** to the bag-of-features family, not unigram-specific. RESOLVED as documented limitation; new `INV-WIRE-060` enforces the convergence invariant in BS_wiring. Path past the ceiling requires external pretrained embeddings — see `GAP-WIRE-002` (DEFERRED) and `GAP-DEP-001`. |
 | GAP-WIRE-008 | research | P2 | TF-IDF retrieval / corpus_expand synonym tables | RESOLVED | corpus-author | 2026-05-01 | 2026-05-01 | **Domain-bounded ceiling confirmed.** Post-Phase-3 #2 (`docs/research/wiring_scaling_v3_deep_negative.md`): adding 20 new families with chemistry / time / conversions vocabulary (lean synonyms) hit 3/20 (15 %); expanding to v2-depth synonyms HURT to 0/20. Diagnosis: generic English glue ("expressed by", "formed by", "computed as") shared across families lowers IDF weight on distinctive concepts → centroids collapse. RESOLVED as documented limitation; new `INV-WIRE-061` records the distinctive-noun structural bound. Implication: vertical productisation (`MIGRATED:PRODUCT_FRAUD_DETECTION.md → see docs/MIGRATED_TO_ORGANELLES_BIO.md` etc.) targets domains with naturally distinctive vocabulary (fraud nouns, finance jargon) where the upper bound is achievable. |
 | GAP-ORG-001 | bug | P2 | `opa_extract_pipe_value` mutation | RESOLVED | corpus-author | 2026-04-30 | 2026-04-30 | Function rewritten to terminate at the FIRST delimiter only (`min(strchr('|'), strchr('\n'))`). Earlier behaviour wrote NULs at BOTH the next pipe AND the next newline, destroying every later "|key=" anchor in the buffer. After the fix, `opa_extract_pipe_value` can be called repeatedly on the same buffer without losing later keys (provided values do not contain `|` or `\n` themselves — see `GAP-WIRE-001`). |
+| GAP-WIRE-009 | research | P2 | wiring compositional search | OPEN | — | 2026-05-01 | Phase 6d (customer-signal-gated) | Phase 6d roadmap. The 15 wrong-answer prompts in V1.0.9 cluster around two structural patterns: (a) **3+ arity outers + duplicate inner primitives** (12/15) — search picks `square` for both ports of `max_two` instead of `square(x), y`; (b) **wrong number of nodes** (3/15) — `[add, harmonic_n]` for "harmonic of abs of fib of n" needs 3 primitives but search picks 2. Fix sketch: per-port keyword binding at inner-pick time (not just at port-allocation time) + recursive inner depth ≥ 1. Pre-registered plan in `COMPOSITIONAL_GENERATOR_PHASE_6D_PLAN.md` with §6.3-style disposition logic. **Not scheduled** — opens only on customer signal. The V1.0.9 50 % is the published baseline; the 60 % full-RESOLUTION gate (`GAP-WIRE-006`) waits on Phase 6d execution. |
 
 ## 4. Convergent P0 items
 

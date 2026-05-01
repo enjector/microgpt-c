@@ -157,6 +157,34 @@ static int earliest_keyword_pos(const WiringPrimitive *prim, const char *prompt_
     return best;
 }
 
+/* G2 (Phase 6c): "after"/"then" connective re-ordering, gated on the
+ * connective genuinely splitting the candidate set.  Lifted from
+ * `wiring_fragments.c:336-352` in the branched project, with the safety
+ * check that without primitives on BOTH sides of the connective the
+ * bump would just bias every candidate uniformly and damage the
+ * earliest-position tie-break.
+ *
+ * Inputs:
+ *   earliest[i] — the raw earliest-keyword position for candidate i
+ *   conn_pos    — the position of " after " (or " then "), or -1 if none
+ *
+ * If both at-least-one-left and at-least-one-right primitives exist, the
+ * function bumps primitives on the right side back by 100000 (so they
+ * win the tie-break and become the outer pick).  Otherwise no-op. */
+static void apply_connective_bump(int *earliest, int total, int conn_pos) {
+    if (conn_pos < 0) return;
+    int n_left = 0, n_right = 0;
+    for (int i = 0; i < total; i++) {
+        if (earliest[i] >= (1 << 30)) continue;
+        if (earliest[i] < conn_pos)  n_left++;
+        else if (earliest[i] > conn_pos) n_right++;
+    }
+    if (n_left == 0 || n_right == 0) return;  /* connective doesn't split set */
+    for (int i = 0; i < total; i++) {
+        if (earliest[i] < (1 << 30) && earliest[i] > conn_pos) earliest[i] -= 100000;
+    }
+}
+
 /* ── Phase 6: top-N outer pick (beam) ────────────────────────
  *
  * Returns up to `n` outer candidates in `out_idx[]`, ordered by
@@ -179,6 +207,15 @@ static void pick_top_n_primitives(const WiringPrimitive *manifest, int n_manifes
         idx[total] = i;
         earliest[total] = earliest_keyword_pos(&manifest[i], prompt_lc);
         total++;
+    }
+
+    /* G2: apply connective bump only when the connective splits the candidate
+     * set into left and right groups. */
+    {
+        const char *c = strstr(prompt_lc, " after ");
+        if (!c) c = strstr(prompt_lc, " then ");
+        int conn_pos = c ? (int)(c - prompt_lc) : -1;
+        apply_connective_bump(earliest, total, conn_pos);
     }
 #if WIRING_USE_GEO
     /* Stream F (Phase 6b): manifest-driven prior. For each candidate,
@@ -210,6 +247,18 @@ static void pick_top_n_primitives(const WiringPrimitive *manifest, int n_manifes
             }
             scores[i] += port_kw_hits;
         }
+        /* G3 (Phase 6c): the legacy FAMILIES-table substring bump is
+         * disabled. Per RESEARCH_DISCLOSURE.md §6.2, the legacy table was
+         * tuned for the Phase-13-leaked anchor set and does not transfer
+         * to the 36-primitive manifest. It was actively biasing toward
+         * primitives whose names happen to be substrings of legacy
+         * family names (e.g. `gcd` substring of `gcd_scaled`), which
+         * does NOT reflect the prompt's compositional intent. Stream F's
+         * port-keyword prior is the right manifest-driven signal.
+         *
+         * The original code is preserved here, gated off, so an ablation
+         * can re-enable it for measurement: */
+#if 0
         const char *top_k[WIRING_GEO_TOP_K] = {0};
         int k = wiring_geo_predict_top_k(original_prompt, top_k);
         for (int i = 0; i < total; i++) {
@@ -221,6 +270,7 @@ static void pick_top_n_primitives(const WiringPrimitive *manifest, int n_manifes
                 }
             }
         }
+#endif
     }
 #else
     (void)original_prompt;

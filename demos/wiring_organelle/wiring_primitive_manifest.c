@@ -62,9 +62,13 @@ static const WiringPrimitive g_manifest[] = {
       {"relu","rectified","thresholded", NULL} },
 
     /* ---- Finance ---- */
+    /* G1 (Phase 6c): "tax" alone is dropped from tax_amount keywords because
+     * it shadows apply_tax on prompts containing "after-tax" / "apply-tax".
+     * tax_amount stays distinguishable via "duty"/"levy"/"compute-tax".
+     * Note: "tax" remains in tax_amount's port keyword tables. */
     { "tax_amount",     2, {PIPE_T_INT, PIPE_T_INT},               {"amount","rate"},   PIPE_T_INT,
-      {"tax","duty","levy","compute-tax", NULL},
-      { {"amount","price","value","gross", NULL}, {"rate","tax-rate","r","percentage", NULL} } },
+      {"duty","levy","compute-tax", NULL},
+      { {"amount","price","value","gross","tax", NULL}, {"rate","tax-rate","r","percentage", NULL} } },
     { "apply_tax",      2, {PIPE_T_INT, PIPE_T_INT},               {"amount","rate"},   PIPE_T_INT,
       {"after-tax","withhold","withholding","apply-tax","net-of-tax","taxed", NULL},
       { {"amount","price","value","gross", NULL}, {"rate","tax-rate","r","t-rate","t_rate", NULL} } },
@@ -78,8 +82,10 @@ static const WiringPrimitive g_manifest[] = {
       {"markup","marked-up","uplifted","raised","markup-by", NULL},
       { {"price","amount","value","p", NULL}, {"rate","markup-rate","m-rate","m_rate","r", NULL} } },
     { "compound",       3, {PIPE_T_INT, PIPE_T_INT, PIPE_T_INT},   {"principal","rate","periods"}, PIPE_T_INT,
-      {"compound","compounding","accumulating","compound-interest", NULL},
-      { {"principal","p","amount", NULL}, {"rate","r","interest-rate", NULL}, {"periods","n","years","intervals", NULL} } },
+      {"compound","compounding","accumulating","compound-interest","interest","yield","accrued","grow", NULL},
+      { {"principal","p","amount","investment","deposit","savings","capital", NULL},
+        {"rate","r","interest-rate","percentage", NULL},
+        {"periods","n","years","intervals","term","cycles", NULL} } },
     { "present_value",  3, {PIPE_T_INT, PIPE_T_INT, PIPE_T_INT},   {"future","rate","periods"},     PIPE_T_INT,
       {"present-value","pv","discounted-future","npv", NULL},
       { {"future","f","x", NULL}, {"rate","r", NULL}, {"periods","n","years", NULL} } },
@@ -98,12 +104,16 @@ static const WiringPrimitive g_manifest[] = {
       {"harmonic","harmonic-sum","H_n","harmonic-number", NULL} },
 
     /* ---- Misc ---- */
+    /* G1 (Phase 6c): bumped circle_area keywords with single-word "circle"
+     * so prompts like "area of a circle with the absolute radius" anchor
+     * on a distinctive noun rather than relying on the multi-word
+     * "area-of-circle" form. Same single-word win for kinetic_energy. */
     { "circle_area",    1, {PIPE_T_INT},                           {"r"},               PIPE_T_INT,
-      {"circle-area","area-of-circle","disk-area", NULL},
+      {"circle-area","area-of-circle","disk-area","circle","disk","circular", NULL},
       { {"r","radius", NULL} } },
     { "kinetic_energy", 2, {PIPE_T_INT, PIPE_T_INT},               {"m","v"},           PIPE_T_INT,
-      {"kinetic-energy","ke","energy-of-motion", NULL},
-      { {"m","mass","weight","kg", NULL}, {"v","velocity","speed","u", NULL} } },
+      {"kinetic-energy","ke","energy-of-motion","kinetic", NULL},
+      { {"m","mass","weight","kg","object", NULL}, {"v","velocity","speed","u","moving","motion", NULL} } },
     { "bmi",            2, {PIPE_T_INT, PIPE_T_INT},               {"weight","height"}, PIPE_T_INT,
       {"bmi","body-mass-index","mass-index", NULL},
       { {"weight","w","mass","kg", NULL}, {"height","h","cm","tall", NULL} } },
