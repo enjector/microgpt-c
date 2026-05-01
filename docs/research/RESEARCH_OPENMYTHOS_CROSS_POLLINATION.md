@@ -66,7 +66,43 @@
 
 **Cost estimate:** ~2 weeks. Single per-family scalar parameter + ZOH discretisation in the vote loop's score-accumulator; modifies `demos/wiring_organelle/main.c`; touches no core transformer code.
 
-### 2.3 Experiment C — Depth extrapolation for game-playing organelles
+### 2.3 Experiment D — Latent-tensor inter-organelle handoffs (the third level)
+
+**Surfaced by an external review (May 2026)** that pointed out the original cross-pollination assessment under-weighted the *inter-organelle wire format*. The OpenMythos technique that maps here isn't internal to a single transformer — it's the principle of "continuous latent state crossing iteration boundaries." Lifted from "iterations within a model" to "stages within the OPA Kanban", this becomes a candidate for the third highest-leverage move.
+
+**Hypothesis (locked):** Replacing the planner→player→judge text-string handoff (the current `OpaKanban` `KEY=val|KEY2=val2` pipe-string format, `FS_organelle_wire.md`) with a continuous latent-tensor handoff lifts the multi-organelle game-pipeline solve rate on tasks where the discretisation step is documented to lose information.
+
+**Mechanism:**
+- Each organelle exposes a *latent emit* alongside its existing text emit. The latent is the post-final-RMSNorm hidden state at the chosen output position (dim=96-128 depending on the organelle).
+- Downstream organelle accepts EITHER the legacy text input (parsed via existing pipe-string protocol) OR the latent (projected through a small linear bridge to its embedding dimension) at runtime via the Kanban dispatcher.
+- Both modes coexist for measurement: same prompt, both wire formats, A/B comparison.
+
+**Pre-registered targets:**
+
+| Eval | Text-string baseline | Latent target | Floor |
+|---|---|---|---|
+| 8-puzzle solve rate (current 90 %) | 90 % | ≥ 92 % | ≥ 88 % |
+| Connect-4 win rate (current 88 %) | 88 % | ≥ 90 % | ≥ 86 % |
+| Mastermind solve rate (current 79 %) | 79 % | ≥ 82 % | ≥ 77 % |
+| Pipeline IR DOT-renderer audit coverage on the resulting traces | 100 % structural + 100 % value-trace | 100 % structural + ≥ 70 % value-trace | 100 % structural required |
+
+**Pre-registered skip rule (and the honest tradeoff this experiment must surface):**
+1. If latent handoff lifts game solve rates by ≥ 2 pp on at least 2 of 3 games AND the audit floor (100 % structural) holds, the latent handoff is shipped behind a build flag `-DMICROGPT_ORG_LATENT_WIRE=ON` defaulting OFF. **It does not become default-ON until** the productisation verticals (private companion repo) explicitly accept the audit-trail tradeoff via an ADR.
+2. If the audit floor is breached (the DOT-renderer cannot reconstruct the structural graph from the latent-only traces), the experiment is **falsified** and the text-string handoff stays as the canonical wire format. Latent emits remain available as an *augmentation* — added to text emits, not replacing them — for any future per-vertical experiment that wants the gradient flow.
+3. If solve rates are flat or worse, the experiment is **falsified** and the discretisation-wall framing is itself called into question (the bottleneck would be elsewhere).
+
+**Honest tradeoff disclosure (load-bearing):**
+The pipe-string text handoff is **audit infrastructure**, not just a limitation. Pipeline IR's typed DAG + DOT renderer makes pipeline traces regulator-reviewable end-to-end. Latent handoffs would let the *signal* flow continuously and make the cross-organelle pipeline end-to-end differentiable — but at the cost of losing the value-by-value audit trace (the structural graph remains, the per-step values become opaque tensors). For productisation verticals where audit is mandatory (fraud per PCI-DSS, finance per SR 11-7, defence per RAI principles), this is potentially **disqualifying** by default. The flag-default-OFF + ADR-required adoption path is the honest way to ship the technique without breaking the productisation pitch.
+
+This experiment must NOT silently swap audit for gradient flow. The trade has to be made explicit in an ADR per the dependency-policy precedent (for verticals that opt in), with a documented per-vertical decision recorded as either "latent ON" or "text ON" — not a global default change.
+
+**What this experiment is NOT testing:**
+- It does NOT test whether latent handoffs lift the calibrated 75-80 % retrieval ceiling. Per `INV-WIRE-060` that ceiling is bag-of-features-bound for the Wiring Organelle's retrieval mechanism, not handoff-bound. Latent handoffs help with gradient flow across organelle boundaries, not with the underlying retrieval-mechanism limit.
+- It does NOT bridge categorical reasoning with numerical sensing for OPA's continuous-domain attempts (e.g. financial time-series). That would require a separate experiment with an explicit numerical-input organelle, not a wire-format change.
+
+**Cost estimate:** ~4 weeks. New `microgpt_organelle_latent.{h,c}` ~500 LoC implementing the latent emit/accept paths and the per-organelle linear bridge. Modifies `OpaKanban` dispatcher to choose wire format per organelle pair. Updates `FS_organelle_wire.md` to document both formats normatively. One game demo (8-puzzle, since it's the most-tested) re-trained end-to-end to validate gradient flow. Most cost is in the audit-trace work (proving the DOT renderer can still produce a reviewable artefact under latent handoffs) — without which the experiment cannot ship even on a flag.
+
+### 2.4 Experiment C — Depth extrapolation for game-playing organelles
 
 **Hypothesis (locked):** A planner organelle trained at recurrent-depth `T` can be evaluated at depth `T + k` and achieves higher solve rates on hard game positions than the same organelle at depth `T`. Concretely: an 8-puzzle planner trained at depth-T = 8, evaluated at depth-T = 16, lifts the current 90 % solve rate to ≥ 92 % on the difficulty-stratified hard-position subset.
 
@@ -103,9 +139,12 @@ Our organelles run at dim=96 to dim=128. Per-iteration LoRA deltas at rank-4 to 
 |---|---|---|---|
 | A — ACT halting at pipeline level | ~2 weeks | Low (well-understood mechanism) | **Direct** — sub-1 ms easy-prompt latency for fraud Phase 1 |
 | B — LTI-stable vote-loop scoring | ~2 weeks | Medium (novel application of contraction mapping to discrete scoring) | **Indirect** — closes `GAP-WIRE-003` properly, lets new family anchors land without rollback |
+| D — Latent inter-organelle handoffs | ~4 weeks | Medium (gradient-flow gain plausible; audit-trail tradeoff is the binding constraint) | **Conditional** — high impact for verticals that ADR-accept the audit tradeoff; OFF by default |
 | C — RDT for game planners | ~3 weeks | High (likely falsified at our 460K-param scale) | None directly; research-side hygiene |
 
-**Recommended order if any of these proceed:** A first (highest leverage, lowest risk, directly enables productisation latency targets), then B (closes the open vote-loop bug at the right architectural level), then C only if the project has appetite for a probably-falsifiable research experiment. None should run before the existing open `GAP-WIRE-006` Phase 6c+ work has its own outcome on record.
+**Recommended order if any of these proceed:** A first (highest leverage, lowest risk, directly enables productisation latency targets), then B (closes the open vote-loop bug at the right architectural level), then D (only if the audit-trail tradeoff is acceptable to a target vertical — ADR-gated adoption), then C only if the project has appetite for a probably-falsifiable research experiment. None should run before the existing open `GAP-WIRE-006` Phase 6c+ work has its own outcome on record.
+
+The broader OPA-side research direction catalogue (independent of OpenMythos cross-pollination) is in [`RESEARCH_OPA_DIRECTIONS.md`](RESEARCH_OPA_DIRECTIONS.md).
 
 ---
 
