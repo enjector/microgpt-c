@@ -146,6 +146,17 @@ void vm_engine_register_fn(vm_engine *e, const char *name, vm_native_fn fn) {
   e->native_fns_count++;
 }
 
+vm_native_fn vm_engine_find_fn(const vm_engine *e, const char *name) {
+  if (!e || !name)
+    return NULL;
+  for (size_t i = 0; i < e->native_fns_count; ++i) {
+    if (strcmp(e->native_fns[i].name, name) == 0) {
+      return e->native_fns[i].fn;
+    }
+  }
+  return NULL;
+}
+
 /* ── Loading ────────────────────────────────────────────────────────────── */
 
 int vm_engine_load(vm_engine *e, const char *source) {

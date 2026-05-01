@@ -1,0 +1,148 @@
+# MicroGPT-C — Compositional held-out test set (Phase 5 pre-registration)
+#
+# Stream C of the compositional generator fix
+# (docs.engineering/CLEAN_ROOM_IMPLEMENTATION/COMPOSITIONAL_GENERATOR_FIX_PLAN.md).
+#
+# 30 prompts across three axes:
+#   Axis 1 (10): Compose 2 primitives that DO NOT co-occur in any of
+#                the 20 anchor families. Tests "novel pair" composition.
+#   Axis 2 (10): Compose 3 primitives where at least one is referenced
+#                by a synonym never seen in tools/corpus_expand.c.
+#   Axis 3 (10): Compose 2 primitives + an outer transform; tests
+#                that the search backtracks under type pressure.
+#
+# Format mirrors pipeline_corpus_held_out.txt:
+#   // <prompt>
+#   # EXPECTED: <comma-separated primitive names>
+#   # REFERENCE: <function_name in wiring_references.c>
+#   ---
+#
+# Pre-registration target (RESEARCH_DISCLOSURE.md §3): ≥ 50 % verified +
+# correct on the leakage-audited set; ≥ 80 % when --use-expected
+# ranking gate is active.
+
+// the absolute difference between x and y
+# EXPECTED: subtract, abs_val
+# REFERENCE: ref_abs_diff
+---
+// the maximum of x squared and y
+# EXPECTED: square, max_two
+# REFERENCE: ref_max_x_squared_y
+---
+// the average of doubled x and y
+# EXPECTED: double_val, average_two
+# REFERENCE: ref_avg_double_x_y
+---
+// the gcd of x and the absolute value of y
+# EXPECTED: abs_val, gcd
+# REFERENCE: ref_gcd_x_abs_y
+---
+// the cube of the minimum of x and y
+# EXPECTED: min_two, cube
+# REFERENCE: ref_cube_min_x_y
+---
+// the relu of x minus y
+# EXPECTED: subtract, relu
+# REFERENCE: ref_relu_x_minus_y
+---
+// the sigmoid of doubled x
+# EXPECTED: double_val, sigmoid
+# REFERENCE: ref_sigmoid_double_x
+---
+// the harmonic of x plus y
+# EXPECTED: add, harmonic_n
+# REFERENCE: ref_harmonic_x_plus_y
+---
+// the factorial of the difference between x and y
+# EXPECTED: subtract, factorial
+# REFERENCE: ref_factorial_diff
+---
+// the percentage that x is of the square of y
+# EXPECTED: square, percentage
+# REFERENCE: ref_pct_x_of_y_squared
+---
+// the body-mass-index of doubled weight and height
+# EXPECTED: double_val, bmi
+# REFERENCE: ref_bmi_double_w_h
+---
+// the after-tax markup on the price at rate r
+# EXPECTED: markup, apply_tax
+# REFERENCE: ref_after_tax_markup
+---
+// the discounted compound interest on a principal
+# EXPECTED: compound, discount
+# REFERENCE: ref_discounted_compound
+---
+// the kinetic energy of an object with doubled mass
+# EXPECTED: double_val, kinetic_energy
+# REFERENCE: ref_ke_double_mass
+---
+// the area of a circle with the absolute radius
+# EXPECTED: abs_val, circle_area
+# REFERENCE: ref_circle_abs_radius
+---
+// the lerp between x and the maximum of y and z
+# EXPECTED: max_two, lerp
+# REFERENCE: ref_lerp_x_max_y_z
+---
+// the gcd of the squared difference between x and y
+# EXPECTED: subtract, square, gcd
+# REFERENCE: ref_gcd_sq_diff
+---
+// the percentage that the markup of x at rate r is of y
+# EXPECTED: markup, percentage
+# REFERENCE: ref_pct_markup_x_y
+---
+// the harmonic-sum of the absolute fibonacci of n
+# EXPECTED: fibonacci, abs_val, harmonic_n
+# REFERENCE: ref_harmonic_abs_fib
+---
+// the future-value of the present-value of x at rate r over n periods
+# EXPECTED: present_value, future_value
+# REFERENCE: ref_fv_of_pv
+---
+
+# === Axis 3: composition + outer transform ===
+# Tests the search backtracks under type pressure (outer's input type
+# must match inner's output).
+
+// the doubled gcd of squared x and y
+# EXPECTED: square, gcd, double_val
+# REFERENCE: ref_double_gcd_sq_y
+---
+// the negated minimum of x and the absolute y
+# EXPECTED: abs_val, min_two, negate
+# REFERENCE: ref_neg_min_x_abs_y
+---
+// the cube of the average of doubled x and y
+# EXPECTED: double_val, average_two, cube
+# REFERENCE: ref_cube_avg_double_x_y
+---
+// the relu of the gcd of x and y
+# EXPECTED: gcd, relu
+# REFERENCE: ref_relu_gcd_x_y
+---
+// the sigmoid of the difference of x and tripled y
+# EXPECTED: triple_val, subtract, sigmoid
+# REFERENCE: ref_sigmoid_x_minus_3y
+---
+// the apply-tax of the markup at rate r on the doubled price
+# EXPECTED: double_val, markup, apply_tax
+# REFERENCE: ref_taxed_markup_double
+---
+// the discount on the kinetic-energy of mass m at velocity v
+# EXPECTED: kinetic_energy, discount
+# REFERENCE: ref_discount_ke
+---
+// the bmi of the squared weight and the doubled height
+# EXPECTED: square, double_val, bmi
+# REFERENCE: ref_bmi_sq_w_double_h
+---
+// the harmonic of the gcd of x and y
+# EXPECTED: gcd, harmonic_n
+# REFERENCE: ref_harmonic_gcd
+---
+// the percentage that the cube of x is of the squared y
+# EXPECTED: cube, square, percentage
+# REFERENCE: ref_pct_cube_x_sq_y
+---

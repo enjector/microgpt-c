@@ -178,7 +178,11 @@
 /*
  * scalar_t — compile-time toggle between float (32-bit) and double (64-bit).
  *
- * Define MICROGPT_USE_FLOAT (via CMake or -D flag) to use single precision.
+ * The CMake build sets MICROGPT_USE_FLOAT=ON by default, so scalar_t is
+ * float in the default build.  Pass -DMICROGPT_USE_FLOAT=OFF to switch to
+ * double (64-bit) for research runs, gradient comparisons against PyTorch,
+ * or any other context that requires more than ~7 decimal digits.
+ *
  * Float roughly doubles SIMD throughput on ARM NEON (4 vs 2 elements per
  * 128-bit register) and halves memory bandwidth, at the cost of ~7 decimal
  * digits of precision vs ~15 for double.
@@ -573,6 +577,20 @@ static inline void microgpt_print_config(const char *demo_name,
 #else
   printf("    Partial RoPE = OFF\n");
 #endif
+#ifdef MSA_POOL_MODE
+  printf("    MSA pool mode= %d (0=mean,1=ramp,2=exp,3=content)\n",
+         (int)(MSA_POOL_MODE));
+#else
+  printf("    MSA pool mode= 0 (default mean)\n");
+#endif
+  /* Optimiser hyperparameters (constants — printed for build fingerprinting) */
+  printf("    BETA1        = %.4f\n", (double)BETA1);
+  printf("    BETA2        = %.4f\n", (double)BETA2);
+  printf("    EPS_ADAM     = %g\n",   (double)EPS_ADAM);
+  printf("    INIT_STD     = %.4f\n", (double)INIT_STD);
+  printf("    WEIGHT_DECAY = %.4f\n", (double)WEIGHT_DECAY);
+  printf("    GRAD_CLIP    = %.4f\n", (double)GRAD_CLIP);
+  printf("    LABEL_SMOOTH = %.4f\n", (double)LABEL_SMOOTH);
   printf("\n");
   printf(
       "================================================================\n\n");
@@ -1010,7 +1028,13 @@ size_t word_to_id(const WordVocab *wv, const char *word);
 
 /*
  * tokenize_words - Tokenize text into word token IDs.
- *   Splits on whitespace; newlines become wv->newline_id tokens.
+ *   Splits on space (' '), '\n', and '\r' only.  Tabs ('\t') are NOT
+ *   delimiters and are kept inside the surrounding word — pre-clean
+ *   corpora that use tabs if you do not want this.
+ *   Newlines (and '\r\n' pairs collapsed into one) become a single
+ *   wv->newline_id token.
+ *   Out-of-vocabulary words map to wv->unk_id.
+ *   The function does NOT prepend or append BOS — callers wrap.
  *   Returns the number of token IDs written to 'ids'.
  *
  *   text       - Input text buffer.

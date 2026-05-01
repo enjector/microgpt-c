@@ -1803,7 +1803,12 @@ endif()
 add_test(NAME microgpt_msa_tests COMMAND test_microgpt_msa WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
 # Graph Pipeline IR — Phase 1 (RESEARCH_PIPELINE_IR.md).
-add_executable(test_microgpt_pipeline tests/test_microgpt_pipeline.c)
+add_executable(test_microgpt_pipeline
+  tests/test_microgpt_pipeline.c
+  src/microgpt_pipeline_vm.c
+  src/microgpt_vm.c
+  src/microgpt_vm_parser.l.c
+  src/microgpt_vm_parser.tab.c)
 target_link_libraries(test_microgpt_pipeline PRIVATE microgpt_lib)
 target_include_directories(test_microgpt_pipeline PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests ${CMAKE_CURRENT_SOURCE_DIR}/src)
 if(NOT MSVC)
@@ -1851,6 +1856,57 @@ if(NOT MSVC)
   target_link_libraries(test_microgpt_ekan_network PRIVATE m)
 endif()
 add_test(NAME microgpt_ekan_network_tests COMMAND test_microgpt_ekan_network WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+# Stream B of the compositional generator fix — type-directed search +
+# primitive manifest. Links the pipeline IR (in microgpt_lib) plus the
+# opt-in VM-backed dispatcher and the VM library, mirroring how
+# test_microgpt_pipeline brings them in.
+add_executable(test_microgpt_wiring_compositional
+  tests/test_microgpt_wiring_compositional.c
+  demos/wiring_organelle/wiring_primitive_manifest.c
+  demos/wiring_organelle/wiring_compositional_search.c
+  demos/wiring_organelle/wiring_geo_classifier.c
+  demos/wiring_organelle/wiring_natives.c
+  src/microgpt_pipeline_vm.c
+  src/microgpt_vm.c
+  src/microgpt_vm_parser.l.c
+  src/microgpt_vm_parser.tab.c)
+target_link_libraries(test_microgpt_wiring_compositional PRIVATE microgpt_lib)
+target_include_directories(test_microgpt_wiring_compositional PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/tests
+  ${CMAKE_CURRENT_SOURCE_DIR}/src
+  ${CMAKE_CURRENT_SOURCE_DIR}/demos/wiring_organelle)
+if(NOT MSVC)
+  target_link_libraries(test_microgpt_wiring_compositional PRIVATE m)
+endif()
+add_test(NAME microgpt_wiring_compositional_tests
+         COMMAND test_microgpt_wiring_compositional
+         WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+# Phase 5 held-out harness — runs the type-directed compositional search
+# over the 30-prompt leakage-audited held-out set, dispatches via the VM,
+# scores against the reference oracle, and prints per-axis stats.
+add_executable(wiring_phase5_harness
+  demos/wiring_organelle/wiring_phase5_harness.c
+  demos/wiring_organelle/wiring_primitive_manifest.c
+  demos/wiring_organelle/wiring_compositional_search.c
+  demos/wiring_organelle/wiring_geo_classifier.c
+  demos/wiring_organelle/wiring_references.c
+  src/microgpt_pipeline_vm.c
+  src/microgpt_vm.c
+  src/microgpt_vm_parser.l.c
+  src/microgpt_vm_parser.tab.c)
+target_link_libraries(wiring_phase5_harness PRIVATE microgpt_lib)
+target_include_directories(wiring_phase5_harness PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/src
+  ${CMAKE_CURRENT_SOURCE_DIR}/demos/wiring_organelle)
+if(NOT MSVC)
+  target_link_libraries(wiring_phase5_harness PRIVATE m)
+endif()
+add_custom_command(TARGET wiring_phase5_harness POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy
+          ${CMAKE_CURRENT_SOURCE_DIR}/demos/wiring_organelle/pipeline_corpus_compositional_test.txt
+          $<TARGET_FILE_DIR:wiring_phase5_harness>/pipeline_corpus_compositional_test.txt)
 
 # Pipeline IR corpus generator (Phase 3a) — produces hand-curated
 # (prompt, graph) training pairs by building Pipeline IR objects
@@ -1913,7 +1969,11 @@ target_sources(wiring_organelle_demo PRIVATE
   demos/wiring_organelle/wiring_references.c
   demos/wiring_organelle/wiring_geo_classifier.c
   demos/wiring_organelle/wiring_anchor_graphs.c
-  demos/wiring_organelle/wiring_fragments.c)
+  demos/wiring_organelle/wiring_fragments.c
+  demos/wiring_organelle/wiring_primitive_manifest.c
+  demos/wiring_organelle/wiring_compositional_search.c)
+target_include_directories(wiring_organelle_demo PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/demos/wiring_organelle)
 # Generate the wiring + planner corpus next to the binary as a POST_BUILD step.
 # Phase 15: 4-arg invocation also emits pipeline_corpus_planner.txt for the
 # planner organelle (template-family classifier).

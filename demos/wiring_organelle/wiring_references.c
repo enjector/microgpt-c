@@ -215,6 +215,69 @@ DEF_REF(clamped_fib_fact) {
     return r_clamp(prod, S[1], S[2]);
 }
 
+/* ============================================================
+ * Phase 5 — Compositional held-out test set (Stream C of compositional fix).
+ *
+ * 30 references for `pipeline_corpus_compositional_test.txt`. Each prompt
+ * names two or three primitives and the canonical reference computes
+ * the expected numeric answer. See COMPOSITIONAL_GENERATOR_FIX_PLAN.md
+ * Stream C for the pre-registration.
+ * ============================================================ */
+
+/* Extra helpers required by the new references. */
+static int64_t r_square(int64_t x)        { return x * x; }
+static int64_t r_cube(int64_t x)          { return x * x * x; }
+static int64_t r_double_val(int64_t x)    { return x * 2; }
+static int64_t r_triple_val(int64_t x)    { return x * 3; }
+static int64_t r_min_two(int64_t a, int64_t b) { return a < b ? a : b; }
+static int64_t r_max_two(int64_t a, int64_t b) { return a > b ? a : b; }
+static int64_t r_negate(int64_t x)        { return -x; }
+static int64_t r_kinetic_energy(int64_t m, int64_t v) { return (m * v * v) / 2; }
+static int64_t r_circle_area(int64_t r)   { return (314 * r * r) / 100; }
+static int64_t r_harmonic_n(int64_t n) {
+    if (n <= 0) return 0;
+    int64_t s = 0;
+    for (int64_t k = 1; k <= n && k <= 1000; k++) s += 1000 / k;
+    return s;
+}
+static int64_t r_lerp(int64_t a, int64_t b, int64_t t) { return a + ((b - a) * t) / 100; }
+
+/* Axis 1 — 2-primitive novel-pair compositions (10). */
+DEF_REF(abs_diff_axis)            { return r_abs(S[0] - S[1]); }
+DEF_REF(max_x_squared_y)          { return r_max_two(r_square(S[0]), S[1]); }
+DEF_REF(avg_double_x_y)           { return r_average_two(r_double_val(S[0]), S[1]); }
+DEF_REF(gcd_x_abs_y)              { return r_gcd(S[0], r_abs(S[1])); }
+DEF_REF(cube_min_x_y)             { return r_cube(r_min_two(S[0], S[1])); }
+DEF_REF(relu_x_minus_y)           { return r_relu(S[0] - S[1]); }
+DEF_REF(sigmoid_double_x)         { return r_sigmoid(r_double_val(S[0])); }
+DEF_REF(harmonic_x_plus_y)        { return r_harmonic_n(S[0] + S[1]); }
+DEF_REF(factorial_diff)           { return r_factorial(r_abs(S[0] - S[1])); }
+DEF_REF(pct_x_of_y_squared)       { return r_percentage(S[0], r_square(S[1])); }
+
+/* Axis 2 — 3-primitive synonym-stress compositions (10). */
+DEF_REF(bmi_double_w_h)           { return r_bmi(r_double_val(S[0]), S[1]); }
+DEF_REF(after_tax_markup)         { return r_apply_tax(r_markup(S[0], S[1]), S[2]); }
+DEF_REF(discounted_compound)      { return r_discount(r_compound(S[0], S[1], S[2]), S[3]); }
+DEF_REF(ke_double_mass)           { return r_kinetic_energy(r_double_val(S[0]), S[1]); }
+DEF_REF(circle_abs_radius)        { return r_circle_area(r_abs(S[0])); }
+DEF_REF(lerp_x_max_y_z)           { return r_lerp(S[0], r_max_two(S[1], S[2]), S[3]); }
+DEF_REF(gcd_sq_diff)              { return r_gcd(r_square(S[0] - S[1]), S[2]); }
+DEF_REF(pct_markup_x_y)           { return r_percentage(r_markup(S[0], S[1]), S[2]); }
+DEF_REF(harmonic_abs_fib)         { return r_harmonic_n(r_abs(r_fibonacci(S[0]))); }
+DEF_REF(fv_of_pv)                 { return r_future_value(r_present_value(S[0], S[1], S[2]), S[1], S[2]); }
+
+/* Axis 3 — 2-or-3 primitives + outer transform with type pressure (10). */
+DEF_REF(double_gcd_sq_y)          { return r_double_val(r_gcd(r_square(S[0]), S[1])); }
+DEF_REF(neg_min_x_abs_y)          { return r_negate(r_min_two(S[0], r_abs(S[1]))); }
+DEF_REF(cube_avg_double_x_y)      { return r_cube(r_average_two(r_double_val(S[0]), S[1])); }
+DEF_REF(relu_gcd_x_y)             { return r_relu(r_gcd(S[0], S[1])); }
+DEF_REF(sigmoid_x_minus_3y)       { return r_sigmoid(S[0] - r_triple_val(S[1])); }
+DEF_REF(taxed_markup_double)      { return r_apply_tax(r_markup(r_double_val(S[0]), S[1]), S[2]); }
+DEF_REF(discount_ke)              { return r_discount(r_kinetic_energy(S[0], S[1]), S[2]); }
+DEF_REF(bmi_sq_w_double_h)        { return r_bmi(r_square(S[0]), r_double_val(S[1])); }
+DEF_REF(harmonic_gcd)             { return r_harmonic_n(r_gcd(S[0], S[1])); }
+DEF_REF(pct_cube_x_sq_y)          { return r_percentage(r_cube(S[0]), r_square(S[1])); }
+
 #undef DEF_REF
 
 typedef int64_t (*RefFn)(const int64_t *S);
@@ -256,6 +319,37 @@ static const RefEntry references[] = {
     {"interest_as_pct",     ref_interest_as_pct},
     {"markup_then_discount", ref_markup_then_discount},
     {"clamped_fib_fact",    ref_clamped_fib_fact},
+    /* Phase 5 compositional held-out (Stream C of compositional fix) */
+    {"ref_abs_diff",            ref_abs_diff_axis},
+    {"ref_max_x_squared_y",     ref_max_x_squared_y},
+    {"ref_avg_double_x_y",      ref_avg_double_x_y},
+    {"ref_gcd_x_abs_y",         ref_gcd_x_abs_y},
+    {"ref_cube_min_x_y",        ref_cube_min_x_y},
+    {"ref_relu_x_minus_y",      ref_relu_x_minus_y},
+    {"ref_sigmoid_double_x",    ref_sigmoid_double_x},
+    {"ref_harmonic_x_plus_y",   ref_harmonic_x_plus_y},
+    {"ref_factorial_diff",      ref_factorial_diff},
+    {"ref_pct_x_of_y_squared",  ref_pct_x_of_y_squared},
+    {"ref_bmi_double_w_h",      ref_bmi_double_w_h},
+    {"ref_after_tax_markup",    ref_after_tax_markup},
+    {"ref_discounted_compound", ref_discounted_compound},
+    {"ref_ke_double_mass",      ref_ke_double_mass},
+    {"ref_circle_abs_radius",   ref_circle_abs_radius},
+    {"ref_lerp_x_max_y_z",      ref_lerp_x_max_y_z},
+    {"ref_gcd_sq_diff",         ref_gcd_sq_diff},
+    {"ref_pct_markup_x_y",      ref_pct_markup_x_y},
+    {"ref_harmonic_abs_fib",    ref_harmonic_abs_fib},
+    {"ref_fv_of_pv",            ref_fv_of_pv},
+    {"ref_double_gcd_sq_y",     ref_double_gcd_sq_y},
+    {"ref_neg_min_x_abs_y",     ref_neg_min_x_abs_y},
+    {"ref_cube_avg_double_x_y", ref_cube_avg_double_x_y},
+    {"ref_relu_gcd_x_y",        ref_relu_gcd_x_y},
+    {"ref_sigmoid_x_minus_3y",  ref_sigmoid_x_minus_3y},
+    {"ref_taxed_markup_double", ref_taxed_markup_double},
+    {"ref_discount_ke",         ref_discount_ke},
+    {"ref_bmi_sq_w_double_h",   ref_bmi_sq_w_double_h},
+    {"ref_harmonic_gcd",        ref_harmonic_gcd},
+    {"ref_pct_cube_x_sq_y",     ref_pct_cube_x_sq_y},
 };
 static const int references_count = (int)(sizeof(references) / sizeof(references[0]));
 

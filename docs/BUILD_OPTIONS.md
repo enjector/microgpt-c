@@ -46,13 +46,15 @@ cmake -DMICROGPT_BLAS=ON ..
 
 ## Float Precision
 
-Switch all weights, activations, and gradients from `double` to `float` (32-bit). Useful for ARM NEON throughput (4-wide vs 2-wide SIMD) and memory-constrained devices:
+`MICROGPT_USE_FLOAT` is **ON by default** — the standard build stores all weights, activations, and gradients as `float` (32-bit). Float gives best throughput on ARM NEON (4-wide vs 2-wide SIMD) and halves memory footprint vs double.
+
+To switch to `double` (64-bit) for research runs or gradient comparisons against a reference PyTorch implementation:
 
 ```bash
-cmake -DMICROGPT_USE_FLOAT=ON ..
+cmake -DMICROGPT_USE_FLOAT=OFF ..
 ```
 
-> **Note:** Optimizer hyperparameters (learning rate, Adam β1/β2/ε) remain `double` for numerical stability. Test tolerances auto-adjust via `SCALAR_TOL`.
+> **Note:** Optimizer hyperparameters (learning rate, Adam β1/β2/ε) remain `double` regardless of this flag for numerical stability. Test tolerances auto-adjust via `SCALAR_TOL` in `tests/test_microgpt.c`.
 
 ---
 

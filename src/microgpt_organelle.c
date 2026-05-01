@@ -1986,13 +1986,20 @@ const char *opa_extract_pipe_value(char *buf, const char *key) {
 
   p += strlen(search); /* skip past "key=" to the value */
 
-  /* NUL-terminate at the next delimiter (pipe or newline) */
-  char *end = strchr(p, '|');
+  /* NUL-terminate at the FIRST delimiter (pipe or newline) so subsequent
+   * extractions on the same buffer can still find the next "key=" pair.
+   * Earlier code wrote NULs at BOTH the next pipe AND the next newline,
+   * which destroyed every later "|key=" anchor in the buffer (GAP-ORG-001).
+   */
+  char *end_pipe = strchr(p, '|');
+  char *end_nl   = strchr(p, '\n');
+  char *end = NULL;
+  if (end_pipe && end_nl)
+    end = (end_pipe < end_nl) ? end_pipe : end_nl;
+  else
+    end = end_pipe ? end_pipe : end_nl;
   if (end)
     *end = '\0';
-  char *nl = strchr(p, '\n');
-  if (nl)
-    *nl = '\0';
 
   return p;
 }

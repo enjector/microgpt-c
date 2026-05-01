@@ -440,18 +440,24 @@ int pipeline_execute(const Pipeline *p,
                      PipelineDispatchFn dispatch, void *user_data);
 
 /* ============================================================
- *  VM-backed dispatch (Phase 2 — convenience integration)
+ *  VM-backed dispatch (Phase 3 — implemented)
  * ============================================================
  *
- * Executes a pipeline by resolving each leaf node's primitive name to
- * a registered native function in the supplied vm_engine, then calling
- * it via the engine's dispatch path.
+ * Executes a verified pipeline by resolving each leaf node's primitive
+ * name to a vm_native_fn registered in the supplied vm_engine via
+ * vm_engine_find_fn(), then calling it with the marshalled inputs.
+ * Subgraph nodes recurse via this same function.
  *
- * Phase 2 limitation: vm_native_fn takes (int argc, const double *argv)
- * and returns double — so this entry point only works for pipelines
- * whose leaf nodes use INT/FLOAT-typed ports exclusively. Pipelines
- * with STRING/LIST/TENSOR/RECORD ports must use the callback-based
- * pipeline_execute().
+ * Type constraint: vm_native_fn is `double(int argc, const double *argv)`
+ * — this entry point only works for pipelines whose leaf nodes use
+ * INT/FLOAT-typed ports exclusively. Pipelines with STRING/LIST/
+ * TENSOR/RECORD ports return PIPE_ERR_EXEC with a message that
+ * identifies the offending node and port name. Use the callback-based
+ * pipeline_execute() for pipelines with non-numeric port types.
+ *
+ * Multi-output limitation: the native ABI returns a single double, so
+ * leaf nodes with multiple output ports receive the return value on
+ * the FIRST output port; additional output ports are filled with 0.0.
  *
  * The host is responsible for:
  *   - Calling vm_engine_register_fn() for every primitive name that
@@ -460,7 +466,8 @@ int pipeline_execute(const Pipeline *p,
  *
  * Returns 0 on success or a negative PIPE_ERR_* code. If a primitive
  * is missing from the engine, returns PIPE_ERR_EXEC and
- * pipeline_last_error() identifies the missing primitive.
+ * pipeline_last_error() identifies the missing primitive and the
+ * containing node id.
  */
 
 /* Forward declaration to avoid including microgpt_vm.h in this header. */

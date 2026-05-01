@@ -65,6 +65,15 @@ typedef struct {
 
 /* =========================================================================
  * Public API
+ *
+ * IMPORTANT — fixed-cap silent truncation:
+ *   The flag complex, edge list, triangle list, and persistence diagram are
+ *   sized at compile time (VR_MAX_EDGES, VR_MAX_TRIANGLES, VR_MAX_SIMPLICES,
+ *   VR_MAX_INTERVALS).  When a point cloud exceeds these caps, vr_compute
+ *   silently truncates the computation and returns whatever fits.  The
+ *   resulting diagram MAY be incomplete.  Callers responsible for
+ *   correctness MUST pre-bound their input (n_points ≤ VR_MAX_PTS = 64) and
+ *   SHOULD validate that diagram->count is plausible for their use case.
  * ========================================================================= */
 
 void vr_engine_init(VREngine *engine, float max_radius, int max_dim, int n_dims);

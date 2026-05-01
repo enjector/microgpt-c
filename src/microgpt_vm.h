@@ -858,6 +858,19 @@ int vm_engine_load(vm_engine *e, const char *source);
  */
 void vm_engine_register_fn(vm_engine *e, const char *name, vm_native_fn fn);
 
+/**
+ * Look up a previously registered native function by name.
+ *
+ * Linear scan over the engine's small native registration table.  Cost is
+ * O(n) in the number of registered natives (typically ≤ 50); not on the
+ * inner-loop hot path.
+ *
+ * @param e     Engine instance (NULL → returns NULL).
+ * @param name  Function name as passed to vm_engine_register_fn (NULL → NULL).
+ * @return The vm_native_fn pointer if found, NULL otherwise.
+ */
+vm_native_fn vm_engine_find_fn(const vm_engine *e, const char *name);
+
 /* Execution */
 
 /**

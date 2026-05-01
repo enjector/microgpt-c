@@ -6,6 +6,7 @@
 #define _CRT_SECURE_NO_WARNINGS 1
 
 #include "microgpt_pipeline.h"
+#include "microgpt_vm.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -650,28 +651,15 @@ TEST(verify_partial_complete_graph_zero_missing) {
 }
 
 /* ============================================================
- *  Phase 2 — VM dispatch (deferred — verify error path)
+ *  Phase 3 — VM dispatch (working — Stream A of compositional fix)
+ *
+ * As of V1.0.4 (compositional generator fix, Stream A) pipeline_execute_vm
+ * is a real dispatcher that looks up vm_native_fn registrations via
+ * vm_engine_find_fn() and calls them with marshalled doubles. The legacy
+ * "deferred" test is replaced with a missing-primitive expectation that
+ * does not require a vm_engine* (so the test file stays free of VM headers
+ * for the args-check tests; full VM tests live further down).
  * ============================================================ */
-
-TEST(execute_vm_returns_deferred_error) {
-    /* Phase 2 ships pipeline_execute_vm() as an API surface; the actual
-     * dispatch is deferred to Phase 3 because vm_engine doesn't expose
-     * a public lookup-and-call for registered native fns. The function
-     * must return PIPE_ERR_EXEC with a clear message that explains what
-     * to do instead. */
-    Pipeline *p = build_add_graph();
-    pipeline_verify(p);
-    /* Pass a non-NULL but bogus vm_engine pointer — Phase 2 stub doesn't
-     * dereference it, just checks the args. */
-    PipelineValue inputs[2] = {0};
-    PipelineValue outputs[1] = {0};
-    int rc = pipeline_execute_vm(p, (vm_engine *)0xdeadbeef, inputs, outputs);
-    ASSERT_EQ(rc, PIPE_ERR_EXEC);
-    const char *msg = pipeline_last_error();
-    ASSERT(msg != NULL);
-    ASSERT(strstr(msg, "Phase 3") != NULL);
-    pipeline_free(p);
-}
 
 TEST(execute_vm_null_args_rejected) {
     int rc = pipeline_execute_vm(NULL, NULL, NULL, NULL);
@@ -1269,6 +1257,166 @@ TEST(last_error_set_on_failure) {
     pipeline_free(p);
 }
 
+/* ============================================================
+ *  V1.0.4 — VM-backed dispatch tests (Stream A of compositional fix)
+ * ============================================================ */
+
+static double vm_native_add(int argc, const double *argv) {
+    (void)argc; return argv[0] + argv[1];
+}
+static double vm_native_mul(int argc, const double *argv) {
+    (void)argc; return argv[0] * argv[1];
+}
+static double vm_native_sub(int argc, const double *argv) {
+    (void)argc; return argv[0] - argv[1];
+}
+
+TEST(vm_dispatch_simple_add) {
+    Pipeline *p = build_add_graph();
+    ASSERT_EQ(pipeline_verify(p), PIPE_OK);
+
+    vm_engine *vm = vm_engine_create();
+    vm_engine_register_fn(vm, "add", vm_native_add);
+
+    PipelineValue inputs[2]  = {0};
+    PipelineValue outputs[1] = {0};
+    inputs[0].v.i = 3;
+    inputs[1].v.i = 4;
+    int rc = pipeline_execute_vm(p, vm, inputs, outputs);
+    if (rc != 0) printf("\n    err: %s ", pipeline_last_error());
+    ASSERT_EQ(rc, PIPE_OK);
+    ASSERT_EQ((int)outputs[0].v.i, 7);
+
+    vm_engine_dispose(vm);
+    pipeline_free(p);
+}
+
+TEST(vm_dispatch_chain_three) {
+    /* (a + b) * c, then negated.  Mirrors execute_chain_three_nodes but via VM. */
+    Pipeline *p = pipeline_create("vm_chain3");
+    const char *sin_names[]  = {"a", "b", "c"};
+    PipelineType *sin_types[] = {pipeline_type_int(), pipeline_type_int(), pipeline_type_int()};
+    const char *sout_names[] = {"y"};
+    PipelineType *sout_types[] = {pipeline_type_int()};
+    pipeline_set_signature(p, 3, sin_names, sin_types, 1, sout_names, sout_types);
+
+    const char *in2[] = {"x", "y"}; const char *out1[] = {"out"};
+    PipelineType *it_a[] = {pipeline_type_int(), pipeline_type_int()};
+    PipelineType *ot_a[] = {pipeline_type_int()};
+    pipeline_add_node(p, "n1", "add", 2, in2, it_a, 1, out1, ot_a);
+    PipelineType *it_b[] = {pipeline_type_int(), pipeline_type_int()};
+    PipelineType *ot_b[] = {pipeline_type_int()};
+    pipeline_add_node(p, "n2", "mul", 2, in2, it_b, 1, out1, ot_b);
+    PipelineType *it_c[] = {pipeline_type_int(), pipeline_type_int()};
+    PipelineType *ot_c[] = {pipeline_type_int()};
+    pipeline_add_node(p, "n3", "sub", 2, in2, it_c, 1, out1, ot_c);
+    /* y = (a + b) * c - 1 */
+    pipeline_connect_signature_in(p, "a", "n1", "x");
+    pipeline_connect_signature_in(p, "b", "n1", "y");
+    pipeline_connect(p, "n1", "out", "n2", "x");
+    pipeline_connect_signature_in(p, "c", "n2", "y");
+    pipeline_connect(p, "n2", "out", "n3", "x");
+    /* hold a constant 1 in via a second sig input "one" — easier: reuse "c" path. */
+    /* Actually we need a 4th input; simplest: reuse "c" twice — sub takes (mul,c) which gives (a+b)*c - c. */
+    pipeline_connect_signature_in(p, "c", "n3", "y");
+    pipeline_connect_signature_out(p, "n3", "out", "y");
+
+    int rc = pipeline_verify(p);
+    if (rc != 0) printf("\n    err: %s ", pipeline_last_error());
+    ASSERT_EQ(rc, PIPE_OK);
+
+    vm_engine *vm = vm_engine_create();
+    vm_engine_register_fn(vm, "add", vm_native_add);
+    vm_engine_register_fn(vm, "mul", vm_native_mul);
+    vm_engine_register_fn(vm, "sub", vm_native_sub);
+
+    PipelineValue inputs[3] = {0}, outputs[1] = {0};
+    inputs[0].v.i = 2; inputs[1].v.i = 3; inputs[2].v.i = 5;  /* (2+3)*5 - 5 = 20 */
+    rc = pipeline_execute_vm(p, vm, inputs, outputs);
+    ASSERT_EQ(rc, PIPE_OK);
+    ASSERT_EQ((int)outputs[0].v.i, 20);
+
+    vm_engine_dispose(vm);
+    pipeline_free(p);
+}
+
+TEST(vm_dispatch_missing_primitive) {
+    Pipeline *p = build_add_graph();
+    ASSERT_EQ(pipeline_verify(p), PIPE_OK);
+
+    vm_engine *vm = vm_engine_create();
+    /* Deliberately do NOT register "add". */
+
+    PipelineValue inputs[2] = {0}, outputs[1] = {0};
+    int rc = pipeline_execute_vm(p, vm, inputs, outputs);
+    ASSERT_EQ(rc, PIPE_ERR_EXEC);
+    const char *msg = pipeline_last_error();
+    ASSERT(msg != NULL);
+    ASSERT(strstr(msg, "add") != NULL);
+    ASSERT(strstr(msg, "not registered") != NULL || strstr(msg, "register") != NULL);
+
+    vm_engine_dispose(vm);
+    pipeline_free(p);
+}
+
+TEST(vm_dispatch_string_port_rejected) {
+    /* Build a graph with a STRING signature input feeding a node port —
+     * the verifier accepts it because types match end-to-end, but the VM
+     * dispatcher rejects with a port-identifying message. */
+    Pipeline *p = pipeline_create("string_port");
+    const char *sin_names[] = {"s"};
+    PipelineType *sin_types[] = {pipeline_type_string()};
+    const char *sout_names[] = {"y"};
+    PipelineType *sout_types[] = {pipeline_type_string()};
+    pipeline_set_signature(p, 1, sin_names, sin_types, 1, sout_names, sout_types);
+
+    const char *in1[] = {"x"};
+    PipelineType *it[] = {pipeline_type_string()};
+    const char *out1[] = {"out"};
+    PipelineType *ot[] = {pipeline_type_string()};
+    pipeline_add_node(p, "n", "id", 1, in1, it, 1, out1, ot);
+    pipeline_connect_signature_in(p, "s", "n", "x");
+    pipeline_connect_signature_out(p, "n", "out", "y");
+    ASSERT_EQ(pipeline_verify(p), PIPE_OK);
+
+    vm_engine *vm = vm_engine_create();
+    PipelineValue inputs[1] = {0}, outputs[1] = {0};
+    int rc = pipeline_execute_vm(p, vm, inputs, outputs);
+    ASSERT_EQ(rc, PIPE_ERR_EXEC);
+    const char *msg = pipeline_last_error();
+    ASSERT(msg != NULL);
+    ASSERT(strstr(msg, "non-numeric") != NULL);
+    ASSERT(strstr(msg, "x") != NULL);  /* offending port name */
+
+    vm_engine_dispose(vm);
+    pipeline_free(p);
+}
+
+TEST(vm_dispatch_matches_callback) {
+    /* Same graph, same inputs, dispatched two ways — outputs MUST match. */
+    Pipeline *p1 = build_add_graph();
+    Pipeline *p2 = build_add_graph();
+    ASSERT_EQ(pipeline_verify(p1), PIPE_OK);
+    ASSERT_EQ(pipeline_verify(p2), PIPE_OK);
+
+    PipelineValue inputs[2] = {0}, out_cb[1] = {0}, out_vm[1] = {0};
+    inputs[0].v.i = 11; inputs[1].v.i = 22;
+
+    int rc1 = pipeline_execute(p1, inputs, out_cb, test_dispatch, NULL);
+    ASSERT_EQ(rc1, PIPE_OK);
+
+    vm_engine *vm = vm_engine_create();
+    vm_engine_register_fn(vm, "add", vm_native_add);
+    int rc2 = pipeline_execute_vm(p2, vm, inputs, out_vm);
+    ASSERT_EQ(rc2, PIPE_OK);
+    ASSERT_EQ((int)out_cb[0].v.i, (int)out_vm[0].v.i);
+    ASSERT_EQ((int)out_vm[0].v.i, 33);
+
+    vm_engine_dispose(vm);
+    pipeline_free(p1);
+    pipeline_free(p2);
+}
+
 /* ---- Main ---- */
 
 int main(void) {
@@ -1317,7 +1465,9 @@ int main(void) {
     RUN(verify_partial_complete_graph_zero_missing);
 
     printf("\n[Pipeline IR — Phase 2 VM dispatch (deferred)]\n");
-    RUN(execute_vm_returns_deferred_error);
+    /* execute_vm_returns_deferred_error removed in V1.0.4 — pipeline_execute_vm
+     * is no longer a stub. Working VM dispatch is exercised by the new tests
+     * registered later in this file (vm_dispatch_*). */
     RUN(execute_vm_null_args_rejected);
 
     printf("\n[Pipeline IR — Phase 3a corpus integrity]\n");
@@ -1350,6 +1500,13 @@ int main(void) {
 
     printf("\n[Pipeline IR — Error reporting]\n");
     RUN(last_error_set_on_failure);
+
+    printf("\n[Pipeline IR — V1.0.4 VM-backed dispatch]\n");
+    RUN(vm_dispatch_simple_add);
+    RUN(vm_dispatch_chain_three);
+    RUN(vm_dispatch_missing_primitive);
+    RUN(vm_dispatch_string_port_rejected);
+    RUN(vm_dispatch_matches_callback);
 
     printf("\n=== Results: %d/%d passed ===\n", g_tests_passed, g_tests_run);
     return g_tests_failed == 0 ? 0 : 1;

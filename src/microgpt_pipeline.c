@@ -10,6 +10,7 @@
 #define _CRT_SECURE_NO_WARNINGS 1
 
 #include "microgpt_pipeline.h"
+#include "microgpt_pipeline_internal.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -1107,56 +1108,24 @@ cleanup:
 }
 
 /* ============================================================
- *  VM-backed dispatch (Phase 2 — API surface, deferred dispatch)
+ *  VM-backed dispatch — bridge symbols
  * ============================================================
  *
- * The header declares pipeline_execute_vm(). The intended semantics
- * are: resolve each leaf primitive name to a registered vm_native_fn
- * in the supplied vm_engine, marshal PipelineValue ↔ double, dispatch.
- *
- * Phase 2 ships the API surface (so dependent code can compile and
- * tests can assert on the error path) but the internal dispatch is
- * deferred to Phase 3 because the public vm_engine API does not
- * provide:
- *   1. A way to enumerate or look up registered native functions
- *      from C — vm_engine_t's native_fns[] table is private to
- *      microgpt_vm.c.
- *   2. A way to invoke a registered native function with C-side
- *      arguments — vm_engine_run() takes only a fn_name and returns
- *      via the engine's result slot; arguments must come from a
- *      preloaded VM script.
- *
- * Working around this either requires (a) extending microgpt_vm.h
- * with an exported lookup-and-call API (cleanest) or (b) synthesising
- * a per-pipeline VM script that calls the registered fns in
- * topological order and runs it via vm_engine_run() (messier, but
- * keeps microgpt_vm unmodified).
- *
- * Phase 3 will choose between (a) and (b) based on whether the
- * Wiring Organelle work pushes for changes in microgpt_vm.h anyway.
- * Until then, callers should use pipeline_execute() with their own
- * (name, fn) lookup table — which is exactly what the VM dispatcher
- * would do internally.
+ * pipeline_execute_vm() lives in src/microgpt_pipeline_vm.c (an opt-in
+ * TU that links the VM).  microgpt_lib does NOT link the VM; demos
+ * and tests that call pipeline_execute_vm must add microgpt_pipeline_vm.c
+ * AND microgpt_vm.c to their target.  These bridges expose the
+ * pipeline.c statics needed by that TU (see microgpt_pipeline_internal.h).
  */
-int pipeline_execute_vm(const Pipeline *p,
-                        vm_engine *vm,
-                        const PipelineValue *inputs,
-                        PipelineValue *outputs) {
-    (void)inputs; (void)outputs;
-    if (!p) {
-        set_err("pipeline_execute_vm: null pipeline");
-        return PIPE_ERR_EXEC;
-    }
-    if (!vm) {
-        set_err("pipeline_execute_vm: null vm_engine");
-        return PIPE_ERR_EXEC;
-    }
-    set_err("pipeline_execute_vm: dispatch deferred to Phase 3 — "
-            "the public vm_engine API doesn't expose native-fn lookup-and-call. "
-            "Use pipeline_execute() with a host-supplied dispatcher that calls "
-            "your fn pointers directly. See microgpt_pipeline.c §VM-backed dispatch "
-            "for the design notes.");
-    return PIPE_ERR_EXEC;
+void mgpt_pipe_set_err(const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(g_pipeline_err, sizeof(g_pipeline_err), fmt, args);
+    va_end(args);
+}
+
+int mgpt_pipe_find_incoming_edge(const Pipeline *p, int dst_node, int dst_port) {
+    return find_incoming_edge(p, dst_node, dst_port);
 }
 
 /* ============================================================

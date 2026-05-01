@@ -987,15 +987,18 @@ size_t model_num_params(const Model *m) {
   return count_params(m->vocab_size, &m->cfg);
 }
 
-/* ======================== Serialisation (fp64 only) ======================= */
+/* ======================== Serialisation (scalar_t, non-INT8 builds) ======= */
 
 #if !defined(QUANTIZATION_INT8) && !defined(QUANTISATION_INT8)
-/* Helper: write 'n' doubles to a binary file.  Returns 0 on success. */
-static int write_doubles(FILE *f, const scalar_t *p, size_t n) {
+/* Helper: write 'n' scalar_t values to a binary file.  Returns 0 on success.
+ * scalar_t is float when MICROGPT_USE_FLOAT is defined, else double — the
+ * file's per-element width matches the producer's build. */
+static int write_scalars(FILE *f, const scalar_t *p, size_t n) {
   return fwrite(p, sizeof(scalar_t), n, f) == n ? 0 : -1;
 }
-/* Helper: read 'n' doubles from a binary file.  Returns 0 on success. */
-static int read_doubles(FILE *f, scalar_t *p, size_t n) {
+/* Helper: read 'n' scalar_t values from a binary file.  Returns 0 on success.
+ * Consumer must be built with the same scalar_t width as the producer. */
+static int read_scalars(FILE *f, scalar_t *p, size_t n) {
   return fread(p, sizeof(scalar_t), n, f) == n ? 0 : -1;
 }
 /*
@@ -1015,33 +1018,33 @@ int model_save(const Model *m, const char *path) {
     fclose(f);
     return -1;
   }
-  if (write_doubles(f, m->wte, vs * ne) != 0) {
+  if (write_scalars(f, m->wte, vs * ne) != 0) {
     fclose(f);
     return -1;
   }
-  if (write_doubles(f, m->wpe, bs * ne) != 0) {
+  if (write_scalars(f, m->wpe, bs * ne) != 0) {
     fclose(f);
     return -1;
   }
-  if (write_doubles(f, m->lm_head, vs * ne) != 0) {
+  if (write_scalars(f, m->lm_head, vs * ne) != 0) {
     fclose(f);
     return -1;
   }
   for (int L = 0; L < nl; L++) {
-    if (write_doubles(f, m->attn_wq[L], ne * ne) != 0 ||
-        write_doubles(f, m->attn_wk[L], ne * ne) != 0 ||
-        write_doubles(f, m->attn_wv[L], ne * ne) != 0 ||
-        write_doubles(f, m->attn_wo[L], ne * ne) != 0 ||
-        write_doubles(f, m->mlp_fc1[L], md * ne) != 0 ||
-        write_doubles(f, m->mlp_fc2[L], ne * md) != 0) {
+    if (write_scalars(f, m->attn_wq[L], ne * ne) != 0 ||
+        write_scalars(f, m->attn_wk[L], ne * ne) != 0 ||
+        write_scalars(f, m->attn_wv[L], ne * ne) != 0 ||
+        write_scalars(f, m->attn_wo[L], ne * ne) != 0 ||
+        write_scalars(f, m->mlp_fc1[L], md * ne) != 0 ||
+        write_scalars(f, m->mlp_fc2[L], ne * md) != 0) {
       fclose(f);
       return -1;
     }
   }
 #ifdef MICROGPT_ATTN_RES
   for (int L = 0; L < nl; L++) {
-    if (write_doubles(f, m->attn_res_proj[L], ne) != 0 ||
-        write_doubles(f, m->mlp_res_proj[L], ne) != 0) {
+    if (write_scalars(f, m->attn_res_proj[L], ne) != 0 ||
+        write_scalars(f, m->mlp_res_proj[L], ne) != 0) {
       fclose(f);
       return -1;
     }
@@ -1074,20 +1077,20 @@ Model *model_load(const char *path, size_t vocab_size,
   const size_t bs = (size_t)BLOCK_SIZE;
   const size_t md = (size_t)MLP_DIM;
   const int nl = N_LAYER;
-  if (read_doubles(f, m->wte, vs * ne) != 0 ||
-      read_doubles(f, m->wpe, bs * ne) != 0 ||
-      read_doubles(f, m->lm_head, vs * ne) != 0) {
+  if (read_scalars(f, m->wte, vs * ne) != 0 ||
+      read_scalars(f, m->wpe, bs * ne) != 0 ||
+      read_scalars(f, m->lm_head, vs * ne) != 0) {
     model_free(m);
     fclose(f);
     return NULL;
   }
   for (int L = 0; L < nl; L++) {
-    if (read_doubles(f, m->attn_wq[L], ne * ne) != 0 ||
-        read_doubles(f, m->attn_wk[L], ne * ne) != 0 ||
-        read_doubles(f, m->attn_wv[L], ne * ne) != 0 ||
-        read_doubles(f, m->attn_wo[L], ne * ne) != 0 ||
-        read_doubles(f, m->mlp_fc1[L], md * ne) != 0 ||
-        read_doubles(f, m->mlp_fc2[L], ne * md) != 0) {
+    if (read_scalars(f, m->attn_wq[L], ne * ne) != 0 ||
+        read_scalars(f, m->attn_wk[L], ne * ne) != 0 ||
+        read_scalars(f, m->attn_wv[L], ne * ne) != 0 ||
+        read_scalars(f, m->attn_wo[L], ne * ne) != 0 ||
+        read_scalars(f, m->mlp_fc1[L], md * ne) != 0 ||
+        read_scalars(f, m->mlp_fc2[L], ne * md) != 0) {
       model_free(m);
       fclose(f);
       return NULL;
@@ -1095,8 +1098,8 @@ Model *model_load(const char *path, size_t vocab_size,
   }
 #ifdef MICROGPT_ATTN_RES
   for (int L = 0; L < nl; L++) {
-    if (read_doubles(f, m->attn_res_proj[L], ne) != 0 ||
-        read_doubles(f, m->mlp_res_proj[L], ne) != 0) {
+    if (read_scalars(f, m->attn_res_proj[L], ne) != 0 ||
+        read_scalars(f, m->mlp_res_proj[L], ne) != 0) {
       model_free(m);
       fclose(f);
       return NULL;
@@ -1135,27 +1138,27 @@ int checkpoint_save(const Model *model, const scalar_t *m_buf,
   }
 
   /* Write model weights (same order as model_save) */
-  if (write_doubles(f, model->wte, vs * ne) != 0 ||
-      write_doubles(f, model->wpe, bs * ne) != 0 ||
-      write_doubles(f, model->lm_head, vs * ne) != 0) {
+  if (write_scalars(f, model->wte, vs * ne) != 0 ||
+      write_scalars(f, model->wpe, bs * ne) != 0 ||
+      write_scalars(f, model->lm_head, vs * ne) != 0) {
     fclose(f);
     return -1;
   }
   for (int L = 0; L < nl; L++) {
-    if (write_doubles(f, model->attn_wq[L], ne * ne) != 0 ||
-        write_doubles(f, model->attn_wk[L], ne * ne) != 0 ||
-        write_doubles(f, model->attn_wv[L], ne * ne) != 0 ||
-        write_doubles(f, model->attn_wo[L], ne * ne) != 0 ||
-        write_doubles(f, model->mlp_fc1[L], md * ne) != 0 ||
-        write_doubles(f, model->mlp_fc2[L], ne * md) != 0) {
+    if (write_scalars(f, model->attn_wq[L], ne * ne) != 0 ||
+        write_scalars(f, model->attn_wk[L], ne * ne) != 0 ||
+        write_scalars(f, model->attn_wv[L], ne * ne) != 0 ||
+        write_scalars(f, model->attn_wo[L], ne * ne) != 0 ||
+        write_scalars(f, model->mlp_fc1[L], md * ne) != 0 ||
+        write_scalars(f, model->mlp_fc2[L], ne * md) != 0) {
       fclose(f);
       return -1;
     }
   }
 #ifdef MICROGPT_ATTN_RES
   for (int L = 0; L < nl; L++) {
-    if (write_doubles(f, model->attn_res_proj[L], ne) != 0 ||
-        write_doubles(f, model->mlp_res_proj[L], ne) != 0) {
+    if (write_scalars(f, model->attn_res_proj[L], ne) != 0 ||
+        write_scalars(f, model->mlp_res_proj[L], ne) != 0) {
       fclose(f);
       return -1;
     }
@@ -1164,7 +1167,7 @@ int checkpoint_save(const Model *model, const scalar_t *m_buf,
 
   /* Write optimizer state */
   size_t np = model_num_params(model);
-  if (write_doubles(f, m_buf, np) != 0 || write_doubles(f, v_buf, np) != 0) {
+  if (write_scalars(f, m_buf, np) != 0 || write_scalars(f, v_buf, np) != 0) {
     fclose(f);
     return -1;
   }
@@ -1203,20 +1206,20 @@ Model *checkpoint_load(const char *path, size_t vocab_size,
   const size_t md = (size_t)MLP_DIM;
   const int nl = N_LAYER;
 
-  if (read_doubles(f, model->wte, vs * ne) != 0 ||
-      read_doubles(f, model->wpe, bs * ne) != 0 ||
-      read_doubles(f, model->lm_head, vs * ne) != 0) {
+  if (read_scalars(f, model->wte, vs * ne) != 0 ||
+      read_scalars(f, model->wpe, bs * ne) != 0 ||
+      read_scalars(f, model->lm_head, vs * ne) != 0) {
     model_free(model);
     fclose(f);
     return NULL;
   }
   for (int L = 0; L < nl; L++) {
-    if (read_doubles(f, model->attn_wq[L], ne * ne) != 0 ||
-        read_doubles(f, model->attn_wk[L], ne * ne) != 0 ||
-        read_doubles(f, model->attn_wv[L], ne * ne) != 0 ||
-        read_doubles(f, model->attn_wo[L], ne * ne) != 0 ||
-        read_doubles(f, model->mlp_fc1[L], md * ne) != 0 ||
-        read_doubles(f, model->mlp_fc2[L], ne * md) != 0) {
+    if (read_scalars(f, model->attn_wq[L], ne * ne) != 0 ||
+        read_scalars(f, model->attn_wk[L], ne * ne) != 0 ||
+        read_scalars(f, model->attn_wv[L], ne * ne) != 0 ||
+        read_scalars(f, model->attn_wo[L], ne * ne) != 0 ||
+        read_scalars(f, model->mlp_fc1[L], md * ne) != 0 ||
+        read_scalars(f, model->mlp_fc2[L], ne * md) != 0) {
       model_free(model);
       fclose(f);
       return NULL;
@@ -1224,8 +1227,8 @@ Model *checkpoint_load(const char *path, size_t vocab_size,
   }
 #ifdef MICROGPT_ATTN_RES
   for (int L = 0; L < nl; L++) {
-    if (read_doubles(f, model->attn_res_proj[L], ne) != 0 ||
-        read_doubles(f, model->mlp_res_proj[L], ne) != 0) {
+    if (read_scalars(f, model->attn_res_proj[L], ne) != 0 ||
+        read_scalars(f, model->mlp_res_proj[L], ne) != 0) {
       model_free(model);
       fclose(f);
       return NULL;
@@ -1235,7 +1238,7 @@ Model *checkpoint_load(const char *path, size_t vocab_size,
 
   /* Read optimizer state */
   size_t np = model_num_params(model);
-  if (read_doubles(f, m_buf, np) != 0 || read_doubles(f, v_buf, np) != 0) {
+  if (read_scalars(f, m_buf, np) != 0 || read_scalars(f, v_buf, np) != 0) {
     model_free(model);
     fclose(f);
     return NULL;
@@ -1247,17 +1250,24 @@ Model *checkpoint_load(const char *path, size_t vocab_size,
 }
 
 #else
+/*
+ * INT8 stubs — when QUANTIZATION_INT8 (or QUANTISATION_INT8) is defined,
+ * the checkpoint format is undefined for V1.0.  These stubs return
+ * -1 / NULL so callers detect the unsupported configuration.  See
+ * GAP-INT8-001 in docs.engineering/CLEAN_ROOM_IMPLEMENTATION/TRACEABILITY.md
+ * — INT8 checkpoint serialisation is DEFERRED to V2.0 of the format.
+ */
 int model_save(const Model *m, const char *path) {
   (void)m;
   (void)path;
-  return -1;
+  return -1;  /* ERR-CKPT-005: format undefined in INT8 builds */
 }
 Model *model_load(const char *path, size_t vocab_size,
                   const MicrogptConfig *cfg) {
   (void)path;
   (void)vocab_size;
   (void)cfg;
-  return NULL;
+  return NULL;  /* ERR-CKPT-005 */
 }
 int checkpoint_save(const Model *model, const scalar_t *m, const scalar_t *v,
                     int step, const char *path) {
@@ -1266,7 +1276,7 @@ int checkpoint_save(const Model *model, const scalar_t *m, const scalar_t *v,
   (void)v;
   (void)step;
   (void)path;
-  return -1;
+  return -1;  /* ERR-CKPT-005 */
 }
 Model *checkpoint_load(const char *path, size_t vocab_size,
                        const MicrogptConfig *cfg, scalar_t *m, scalar_t *v,
@@ -1277,7 +1287,7 @@ Model *checkpoint_load(const char *path, size_t vocab_size,
   (void)m;
   (void)v;
   (void)step_out;
-  return NULL;
+  return NULL;  /* ERR-CKPT-005 */
 }
 #endif
 
