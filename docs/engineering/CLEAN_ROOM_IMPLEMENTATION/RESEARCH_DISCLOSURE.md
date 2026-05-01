@@ -438,7 +438,60 @@ Re-ran `tools/scaling_leakage_audit.sh pipeline_corpus_compositional_test.txt pi
 
 The held-out remains leakage-clean. No re-tuning of prompts or references; only the manifest's keyword sets and the search's outer-pick scoring changed.
 
-## 7. Cross-references
+## 8. Phase 6d — Per-port noun-aware inner picker + depth-2 recursion (pre-registration, 2026-05-01)
+
+V1.0.9 (Phase 6c) hit the original `SLO-WIRE-005` ≥ 50 % design goal at 15/30 (50 %). The §6.3 stretch gate of 60 % stayed open as `GAP-WIRE-009`. After explicit user direction to proceed to Phase 6d, this §8 pre-registers the plan from `COMPOSITIONAL_GENERATOR_PHASE_6D_PLAN.md` BEFORE any code change — same discipline as §3, §4, §5, §6.
+
+### 8.1 Failure mode being attacked
+
+From V1.0.9 harness output (`RESEARCH_DISCLOSURE.md` §6.5), 12 of the 15 wrong-answer prompts share the **3+ arity outer + duplicate inner primitive** pattern (e.g. prompt 2 `[square, square, max_two]` should be `max_two(square(x), y)` not `max_two(square(x), square(y))`). 3 of the 15 are **wrong number of nodes** (e.g. prompt 19 `[add, harmonic_n]` for "harmonic of abs of fib of n" needs 3 primitives, search picks 2).
+
+### 8.2 Hypotheses (in falsifiable form)
+
+- **H8 — Per-port noun-aware inner picker.** Replace `discover_inner_picks` with a function that takes an `excluded_tokens` accumulator. Per outer port `ip`: identify the **expected noun** (first prompt token matching the outer's `port_keywords[ip]` not yet consumed); search inner candidates for the highest-scoring primitive whose own keywords / port keywords accept that noun; mark the noun as consumed so subsequent outer ports see a different noun-budget. Predicted lift on Pattern A (12 prompts): +6/12 → axis-1 +3, axis-2 +1, axis-3 +2 (aggregate +6).
+
+- **H9 — Depth-2 inner recursion.** After picking each inner, run a one-shot inner-pick against the inner primitive itself with the remaining unconsumed nouns. Gate: only accept the depth-2 inner if its keyword's earliest-position is strictly to the right of the outer's keyword (semantic nesting requirement). Compile-time `WIRING_INNER_DEPTH=2` default; falls back to 1 for ablation. Predicted lift on Pattern B (3 prompts): +2/3.
+
+### 8.3 Aggregate target
+
+| Source | Predicted lift | Cumulative |
+|---|---:|---:|
+| V1.0.9 baseline | — | 15/30 (50 %) |
+| H8 per-port inner picker | +6 prompts | 21/30 (70 %) |
+| H9 depth-2 recursion | +2 prompts | 23/30 (77 %) |
+
+**Aggregate target: ≥ 21/30 (70 %).** **Failure floor: < 18/30 (60 %).**
+
+### 8.4 Disposition logic
+
+Same §6.3 framework, applied to V1.1.0:
+
+- ≥ 70 %: `GAP-WIRE-005`, `GAP-WIRE-006`, `GAP-WIRE-009` → RESOLVED. SLO-WIRE-005 promoted.
+- 60–69 %: All three stay PARTIALLY-RESOLVED; achieved score becomes new SLO baseline. Phase 6e not opened.
+- < 60 %: All three stay PARTIALLY-RESOLVED at V1.0.9 50 % baseline (the gain is a regression-recovery, not progress). H8/H9 falsified at this corpus scale.
+
+### 8.5 No-regression invariants
+
+Both mechanisms gated by compile-time toggles:
+
+- `WIRING_PORT_AWARE_INNER` (default ON) — H8.
+- `WIRING_INNER_DEPTH` (default 2) — H9.
+
+Setting both off recovers V1.0.9 behaviour bit-identically. Pre-existing wiring numbers (anchor 100 %, fragment 60 %, transformer 35 %, TF-IDF 90 %) untouched. ctest 15/15 must persist. The leakage audit re-run on the unchanged held-out must report 0 verbatim, < 0.7 Jaccard.
+
+### 8.6 What this plan deliberately does NOT do
+
+- No new training corpus (retain methodology #4 standing protection).
+- No external dependencies.
+- No changes to `pipeline_corpus_compositional_test.txt` (held-out unchanged).
+- No changes to `wiring_references.c` (reference oracle unchanged).
+- No changes to existing BS contracts in `BS_wiring.md` invariant rows; Phase 6d adds a new `INV-WIRE-052` for the noun-aware-binder property if H8 confirms.
+
+### 8.7 Outcome (to be filled when results land)
+
+To be populated after re-running `wiring_phase5_harness` post-implementation.
+
+## 9. Cross-references
 
 - `BRD.md` BREQ-015..017 — cite restated headlines.
 - `BS_wiring.md` INV-WIRE-040..041, SLO-WIRE-001..004.

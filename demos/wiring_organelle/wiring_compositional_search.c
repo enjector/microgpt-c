@@ -46,6 +46,23 @@
 #ifndef WIRING_USE_GEO
 #define WIRING_USE_GEO 1
 #endif
+/* Phase 6d (V1.1.0): per-port noun-aware inner picker (H8). When ON, the
+ * inner-pick loop tracks which prompt content nouns it has already
+ * consumed at earlier outer ports and prefers inner candidates whose
+ * port-keyword set accepts a still-unconsumed noun. Eliminates the
+ * V1.0.9 duplicate-inner pattern (e.g. max_two(square(x), square(y))
+ * → max_two(square(x), y)). */
+#ifndef WIRING_PORT_AWARE_INNER
+#define WIRING_PORT_AWARE_INNER 1
+#endif
+/* Phase 6d (V1.1.0): depth-2 inner recursion (H9). When > 1, after each
+ * inner is picked, run a one-shot inner pick against the inner primitive
+ * itself with the remaining unconsumed nouns. The depth-2 inner is
+ * accepted only if its keyword's earliest position is strictly to the
+ * right of the outer's keyword (semantic nesting). */
+#ifndef WIRING_INNER_DEPTH
+#define WIRING_INNER_DEPTH 2
+#endif
 
 #define MAX_LOWER_BUF 4096
 
@@ -292,6 +309,154 @@ static void pick_top_n_primitives(const WiringPrimitive *manifest, int n_manifes
     *out_count = take;
 }
 
+/* ── Phase 6d helper: tokenise prompt_lc into content-word tokens.
+ *
+ * Returns the count of tokens written to `tokens[][]` (length 24 each).
+ * Skip leading articles and trivial glue ("the", "of", "a", "an", "and",
+ * "to", "is", "with", "by", "for", "on", "in", "at"); they are never
+ * good port-noun bindings.  Tokens are lowercased copies of the
+ * underlying prompt span, with hyphens already normalised to spaces by
+ * the caller's `to_lower_copy`. */
+#define WIRING_MAX_PROMPT_TOKENS 32
+#define WIRING_PROMPT_TOKEN_LEN 24
+static int wiring_tokenise_prompt(const char *prompt_lc,
+                                  char tokens[WIRING_MAX_PROMPT_TOKENS][WIRING_PROMPT_TOKEN_LEN],
+                                  int *out_token_pos) {
+    static const char *STOPWORDS[] = {
+        "the","of","a","an","and","to","is","with","by","for","on","in","at",
+        "that","its","be","or","each","both","over","into",NULL
+    };
+    int n = 0;
+    const char *p = prompt_lc;
+    while (*p && n < WIRING_MAX_PROMPT_TOKENS) {
+        while (*p == ' ' || *p == '\t' || *p == ',' || *p == '.' || *p == ';') p++;
+        if (!*p) break;
+        const char *start = p;
+        while (*p && *p != ' ' && *p != '\t' && *p != ',' && *p != '.' && *p != ';') p++;
+        size_t len = (size_t)(p - start);
+        if (len == 0) continue;
+        if (len + 1 >= WIRING_PROMPT_TOKEN_LEN) len = WIRING_PROMPT_TOKEN_LEN - 1;
+        char tok[WIRING_PROMPT_TOKEN_LEN];
+        memcpy(tok, start, len);
+        tok[len] = '\0';
+        int is_stop = 0;
+        for (int s = 0; STOPWORDS[s]; s++) {
+            if (strcmp(tok, STOPWORDS[s]) == 0) { is_stop = 1; break; }
+        }
+        if (is_stop) continue;
+        memcpy(tokens[n], tok, len + 1);
+        if (out_token_pos) out_token_pos[n] = (int)(start - prompt_lc);
+        n++;
+    }
+    return n;
+}
+
+/* Phase 6d helper: does a primitive's port `ip` accept the given prompt
+ * token (case-insensitive match against port_keywords + fallback to
+ * port name)? */
+static int prim_port_accepts_token(const WiringPrimitive *prim, int ip,
+                                   const char *tok) {
+    if (!prim || ip < 0 || ip >= prim->n_inputs) return 0;
+    int has_custom = 0;
+    for (int k = 0; k < WIRING_PRIM_MAX_PORT_KEYWORDS; k++) {
+        const char *kw = prim->port_keywords[ip][k];
+        if (!kw) break;
+        has_custom = 1;
+        char kw_lc[64];
+        to_lower_copy(kw, kw_lc, sizeof(kw_lc));
+        if (strcmp(kw_lc, tok) == 0) return 1;
+    }
+    if (!has_custom) {
+        const char *pn = prim->input_names[ip];
+        if (pn && strcmp(pn, tok) == 0) return 1;
+    }
+    return 0;
+}
+
+/* Phase 6d helper: does any port of `prim` accept `tok`? Used to decide
+ * if `tok` is a relevant noun for a candidate inner primitive. */
+static int prim_any_port_accepts_token(const WiringPrimitive *prim, const char *tok) {
+    if (!prim) return 0;
+    for (int ip = 0; ip < prim->n_inputs; ip++) {
+        if (prim_port_accepts_token(prim, ip, tok)) return 1;
+    }
+    return 0;
+}
+
+#if WIRING_PORT_AWARE_INNER
+/* Phase 6d (H8): noun-aware inner picker. For each outer input port,
+ * pick the inner primitive whose own keywords score on the prompt AND
+ * whose port-keyword set accepts a still-unconsumed prompt noun for
+ * which the OUTER's port at `ip` is also a match.
+ *
+ * The "noun budget" is shared across outer ports — once a noun is
+ * consumed by port 0's inner, port 1 must find a different noun.
+ * This eliminates the V1.0.9 duplicate-inner pattern. */
+static void discover_inner_picks_v2(const WiringPrimitive *manifest, int n_manifest,
+                                    int outer_idx, const char *prompt_lc,
+                                    int *inner_picks_out,
+                                    int *consumed_token_out_or_null) {
+    const WiringPrimitive *outer = &manifest[outer_idx];
+    for (int i = 0; i < WIRING_PRIM_MAX_INPUTS; i++) inner_picks_out[i] = -1;
+
+    char tokens[WIRING_MAX_PROMPT_TOKENS][WIRING_PROMPT_TOKEN_LEN];
+    int  token_pos[WIRING_MAX_PROMPT_TOKENS];
+    int  n_tokens = wiring_tokenise_prompt(prompt_lc, tokens, token_pos);
+    int  consumed[WIRING_MAX_PROMPT_TOKENS] = {0};
+
+    for (int ip = 0; ip < outer->n_inputs; ip++) {
+        /* Step 1: identify the expected noun for THIS outer port. */
+        int expected_noun_idx = -1;
+        for (int t = 0; t < n_tokens; t++) {
+            if (consumed[t]) continue;
+            if (prim_port_accepts_token(outer, ip, tokens[t])) {
+                expected_noun_idx = t;
+                break;
+            }
+        }
+
+        /* Step 2: find the highest-scoring inner candidate (excluding
+         * outer name) whose own keywords match the prompt AND whose
+         * port-keyword set accepts the expected noun. */
+        int best_inner = -1;
+        int best_score = 0;
+        int best_pos   = 1 << 30;
+        for (int i = 0; i < n_manifest; i++) {
+            if (i == outer_idx) continue;
+            if (manifest[i].output_type != outer->input_types[ip]) continue;
+            int s = score_primitive(&manifest[i], prompt_lc);
+            if (s == 0) continue;
+            int port_match = 0;
+            if (expected_noun_idx >= 0) {
+                if (prim_any_port_accepts_token(&manifest[i], tokens[expected_noun_idx])) {
+                    port_match = 1;
+                }
+            }
+            int adjusted = s + (port_match ? 2 : 0);
+            int pos = earliest_keyword_pos(&manifest[i], prompt_lc);
+            if (adjusted > best_score ||
+                (adjusted == best_score && pos < best_pos)) {
+                best_score = adjusted;
+                best_inner = i;
+                best_pos   = pos;
+            }
+        }
+
+        if (best_inner >= 0) {
+            inner_picks_out[ip] = best_inner;
+            if (expected_noun_idx >= 0) consumed[expected_noun_idx] = 1;
+        }
+    }
+
+    if (consumed_token_out_or_null) {
+        for (int t = 0; t < n_tokens && t < WIRING_MAX_PROMPT_TOKENS; t++)
+            consumed_token_out_or_null[t] = consumed[t];
+        for (int t = n_tokens; t < WIRING_MAX_PROMPT_TOKENS; t++)
+            consumed_token_out_or_null[t] = 0;
+    }
+}
+#endif
+
 /* Discover the inner picks for an outer (factored out so the binder
  * path can use them too). Writes to inner_picks_out (length
  * WIRING_PRIM_MAX_INPUTS). */
@@ -341,7 +506,12 @@ static Pipeline *build_graph_for_outer(
     const WiringPrimitive *outer = &manifest[outer_idx];
 
     int inner_picks[WIRING_PRIM_MAX_INPUTS];
+#if WIRING_PORT_AWARE_INNER
+    discover_inner_picks_v2(manifest, n_manifest, outer_idx, prompt_lc,
+                            inner_picks, NULL);
+#else
     discover_inner_picks(manifest, n_manifest, outer_idx, prompt_lc, inner_picks);
+#endif
     for (int i = 0; i < WIRING_PRIM_MAX_INPUTS; i++) inner_picks_out[i] = inner_picks[i];
 
     /* ── Build the Pipeline IR graph. ── */
