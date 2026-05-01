@@ -63,6 +63,6 @@ For each viable option, give one paragraph:
 
 - ADRs are immutable once Accepted. To change a decision, write a new ADR that supersedes the old one and link both ways.
 - Keep ADRs short — under 500 words is ideal. If it's longer, the decision is probably actually two decisions.
-- File at `docs.engineering/CLEAN_ROOM_IMPLEMENTATION/ADR_NNN_<short_slug>.md`. NNN is a zero-padded 3-digit number assigned at creation time per `METHODOLOGY.md` §4 ID discipline.
+- File at `docs/engineering/CLEAN_ROOM_IMPLEMENTATION/ADR_NNN_<short_slug>.md`. NNN is a zero-padded 3-digit number assigned at creation time per `METHODOLOGY.md` §4 ID discipline.
 - Add the row to `TRACEABILITY.md` §6 ID assignment registry (new column "Highest ADR" if first ADR being added).
 - ADRs are descriptive (TDD voice), not prescriptive (BS voice). They record *what was decided and why*; they do not bind future implementers — a future ADR can supersede.

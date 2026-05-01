@@ -121,12 +121,12 @@ The discipline of "**do not silently re-tune** the held-out, the reference oracl
 | `demos/wiring_organelle/wiring_phase5_harness.c` | E | Parse and apply `INPUT_ORDER:` |
 | `tests/test_microgpt_wiring_compositional.c` | D | 3 new binder tests |
 | `CMakeLists.txt` | D | Add `wiring_arg_binder.c` to harness + test target sources |
-| `docs.engineering/CLEAN_ROOM_IMPLEMENTATION/RESEARCH_DISCLOSURE.md` | all | New §5 Phase 6b pre-registration; §5.5 outcome (post-run) |
-| `docs.engineering/CLEAN_ROOM_IMPLEMENTATION/BS_wiring.md` | all | §1.1 update on positive outcome; new INV-WIRE-052 (binder) |
-| `docs.engineering/CLEAN_ROOM_IMPLEMENTATION/FRD.md` | all | New REQ-WIRE-013 (binder), REQ-WIRE-014 (input-order annotation) |
-| `docs.engineering/CLEAN_ROOM_IMPLEMENTATION/NFRD.md` | all | SLO-WIRE-005 update to achieved (post-run) |
-| `docs.engineering/CLEAN_ROOM_IMPLEMENTATION/TDD_wiring.md` | D + F | New §7 binder, §8 manifest-driven geo classifier |
-| `docs.engineering/CLEAN_ROOM_IMPLEMENTATION/TRACEABILITY.md` | all | Promote `GAP-WIRE-005` and `GAP-WIRE-006` per §4.3 outcome |
+| `docs/engineering/CLEAN_ROOM_IMPLEMENTATION/RESEARCH_DISCLOSURE.md` | all | New §5 Phase 6b pre-registration; §5.5 outcome (post-run) |
+| `docs/engineering/CLEAN_ROOM_IMPLEMENTATION/BS_wiring.md` | all | §1.1 update on positive outcome; new INV-WIRE-052 (binder) |
+| `docs/engineering/CLEAN_ROOM_IMPLEMENTATION/FRD.md` | all | New REQ-WIRE-013 (binder), REQ-WIRE-014 (input-order annotation) |
+| `docs/engineering/CLEAN_ROOM_IMPLEMENTATION/NFRD.md` | all | SLO-WIRE-005 update to achieved (post-run) |
+| `docs/engineering/CLEAN_ROOM_IMPLEMENTATION/TDD_wiring.md` | D + F | New §7 binder, §8 manifest-driven geo classifier |
+| `docs/engineering/CLEAN_ROOM_IMPLEMENTATION/TRACEABILITY.md` | all | Promote `GAP-WIRE-005` and `GAP-WIRE-006` per §4.3 outcome |
 
 ---
 
@@ -176,7 +176,7 @@ bash tools/scaling_leakage_audit.sh \
 
 # 7. Spec consistency
 grep -rn "GAP-WIRE-005\|GAP-WIRE-006\|SLO-WIRE-005" \
-     docs.engineering/CLEAN_ROOM_IMPLEMENTATION/
+     docs/engineering/CLEAN_ROOM_IMPLEMENTATION/
 # Both gaps should reflect the §4.3 outcome consistently.
 ```
 

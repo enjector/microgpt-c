@@ -162,7 +162,7 @@ The following SLOs are reproducible on the dev reference machine (Apple M2 Max, 
 |---|---|
 | NFR-080 | The repository SHALL ship a top-level `README.md`, `VISION.md`, `VALUE_PROPOSITION.md`, `ROADMAP.md`, `FAQ.md`, `CONTRIBUTING.md`, `LICENSE`, `DATA_LICENSE.md`. |
 | NFR-081 | The `docs/` directory SHALL ship `ARCHITECTURE.md`, `DESIGN.md`, `FUNCTIONAL_SPEC.md`, `BUILD_OPTIONS.md`, `EXTENDING_WIRING_ORGANELLE.md`, `DEPENDENCY_POLICY.md`, productisation sketches, and a `research/` folder with the per-feature research notes. |
-| NFR-082 | This corpus (`docs.engineering/CLEAN_ROOM_IMPLEMENTATION/`) is the prescriptive engineering counterpart to the descriptive `docs/` folder. |
+| NFR-082 | This corpus (`docs/engineering/CLEAN_ROOM_IMPLEMENTATION/`) is the prescriptive engineering counterpart to the descriptive `docs/` folder. |
 | NFR-083 | A 16-chapter book SHALL be published in `book/`, both as a `.md` aggregate and a `.pdf`. |
 
 ## 12. Licensing

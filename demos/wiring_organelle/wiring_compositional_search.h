@@ -1,7 +1,7 @@
 /*
  * MicroGPT-C — Type-directed compositional search (Stream B of compositional fix)
  *
- * Closes GAP-WIRE-005 in docs.engineering/CLEAN_ROOM_IMPLEMENTATION/TRACEABILITY.md.
+ * Closes GAP-WIRE-005 in docs/engineering/CLEAN_ROOM_IMPLEMENTATION/TRACEABILITY.md.
  *
  * Given an NL prompt and a target output type, this module synthesises a
  * verified Pipeline IR graph by:

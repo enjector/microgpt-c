@@ -21,7 +21,7 @@
     
     {\large \today\par}
     \vspace{0.3cm}
-    {\normalsize\texttt{Version 1.8.1}\par}
+    {\normalsize\texttt{Version 1.8.2}\par}
 \end{titlepage}
 
 % --- Copyright Page ---
@@ -32,7 +32,7 @@
 \noindent
 \textbf{MicroGPT-C: Composable Intelligence at the Edge}\\
 From Stem Cell Models to Real-World AI Pipelines \textendash{} Architecture, Implementation, and Research\\
-\textit{Version 1.8.1}\\[2em]
+\textit{Version 1.8.2}\\[2em]
 
 \noindent
 \textbf{Research Team}\\
@@ -3639,12 +3639,12 @@ The architecture didn't get smaller during this arc. Its *honest claims* did. Th
 ## References
 
 - Audit tool: `tools/scaling_leakage_audit.sh`
-- Honest restatements in regulator-friendly form: `docs.engineering/CLEAN_ROOM_IMPLEMENTATION/RESEARCH_DISCLOSURE.md` §3, §7
+- Honest restatements in regulator-friendly form: `docs/engineering/CLEAN_ROOM_IMPLEMENTATION/RESEARCH_DISCLOSURE.md` §3, §7
 - Per-arc research notes: `docs/research/wiring_scaling_curve.md`, `wiring_scaling_curve_phase3.md`, `wiring_scaling_v3_deep_negative.md`, `wiring_scaling_post_phase3.md`
 - Three-bound consolidation: `docs/research/wiring_scaling_post_phase3.md` §"What this means for §44.5"
 - Top-of-stack synthesis: `docs/research/ORGANELLE_STATE.md`
-- Normative invariants: `docs.engineering/CLEAN_ROOM_IMPLEMENTATION/BS_wiring.md` `INV-WIRE-060/061/062`, `SLO-WIRE-008/009/010`
-- Gap register: `docs.engineering/CLEAN_ROOM_IMPLEMENTATION/TRACEABILITY.md` `GAP-WIRE-007/008` (both RESOLVED as documented structural bounds)
+- Normative invariants: `docs/engineering/CLEAN_ROOM_IMPLEMENTATION/BS_wiring.md` `INV-WIRE-060/061/062`, `SLO-WIRE-008/009/010`
+- Gap register: `docs/engineering/CLEAN_ROOM_IMPLEMENTATION/TRACEABILITY.md` `GAP-WIRE-007/008` (both RESOLVED as documented structural bounds)
 
 — Ajay Soni, Enjector Software Ltd. May 2026.
 
@@ -3769,14 +3769,14 @@ The fraud vertical is the genuine first move because:
 
 - **Specific revenue projections.** Depends entirely on customer access and which prime / bank / processor lands first.
 - **Hiring plan.** None of the above is doable as a single-engineer project past the first prototype. Each vertical past prototype needs at least one domain expert.
-- **Open-source vs commercial licensing.** The project is currently MIT-permissive. Commercialisation may need a dual-license scheme; that's a separate ADR (`docs.engineering/CLEAN_ROOM_IMPLEMENTATION/ADR_template.md` is ready for it).
+- **Open-source vs commercial licensing.** The project is currently MIT-permissive. Commercialisation may need a dual-license scheme; that's a separate ADR (`docs/engineering/CLEAN_ROOM_IMPLEMENTATION/ADR_template.md` is ready for it).
 - **LLM dependency.** The project is presently independent of any LLM. Productisation may want an LLM for the natural-language UX layer (prompt -> wiring), but that's an explicit decision to be made as an ADR, not a default.
 
 ## What this chapter does claim
 
 > **The architecture's distinctive value (composition, explainability, edge-deployment, calibrated honest claims with three documented structural bounds) is real and matters — in the verticals where audit, edge, and composition are mandatory rather than nice-to-have. Fraud is the cleanest fit and shippable in 90 days. Finance is plausible in 6 months. Defence is partner-led and 12-18 months out. The single gating decision is the dependency-boundary policy; without it, no vertical ships; with it, all three become tractable.**
 
-The strategy one-pager (`docs/STRATEGY_ONE_PAGER.md`) is the executive summary. The vertical sketches (`docs/PRODUCT_FRAUD_DETECTION.md`, `docs/PRODUCT_FINANCE_RISK.md`, `docs/PRODUCT_DEFENCE_TRACKING.md`) are the engineering plans. The dependency policy (`docs/DEPENDENCY_POLICY.md`) is the gating decision document. The roadmap (`docs.engineering/CLEAN_ROOM_IMPLEMENTATION/ROADMAP.md`) tracks all of the above against trigger conditions.
+The strategy one-pager (`docs/STRATEGY_ONE_PAGER.md`) is the executive summary. The vertical sketches (`docs/PRODUCT_FRAUD_DETECTION.md`, `docs/PRODUCT_FINANCE_RISK.md`, `docs/PRODUCT_DEFENCE_TRACKING.md`) are the engineering plans. The dependency policy (`docs/DEPENDENCY_POLICY.md`) is the gating decision document. The roadmap (`docs/engineering/CLEAN_ROOM_IMPLEMENTATION/ROADMAP.md`) tracks all of the above against trigger conditions.
 
 The book is now caught up with where the project actually is. The next chapter — when it gets written — will be the post-pilot chapter: *here is what happened when a real customer's transaction stream met the architecture; here are the bounds that turned out to bind; here is what the next vertical will inherit.* That chapter is the one that closes the productization loop. Until then, the architecture is honest about its bounds, the strategy is named, the dependency policy is documented and waiting for its trigger, and the next move is genuinely a commitment, not another experiment.
 
@@ -3786,9 +3786,9 @@ The book is now caught up with where the project actually is. The next chapter �
 - Full strategic reasoning: `docs/PRODUCTIZATION_VERTICALS.md`
 - Per-vertical engineering plans: `docs/PRODUCT_FRAUD_DETECTION.md`, `docs/PRODUCT_FINANCE_RISK.md`, `docs/PRODUCT_DEFENCE_TRACKING.md`
 - Dependency-boundary policy: `docs/DEPENDENCY_POLICY.md`
-- Internal roadmap (trigger-conditioned): `docs.engineering/CLEAN_ROOM_IMPLEMENTATION/ROADMAP.md`
-- Audit log format placeholder: `docs.engineering/CLEAN_ROOM_IMPLEMENTATION/AUDITLOG_SPEC.md`
-- Architecture Decision Record template: `docs.engineering/CLEAN_ROOM_IMPLEMENTATION/ADR_template.md`
+- Internal roadmap (trigger-conditioned): `docs/engineering/CLEAN_ROOM_IMPLEMENTATION/ROADMAP.md`
+- Audit log format placeholder: `docs/engineering/CLEAN_ROOM_IMPLEMENTATION/AUDITLOG_SPEC.md`
+- Architecture Decision Record template: `docs/engineering/CLEAN_ROOM_IMPLEMENTATION/ADR_template.md`
 - The calibrated three-bound claim this chapter builds on: Chapter 20
 
 — Ajay Soni, Enjector Software Ltd. May 2026.

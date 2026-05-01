@@ -1,7 +1,7 @@
 # MicroGPT-C — Compositional held-out test set (Phase 5 pre-registration)
 #
 # Stream C of the compositional generator fix
-# (docs.engineering/CLEAN_ROOM_IMPLEMENTATION/COMPOSITIONAL_GENERATOR_FIX_PLAN.md).
+# (docs/engineering/CLEAN_ROOM_IMPLEMENTATION/COMPOSITIONAL_GENERATOR_FIX_PLAN.md).
 #
 # 30 prompts across three axes:
 #   Axis 1 (10): Compose 2 primitives that DO NOT co-occur in any of

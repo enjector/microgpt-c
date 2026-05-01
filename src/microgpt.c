@@ -1254,7 +1254,7 @@ Model *checkpoint_load(const char *path, size_t vocab_size,
  * INT8 stubs — when QUANTIZATION_INT8 (or QUANTISATION_INT8) is defined,
  * the checkpoint format is undefined for V1.0.  These stubs return
  * -1 / NULL so callers detect the unsupported configuration.  See
- * GAP-INT8-001 in docs.engineering/CLEAN_ROOM_IMPLEMENTATION/TRACEABILITY.md
+ * GAP-INT8-001 in docs/engineering/CLEAN_ROOM_IMPLEMENTATION/TRACEABILITY.md
  * — INT8 checkpoint serialisation is DEFERRED to V2.0 of the format.
  */
 int model_save(const Model *m, const char *path) {

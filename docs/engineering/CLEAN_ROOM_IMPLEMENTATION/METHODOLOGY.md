@@ -16,7 +16,7 @@ The key words MUST, MUST NOT, REQUIRED, SHALL, SHALL NOT, SHOULD, SHOULD NOT, RE
 
 ## 1. Scope
 
-This document defines the rules a clean-room reimplementation team SHALL follow to reproduce the MicroGPT-C platform from the corpus in `docs.engineering/CLEAN_ROOM_IMPLEMENTATION/` without consulting the original source tree. It also defines the rules the corpus MUST follow to remain a valid input to that reimplementation.
+This document defines the rules a clean-room reimplementation team SHALL follow to reproduce the MicroGPT-C platform from the corpus in `docs/engineering/CLEAN_ROOM_IMPLEMENTATION/` without consulting the original source tree. It also defines the rules the corpus MUST follow to remain a valid input to that reimplementation.
 
 In scope: corpus structure, ID discipline, voice rules, gap discipline, the rebuild test.
 
