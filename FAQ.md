@@ -199,8 +199,9 @@ The project includes a **16-chapter technical guide** covering everything from t
 | Document | What it covers |
 |----------|---------------|
 | [VISION.md](VISION.md) | The stem cell philosophy |
-| [VALUE_PROPOSITION.md](VALUE_PROPOSITION.md) | Why this matters, who benefits |
-| [Technical guide](book/0.md) | 16 chapters, from basics to advanced |
+| [docs/MIGRATED_TO_ORGANELLES_BIO.md](docs/MIGRATED_TO_ORGANELLES_BIO.md) | Productisation strategy + value proposition (migrated to private companion repo) |
+| [docs/research/ORGANELLE_STATE.md](docs/research/ORGANELLE_STATE.md) | Calibrated three-bound research state (May 2026) |
+| [Technical guide](book/MicroGPT-C_Composable_Intelligence_at_the_Edge.md) | 21 chapters + appendix (calibrated three-bound + productisation handoff) |
 | [RESEARCH_ORGANELLE_PIPELINE](docs/research/RESEARCH_ORGANELLE_PIPELINE.md) | Pipeline wire format design |
 | [RESEARCH_ORGANELLE_REASONING](docs/research/RESEARCH_ORGANELLE_REASONING.md) | Reasoning verdict and learning frontier |
 | [RESEARCH_TRAINING_STRATEGIES](docs/research/RESEARCH_TRAINING_STRATEGIES.md) | LR scheduling, warmup, capacity scaling |

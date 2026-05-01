@@ -4,22 +4,23 @@
 
 **Author:** Ajay Soni, Enjector Software Ltd.
 
-**Date:** February 2026
+**Date:** February 2026 — calibrated-claim update May 2026
+
+---
+
+> **2026-05-01 honest-restatement note (read first):** earlier versions of this document carried headline figures that were later audited and re-stated. The most inflated claim — *"94 % recall validations across six personas, $4M illicit money streams"* — was a forward-looking commercial illustration, not a measured experimental result, and has been removed. Per the calibrated three-bound claim documented in [`docs/research/ORGANELLE_STATE.md`](docs/research/ORGANELLE_STATE.md) and [`docs/engineering/CLEAN_ROOM_IMPLEMENTATION/RESEARCH_DISCLOSURE.md`](docs/engineering/CLEAN_ROOM_IMPLEMENTATION/RESEARCH_DISCLOSURE.md), the architecture's honest retrieval ceiling is ~75-80 % on novel-paraphrase tests in distinctive-noun domains, with three documented structural bounds (curator-, model-, domain-bounded). The *vision* (composable stem-cell intelligence; tiny specialists outperforming monoliths on focused tasks) is unchanged and validated; the specific numerical headlines are now those in `RESEARCH_DISCLOSURE.md`. Productisation strategy and per-vertical implementation plans have been migrated to a private companion repo — see [`docs/MIGRATED_TO_ORGANELLES_BIO.md`](docs/MIGRATED_TO_ORGANELLES_BIO.md).
 
 ---
 
 ## Spear Summary
 
-**Point:** Intelligence doesn't need to be big — it needs to be focused. A tiny model trained on one task outperforms a giant model distracted by everything.
+**Point:** Intelligence doesn't need to be big — it needs to be focused. A tiny model trained on one task outperforms a giant model distracted by everything, in the class of focused tasks where its bounded vocabulary matches the problem.
 
-**Picture:** A stem cell doesn't know what it will become until it encounters its environment. Hand it muscle tissue signals and it becomes muscle. Hand MicroGPT-C a shipping address corpus and it becomes an address validator. Same engine, infinite specialisations.
+**Picture:** A stem cell doesn't know what it will become until it encounters its environment. Hand it muscle tissue signals and it becomes muscle. Hand MicroGPT-C a Connect-4 corpus and it becomes a planner / player / judge organelle ensemble. Same engine, role-specialised through training, coordinated by a deterministic pipeline.
 
-**Proof:** Twenty-Two working experiments — name generation (trains in < 1s), Shakespeare text (840K params, zero `<unk>`), C code retrieval (byte-perfect on 2,081 functions), C code composition (**83% exact match**, 1.2M params with LR scheduling), 8-puzzle solving (**90% via 5-organelle pipeline, 460K params**), Tic-Tac-Toe (**87% win+draw**)
-- **100,000+ context lengths** evaluated live in the terminal using Memory Sparse Attention limits.
-- **Micro-Memory Expansion**: Edge implementations successfully shrinking physical storage requirements by 8x with the independent TurboQuant transformer module, generating **25% inference speedups** running purely in-memory at **1,300,000 ops/second**.
-- **94% Recall Validations** mapped securely across six unique industry personas identifying $4M in illicit money streams. 28k to 36k tok/s), **market regime detection** (**60% on unseen data**, 3.0× baseline) and a **lottery control** (entropy floor ~0.50). All edge experiments leverage native multi-vote ensemble constraints achieving zero-invalid metrics natively.
+**Proof (calibrated):** Eleven game demos with documented results in [`docs/research/RESEARCH_ORGANELLE_GAMES.md`](docs/research/RESEARCH_ORGANELLE_GAMES.md) (Pentago 91 % win, Connect-4 88 %, 8-Puzzle 90 % solve, Tic-Tac-Toe 87 % win+draw, Sudoku 78 %, Mastermind 79 %, etc.). Wiring Organelle (NL → typed graph) at 100 % anchor retrieval on novel paraphrases (single-family), 70 % multi-stage compositions, ~75-80 % on novel-paraphrase retrieval in distinctive-noun domains (the calibrated three-bound ceiling). Memory Sparse Attention enabling sustained long-context evaluation. TurboQuant 4-bit dual-state KV compression with 8x memory reduction at ~1.3M encodes/sec. Negative-control validity check via the lottery experiment (entropy floor ~0.50, the engine learns nothing because there is nothing to learn).
 
-**Push:** Read [VALUE_PROPOSITION.md](VALUE_PROPOSITION.md) for the business case, or jump straight to `demos/character-level/` to see the experimental evidence.
+**Push:** Read [`docs/research/ORGANELLE_STATE.md`](docs/research/ORGANELLE_STATE.md) for the calibrated synthesis, or jump straight to `demos/character-level/` to see the experimental evidence.
 
 ---
 

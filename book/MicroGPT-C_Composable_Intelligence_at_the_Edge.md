@@ -21,7 +21,7 @@
     
     {\large \today\par}
     \vspace{0.3cm}
-    {\normalsize\texttt{Version 1.8.3}\par}
+    {\normalsize\texttt{Version 1.8.4}\par}
 \end{titlepage}
 
 % --- Copyright Page ---
@@ -32,7 +32,7 @@
 \noindent
 \textbf{MicroGPT-C: Composable Intelligence at the Edge}\\
 From Stem Cell Models to Real-World AI Pipelines \textendash{} Architecture, Implementation, and Research\\
-\textit{Version 1.8.3}\\[2em]
+\textit{Version 1.8.4}\\[2em]
 
 \noindent
 \textbf{Research Team}\\
