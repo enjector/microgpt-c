@@ -49,9 +49,11 @@ static const WiringPrimitive g_manifest[] = {
 
     /* ---- Bounding ---- */
     { "clamp",          3, {PIPE_T_INT, PIPE_T_INT, PIPE_T_INT},   {"x","lo","hi"},     PIPE_T_INT,
-      {"clamp","clipped","bounded","constrained","pinned","limited","inside","within", NULL} },
+      {"clamp","clipped","bounded","constrained","pinned","limited","inside","within", NULL},
+      { {"x","value","input", NULL}, {"lo","low","minimum","floor","lower-bound", NULL}, {"hi","high","maximum","ceiling","upper-bound", NULL} } },
     { "lerp",           3, {PIPE_T_INT, PIPE_T_INT, PIPE_T_INT},   {"a","b","t"},       PIPE_T_INT,
-      {"lerp","interpolate","interpolated","interpolation","blend", NULL} },
+      {"lerp","interpolate","interpolated","interpolation","blend", NULL},
+      { {"a","x","start","from", NULL}, {"b","y","end","to","target", NULL}, {"t","alpha","fraction","blend-weight", NULL} } },
 
     /* ---- Nonlinear ---- */
     { "sigmoid",        1, {PIPE_T_INT},                           {"x"},               PIPE_T_INT,
@@ -61,21 +63,29 @@ static const WiringPrimitive g_manifest[] = {
 
     /* ---- Finance ---- */
     { "tax_amount",     2, {PIPE_T_INT, PIPE_T_INT},               {"amount","rate"},   PIPE_T_INT,
-      {"tax","duty","levy","compute-tax", NULL} },
+      {"tax","duty","levy","compute-tax", NULL},
+      { {"amount","price","value","gross", NULL}, {"rate","tax-rate","r","percentage", NULL} } },
     { "apply_tax",      2, {PIPE_T_INT, PIPE_T_INT},               {"amount","rate"},   PIPE_T_INT,
-      {"after-tax","withhold","withholding","apply-tax","net-of-tax","taxed", NULL} },
+      {"after-tax","withhold","withholding","apply-tax","net-of-tax","taxed", NULL},
+      { {"amount","price","value","gross", NULL}, {"rate","tax-rate","r","t-rate","t_rate", NULL} } },
     { "percentage",     2, {PIPE_T_INT, PIPE_T_INT},               {"part","whole"},    PIPE_T_INT,
-      {"percentage","percent","fraction","portion","share", NULL} },
+      {"percentage","percent","fraction","portion","share", NULL},
+      { {"part","numerator","x", NULL}, {"whole","total","denominator","y", NULL} } },
     { "discount",       2, {PIPE_T_INT, PIPE_T_INT},               {"price","rate"},    PIPE_T_INT,
-      {"discount","discounted","reduced","marked-down","sale", NULL} },
+      {"discount","discounted","reduced","marked-down","sale", NULL},
+      { {"price","amount","value","p", NULL}, {"rate","discount-rate","d-rate","d_rate","r", NULL} } },
     { "markup",         2, {PIPE_T_INT, PIPE_T_INT},               {"price","rate"},    PIPE_T_INT,
-      {"markup","marked-up","uplifted","raised","markup-by", NULL} },
+      {"markup","marked-up","uplifted","raised","markup-by", NULL},
+      { {"price","amount","value","p", NULL}, {"rate","markup-rate","m-rate","m_rate","r", NULL} } },
     { "compound",       3, {PIPE_T_INT, PIPE_T_INT, PIPE_T_INT},   {"principal","rate","periods"}, PIPE_T_INT,
-      {"compound","compounding","accumulating","compound-interest", NULL} },
+      {"compound","compounding","accumulating","compound-interest", NULL},
+      { {"principal","p","amount", NULL}, {"rate","r","interest-rate", NULL}, {"periods","n","years","intervals", NULL} } },
     { "present_value",  3, {PIPE_T_INT, PIPE_T_INT, PIPE_T_INT},   {"future","rate","periods"},     PIPE_T_INT,
-      {"present-value","pv","discounted-future","npv", NULL} },
+      {"present-value","pv","discounted-future","npv", NULL},
+      { {"future","f","x", NULL}, {"rate","r", NULL}, {"periods","n","years", NULL} } },
     { "future_value",   3, {PIPE_T_INT, PIPE_T_INT, PIPE_T_INT},   {"present","rate","periods"},    PIPE_T_INT,
-      {"future-value","fv","grown","grow", NULL} },
+      {"future-value","fv","grown","grow", NULL},
+      { {"present","p","x", NULL}, {"rate","r", NULL}, {"periods","n","years", NULL} } },
 
     /* ---- Number theory ---- */
     { "factorial",      1, {PIPE_T_INT},                           {"n"},               PIPE_T_INT,
@@ -89,13 +99,17 @@ static const WiringPrimitive g_manifest[] = {
 
     /* ---- Misc ---- */
     { "circle_area",    1, {PIPE_T_INT},                           {"r"},               PIPE_T_INT,
-      {"circle-area","area-of-circle","disk-area", NULL} },
+      {"circle-area","area-of-circle","disk-area", NULL},
+      { {"r","radius", NULL} } },
     { "kinetic_energy", 2, {PIPE_T_INT, PIPE_T_INT},               {"m","v"},           PIPE_T_INT,
-      {"kinetic-energy","ke","energy-of-motion", NULL} },
+      {"kinetic-energy","ke","energy-of-motion", NULL},
+      { {"m","mass","weight","kg", NULL}, {"v","velocity","speed","u", NULL} } },
     { "bmi",            2, {PIPE_T_INT, PIPE_T_INT},               {"weight","height"}, PIPE_T_INT,
-      {"bmi","body-mass-index","mass-index", NULL} },
+      {"bmi","body-mass-index","mass-index", NULL},
+      { {"weight","w","mass","kg", NULL}, {"height","h","cm","tall", NULL} } },
     { "power",          2, {PIPE_T_INT, PIPE_T_INT},               {"base","exp"},      PIPE_T_INT,
-      {"power","raised-to","exponent","pow","to-the", NULL} },
+      {"power","raised-to","exponent","pow","to-the", NULL},
+      { {"base","b","x", NULL}, {"exp","e","exponent","power", NULL} } },
 };
 
 static const int g_manifest_count = (int)(sizeof(g_manifest) / sizeof(g_manifest[0]));

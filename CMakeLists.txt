@@ -1865,6 +1865,7 @@ add_executable(test_microgpt_wiring_compositional
   tests/test_microgpt_wiring_compositional.c
   demos/wiring_organelle/wiring_primitive_manifest.c
   demos/wiring_organelle/wiring_compositional_search.c
+  demos/wiring_organelle/wiring_arg_binder.c
   demos/wiring_organelle/wiring_geo_classifier.c
   demos/wiring_organelle/wiring_natives.c
   src/microgpt_pipeline_vm.c
@@ -1890,6 +1891,7 @@ add_executable(wiring_phase5_harness
   demos/wiring_organelle/wiring_phase5_harness.c
   demos/wiring_organelle/wiring_primitive_manifest.c
   demos/wiring_organelle/wiring_compositional_search.c
+  demos/wiring_organelle/wiring_arg_binder.c
   demos/wiring_organelle/wiring_geo_classifier.c
   demos/wiring_organelle/wiring_references.c
   src/microgpt_pipeline_vm.c

@@ -8,98 +8,122 @@
 #                the 20 anchor families. Tests "novel pair" composition.
 #   Axis 2 (10): Compose 3 primitives where at least one is referenced
 #                by a synonym never seen in tools/corpus_expand.c.
-#   Axis 3 (10): Compose 2 primitives + an outer transform; tests
-#                that the search backtracks under type pressure.
+#   Axis 3 (10): Compose 2 primitives + an outer transformation, total
+#                3 nodes; tests whether the search backtracks under
+#                type-mismatch.
 #
 # Format mirrors pipeline_corpus_held_out.txt:
 #   // <prompt>
 #   # EXPECTED: <comma-separated primitive names>
 #   # REFERENCE: <function_name in wiring_references.c>
+#   # INPUT_ORDER: <comma-separated nouns matching the reference's S[0..N] slots>
 #   ---
 #
-# Pre-registration target (RESEARCH_DISCLOSURE.md §3): ≥ 50 % verified +
-# correct on the leakage-audited set; ≥ 80 % when --use-expected
-# ranking gate is active.
+# The INPUT_ORDER annotation (Phase 6b, Stream E) tells the harness how to
+# map the reference's positional inputs onto the binder's noun-keyed
+# signature inputs. Without this, a topologically-correct graph whose
+# signature inputs were reordered by the binder would score against the
+# wrong reference slots.
 
 // the absolute difference between x and y
 # EXPECTED: subtract, abs_val
 # REFERENCE: ref_abs_diff
+# INPUT_ORDER: x,y
 ---
 // the maximum of x squared and y
 # EXPECTED: square, max_two
 # REFERENCE: ref_max_x_squared_y
+# INPUT_ORDER: x,y
 ---
 // the average of doubled x and y
 # EXPECTED: double_val, average_two
 # REFERENCE: ref_avg_double_x_y
+# INPUT_ORDER: x,y
 ---
 // the gcd of x and the absolute value of y
 # EXPECTED: abs_val, gcd
 # REFERENCE: ref_gcd_x_abs_y
+# INPUT_ORDER: x,y
 ---
 // the cube of the minimum of x and y
 # EXPECTED: min_two, cube
 # REFERENCE: ref_cube_min_x_y
+# INPUT_ORDER: x,y
 ---
 // the relu of x minus y
 # EXPECTED: subtract, relu
 # REFERENCE: ref_relu_x_minus_y
+# INPUT_ORDER: x,y
 ---
 // the sigmoid of doubled x
 # EXPECTED: double_val, sigmoid
 # REFERENCE: ref_sigmoid_double_x
+# INPUT_ORDER: x
 ---
 // the harmonic of x plus y
 # EXPECTED: add, harmonic_n
 # REFERENCE: ref_harmonic_x_plus_y
+# INPUT_ORDER: x,y
 ---
 // the factorial of the difference between x and y
 # EXPECTED: subtract, factorial
 # REFERENCE: ref_factorial_diff
+# INPUT_ORDER: x,y
 ---
 // the percentage that x is of the square of y
 # EXPECTED: square, percentage
 # REFERENCE: ref_pct_x_of_y_squared
+# INPUT_ORDER: x,y
 ---
 // the body-mass-index of doubled weight and height
 # EXPECTED: double_val, bmi
 # REFERENCE: ref_bmi_double_w_h
+# INPUT_ORDER: weight,height
 ---
 // the after-tax markup on the price at rate r
 # EXPECTED: markup, apply_tax
 # REFERENCE: ref_after_tax_markup
+# INPUT_ORDER: price,rate,r
 ---
 // the discounted compound interest on a principal
 # EXPECTED: compound, discount
 # REFERENCE: ref_discounted_compound
+# INPUT_ORDER: principal,rate,periods,r
 ---
 // the kinetic energy of an object with doubled mass
 # EXPECTED: double_val, kinetic_energy
 # REFERENCE: ref_ke_double_mass
+# INPUT_ORDER: mass,velocity
 ---
 // the area of a circle with the absolute radius
 # EXPECTED: abs_val, circle_area
 # REFERENCE: ref_circle_abs_radius
+# INPUT_ORDER: radius
 ---
 // the lerp between x and the maximum of y and z
 # EXPECTED: max_two, lerp
 # REFERENCE: ref_lerp_x_max_y_z
+# INPUT_ORDER: x,y,z,t
 ---
 // the gcd of the squared difference between x and y
 # EXPECTED: subtract, square, gcd
 # REFERENCE: ref_gcd_sq_diff
+# INPUT_ORDER: x,y,z
 ---
 // the percentage that the markup of x at rate r is of y
 # EXPECTED: markup, percentage
 # REFERENCE: ref_pct_markup_x_y
+# INPUT_ORDER: x,r,y
 ---
 // the harmonic-sum of the absolute fibonacci of n
 # EXPECTED: fibonacci, abs_val, harmonic_n
 # REFERENCE: ref_harmonic_abs_fib
+# INPUT_ORDER: n
 ---
 // the future-value of the present-value of x at rate r over n periods
 # EXPECTED: present_value, future_value
 # REFERENCE: ref_fv_of_pv
+# INPUT_ORDER: x,r,n
 ---
 
 # === Axis 3: composition + outer transform ===
@@ -109,40 +133,50 @@
 // the doubled gcd of squared x and y
 # EXPECTED: square, gcd, double_val
 # REFERENCE: ref_double_gcd_sq_y
+# INPUT_ORDER: x,y
 ---
 // the negated minimum of x and the absolute y
 # EXPECTED: abs_val, min_two, negate
 # REFERENCE: ref_neg_min_x_abs_y
+# INPUT_ORDER: x,y
 ---
 // the cube of the average of doubled x and y
 # EXPECTED: double_val, average_two, cube
 # REFERENCE: ref_cube_avg_double_x_y
+# INPUT_ORDER: x,y
 ---
 // the relu of the gcd of x and y
 # EXPECTED: gcd, relu
 # REFERENCE: ref_relu_gcd_x_y
+# INPUT_ORDER: x,y
 ---
 // the sigmoid of the difference of x and tripled y
 # EXPECTED: triple_val, subtract, sigmoid
 # REFERENCE: ref_sigmoid_x_minus_3y
+# INPUT_ORDER: x,y
 ---
 // the apply-tax of the markup at rate r on the doubled price
 # EXPECTED: double_val, markup, apply_tax
 # REFERENCE: ref_taxed_markup_double
+# INPUT_ORDER: price,rate,r
 ---
 // the discount on the kinetic-energy of mass m at velocity v
 # EXPECTED: kinetic_energy, discount
 # REFERENCE: ref_discount_ke
+# INPUT_ORDER: m,v,rate
 ---
 // the bmi of the squared weight and the doubled height
 # EXPECTED: square, double_val, bmi
 # REFERENCE: ref_bmi_sq_w_double_h
+# INPUT_ORDER: weight,height
 ---
 // the harmonic of the gcd of x and y
 # EXPECTED: gcd, harmonic_n
 # REFERENCE: ref_harmonic_gcd
+# INPUT_ORDER: x,y
 ---
 // the percentage that the cube of x is of the squared y
 # EXPECTED: cube, square, percentage
 # REFERENCE: ref_pct_cube_x_sq_y
+# INPUT_ORDER: x,y
 ---

@@ -265,6 +265,7 @@ typedef struct {
     char prompt[MAX_PROMPT_LEN];
     char expected[MAX_PROMPT_LEN];   /* comma-separated primitives */
     char reference[64];              /* reference function name */
+    char input_order[MAX_PROMPT_LEN];/* comma-separated nouns matching reference S[0..N] (Phase 6b Stream E) */
 } HeldOut;
 
 static int load_held_out(const char *path, HeldOut *out, int max) {
@@ -301,6 +302,11 @@ static int load_held_out(const char *path, HeldOut *out, int max) {
             while (*p == ' ') p++;
             strncpy(cur.reference, p, sizeof(cur.reference) - 1);
             cur.reference[sizeof(cur.reference) - 1] = '\0';
+        } else if (strncmp(line, "# INPUT_ORDER:", 14) == 0) {
+            const char *p = line + 14;
+            while (*p == ' ') p++;
+            strncpy(cur.input_order, p, sizeof(cur.input_order) - 1);
+            cur.input_order[sizeof(cur.input_order) - 1] = '\0';
         } else if (strcmp(line, "---") == 0) {
             if (have_prompt && n < max) {
                 out[n++] = cur;
@@ -381,16 +387,58 @@ int main(int argc, char **argv) {
             if (off >= sizeof(rows[i].primitives)) break;
         }
 
-        /* Run on each of 5 input sets and score against reference. */
+        /* Run on each of 5 input sets and score against reference.
+         *
+         * Stream E (Phase 6b): if a # INPUT_ORDER: noun list is annotated
+         * for this prompt, we re-map the reference's positional S[0..N]
+         * inputs onto the binder's noun-keyed signature inputs by name.
+         * Without this, a topologically-correct graph whose sig inputs
+         * were reordered by the binder scores against the wrong slots. */
         int matches = 0;
+
+        /* Tokenise the INPUT_ORDER list into a small array of noun names. */
+        char order_nouns[WIRING_MAX_INPUTS][32];
+        int n_order_nouns = 0;
+        if (held[i].input_order[0]) {
+            const char *p = held[i].input_order;
+            while (*p && n_order_nouns < WIRING_MAX_INPUTS) {
+                while (*p == ' ' || *p == ',') p++;
+                if (!*p) break;
+                int len = 0;
+                while (*p && *p != ',' && *p != ' ' && len < 31) {
+                    char c = *p++;
+                    if (c == '-') c = '_';
+                    order_nouns[n_order_nouns][len++] = c;
+                }
+                order_nouns[n_order_nouns][len] = '\0';
+                if (len > 0) n_order_nouns++;
+            }
+        }
+
         for (int s = 0; s < WIRING_INPUT_SETS; s++) {
             int64_t inputs_int[WIRING_MAX_INPUTS];
             wiring_input_set(s, inputs_int);
 
             PipelineValue inputs[WIRING_MAX_INPUTS] = {0};
             PipelineValue outputs[1] = {0};
-            for (int k = 0; k < report.signature_in_count && k < WIRING_MAX_INPUTS; k++) {
-                inputs[k].v.i = inputs_int[k];
+
+            if (n_order_nouns > 0) {
+                /* Noun-keyed mapping: inputs[k] in graph order ←
+                 * inputs_int[j] where j is the index of report->signature_in_names[k]
+                 * inside order_nouns[]. Falls back to positional if the
+                 * graph noun is not in the order list. */
+                for (int k = 0; k < report.signature_in_count && k < WIRING_MAX_INPUTS; k++) {
+                    int j = -1;
+                    const char *graph_noun = report.signature_in_names[k];
+                    for (int q = 0; q < n_order_nouns; q++) {
+                        if (strcmp(order_nouns[q], graph_noun) == 0) { j = q; break; }
+                    }
+                    inputs[k].v.i = (j >= 0) ? inputs_int[j] : inputs_int[k];
+                }
+            } else {
+                for (int k = 0; k < report.signature_in_count && k < WIRING_MAX_INPUTS; k++) {
+                    inputs[k].v.i = inputs_int[k];
+                }
             }
 
             int rc = pipeline_execute_vm(p, vm, inputs, outputs);

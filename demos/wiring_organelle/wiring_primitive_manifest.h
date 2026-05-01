@@ -25,6 +25,7 @@ extern "C" {
 
 #define WIRING_PRIM_MAX_INPUTS   8
 #define WIRING_PRIM_MAX_KEYWORDS 12
+#define WIRING_PRIM_MAX_PORT_KEYWORDS 6
 #define WIRING_PRIM_MAX_PORTS    8
 
 typedef struct {
@@ -44,6 +45,12 @@ typedef struct {
     /* NL keywords (case-insensitive whole-word match). NULL-terminated;
      * fewer than WIRING_PRIM_MAX_KEYWORDS in practice. */
     const char *keywords[WIRING_PRIM_MAX_KEYWORDS];
+
+    /* Phase 6b — per-input-port NL nouns, used by wiring_arg_binder to
+     * map prompt content words to input ports. NULL-terminated lists,
+     * one per input port. May be empty (NULL) if the port name itself
+     * is the only canonical noun (e.g. "x", "y"). */
+    const char *port_keywords[WIRING_PRIM_MAX_INPUTS][WIRING_PRIM_MAX_PORT_KEYWORDS];
 } WiringPrimitive;
 
 /* Returns a pointer to the static manifest array.  Length out_count. */

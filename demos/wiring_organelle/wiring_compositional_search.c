@@ -28,6 +28,7 @@
 
 #include "wiring_compositional_search.h"
 #include "wiring_primitive_manifest.h"
+#include "wiring_arg_binder.h"
 #include "wiring_geo_classifier.h"
 #include "microgpt_pipeline.h"
 
@@ -138,17 +139,37 @@ static PipelineType *make_type(PipelineTypeKind k) {
     }
 }
 
+/* Find the smallest character offset of any of `prim`'s keywords inside
+ * `prompt_lc`. Returns INT32_MAX-equivalent (large number) if none match. */
+static int earliest_keyword_pos(const WiringPrimitive *prim, const char *prompt_lc) {
+    int best = 1 << 30;
+    for (int k = 0; k < WIRING_PRIM_MAX_KEYWORDS; k++) {
+        const char *kw = prim->keywords[k];
+        if (!kw) break;
+        char kw_lc[64];
+        to_lower_copy(kw, kw_lc, sizeof(kw_lc));
+        const char *hit = strstr(prompt_lc, kw_lc);
+        if (hit) {
+            int pos = (int)(hit - prompt_lc);
+            if (pos < best) best = pos;
+        }
+    }
+    return best;
+}
+
 /* ── Phase 6: top-N outer pick (beam) ────────────────────────
  *
  * Returns up to `n` outer candidates in `out_idx[]`, ordered by
  * descending score. `*out_count` is populated with the number actually
- * written (≤ n). Ties are broken by manifest order, then optionally by
+ * written (≤ n). Ties are broken by EARLIEST-keyword-position in the
+ * prompt (English heads its compositions left-to-right — "the X of Y"
+ * means X is the outer), then by manifest order, then optionally by
  * the geo-classifier hint when WIRING_USE_GEO is enabled. */
 static void pick_top_n_primitives(const WiringPrimitive *manifest, int n_manifest,
                                   const char *prompt_lc, const char *original_prompt,
                                   PipelineTypeKind desired,
                                   int n, int *out_idx, int *out_count) {
-    int scores[64]; int idx[64];
+    int scores[64]; int idx[64]; int earliest[64];
     int total = 0;
     for (int i = 0; i < n_manifest && total < 64; i++) {
         if (manifest[i].output_type != desired) continue;
@@ -156,12 +177,39 @@ static void pick_top_n_primitives(const WiringPrimitive *manifest, int n_manifes
         if (s == 0) continue;
         scores[total] = s;
         idx[total] = i;
+        earliest[total] = earliest_keyword_pos(&manifest[i], prompt_lc);
         total++;
     }
 #if WIRING_USE_GEO
-    /* Tie-break: bump score by 1 for primitives whose name appears as
-     * a substring of any top-K family name from the geo classifier. */
+    /* Stream F (Phase 6b): manifest-driven prior. For each candidate,
+     * count how many of its PORT keywords appear in the prompt; bump
+     * the score by that many. Per-port keywords are domain-specific
+     * nouns (e.g. bmi has weight/height/mass/cm) and matching them
+     * shifts the tie-break toward primitives whose argument vocabulary
+     * the prompt actually uses. This replaces the V1.0.6 substring
+     * match against the legacy FAMILIES table — that table was tuned
+     * for the Phase-13-leaked anchors and didn't transfer.
+     *
+     * Also retained: the legacy substring-match against the geo
+     * classifier's top-K family hint, as an additional +1 nudge. */
     if (original_prompt) {
+        for (int i = 0; i < total; i++) {
+            const WiringPrimitive *prim = &manifest[idx[i]];
+            int port_kw_hits = 0;
+            for (int ip = 0; ip < prim->n_inputs; ip++) {
+                for (int k = 0; k < WIRING_PRIM_MAX_PORT_KEYWORDS; k++) {
+                    const char *kw = prim->port_keywords[ip][k];
+                    if (!kw) break;
+                    char kw_lc[64];
+                    to_lower_copy(kw, kw_lc, sizeof(kw_lc));
+                    if (prompt_contains_keyword(prompt_lc, kw_lc)) {
+                        port_kw_hits++;
+                        break;  /* count each port at most once */
+                    }
+                }
+            }
+            scores[i] += port_kw_hits;
+        }
         const char *top_k[WIRING_GEO_TOP_K] = {0};
         int k = wiring_geo_predict_top_k(original_prompt, top_k);
         for (int i = 0; i < total; i++) {
@@ -177,16 +225,59 @@ static void pick_top_n_primitives(const WiringPrimitive *manifest, int n_manifes
 #else
     (void)original_prompt;
 #endif
-    /* Sort by score desc, manifest order asc on tie. */
+    /* Sort by score desc, then earliest-keyword-pos asc on tie. */
     for (int i = 1; i < total; i++) {
-        for (int j = i; j > 0 && scores[j] > scores[j-1]; j--) {
+        for (int j = i; j > 0; j--) {
+            int swap = 0;
+            if (scores[j] > scores[j-1]) swap = 1;
+            else if (scores[j] == scores[j-1] && earliest[j] < earliest[j-1]) swap = 1;
+            if (!swap) break;
             int ts = scores[j]; scores[j] = scores[j-1]; scores[j-1] = ts;
             int ti = idx[j]; idx[j] = idx[j-1]; idx[j-1] = ti;
+            int te = earliest[j]; earliest[j] = earliest[j-1]; earliest[j-1] = te;
         }
     }
     int take = total < n ? total : n;
     for (int i = 0; i < take; i++) out_idx[i] = idx[i];
     *out_count = take;
+}
+
+/* Discover the inner picks for an outer (factored out so the binder
+ * path can use them too). Writes to inner_picks_out (length
+ * WIRING_PRIM_MAX_INPUTS). */
+static void discover_inner_picks(const WiringPrimitive *manifest, int n_manifest,
+                                 int outer_idx, const char *prompt_lc,
+                                 int *inner_picks_out) {
+    const WiringPrimitive *outer = &manifest[outer_idx];
+    for (int i = 0; i < WIRING_PRIM_MAX_INPUTS; i++) inner_picks_out[i] = -1;
+    const char *exclude[3] = { outer->name, NULL, NULL };
+    for (int ip = 0; ip < outer->n_inputs; ip++) {
+        int s = 0;
+        int inner_idx = pick_best_primitive(manifest, n_manifest, prompt_lc,
+                                            outer->input_types[ip], exclude, &s);
+        if (inner_idx >= 0 && s > 0) inner_picks_out[ip] = inner_idx;
+    }
+
+#if !WIRING_KEEP_DUPS
+    {
+        int best_score_per_inner[64] = {0};
+        int best_port_per_inner[64];
+        for (int i = 0; i < 64; i++) best_port_per_inner[i] = -1;
+        for (int ip = 0; ip < outer->n_inputs; ip++) {
+            int idx = inner_picks_out[ip];
+            if (idx < 0) continue;
+            int s = score_primitive(&manifest[idx], prompt_lc);
+            if (s > best_score_per_inner[idx]) {
+                if (best_port_per_inner[idx] >= 0)
+                    inner_picks_out[best_port_per_inner[idx]] = -1;
+                best_score_per_inner[idx] = s;
+                best_port_per_inner[idx] = ip;
+            } else {
+                inner_picks_out[ip] = -1;
+            }
+        }
+    }
+#endif
 }
 
 /* ── Phase 6: build a graph from a chosen outer + inner picks ────── */
@@ -200,41 +291,8 @@ static Pipeline *build_graph_for_outer(
     const WiringPrimitive *outer = &manifest[outer_idx];
 
     int inner_picks[WIRING_PRIM_MAX_INPUTS];
-    for (int i = 0; i < WIRING_PRIM_MAX_INPUTS; i++) inner_picks[i] = -1;
-
-    const char *exclude[3] = { outer->name, NULL, NULL };
-
-    for (int ip = 0; ip < outer->n_inputs; ip++) {
-        int s = 0;
-        int inner_idx = pick_best_primitive(manifest, n_manifest, prompt_lc,
-                                            outer->input_types[ip], exclude, &s);
-        if (inner_idx >= 0 && s > 0) {
-            inner_picks[ip] = inner_idx;
-        }
-    }
-
-#if !WIRING_KEEP_DUPS
-    /* H2 ablation toggle: keep the legacy V1.0.4 dedup. */
-    {
-        int best_score_per_inner[64] = {0};
-        int best_port_per_inner[64];
-        for (int i = 0; i < 64; i++) best_port_per_inner[i] = -1;
-        for (int ip = 0; ip < outer->n_inputs; ip++) {
-            int idx = inner_picks[ip];
-            if (idx < 0) continue;
-            int s = score_primitive(&manifest[idx], prompt_lc);
-            if (s > best_score_per_inner[idx]) {
-                if (best_port_per_inner[idx] >= 0) {
-                    inner_picks[best_port_per_inner[idx]] = -1;
-                }
-                best_score_per_inner[idx] = s;
-                best_port_per_inner[idx] = ip;
-            } else {
-                inner_picks[ip] = -1;
-            }
-        }
-    }
-#endif
+    discover_inner_picks(manifest, n_manifest, outer_idx, prompt_lc, inner_picks);
+    for (int i = 0; i < WIRING_PRIM_MAX_INPUTS; i++) inner_picks_out[i] = inner_picks[i];
 
     /* ── Build the Pipeline IR graph. ── */
     Pipeline *p = pipeline_create("composed");
@@ -373,6 +431,129 @@ static Pipeline *build_graph_for_outer(
     return p;
 }
 
+/* ── Phase 6b: build a graph using the argument binder (Stream D). ──
+ *
+ * Signature inputs are noun-keyed: each unique prompt noun bound to any
+ * port becomes one signature input.  Two ports that bound the same noun
+ * share the same signature input — this eliminates the V1.0.6 duplicate-
+ * inner misrouting failure mode.  Unbound ports fall back to positional
+ * arg_<n> slots (legacy V1.0.4 behaviour). */
+static Pipeline *build_graph_with_binder(
+        const WiringPrimitive *manifest, int n_manifest,
+        int outer_idx, const int *inner_picks,
+        const WiringBindResult *bindings,
+        int *signature_in_count_out) {
+    (void)n_manifest;
+    const WiringPrimitive *outer = &manifest[outer_idx];
+
+    Pipeline *p = pipeline_create("composed");
+    if (!p) return NULL;
+
+    /* Build the signature input list straight from the binder. */
+    int n_sig_in = bindings->n_sig_inputs;
+    if (n_sig_in <= 0 || n_sig_in > 16) { pipeline_free(p); return NULL; }
+
+    const char *sig_in_names[16];
+    PipelineType *sig_in_types[16];
+    for (int i = 0; i < n_sig_in; i++) {
+        sig_in_names[i] = bindings->sig_in_names[i];
+        sig_in_types[i] = pipeline_type_int();
+    }
+    const char *sig_out_names[1] = {"y"};
+    PipelineType *sig_out_types[1] = { pipeline_type_int() };
+    if (pipeline_set_signature(p, n_sig_in, sig_in_names, sig_in_types,
+                               1, sig_out_names, sig_out_types) != 0) {
+        pipeline_free(p);
+        return NULL;
+    }
+
+    /* Add each inner node and wire its inputs from the binder. */
+    char inner_node_ids[WIRING_PRIM_MAX_INPUTS][32];
+    for (int ip = 0; ip < outer->n_inputs; ip++) {
+        if (inner_picks[ip] < 0) continue;
+        const WiringPrimitive *inner = &manifest[inner_picks[ip]];
+        snprintf(inner_node_ids[ip], sizeof(inner_node_ids[ip]), "inner_%d", ip);
+
+        const char *in_names[WIRING_PRIM_MAX_INPUTS];
+        PipelineType *in_types[WIRING_PRIM_MAX_INPUTS];
+        for (int k = 0; k < inner->n_inputs; k++) {
+            in_names[k] = inner->input_names[k] ? inner->input_names[k] : "in";
+            in_types[k] = make_type(inner->input_types[k]);
+        }
+        const char *out_names[1] = {"out"};
+        PipelineType *out_types[1] = { make_type(inner->output_type) };
+        if (pipeline_add_node(p, inner_node_ids[ip], inner->name,
+                              inner->n_inputs, in_names, in_types,
+                              1, out_names, out_types) < 0) {
+            pipeline_free(p);
+            return NULL;
+        }
+        for (int k = 0; k < inner->n_inputs; k++) {
+            int slot = -1;
+            for (int _i = 0; _i < bindings->n_bindings; _i++) {
+                if (bindings->bindings[_i].node_idx == (1 + ip) &&
+                    bindings->bindings[_i].port_idx == k) {
+                    slot = bindings->bindings[_i].sig_in_idx; break;
+                }
+            }
+            if (slot < 0 || slot >= n_sig_in) { pipeline_free(p); return NULL; }
+            if (pipeline_connect_signature_in(p, sig_in_names[slot],
+                                              inner_node_ids[ip], in_names[k]) != 0) {
+                pipeline_free(p);
+                return NULL;
+            }
+        }
+    }
+
+    /* Add the outer node and wire its inputs. */
+    {
+        const char *in_names[WIRING_PRIM_MAX_INPUTS];
+        PipelineType *in_types[WIRING_PRIM_MAX_INPUTS];
+        for (int k = 0; k < outer->n_inputs; k++) {
+            in_names[k] = outer->input_names[k] ? outer->input_names[k] : "in";
+            in_types[k] = make_type(outer->input_types[k]);
+        }
+        const char *out_names[1] = {"out"};
+        PipelineType *out_types[1] = { make_type(outer->output_type) };
+        if (pipeline_add_node(p, "outer", outer->name,
+                              outer->n_inputs, in_names, in_types,
+                              1, out_names, out_types) < 0) {
+            pipeline_free(p);
+            return NULL;
+        }
+        for (int ip = 0; ip < outer->n_inputs; ip++) {
+            if (inner_picks[ip] >= 0) {
+                if (pipeline_connect(p, inner_node_ids[ip], "out",
+                                     "outer", in_names[ip]) != 0) {
+                    pipeline_free(p);
+                    return NULL;
+                }
+            } else {
+                int slot = -1;
+                for (int _i = 0; _i < bindings->n_bindings; _i++) {
+                    if (bindings->bindings[_i].node_idx == 0 &&
+                        bindings->bindings[_i].port_idx == ip) {
+                        slot = bindings->bindings[_i].sig_in_idx; break;
+                    }
+                }
+                if (slot < 0 || slot >= n_sig_in) { pipeline_free(p); return NULL; }
+                if (pipeline_connect_signature_in(p, sig_in_names[slot],
+                                                  "outer", in_names[ip]) != 0) {
+                    pipeline_free(p);
+                    return NULL;
+                }
+            }
+        }
+    }
+    if (pipeline_connect_signature_out(p, "outer", "out", "y") != 0) {
+        pipeline_free(p);
+        return NULL;
+    }
+    if (pipeline_verify(p) != PIPE_OK) { pipeline_free(p); return NULL; }
+    *signature_in_count_out = n_sig_in;
+    return p;
+}
+
 /* ── Top-level entry point: beam search over outer candidates. ── */
 
 Pipeline *wiring_compositional_search(const char *prompt,
@@ -408,22 +589,56 @@ Pipeline *wiring_compositional_search(const char *prompt,
     for (int b = 0; b < outer_count; b++) {
         int inner_picks[WIRING_PRIM_MAX_INPUTS];
         int sig_in = 0;
-        Pipeline *p = build_graph_for_outer(manifest, n_manifest,
-                                            outer_top[b], prompt_lc, prompt,
-                                            inner_picks, &sig_in);
+
+        /* Discover inner picks once per outer candidate. */
+        discover_inner_picks(manifest, n_manifest, outer_top[b], prompt_lc, inner_picks);
+
+        /* Run the binder (Stream D). */
+        WiringBindResult bindings;
+        Pipeline *p = NULL;
+        if (wiring_arg_bind(prompt, outer_top[b], inner_picks, &bindings)) {
+            p = build_graph_with_binder(manifest, n_manifest,
+                                        outer_top[b], inner_picks,
+                                        &bindings, &sig_in);
+        }
+        /* Fallback to the legacy positional builder if binder failed. */
+        if (!p) {
+            (void)bindings;
+            p = build_graph_for_outer(manifest, n_manifest,
+                                      outer_top[b], prompt_lc, prompt,
+                                      inner_picks, &sig_in);
+        }
         if (!p) continue;
 
-        /* Score: 1 (outer) + number of distinct inner primitives. */
-        int n_inner = 0;
+        /* Score: total keyword + port-keyword hits across outer + distinct inners.
+         * This rewards primitives whose vocabulary the prompt actually uses,
+         * not just graphs with more nodes. Fixes the lerp-vs-max_two-with-
+         * inner case where the bigger graph misroutes despite the simpler
+         * graph being semantically right. */
         int seen[64] = {0};
+        int n_inner = 0;
+        int coverage = score_primitive(&manifest[outer_top[b]], prompt_lc);
+        /* Add port-keyword hits for the outer. */
+        {
+            const WiringPrimitive *po = &manifest[outer_top[b]];
+            for (int ip = 0; ip < po->n_inputs; ip++) {
+                for (int k = 0; k < WIRING_PRIM_MAX_PORT_KEYWORDS; k++) {
+                    const char *kw = po->port_keywords[ip][k];
+                    if (!kw) break;
+                    char kw_lc[64];
+                    to_lower_copy(kw, kw_lc, sizeof(kw_lc));
+                    if (prompt_contains_keyword(prompt_lc, kw_lc)) { coverage++; break; }
+                }
+            }
+        }
         for (int ip = 0; ip < manifest[outer_top[b]].n_inputs; ip++) {
             int pi = inner_picks[ip];
             if (pi >= 0 && pi < 64 && !seen[pi]) {
                 seen[pi] = 1;
                 n_inner++;
+                coverage += score_primitive(&manifest[pi], prompt_lc);
             }
         }
-        int coverage = 1 + n_inner;
         int n_nodes = 1 + n_inner;
         if (coverage > best_score ||
             (coverage == best_score && n_nodes < best_nodes)) {
@@ -457,6 +672,16 @@ Pipeline *wiring_compositional_search(const char *prompt,
             report->primitive_names[idx++] = outer->name;
         }
         report->n_nodes_used = idx;
+        /* Phase 6b Stream E — copy signature input names from the verified
+         * graph so the harness can remap inputs by noun. */
+        for (int i = 0; i < best_p->n_sig_in &&
+                       i < WIRING_COMPOSE_MAX_SIG_INS; i++) {
+            const char *nm = best_p->signature_in[i].name
+                                 ? best_p->signature_in[i].name : "";
+            strncpy(report->signature_in_names[i], nm,
+                    WIRING_COMPOSE_NAME_LEN - 1);
+            report->signature_in_names[i][WIRING_COMPOSE_NAME_LEN - 1] = '\0';
+        }
     }
 
     return best_p;

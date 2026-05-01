@@ -30,12 +30,20 @@ extern "C" {
 /* Maximum number of primitives in a generated graph. */
 #define WIRING_COMPOSE_MAX_NODES 8
 
+#define WIRING_COMPOSE_MAX_SIG_INS 16
+#define WIRING_COMPOSE_NAME_LEN    24
+
 typedef struct {
     int n_nodes_used;            /* number of primitives the search picked */
     const char *primitive_names[WIRING_COMPOSE_MAX_NODES];
     int verified;                /* 1 if pipeline_verify succeeded */
     int signature_in_count;
     int signature_out_count;
+    /* Phase 6b Stream E — names of the signature inputs in the order they
+     * appear in the graph. The harness uses this together with the
+     * held-out's # INPUT_ORDER: annotation to remap reference S[0..N]
+     * onto the binder's noun-keyed sig inputs. */
+    char signature_in_names[WIRING_COMPOSE_MAX_SIG_INS][WIRING_COMPOSE_NAME_LEN];
 } WiringComposeReport;
 
 /*
