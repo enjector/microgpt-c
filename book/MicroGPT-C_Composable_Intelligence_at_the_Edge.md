@@ -21,7 +21,7 @@
     
     {\large \today\par}
     \vspace{0.3cm}
-    {\normalsize\texttt{Version 1.7.1}\par}
+    {\normalsize\texttt{Version 1.8.1}\par}
 \end{titlepage}
 
 % --- Copyright Page ---
@@ -32,7 +32,7 @@
 \noindent
 \textbf{MicroGPT-C: Composable Intelligence at the Edge}\\
 From Stem Cell Models to Real-World AI Pipelines \textendash{} Architecture, Implementation, and Research\\
-\textit{Version 1.7.1}\\[2em]
+\textit{Version 1.8.1}\\[2em]
 
 \noindent
 \textbf{Research Team}\\
@@ -3450,6 +3450,20 @@ Each scenario produces a deterministic, auditable, no-cloud-dependency translato
 
 This is the project's deployment story: not "scale up the model," but "curate the library for the domain you actually want to ship into."
 
+## Postscript: Phase 5 / 6 / 6b — when extension means a new mechanism
+
+The four mechanisms documented above (anchor retrieval, fragment composition, TF-IDF, wiring transformer) were the closing-the-arc story. Two follow-on engineering passes added a *fifth* mechanism — type-directed compositional search over the primitive manifest — because the existing four cover prompts whose primitive set is in some anchor or fragment, and the natural next question is *what about prompts whose primitive set is novel?*
+
+**Phase 5 — type-directed search.** New module `wiring_compositional_search.{c,h}` synthesises a verified Pipeline IR graph from an NL prompt and a target output type by greedy reverse construction over a 36-primitive manifest (`wiring_primitive_manifest.{c,h}`). At each step, pick a primitive whose output type matches; bind each of its inputs either to a fresh signature input (consuming a prompt noun) or recursively to another primitive's output. Synthesise the graph and run `pipeline_verify()`. Pre-registered held-out: 30 prompts in three axes (novel pair, synonym-disjoint triple, type-pressure backtrack). Pre-registered target: ≥ 50 % verified-and-correct. **First-run baseline: 30 / 30 verified, 9 / 30 correct (30 %).** Below the pre-registered target; per the §3.3 skip rule, recorded as `PARTIALLY-RESOLVED`, not silently re-tuned.
+
+**Phase 6 — three pre-registered improvements.** Beam ≥ 2 instead of greedy beam = 1; drop name-deduplication so duplicate-inner candidates remain distinguishable; geo-classifier prior as tie-breaker. All three behind compile-time toggles. **Outcome: same 30 / 30 verified, 9 / 30 correct.** Per the §4.3 disposition rule, this *falsifies the simple-search hypothesis*: the dominant failure mode is not greedy outer picking but argument-to-port routing under multiple inner candidates. Phase 6 changes retained in source as ablation toggles because they exposed the structural duplicate-inner misrouting failure mode.
+
+**Phase 6b — argument binder.** New module `wiring_arg_binder.{c,h}` closes the failure mode Phase 6 surfaced: prompt-noun -> port-name binding, with repeated-noun unification across ports (two ports binding to the same prompt noun aliased onto the same signature input). Eliminates the duplicate-inner misrouting at the binder layer. **Outcome: 30 / 30 verified, 12 / 30 correct (40 %).** Lifted from V1.0.5 30 % through a four-root-cause fix; the 50 % design target persists in `GAP-WIRE-006` as `PARTIALLY-RESOLVED`. Per-prompt analysis lives in `RESEARCH_DISCLOSURE.md` §5.5.
+
+The lesson: extension does not always mean new content in an existing table; sometimes it means a new *mechanism* that joins the existing four. The compositional search mechanism is now mechanism (5) in the order-of-decreasing-prior list above; the wiring transformer slot moves from (4) to (5)-fallback. The pipeline IR + verifier Judge stack absorbs all five identically, which was the architectural promise from the start.
+
+What this postscript also confirms — for the chapter that follows it (Chapter 20) — is that *the calibrated honest-claim discipline carries forward*. Each phase was pre-registered with skip rules; each phase's outcome was recorded against its prediction; falsified hypotheses are documented as falsifications, not silently dropped; the per-prompt sign analysis lives in `RESEARCH_DISCLOSURE.md` for any future reviewer.
+
 ## What this chapter is, and what it isn't
 
 This chapter **is**:
@@ -3483,6 +3497,301 @@ The next chapter — written by whoever picks up the project for a deployment sc
 - Release tag: `v3.5-wiring-organelle` on the post-Phase-4 commit
 
 — Ajay Soni, Enjector Software Ltd. April 2026.
+
+
+\newpage
+
+
+# The honest scaling ceiling: three structural bounds, calibrated
+
+*Teaser: After Chapter 19 declared the research arc closed, a follow-on scaling experiment claimed 1:1 linear-effort scaling — and was wrong. This chapter is the falsification, the audit that found it, the calibrated three-bound claim that survives, and the discipline lesson that now lives in the corpus.*
+
+## Introduction
+
+Chapter 19 closed the Wiring Organelle research arc with four working mechanisms (anchor retrieval, fragment composition, TF-IDF on the Phase 4 expanded corpus, wiring transformer fallback) and declared the next chapter to be the curator's chapter. A follow-on experiment, run as a "let us measure the curve" engineering study, set out to test the claim implicit in the curator's hand: *if curating one family takes ~30 minutes and delivers one family of coverage, does it really scale 1:1 across 20 new families and four new domains?*
+
+The first run said yes — 20 / 20 retrieval on the 20-family expansion, perfect 1:1 across all four batches. The headline was on its way to the strategy one-pager.
+
+The audit caught it.
+
+This chapter is the story of that audit, the v2 / v3 clean rebuilds that followed, the structural-bound calibration that survives, and the methodological discipline that the project now treats as load-bearing infrastructure.
+
+## What the inflated 1 : 1 claim looked like
+
+The setup was conventional. Add 20 new families across four disjoint domains (geometry, physics, statistics, math chains), each curated for ~30 minutes with anchor + geo-classifier + corpus-expand entries. Build a 20-prompt held-out test set (one paraphrase per family). Run TF-IDF on the corpus. Measure.
+
+Per-batch numbers came out clean:
+
+| Batch | Domain | Curated families | Held-out hits | Per-batch |
+|---|---|---|---|---|
+| 1 | Geometry | 5 | 5 / 20 | **5 / 5** |
+| 2 | Physics | 10 | 10 / 20 | **5 / 5** |
+| 3 | Statistics | 15 | 15 / 20 | **5 / 5** |
+| 4 | Math chains | 20 | **20 / 20** | **5 / 5** |
+
+Slope = +1 hit per +1 curated family. Per-pre-registration, all three locked hypotheses passed: H_main (≥ 18 / 20), H_no_regression, H_adversarial_floor. The temptation was strong to publish.
+
+Instead, the audit ran.
+
+## The audit that found the leak
+
+The audit followed the same shape as the §38 Phase 13 leakage discovery from the earlier arc, generalised: not just *"does any held-out prompt appear verbatim in training?"* but also *"does any held-out prompt have ≥ 0.7 bag-of-words Jaccard against any training prompt?"*
+
+The TF-IDF classifier is bag-of-words. To it, a training prompt that shares all the same content words as a held-out prompt — even shuffled, even with a different sentence frame — is the same prompt. Verbatim leakage protection (the existing `tools/check_held_out_leakage.sh`) misses this. So a new audit script was written: `tools/scaling_leakage_audit.sh`, with three checks (verbatim, Jaccard ≥ 0.7, lexical-anchor exclusivity).
+
+The result, on the v1 held-out set:
+
+| Audit | Result |
+|---|---|
+| A: verbatim leaks | 0 / 20 (the existing guard worked) |
+| B: Jaccard ≥ 0.7 | **19 / 20** |
+| B: Jaccard = 1.0 (full bag-of-words clones) | **2 / 20** (`circle_area_ratio` held-out matched a training prompt with the same words in shuffled order; `harmonic_sum` similarly) |
+| C: ≥ 50% lexical anchors | 2 / 20 |
+
+The 1:1 claim was inflated. Not by design fraud, by *curator self-overlap*: the same person (me) had written both the synonym tables and the held-out paraphrases. Surface vocabulary was naturally shared. Bag-of-words TF-IDF, asked to discriminate between a training prompt and a "novel" paraphrase that uses the same content words shuffled, will of course recognise the family.
+
+The honest restatement followed the same pattern as §38: retract the inflated number, name the audit, build the standing protection, re-measure on a clean test.
+
+## v2: the clean rebuild
+
+The v2 held-out set (`pipeline_corpus_scaling_heldout_v2.txt`) was built with vocabulary deliberately disjoint from `corpus_expand.c` synonym tables. For each family, the held-out paraphrase used different content words than the training synonyms — *"comparing the surface coverage of two disks based on radial measurements"* instead of *"ratio of two circle areas given their radii"*.
+
+Re-measuring TF-IDF on v2: **15 / 20 (75 %)**, audit clean (Jaccard ≥ 0.7: 1 / 20, the single residual outlier `gcd_with_offset` at 0.667). The inflated 1:1 result was replaced by the honest 75 % baseline.
+
+A subtractive sharpening pass (removing generic clamp words like "restricted" and "permitted window" from the centroids of clamp families that wrongly out-scored their siblings) lifted v2 to **16 / 20 (80 %)** without re-introducing leakage. That number — **80 % retrieval on novel-paraphrase tests when the family vocabulary is genuinely distinctive** — is the calibrated baseline that survived everything that followed.
+
+## v3: when broad expansion fails the same way
+
+A second experiment (Phase 3 broad expansion) added 20 *more* families across new disjoint domains: chemistry, time / dates, conversions, simple combinatorics. Lean synonym tables (~6 entries / family, 3 templates). Held-out built with the same vocabulary-disjoint discipline, audit clean before measurement.
+
+Result: **3 / 20 (15 %)**, vs the 80 % held by v2 on the previous batch.
+
+A natural follow-up: maybe the lean synonyms were the problem. Run v3 with v2-depth synonyms (~12 entries / family, 5 templates). Audit again before measurement (clean, Audit B = 0 / 20).
+
+Result: **0 / 20**. Deeper synonyms made it *worse*.
+
+The diagnosis took some staring. The deeper templates introduced generic English glue — *"expressed by"*, *"formed by"*, *"computed as"*, *"scaled by"* — across all 20 families. Words that appear with high frequency across many family centroids carry low IDF weight; their discriminative contribution drops to zero. Worse, those generic words *also* appear in held-out paraphrases (which use phrases like *"derived from"*, *"computed at"*) — so the held-out matches a centroid heavily weighted on those generic words but for the wrong family.
+
+The lesson, written down as `INV-WIRE-061` in `BS_wiring.md`: synonym depth helps only when each new entry is *domain-distinctive*. v2's pricing / math / finance / physics families used distinctive nouns (interest, factorial, sigmoid, momentum) that show up in few other families. v3's chemistry / time / conversions families used generic concept vocabulary (count, value, total, scale, conversion) that doesn't naturally distinguish — independent of curation depth.
+
+## The bigram experiment: confirming the ceiling is bag-of-features-wide
+
+If the ~75-80 % ceiling on v2 and the ~15 % ceiling on v3 were unigram-specific artefacts, a richer feature representation should move them. Two experiments tested this:
+
+**Bigram TF-IDF.** Tokenise into adjacent word pairs (`tok[i]_tok[i+1]`) in addition to unigrams. Re-measure on v2 and v3.
+
+**Character-trigram TF-IDF.** Emit length-3 character n-grams from each word in addition to unigrams. Re-measure on v2 and v3.
+
+Triple measurement, tabulated honestly:
+
+| Eval | Unigram | Bigram | Char-trigram |
+|---|---|---|---|
+| v2 (deep distinctive synonyms) | **16 / 20** | 15 / 20 | 15 / 20 |
+| v3 (lean generic-English synonyms) | **3 / 20** | 2 / 20 | 3 / 20 |
+| Phase 2c no-regression | 39 / 40 | 39 / 40 | 39 / 40 |
+| Adversarial axis-2 | 17 / 20 | **18 / 20** | **18 / 20** |
+
+All three feature variants converge within ±1 / 20 on both held-out tests. Bigrams and char-trigrams help by exactly +1 on adversarial (where training shares some surface forms with the test) and hurt by exactly -1 on v2 / v3 (where the held-out is genuinely vocabulary-disjoint, so feature variants add noise without signal). The ceiling is not a unigram artefact; it is a property of the bag-of-features classifier *family*.
+
+This is the kind of finding that moves a research project from "we have a ceiling" to "we know what kind of ceiling it is". Recorded as `INV-WIRE-060`: any new feature variant tested on a vocabulary-disjoint held-out MUST converge within ±1 prompt of the unigram baseline. A diverging variant invalidates the calibrated ceiling and triggers re-measurement.
+
+## The three structural bounds, named
+
+The cumulative arc (v1 inflated -> v2 clean -> Phase 2 sharpening -> v3 broad expansion -> bigram + char-trigram falsification -> v3 deep negative) consolidates into three structural bounds, each independently confirmed and now load-bearing in the corpus:
+
+| Bound | What it is | Where it's enforced |
+|---|---|---|
+| **Curator-bounded** | TF-IDF retrieval is bounded by the curator's synonym vocabulary. Held-out paraphrases sharing no surface words with training cannot be matched. Standing protection: `tools/scaling_leakage_audit.sh` (Audit B Jaccard ≥ 0.7) MUST run on every new held-out before any retrieval number is reported. | `INV-WIRE-062` in `BS_wiring.md`; the audit script itself |
+| **Model-bounded** | The retrieval ceiling is a bag-of-features property, not unigram-specific. Three feature variants converge to the same ~75-80 % bound on vocabulary-disjoint tests. Breaking past it requires a different model class — external pretrained semantic embeddings — gated by the dependency-boundary policy. | `INV-WIRE-060`, `SLO-WIRE-010`, `GAP-WIRE-002` (DEFERRED) and `GAP-DEP-001` |
+| **Domain-bounded** | The achievable ceiling depends on whether family concepts have distinctive nouns or share generic English vocabulary. v2 (math / physics / finance) hits 80 %; v3 (chemistry / time / conversions) drops to 15 % — independent of curation depth. v3 deep made it *worse* by diluting distinctive vocabulary with generic glue. | `INV-WIRE-061` in `BS_wiring.md`; recorded as `GAP-WIRE-008` (RESOLVED as a documented limitation) |
+
+The honest one-line claim, suitable for a paper or a customer conversation:
+
+> **TF-IDF + curator's synonyms achieves ~75-80 % retrieval on novel-paraphrase tests when the family's distinctive nouns are genuinely unique to that family. For domains where family concepts share generic English vocabulary, the ceiling drops to ~15 % and is independent of curation depth or n-gram feature choice. Breaking past the ceiling requires either external pretrained embeddings (a model class change) or restriction to distinctive-noun domains.**
+
+This is calibrated, falsifiable, reproducible. It is also actionable: anyone evaluating whether the architecture fits their problem can read the three bounds and decide.
+
+## Discipline lessons that survived the arc
+
+Three pieces of methodological infrastructure landed during this arc that are now standing protections, not one-off audits:
+
+1. **`tools/scaling_leakage_audit.sh`** — three-axis audit (verbatim, Jaccard ≥ 0.7, lexical anchoring) that MUST run on every new held-out test set before measurement. Built after v1 was caught, applied retroactively to v1 (caught 19 / 20), then forwards to v2 (caught 1 / 20) and v3 (caught 0 / 20).
+2. **Pre-measurement audit gate** (`INV-WIRE-062`). A retrieval claim cannot be reported until it cites the audit's per-test report. The HEADLINE table in `RESEARCH_DISCLOSURE.md` §3 is the regulator-friendly distillation; the per-test logs in `docs/research/wiring_scaling_*_audit.log` are the evidence.
+3. **Bag-of-features convergence invariant** (`INV-WIRE-060`). Any new feature variant tested on a vocabulary-disjoint held-out must converge within ±1 prompt of the unigram baseline. A diverging variant means either the audit was wrong (re-run), the variant has a bug (debug), or the ceiling has actually moved (publish — that's a real finding).
+
+The §38 Phase 13 leakage discovery taught the project to write down its retractions. This arc taught the project to *bake in the audit infrastructure that would have caught the leak before it shipped*. Both lessons are now in the corpus's normative invariants — not just in research notes.
+
+## What this chapter doesn't claim
+
+This chapter **does not** claim:
+
+- That bigrams or char-trigrams "fail." They perform exactly as expected for bag-of-features methods. The convergence at the same ceiling IS the finding.
+- That v3 is unfixable. It is documented as fixable via either external embeddings (model class change) or vertical-domain restriction. The productization plan (Chapter 21) chooses the latter for the first vertical (fraud, where nouns are distinctive) and reserves the former for cross-vertical use.
+- That the curator's hand is the only bottleneck. The model class is also a bottleneck. The domain is also a bottleneck. Three independent bounds, each documented, each independently addressable.
+- A re-opening of any previously-cancelled phase. Phase 3a-full (EKAN-Network), Phase 3c (RAG fallback), and Phase 4b-full (EKAN-Network on the expanded corpus) all remain `CANCELLED` per their pre-registered skip rules.
+
+## What the next chapter does claim
+
+The next chapter — written as the productization arc began to take shape — answers the question this one leaves open: *given the calibrated three-bound ceiling, what verticals does the architecture's distinctive value actually fit?* The answer is fraud first, finance second, defence third — each with concrete plans, dependency policy adoption, and a strategy one-pager for stakeholders who don't want the full research arc.
+
+The architecture didn't get smaller during this arc. Its *honest claims* did. That is, in the framing of the book's central thesis, the right shape for a research project graduating into product: *small specialist models coordinated by deterministic infrastructure, with calibrated honest claims and audit infrastructure baked in, outperform single larger models on focused tasks where the focus matches the architecture's bounded vocabulary.* Calibration is more valuable than inflation. The audit is more valuable than the headline.
+
+## References
+
+- Audit tool: `tools/scaling_leakage_audit.sh`
+- Honest restatements in regulator-friendly form: `docs.engineering/CLEAN_ROOM_IMPLEMENTATION/RESEARCH_DISCLOSURE.md` §3, §7
+- Per-arc research notes: `docs/research/wiring_scaling_curve.md`, `wiring_scaling_curve_phase3.md`, `wiring_scaling_v3_deep_negative.md`, `wiring_scaling_post_phase3.md`
+- Three-bound consolidation: `docs/research/wiring_scaling_post_phase3.md` §"What this means for §44.5"
+- Top-of-stack synthesis: `docs/research/ORGANELLE_STATE.md`
+- Normative invariants: `docs.engineering/CLEAN_ROOM_IMPLEMENTATION/BS_wiring.md` `INV-WIRE-060/061/062`, `SLO-WIRE-008/009/010`
+- Gap register: `docs.engineering/CLEAN_ROOM_IMPLEMENTATION/TRACEABILITY.md` `GAP-WIRE-007/008` (both RESOLVED as documented structural bounds)
+
+— Ajay Soni, Enjector Software Ltd. May 2026.
+
+
+\newpage
+
+
+# From research to product: three verticals, one gating decision
+
+*Teaser: Tiny, deterministic, on-device AI loses to frontier LLMs on open-domain accuracy — and wins, decisively, in the verticals where audit, edge, and composition are mandatory rather than nice-to-have. This chapter maps the architecture's distinctive value onto fraud detection, finance regime / risk, and defence digital-twin tracking, and names the single dependency-policy decision that gates all three.*
+
+## Introduction
+
+Chapter 20 closed the calibrated honest-claim work: ~75-80 % retrieval on novel-paraphrase tests in distinctive-noun domains, three documented structural bounds, audit infrastructure baked in. The natural next question — and the one that keeps the book honest — is *what is this architecture actually for?*
+
+The dominant trajectory of AI in 2026 is bigger models, more compute, cloud-only inference, opaque decisions. The verticals that *can't* live there — regulated industries, edge-constrained platforms, compositional decision pipelines, audit-required outputs — are an under-served market. MicroGPT-C's distinctive bets (tiny specialists, typed pipeline IR, deterministic verifier, on-device deployment) line up *exactly* with what those verticals are paying money to fix.
+
+This chapter is the productization chapter. It maps the architecture onto three candidate verticals, ranks them by time-to-revenue, and surfaces the single gating decision that has to be made before any of them can ship.
+
+## What the architecture actually offers (vs what it doesn't)
+
+Honest accounting before the pitch:
+
+| The architecture is | The architecture is not |
+|---|---|
+| Compositional (pipeline IR + typed verifier) | Higher-accuracy than frontier LLMs on open-domain tasks |
+| Auditable (DOT-rendered DAGs + verifier proofs) | A replacement for incumbent risk / fraud / defence systems |
+| Edge-deployable (< 5 MB binary, < 5 ms p99) | A research breakthrough — the architecture is mostly conventional |
+| Reproducible (deterministic, hash-pinnable) | Scalable across all domains without external embeddings |
+| Explainable to a non-engineer (rules-as-DAG) | A turnkey one-vendor solution — needs domain-specific curation |
+| Pre-registered + leakage-audited (calibrated claims) | Suitable when accuracy beats explainability |
+
+The pitch lives precisely in the asymmetry between the two columns. *Comparable accuracy to incumbents, with audit trails your regulator already wants and rules your domain experts can edit without an engineer, on hardware your customer already owns, for a fraction of the cost.* That's the claim. It is honest in three named verticals and dishonest outside them.
+
+## Vertical 1 — Fraud detection (90-day pilot achievable)
+
+**Why it fits.** A fraud rule is literally a typed DAG: *transaction + cardholder profile + history -> feature extraction -> scoring -> flag with reason code*. The pipeline IR encodes this directly. Every customer (issuer, processor, acquiring bank) maintains a rule library; today these live as untyped Drools / Python / SAS scripts. Migrating them to a typed graph IR with a verifier is **value the customer pays for** — auditable, edit-by-non-engineer, regulator-explainable.
+
+Fraud vocabulary is genuinely distinctive: *card-not-present*, *MCC code*, *AVS-mismatch*, *velocity*, *chargeback*, *BIN*. Per the §INV-WIRE-061 distinctive-noun bound from Chapter 20, this is exactly the domain class where TF-IDF + curator's synonyms hits the upper end of the calibrated ceiling — plausibly 85-90 % with deeper domain curation.
+
+**90-day shape.** Three workstreams, each spec'd in `docs/PRODUCT_FRAUD_DETECTION.md`:
+
+| Weeks | Workstream | Deliverable |
+|---|---|---|
+| 1-4 | 20-family anchor library + 25 fraud primitives (`wiring_natives_fraud.c`) | velocity_spike_24h, geo_distance_anomaly, mcc_outlier, avs_mismatch_cluster, chargeback_pattern_match, … each as a typed pipeline anchor |
+| 5-8 | Streaming adapter + audit log | Kafka consumer (or equivalent); hash-chained tamper-evident audit log per `AUDITLOG_SPEC.md` |
+| 9-12 | End-to-end on PaySim -> first customer demo | Sub-5 ms p99 decisions; 95 % of analyst-reviewed flags explainable from audit log alone in < 30 seconds |
+
+**Customer profile.** Not a tier-1 bank (entrenched vendors, multi-year procurement). The right first customer is a mid-tier processor / neobank / fintech-as-a-service platform whose fraud team is frustrated with their current tooling and whose regulator is asking pointed questions about model explainability.
+
+**Differentiation against incumbents.** Not on accuracy — that's a losing pitch against FICO Falcon, NICE Actimize, Featurespace ARIC. On **edge-deployable, sub-5 ms decisions, analyst-editable composable rules, on-prem with no per-decision SaaS bill, audit trails that regulators ask for by name.**
+
+## Vertical 2 — Finance market regime / risk (6-month prototype, 12-24-month sales cycle)
+
+**Why it fits.** Risk pipelines are graphs (*prices -> returns -> covariance -> portfolio variance -> expected shortfall*). Market regimes are positions in a feature space; transitions are geodesic distance — what `microgpt_geodesic.{h,c}` was *literally designed for*. MSA's compact long-context primitive is the right shape for months of historical features. Explainability is regulator-mandated (SR 11-7, MAR, MiFID II).
+
+**What's harder than fraud.** Three real engineering investments before a useful prototype exists:
+
+1. **Probabilistic verifier** — the current `pipeline_verify()` returns binary pass / fail. Risk requires confidence distributions over outcomes. The proposed extension (`pipeline_verify_with_confidence`) is a real architectural change, ~6-8 weeks.
+2. **Time-series primitive library** — `wiring_natives.c` does scalar arithmetic. Risk needs rolling stats, EWMA, GARCH residuals, jump detection, drawdown. ~3-4 weeks for ~25 primitives in `wiring_natives_finance.c`.
+3. **Walk-forward backtest harness with lookahead-bias enforcement** — using the typed pipeline IR to *enforce* `temporal:past_only` types, so any forward-looking primitive reference is rejected by the verifier. ~4-6 weeks.
+
+**Customer profile.** Not a tier-1 bank. A mid-tier asset manager whose risk officer wants to migrate off Excel + ad-hoc Python; a multi-strategy hedge fund that resents paying $500k/yr to MSCI BarraOne or Bloomberg PORT for tools it can't extend; a regulator building internal market-monitoring tools where explainability is the entire pitch; a clearing house needing real-time risk for margin calls.
+
+**Differentiation.** *Composable risk pipelines, lookahead-bias enforced at the IR level, on-prem, customer-extensible, at < 10 % the cost of MSCI / Bloomberg.*
+
+## Vertical 3 — Defence digital-twin object tracking (12-18 months, partner-led)
+
+**Why it fits the spirit.** Modern defence digital-twin programmes (UK Defence Digital, US JADC2, Project Maven, Project Convergence) are converging on a common need: *compose multiple sensor-derived models into auditable decision pipelines that run on-edge with sub-100 ms latency and survive disconnected operations.* That is precisely the architecture, re-pitched. Compositional + explainable + edge — increasingly mandated by Defence AI Strategy (UK MOD) and DoD Responsible AI principles.
+
+**Why the substance doesn't yet fit.** Three real gaps:
+
+1. **No sensor primitives.** `wiring_natives.c` does scalar arithmetic. Defence object tracking starts with imagery, ADS-B / AIS / IFF, radar plot extracts, RF emissions, acoustic bearings. Each is its own engineering subdiscipline; one compliant adapter is ~2-4 engineer-months.
+2. **No multi-object tracking infrastructure.** JPDA, MHT, PHD / CPHD, GLMB — 30 years of mature literature, none of it in the architecture today. Building a competent baseline in `wiring_natives_tracking.c` is ~6 engineer-months for ~12 primitives (Kalman, IMM, association, lifecycle, geofence, anomaly).
+3. **Procurement, security clearance, IL ratings.** A defence customer cannot download from GitHub. Selling here requires a defence prime as a partner from day one (BAE Digital Intelligence, QinetiQ, Lockheed, Raytheon, Northrop, AFWERX / SOFWERX, DIU, AFRL — programme-specific), cleared engineers, formal V&V, and a years-long sales cycle.
+
+**Realistic shape.** Not a 90-day MVP. Phase 0 (months 1-3): partner identification. Phase 1 (months 4-9): build on civilian AIS data (open maritime tracking — anomaly detection on vessels going AIS-off, course-changing in marine protected zones, etc.). Phase 2 (months 10-15): partner-led port to a real defence dataset behind their security boundary. Phase 3 (months 16-24): formal V&V, accreditation, first paid pilot.
+
+**What this product is *not*.** Not a SIGINT system, not a kinetic targeting system, not a sensor itself, not fully autonomous. The narrow product: *compositional, explainable, edge-deployable object-track-anomaly detection that augments human decision-making with auditable reasoning.*
+
+## The single gating decision: dependency-boundary policy
+
+The current project policy is `pure C99, zero deps in core`. This was correct for research:
+
+- Pedagogically clean
+- Every claim reproducible without dependency provenance issues
+- Architecture forced to be small enough for a single laptop
+- 60-second `bootstrap.sh` -> working binary
+- CI failures attributable to *our* code, not someone else's transitive dep
+
+It is wrong for product. Within the first month of any vertical work the project trips over: no streaming ingestion (Kafka, FIX, NMEA), no external embeddings (per Chapter 20's §INV-WIRE-060 model-bound finding), no SBOM generation, no standard observability, no HSM / KMS for tamper-evident audit logs, no standard JSON / Protobuf for cross-system interop.
+
+The replacement is `docs/DEPENDENCY_POLICY.md`: three categories (allowed / conditionally allowed / forbidden), each with named libraries and explicit governance:
+
+- **Category A (allowed, treated as platform).** `librdkafka`, `OpenSSL` / `mbedTLS`, `SQLite`, `cJSON`, `protobuf-c`, `libuv`, Prometheus / OpenTelemetry C clients. Each must be permissively licensed, available on every target, vendored or hash-pinned, tech-lead-signed-off.
+- **Category B (conditionally allowed, scoped to one product line).** `ONNX Runtime` for sentence embeddings (only for verticals that need to break the §INV-WIRE-060 ceiling); per-vendor sensor SDKs (defence vertical only); FIX engines (finance vertical only); `Eigen` / `Stone Soup` where domain demands.
+- **Category C (forbidden).** Cloud-only ML APIs in core (defeats the edge story); GPL / AGPL in shipped binaries (license contagion); LLM frameworks pulling in CUDA / ROCm by default (eliminates SoC targets); anything > ~10 MB binary footprint in core.
+
+The adoption trigger is named explicitly: *the first PR in fraud Phase 1 that needs `librdkafka`.* That PR makes the policy binding. Before that, the project remains research-pure. It is a deliberate boundary, not a creeping erosion.
+
+## Recommended sequence
+
+```
+Phase 0  (today)        Strategy + dependency policy approval
+Phase 1  (months 1-3)   Fraud MVP -> first paid customer pilot
+Phase 2  (months 4-6)   Cross-cutting investments — probabilistic verifier,
+                        external embedding integration, audit log surface
+Phase 3  (months 6-12)  Finance prototype + first regulatory engagement
+Phase 4  (months 12-24) Defence partner conversations + AIS demo
+```
+
+Each phase is independently shippable. Each later phase reuses the cross-cutting infrastructure earned by the earlier ones. The order is fraud -> finance -> defence not because defence is unimportant — it's the largest TAM of the three — but because each successive vertical re-uses the previous one's investment and validates the architecture in progressively harder contexts.
+
+The fraud vertical is the genuine first move because:
+
+- It is the only one where 90 days from now you could have a real customer pilot.
+- The architecture's strengths (audit, edge, composition) are direct customer pain points.
+- Failure modes are tolerable — false positives waste analyst time, not lives or capital.
+- The infrastructure investments needed (Kafka adapter, audit log, SBOM, governance for Category A deps) are vertical-portable and bootstrap the other two verticals.
+
+## What this chapter does *not* commit to
+
+- **Specific revenue projections.** Depends entirely on customer access and which prime / bank / processor lands first.
+- **Hiring plan.** None of the above is doable as a single-engineer project past the first prototype. Each vertical past prototype needs at least one domain expert.
+- **Open-source vs commercial licensing.** The project is currently MIT-permissive. Commercialisation may need a dual-license scheme; that's a separate ADR (`docs.engineering/CLEAN_ROOM_IMPLEMENTATION/ADR_template.md` is ready for it).
+- **LLM dependency.** The project is presently independent of any LLM. Productisation may want an LLM for the natural-language UX layer (prompt -> wiring), but that's an explicit decision to be made as an ADR, not a default.
+
+## What this chapter does claim
+
+> **The architecture's distinctive value (composition, explainability, edge-deployment, calibrated honest claims with three documented structural bounds) is real and matters — in the verticals where audit, edge, and composition are mandatory rather than nice-to-have. Fraud is the cleanest fit and shippable in 90 days. Finance is plausible in 6 months. Defence is partner-led and 12-18 months out. The single gating decision is the dependency-boundary policy; without it, no vertical ships; with it, all three become tractable.**
+
+The strategy one-pager (`docs/STRATEGY_ONE_PAGER.md`) is the executive summary. The vertical sketches (`docs/PRODUCT_FRAUD_DETECTION.md`, `docs/PRODUCT_FINANCE_RISK.md`, `docs/PRODUCT_DEFENCE_TRACKING.md`) are the engineering plans. The dependency policy (`docs/DEPENDENCY_POLICY.md`) is the gating decision document. The roadmap (`docs.engineering/CLEAN_ROOM_IMPLEMENTATION/ROADMAP.md`) tracks all of the above against trigger conditions.
+
+The book is now caught up with where the project actually is. The next chapter — when it gets written — will be the post-pilot chapter: *here is what happened when a real customer's transaction stream met the architecture; here are the bounds that turned out to bind; here is what the next vertical will inherit.* That chapter is the one that closes the productization loop. Until then, the architecture is honest about its bounds, the strategy is named, the dependency policy is documented and waiting for its trigger, and the next move is genuinely a commitment, not another experiment.
+
+## References
+
+- Strategy summary (one page, board / investor / customer): `docs/STRATEGY_ONE_PAGER.md`
+- Full strategic reasoning: `docs/PRODUCTIZATION_VERTICALS.md`
+- Per-vertical engineering plans: `docs/PRODUCT_FRAUD_DETECTION.md`, `docs/PRODUCT_FINANCE_RISK.md`, `docs/PRODUCT_DEFENCE_TRACKING.md`
+- Dependency-boundary policy: `docs/DEPENDENCY_POLICY.md`
+- Internal roadmap (trigger-conditioned): `docs.engineering/CLEAN_ROOM_IMPLEMENTATION/ROADMAP.md`
+- Audit log format placeholder: `docs.engineering/CLEAN_ROOM_IMPLEMENTATION/AUDITLOG_SPEC.md`
+- Architecture Decision Record template: `docs.engineering/CLEAN_ROOM_IMPLEMENTATION/ADR_template.md`
+- The calibrated three-bound claim this chapter builds on: Chapter 20
+
+— Ajay Soni, Enjector Software Ltd. May 2026.
 
 
 \newpage
