@@ -526,10 +526,65 @@ H9 (depth-2 inner recursion) was **not implemented** in V1.1.0. Per the methodol
 
 Of the 11 residual failures, ~5–6 are **binder issues** (correct primitive set, wrong wiring), ~2 are H9 territory (depth ≥ 2), and ~3 are H8 over-/under-firing. A future Phase 6e should focus on the **binder's positional scoping** (the highest-leverage fix) rather than further inner-picker tuning.
 
-## 9. Cross-references
+## 9. Phase 7 — OPA Adaptive-Depth (pre-registration, 2026-05-01)
+
+The full pre-registration document is `OPA_ADAPTIVE_DEPTH_ROADMAP.md` (MGC-PLAN-OPA-AD-001 v1.0). This §9 is the disclosure-side companion: it records what V1.2.0 delivers, what is deliberately deferred, and the disposition logic for results when measurement-driven mechanisms (M3, M4) are eventually scheduled.
+
+### 9.1 Hypotheses (verbatim from the roadmap)
+
+- **H10 (M1, ACT halting):** ACT-driven adaptive replan depth lifts 8-puzzle hard-tier solve rate from 30 % to ≥ 80 %, **without disturbing easy/medium**. Predicted aggregate: 90 % → 93 %. Falsifies if hard-tier lift < +3 %.
+- **H11 (M2, frozen-input injection):** reduces `OpaCycleDetector` trip count by ≥ 30 % on Connect-4 deep solves. Falsifies if trips unchanged within ±10 %.
+- **H12 (M3, loop-index step token):** planner produces measurably different next-action distributions at step 0 vs ≥ 5 (KL ≥ 0.1 on ≥ 30 % of replan transitions). Falsifies if KL < 0.05 on > 90 % (planner ignores the token).
+- **H13 (M4, depth extrapolation):** open measurement, no falsification — what is the 8×8 Connect-4 win rate at depth=2N from a 7×6-trained 460K organelle?
+
+### 9.2 V1.2.0 — what ships in this iteration
+
+- **M1 (OpaActHalting) primitives** — `OpaActHalting` struct + `opa_act_init` / `opa_act_observe` / `opa_act_should_halt` API in `microgpt_organelle.{h,c}`, plus three pure unit tests (init, accumulation, threshold-cross). Compile-time toggle: none — primitives are inert until a demo opts in.
+- **M2 (opa_freeze_input) primitives** — `OpaFrozenInput` struct + `opa_freeze_input` / `opa_prefix_with_frozen` helpers + round-trip / idempotency tests. Compile-time toggle: none.
+
+V1.2.0 deliberately does NOT integrate M1/M2 into the puzzle8 / Connect-4 demos. Per the roadmap §"Trigger criteria", the customer-signal gate is required for the full evaluation run (100 games per axis). Shipping the primitives without integration:
+- preserves the V1.0 demo numbers bit-identically (no-regression invariant trivially satisfied);
+- gives a customer the half-day work of opting in if they want to measure — the heavy lift (the API + the tests) is already committed;
+- keeps the H10/H11 hypothesis falsifiable when the integration eventually lands, without prematurely "spending" the falsification budget on a demo that wasn't asked for.
+
+### 9.3 What is deferred to Phase 7b (and why)
+
+- **M3 (loop-index step token H12):** a working evaluation requires either (a) a re-trained planner organelle that has seen `STEP|t=N|` prefixes during training, or (b) a KL-divergence rig over the existing planner. (b) is feasible without retraining but requires hooking the next-token softmax in the demo's planner-call site; that's a non-trivial demo edit and is best done alongside a customer-facing measurement run.
+- **M4 (depth-extrapolation measurement H13):** requires an 8×8 Connect-4 board scaffolding + reference opponent, ~1 week of engineering, and is purely measurement (no falsification floor). Defers cleanly until Phase 7b.
+
+### 9.4 Disposition logic (per-mechanism, applied at integration time)
+
+Same §6.3 framework, applied per-mechanism:
+
+- **Achieved ≥ pre-registered target:** `GAP-OPA-NNN` → RESOLVED. Relevant SLO promoted.
+- **Within ±50 % of target:** PARTIALLY-RESOLVED with achieved score as new baseline.
+- **Below falsification floor:** mechanism reverted; gap stays OPEN with V1.0 baseline.
+
+Cross-mechanism aggregate: if 0 of 4 confirm, the OpenMythos-→OPA transfer hypothesis is **falsified at the OPA scaffolding layer**; recurrent-depth doesn't transfer to deterministic-C-coordinated organelles. If 4 of 4 confirm, OPA layer becomes adaptive-depth and `BS_organelle.md` §1 is rewritten.
+
+### 9.5 No-regression invariants (V1.2.0)
+
+- M1/M2 are inert until opted in; no game-demo behaviour changes.
+- ctest 15/15 → expected 18/18 (3 M1 tests + 2 M2 tests added; no regressions).
+- Anchor 100 %, fragment 60 %, transformer 35 %, TF-IDF 90 %, compositional 63 % all unchanged (they don't touch the OPA layer).
+- The wiring V1.1.0 baseline persists.
+
+### 9.6 What this disclosure deliberately does NOT do
+
+- No measurement claims — V1.2.0 ships primitives, not numbers.
+- No `INV-WIRE-NNN` / `INV-OPA-NNN` invariant promotions in `BS_organelle.md`. Those promote when measurement lands and confirms.
+- No new SLOs in `NFRD.md`. The roadmap's predicted lifts are not SLOs until Phase 7b confirms them.
+
+### 9.7 Outcome (to be filled when Phase 7b lands)
+
+To be populated when M1/M2 integration + measurement land. Per the methodology, the V1.0 baseline is the published number until then — not the predicted lift.
+
+## 10. Cross-references
 
 - `BRD.md` BREQ-015..017 — cite restated headlines.
 - `BS_wiring.md` INV-WIRE-040..041, SLO-WIRE-001..004.
+- `BS_organelle.md` §1, §2 — OPA scaffolding contract; unchanged in V1.2.0.
+- `OPA_ADAPTIVE_DEPTH_ROADMAP.md` — Phase 7 full pre-registration.
 - `docs/research/RESEARCH_PIPELINE_IR.md` — full development log.
 - `docs/research/wiring_scaling_post_phase3.md` — honest scaling-curve closure.
 - `MIGRATED:STRATEGY_ONE_PAGER.md → see docs/MIGRATED_TO_ORGANELLES_BIO.md` "What we are not claiming".

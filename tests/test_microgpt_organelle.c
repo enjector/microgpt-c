@@ -913,6 +913,103 @@ TEST(ensemble_single_vote_unchanged) {
 }
 
 /* ==================================================================== */
+/*       OpaActHalting (Phase 7 / GAP-OPA-001)                          */
+/* ==================================================================== */
+
+TEST(act_init_zeroes_state) {
+  OpaActHalting act;
+  opa_act_init(&act);
+  ASSERT(act.cumulative == (scalar_t)0);
+  ASSERT_EQ(act.n_observed, 0);
+  ASSERT_EQ(act.halted_at, -1);
+  /* Defaults */
+  ASSERT(act.threshold > (scalar_t)0.9);
+  ASSERT(act.threshold <= (scalar_t)1.0);
+  ASSERT(act.floor > (scalar_t)0);
+  ASSERT(act.floor < act.threshold);
+}
+
+TEST(act_observe_accumulates_monotonically) {
+  /* Survival-style accumulation: each observation moves cumulative
+   * toward 1 by p_local of the remaining mass. So three observations
+   * of p=0.5 should produce 0.5, 0.75, 0.875. */
+  OpaActHalting act;
+  opa_act_init(&act);
+  opa_act_observe(&act, (scalar_t)0.5);
+  ASSERT(act.cumulative > (scalar_t)0.49 && act.cumulative < (scalar_t)0.51);
+  opa_act_observe(&act, (scalar_t)0.5);
+  ASSERT(act.cumulative > (scalar_t)0.74 && act.cumulative < (scalar_t)0.76);
+  opa_act_observe(&act, (scalar_t)0.5);
+  ASSERT(act.cumulative > (scalar_t)0.87 && act.cumulative < (scalar_t)0.88);
+  ASSERT_EQ(act.n_observed, 3);
+}
+
+TEST(act_threshold_cross_records_halted_at) {
+  OpaActHalting act;
+  opa_act_init_custom(&act, (scalar_t)0.99, (scalar_t)0.05);
+  /* Should halt after a single p=1.0 observation. */
+  ASSERT_EQ(opa_act_should_halt(&act), 0);
+  opa_act_observe(&act, (scalar_t)1.0);
+  ASSERT_EQ(opa_act_should_halt(&act), 1);
+  ASSERT_EQ(act.halted_at, 0);
+  /* Floor check: 1.0 cumulative is far above the floor, so below_floor=0. */
+  ASSERT_EQ(opa_act_below_floor(&act), 0);
+}
+
+TEST(act_below_floor_after_low_signals) {
+  /* Three observations at p=0.01 → cumulative ~ 0.03, below default 0.05 floor. */
+  OpaActHalting act;
+  opa_act_init(&act);
+  opa_act_observe(&act, (scalar_t)0.01);
+  opa_act_observe(&act, (scalar_t)0.01);
+  opa_act_observe(&act, (scalar_t)0.01);
+  ASSERT_EQ(opa_act_should_halt(&act), 0);
+  ASSERT_EQ(opa_act_below_floor(&act), 1);
+}
+
+/* ==================================================================== */
+/*       Frozen-Input Injection (Phase 7 / GAP-OPA-002)                 */
+/* ==================================================================== */
+
+TEST(frozen_input_freeze_basic) {
+  OpaFrozenInput h;
+  memset(&h, 0, sizeof(h));
+  ASSERT_EQ(opa_freeze_input("board=XO_|empties=6", &h), 0);
+  ASSERT_EQ(h.initialised, 1);
+  ASSERT(h.prefix_len > 0);
+  /* Prefix must start with "FROZEN|" and end with "|". */
+  ASSERT(strncmp(h.prefix, "FROZEN|", 7) == 0);
+  ASSERT_EQ(h.prefix[h.prefix_len - 1], '|');
+  /* And must contain the state body. */
+  ASSERT(strstr(h.prefix, "board=XO_") != NULL);
+}
+
+TEST(frozen_input_prefix_idempotent) {
+  /* Calling opa_prefix_with_frozen twice should NOT double-prefix. */
+  OpaFrozenInput h;
+  memset(&h, 0, sizeof(h));
+  opa_freeze_input("S0", &h);
+  char buf[256] = {0};
+  int len1 = opa_prefix_with_frozen(&h, buf, sizeof(buf), "step=1");
+  ASSERT(len1 > 0);
+  /* Buffer should now be FROZEN|S0|step=1 */
+  ASSERT(strstr(buf, "FROZEN|S0|step=1") != NULL);
+  /* Counting "FROZEN|" occurrences — should be exactly 1. */
+  int n_frozen = 0;
+  for (const char *p = buf; (p = strstr(p, "FROZEN|")); p++, n_frozen++);
+  ASSERT_EQ(n_frozen, 1);
+  /* Second call should overwrite the follow-up, NOT add another prefix. */
+  int len2 = opa_prefix_with_frozen(&h, buf, sizeof(buf), "step=2");
+  ASSERT(len2 > 0);
+  ASSERT(strstr(buf, "FROZEN|S0|step=2") != NULL);
+  ASSERT(strstr(buf, "step=1") == NULL);  /* old follow-up gone */
+  /* Still exactly 1 "FROZEN|" — idempotent. */
+  n_frozen = 0;
+  for (const char *p = buf; (p = strstr(p, "FROZEN|")); p++, n_frozen++);
+  ASSERT_EQ(n_frozen, 1);
+}
+
+/* ==================================================================== */
 /*                              MAIN                                     */
 /* ==================================================================== */
 
@@ -997,6 +1094,16 @@ int main(void) {
   RUN(speculative_decode_produces_output);
   RUN(ensemble_prefix_cache_runs);
   RUN(ensemble_single_vote_unchanged);
+
+  printf("\n[OpaActHalting (Phase 7 GAP-OPA-001)]\n");
+  RUN(act_init_zeroes_state);
+  RUN(act_observe_accumulates_monotonically);
+  RUN(act_threshold_cross_records_halted_at);
+  RUN(act_below_floor_after_low_signals);
+
+  printf("\n[Frozen-Input Injection (Phase 7 GAP-OPA-002)]\n");
+  RUN(frozen_input_freeze_basic);
+  RUN(frozen_input_prefix_idempotent);
 
   /* Summary */
   printf("\n=== Results: %d/%d passed", g_tests_passed, g_tests_run);

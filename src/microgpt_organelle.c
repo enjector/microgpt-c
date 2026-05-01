@@ -1944,6 +1944,104 @@ void opa_cycle_record(OpaCycleDetector *cd, int action_id) {
   cd->len++;
 }
 
+/* ======================== ACT Halting (Phase 7 / GAP-OPA-001) ============ */
+
+static scalar_t opa_clamp01(scalar_t v) {
+  if (v < (scalar_t)0) return (scalar_t)0;
+  if (v > (scalar_t)1) return (scalar_t)1;
+  return v;
+}
+
+void opa_act_init(OpaActHalting *act) {
+  opa_act_init_custom(act, (scalar_t)OPA_ACT_THRESHOLD_DEFAULT,
+                      (scalar_t)OPA_ACT_FLOOR_DEFAULT);
+}
+
+void opa_act_init_custom(OpaActHalting *act, scalar_t threshold, scalar_t floor) {
+  if (!act) return;
+  act->cumulative = (scalar_t)0;
+  act->threshold = opa_clamp01(threshold);
+  act->floor = opa_clamp01(floor);
+  act->n_observed = 0;
+  act->halted_at = -1;
+}
+
+void opa_act_observe(OpaActHalting *act, scalar_t p_local) {
+  if (!act) return;
+  scalar_t p = opa_clamp01(p_local);
+  /* Survival-style accumulation: each step contributes p_local of the
+   * remaining (1 - cumulative) probability mass. Equivalent to
+   *   cumulative_{t+1} = 1 - (1 - cumulative_t) * (1 - p_local)
+   * which is the standard ACT update.  This guarantees cumulative
+   * stays in [0, 1] regardless of how many observations are made. */
+  scalar_t remaining = (scalar_t)1 - act->cumulative;
+  act->cumulative += p * remaining;
+  if (act->cumulative > (scalar_t)1) act->cumulative = (scalar_t)1;
+  act->n_observed++;
+  if (act->halted_at < 0 && act->cumulative >= act->threshold) {
+    act->halted_at = act->n_observed - 1;  /* 0-indexed step at which we crossed */
+  }
+}
+
+int opa_act_should_halt(const OpaActHalting *act) {
+  if (!act) return 0;
+  return act->cumulative >= act->threshold ? 1 : 0;
+}
+
+int opa_act_below_floor(const OpaActHalting *act) {
+  if (!act) return 0;
+  return act->cumulative < act->floor ? 1 : 0;
+}
+
+/* ======================== Frozen-Input Injection (Phase 7 / GAP-OPA-002) */
+
+int opa_freeze_input(const char *state_str, OpaFrozenInput *handle) {
+  if (!handle || !state_str) return -1;
+  /* Build "FROZEN|<state>|" — truncate if needed. */
+  const char *prelude = "FROZEN|";
+  const char *suffix  = "|";
+  size_t prelude_len = strlen(prelude);
+  size_t suffix_len  = strlen(suffix);
+  size_t state_max   = OPA_FROZEN_INPUT_MAX - prelude_len - suffix_len - 1;
+  size_t state_len   = strlen(state_str);
+  if (state_len > state_max) state_len = state_max;
+
+  memcpy(handle->prefix, prelude, prelude_len);
+  memcpy(handle->prefix + prelude_len, state_str, state_len);
+  memcpy(handle->prefix + prelude_len + state_len, suffix, suffix_len);
+  handle->prefix[prelude_len + state_len + suffix_len] = '\0';
+  handle->prefix_len = prelude_len + state_len + suffix_len;
+  handle->initialised = 1;
+  return 0;
+}
+
+int opa_prefix_with_frozen(const OpaFrozenInput *handle,
+                           char *prompt_buf, size_t cap,
+                           const char *follow_up) {
+  if (!handle || !handle->initialised || !prompt_buf || cap == 0) return -1;
+  const char *fu = follow_up ? follow_up : "";
+  size_t fu_len = strlen(fu);
+
+  /* Idempotency: if prompt_buf already starts with the prefix, just
+   * append (or overwrite) follow_up after it. */
+  size_t existing = strlen(prompt_buf);
+  if (existing >= handle->prefix_len &&
+      memcmp(prompt_buf, handle->prefix, handle->prefix_len) == 0) {
+    /* Truncate any existing follow-up and write the new one. */
+    if (handle->prefix_len + fu_len + 1 > cap) return -1;
+    memcpy(prompt_buf + handle->prefix_len, fu, fu_len);
+    prompt_buf[handle->prefix_len + fu_len] = '\0';
+    return (int)(handle->prefix_len + fu_len);
+  }
+
+  /* Fresh prefix: prepend then append follow_up. */
+  if (handle->prefix_len + fu_len + 1 > cap) return -1;
+  memcpy(prompt_buf, handle->prefix, handle->prefix_len);
+  memcpy(prompt_buf + handle->prefix_len, fu, fu_len);
+  prompt_buf[handle->prefix_len + fu_len] = '\0';
+  return (int)(handle->prefix_len + fu_len);
+}
+
 /* ======================== Pipe-String Helpers ==============================
  */
 

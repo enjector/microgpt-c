@@ -236,6 +236,115 @@ int opa_cycle_other(const OpaCycleDetector *cd, int proposed_action);
 /* Record an accepted action in the history ring. */
 void opa_cycle_record(OpaCycleDetector *cd, int action_id);
 
+/* ======================== ACT Halting (Phase 7 / GAP-OPA-001) =========== */
+/*
+ * Adaptive Computation Time halting at the OPA pipeline layer.
+ *
+ * Inspired by OpenMythos's ACTHalting (Graves 2016): accumulate a per-puzzle
+ * halting probability across replans; exit when cumulative probability
+ * crosses a threshold OR when the probability is too low after K replans.
+ *
+ * The signal source is per-replan: typically the planner's softmax-entropy
+ * mapped to a halting probability (low entropy = high confidence = high
+ * p_halt), but the API is signal-agnostic — the demo passes whatever scalar
+ * in [0, 1] makes sense for that workload.
+ *
+ * Usage:
+ *   OpaActHalting act;
+ *   opa_act_init(&act);
+ *   for (int t = 0; ; t++) {
+ *     scalar_t p_local = compute_halt_signal(planner_output);  // in [0, 1]
+ *     opa_act_observe(&act, p_local);
+ *     if (opa_act_should_halt(&act)) break;     // threshold-cross halt
+ *     if (t >= K_MAX) break;                    // hard fallback
+ *   }
+ *
+ * Defaults:
+ *   threshold = 0.99 — accumulate until cumulative p_halt ≥ 0.99
+ *   floor     = 0.05 — if cumulative is below this after K_MAX, hard fallback
+ */
+
+#ifndef OPA_ACT_THRESHOLD_DEFAULT
+#define OPA_ACT_THRESHOLD_DEFAULT 0.99
+#endif
+#ifndef OPA_ACT_FLOOR_DEFAULT
+#define OPA_ACT_FLOOR_DEFAULT 0.05
+#endif
+
+typedef struct {
+  scalar_t cumulative;    /* Σ p_local clamped to [0, 1] */
+  scalar_t threshold;     /* halt when cumulative ≥ threshold */
+  scalar_t floor;         /* "low confidence" trip line for hard fallback */
+  int n_observed;         /* number of opa_act_observe calls so far */
+  int halted_at;          /* iteration index when threshold first crossed; -1 if not */
+} OpaActHalting;
+
+/* Initialise with default threshold/floor. */
+void opa_act_init(OpaActHalting *act);
+
+/* Initialise with custom threshold/floor. Both clamped to [0, 1]. */
+void opa_act_init_custom(OpaActHalting *act, scalar_t threshold, scalar_t floor);
+
+/* Observe a per-iteration halting probability p_local in [0, 1].
+ * Cumulative is updated as cumulative += p_local * (1 - cumulative)
+ * (a survival-style accumulation, matching ACT semantics: each step
+ *  contributes the probability of halting *given* we have not yet halted).
+ * Values outside [0, 1] are clamped. */
+void opa_act_observe(OpaActHalting *act, scalar_t p_local);
+
+/* Returns 1 if cumulative ≥ threshold, else 0. */
+int opa_act_should_halt(const OpaActHalting *act);
+
+/* Returns 1 if cumulative is still below the floor. The caller may use this
+ * after the K_MAX iterations have run to decide whether to take a hard
+ * deterministic-fallback path rather than trusting the model. */
+int opa_act_below_floor(const OpaActHalting *act);
+
+/* ======================== Frozen-Input Injection (Phase 7 / GAP-OPA-002) */
+/*
+ * Captures the canonical input state once at puzzle start and re-injects it
+ * (as a stable prompt prefix) at every subsequent organelle call. Inspired
+ * by OpenMythos's LTI invariant — the encoded input `e` is captured after
+ * the Prelude and frozen, then injected at every recurrent loop iteration.
+ *
+ * In OPA this is at the prompt layer rather than the hidden-state layer:
+ *   1. opa_freeze_input(state_str, &handle)         — once, at puzzle start
+ *   2. opa_prefix_with_frozen(handle, prompt_buf,
+ *                              cap, follow_up)      — every replan
+ *
+ * The handle is a small fixed-size struct so the demo can stack-allocate it.
+ *
+ * Idempotency invariant: calling opa_prefix_with_frozen on a buffer that
+ * already starts with the frozen prefix is a no-op (returns the same buffer
+ * length). This makes the helper safe to call in a loop without tracking
+ * "is this prompt already prefixed?" state.
+ */
+
+#ifndef OPA_FROZEN_INPUT_MAX
+#define OPA_FROZEN_INPUT_MAX 256
+#endif
+
+typedef struct {
+  char prefix[OPA_FROZEN_INPUT_MAX];  /* "FROZEN|<state>|" */
+  size_t prefix_len;
+  int initialised;                    /* 0 before freeze, 1 after */
+} OpaFrozenInput;
+
+/* Freeze the canonical state string into the handle. The handle's prefix
+ * format is "FROZEN|<state>|" — a stable, parseable token sequence. The
+ * state is truncated if it would overflow OPA_FROZEN_INPUT_MAX. Returns 0
+ * on success, -1 if state_str is NULL. */
+int opa_freeze_input(const char *state_str, OpaFrozenInput *handle);
+
+/* Prepend the frozen prefix to `prompt_buf`, then append `follow_up` after
+ * it. Idempotent: if `prompt_buf` already starts with the handle's prefix,
+ * the follow-up is appended without re-prefixing. Returns the new length
+ * of prompt_buf (excluding NUL), or -1 if the buffer is too small or the
+ * handle is uninitialised. */
+int opa_prefix_with_frozen(const OpaFrozenInput *handle,
+                           char *prompt_buf, size_t cap,
+                           const char *follow_up);
+
 /* ======================== Pipe-String Helpers ============================= */
 
 /*
