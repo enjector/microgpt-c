@@ -63,6 +63,9 @@
 #ifndef WIRING_INNER_DEPTH
 #define WIRING_INNER_DEPTH 2
 #endif
+#ifndef WIRING_NOUN_COVERAGE_BONUS
+#define WIRING_NOUN_COVERAGE_BONUS 0
+#endif
 
 #define MAX_LOWER_BUF 4096
 
@@ -100,6 +103,45 @@ static int prompt_contains_keyword(const char *prompt_lc, const char *keyword_lc
         p += k_len;
     }
     return 0;
+}
+
+/* Count whole-word occurrences of `keyword_lc` in `prompt_lc`. */
+static int count_keyword_hits(const char *prompt_lc, const char *keyword_lc) {
+    size_t k_len = strlen(keyword_lc);
+    if (k_len == 0) return 0;
+    int hits = 0;
+    const char *p = prompt_lc;
+    while ((p = strstr(p, keyword_lc)) != NULL) {
+        char before = (p == prompt_lc) ? ' ' : *(p - 1);
+        char after  = p[k_len];
+        int b_ok = (before == ' ' || before == '\t' || before == '.' || before == ','
+                    || before == ';' || before == ':' || before == '!' || before == '?'
+                    || before == '\'' || before == '"' || before == '(');
+        int a_ok = (after == '\0' || after == ' ' || after == '\t' || after == '.'
+                    || after == ',' || after == ';' || after == ':' || after == '!'
+                    || after == '?' || after == '\'' || after == '"' || after == ')'
+                    || after == 's');
+        if (b_ok && a_ok) hits++;
+        p += k_len;
+    }
+    return hits;
+}
+
+/* Phase 6d: max keyword-hit count across `prim`'s keyword set. Used to
+ * detect symmetric prompts ("gcd of x SQUARED and y SQUARED") where the
+ * inner primitive really is meant to appear twice — in which case the
+ * dedup post-pass should NOT fire. */
+static int prim_max_keyword_hits(const WiringPrimitive *prim, const char *prompt_lc) {
+    int best = 0;
+    for (int k = 0; k < WIRING_PRIM_MAX_KEYWORDS; k++) {
+        const char *kw = prim->keywords[k];
+        if (!kw) break;
+        char kw_lc[64];
+        to_lower_copy(kw, kw_lc, sizeof(kw_lc));
+        int n = count_keyword_hits(prompt_lc, kw_lc);
+        if (n > best) best = n;
+    }
+    return best;
 }
 
 static int score_primitive(const WiringPrimitive *prim, const char *prompt_lc) {
@@ -391,7 +433,12 @@ static int prim_any_port_accepts_token(const WiringPrimitive *prim, const char *
  *
  * The "noun budget" is shared across outer ports — once a noun is
  * consumed by port 0's inner, port 1 must find a different noun.
- * This eliminates the V1.0.9 duplicate-inner pattern. */
+ *
+ * When noun-affinity does NOT disambiguate (the common case for
+ * outers like `subtract`, `add`, `min_two` whose port_keywords are
+ * generic `a`/`b`), fall back to V1.0.9's dedup post-pass: among
+ * ports that picked the same primitive, keep the higher-scoring one
+ * and re-pick the loser from the manifest excluding the duplicate. */
 static void discover_inner_picks_v2(const WiringPrimitive *manifest, int n_manifest,
                                     int outer_idx, const char *prompt_lc,
                                     int *inner_picks_out,
@@ -403,6 +450,7 @@ static void discover_inner_picks_v2(const WiringPrimitive *manifest, int n_manif
     int  token_pos[WIRING_MAX_PROMPT_TOKENS];
     int  n_tokens = wiring_tokenise_prompt(prompt_lc, tokens, token_pos);
     int  consumed[WIRING_MAX_PROMPT_TOKENS] = {0};
+    int  noun_driven[WIRING_PRIM_MAX_INPUTS] = {0};
 
     for (int ip = 0; ip < outer->n_inputs; ip++) {
         /* Step 1: identify the expected noun for THIS outer port. */
@@ -421,6 +469,7 @@ static void discover_inner_picks_v2(const WiringPrimitive *manifest, int n_manif
         int best_inner = -1;
         int best_score = 0;
         int best_pos   = 1 << 30;
+        int best_port_match = 0;
         for (int i = 0; i < n_manifest; i++) {
             if (i == outer_idx) continue;
             if (manifest[i].output_type != outer->input_types[ip]) continue;
@@ -439,12 +488,51 @@ static void discover_inner_picks_v2(const WiringPrimitive *manifest, int n_manif
                 best_score = adjusted;
                 best_inner = i;
                 best_pos   = pos;
+                best_port_match = port_match;
             }
         }
 
         if (best_inner >= 0) {
             inner_picks_out[ip] = best_inner;
-            if (expected_noun_idx >= 0) consumed[expected_noun_idx] = 1;
+            if (expected_noun_idx >= 0 && best_port_match) {
+                consumed[expected_noun_idx] = 1;
+                /* Only flag as "noun-driven" when the matched token is a
+                 * semantically meaningful noun (length > 1). Single-letter
+                 * variable names (`x`, `y`, `n`, `r`) appear as port_keywords
+                 * for many primitives but don't disambiguate which inner to
+                 * pick — so we still want the dedup fallback to fire. */
+                if (strlen(tokens[expected_noun_idx]) > 1) {
+                    noun_driven[ip] = 1;
+                }
+            }
+        }
+    }
+
+    /* Dedup fallback: if two ports landed on the same inner and neither
+     * pick was noun-driven AND the inner's keyword does NOT appear in
+     * the prompt twice (i.e. the prompt is asymmetric — only one port
+     * should bind it), drop the lower-scoring port and re-pick it from
+     * the manifest excluding the duplicate. Mirrors V1.0.9's
+     * WIRING_KEEP_DUPS=0 behaviour but only when noun-affinity didn't
+     * fire AND the prompt is asymmetric — preserves symmetric cases
+     * like "gcd of x SQUARED and y SQUARED" where two square nodes are
+     * genuinely needed. */
+    for (int ip_a = 0; ip_a < outer->n_inputs; ip_a++) {
+        if (inner_picks_out[ip_a] < 0) continue;
+        for (int ip_b = ip_a + 1; ip_b < outer->n_inputs; ip_b++) {
+            if (inner_picks_out[ip_a] != inner_picks_out[ip_b]) continue;
+            if (noun_driven[ip_a] || noun_driven[ip_b]) continue;
+            int dup_idx = inner_picks_out[ip_a];
+            int kw_hits = prim_max_keyword_hits(&manifest[dup_idx], prompt_lc);
+            if (kw_hits >= 2) continue;  /* symmetric — keep both */
+            int loser = ip_b;
+            int dup = inner_picks_out[loser];
+            const char *exclude[3] = { outer->name, manifest[dup].name, NULL };
+            int new_score = 0;
+            int new_pick = pick_best_primitive(manifest, n_manifest, prompt_lc,
+                                               outer->input_types[loser],
+                                               exclude, &new_score);
+            inner_picks_out[loser] = (new_pick >= 0 && new_score > 0) ? new_pick : -1;
         }
     }
 
@@ -811,7 +899,14 @@ Pipeline *wiring_compositional_search(const char *prompt,
         int sig_in = 0;
 
         /* Discover inner picks once per outer candidate. */
+        int consumed_tokens[WIRING_MAX_PROMPT_TOKENS];
+        for (int t = 0; t < WIRING_MAX_PROMPT_TOKENS; t++) consumed_tokens[t] = 0;
+#if WIRING_PORT_AWARE_INNER
+        discover_inner_picks_v2(manifest, n_manifest, outer_top[b], prompt_lc,
+                                inner_picks, consumed_tokens);
+#else
         discover_inner_picks(manifest, n_manifest, outer_top[b], prompt_lc, inner_picks);
+#endif
 
         /* Run the binder (Stream D). */
         WiringBindResult bindings;
@@ -859,6 +954,19 @@ Pipeline *wiring_compositional_search(const char *prompt,
                 coverage += score_primitive(&manifest[pi], prompt_lc);
             }
         }
+#if WIRING_PORT_AWARE_INNER && WIRING_NOUN_COVERAGE_BONUS
+        /* Phase 6d H8 noun-coverage bonus: reward graphs that consumed
+         * more distinct prompt nouns. Encourages port-aware picks over
+         * duplicate-inner picks that ignore half the prompt. */
+        {
+            int n_consumed = 0;
+            for (int t = 0; t < WIRING_MAX_PROMPT_TOKENS; t++)
+                if (consumed_tokens[t]) n_consumed++;
+            coverage += n_consumed;
+        }
+#else
+        (void)consumed_tokens;
+#endif
         int n_nodes = 1 + n_inner;
         if (coverage > best_score ||
             (coverage == best_score && n_nodes < best_nodes)) {

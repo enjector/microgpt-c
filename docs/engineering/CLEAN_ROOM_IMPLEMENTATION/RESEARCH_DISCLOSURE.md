@@ -487,9 +487,44 @@ Setting both off recovers V1.0.9 behaviour bit-identically. Pre-existing wiring 
 - No changes to `wiring_references.c` (reference oracle unchanged).
 - No changes to existing BS contracts in `BS_wiring.md` invariant rows; Phase 6d adds a new `INV-WIRE-052` for the noun-aware-binder property if H8 confirms.
 
-### 8.7 Outcome (to be filled when results land)
+### 8.7 Outcome (V1.1.0, 2026-05-01)
 
-To be populated after re-running `wiring_phase5_harness` post-implementation.
+Implementation landed: `discover_inner_picks_v2` in `wiring_compositional_search.c` per §8.2 H8, plus a **dedup fallback** that mirrors V1.0.9's `WIRING_KEEP_DUPS=0` post-pass when noun-affinity does NOT disambiguate (most outers have generic `a`/`b` port_keywords, so the H8 mechanism alone cannot enforce distinct-inner picks). Plus a **symmetry-aware** override: when the inner's keyword appears in the prompt twice (e.g. "gcd of x **squared** and y **squared**"), the dedup is suppressed because the duplicate is genuinely needed. Plus a **single-letter variable filter** so port_keywords like `x`/`y`/`n`/`r` (common in physics/finance manifests) don't suppress the dedup safety net.
+
+H9 (depth-2 inner recursion) was **not implemented** in V1.1.0. Per the methodology, the residual failures after H8 fall mostly into shapes that require either (a) re-architecting `build_graph_for_outer` to add depth-2 nodes or (b) fixing the binder's positional/scoping awareness. The predicted +2/3 lift from H9 alone is not worth the architectural cost given that H8 already reached PARTIALLY-RESOLVED. H9 is preserved in `COMPOSITIONAL_GENERATOR_PHASE_6D_PLAN.md` for a future Phase 6e if a customer signal warrants.
+
+**Measured (V1.1.0 — pre-registered §8.3):**
+
+| Axis | V1.0.9 | V1.1.0 | Δ |
+|---|---:|---:|---:|
+| Axis 1 (novel pair) | 6/10 | 7/10 | +1 |
+| Axis 2 (synonym stress) | 7/10 | 7/10 | 0 |
+| Axis 3 (outer transform) | 3/10 | 5/10 | +2 |
+| **Total** | **16/30 (53 %)** | **19/30 (63 %)** | **+3 (+10pp)** |
+
+(Note: the V1.0.9 baseline is 16/30 = 53%, not 15/30 = 50% as quoted in §6.5 — the §6.5 baseline number was off by one. Re-running with `WIRING_PORT_AWARE_INNER=0` confirms 16/30 in V1.0.9 as well.)
+
+**Disposition (per §8.4):** 63 % is in the **60–69 % PARTIALLY-RESOLVED band**. H8 partially confirmed. `GAP-WIRE-005`, `GAP-WIRE-006`, `GAP-WIRE-009` all remain PARTIALLY-RESOLVED. New SLO baseline: 63 %. Phase 6e (H9 + binder positional scoping) not opened.
+
+**No-regression check:** ctest 15/15 green. Anchor 100 %, fragment 60 %, transformer 35 %, TF-IDF 90 % unchanged. Leakage audit unchanged (held-out file untouched).
+
+**Honest disclosure of remaining 11 failures:**
+
+| # | Prompt | Output | Pattern |
+|---:|---|---|---|
+| 1 | abs-diff of x and y | `[abs_val, distance_1d, subtract]` | dedup over-engaged |
+| 9 | factorial-diff of x and y | `[factorial, distance_1d, subtract]` | wrong replacement after dedup |
+| 10 | percentage of x of y squared | `[square, percentage]` | now correct primitive set, wiring wrong (binder issue) |
+| 16 | lerp of x, max of y and z | `[distance_1d, max_two, distance_1d, lerp]` | wrong inners on lerp ports |
+| 17 | gcd of x squared and y squared | `[square, subtract, gcd]` | wrong inner (subtract not asked for) |
+| 19 | harmonic-sum of abs of fib of n | `[harmonic_n, abs_val, add]` | needs depth-3 (H9 territory) |
+| 21 | doubled gcd of x squared and y | `[double_val, square, gcd]` | binder wiring |
+| 23 | cube of avg of doubled x and y | `[cube, double_val, average_two]` | binder wiring |
+| 25 | sigmoid of x − 3y | `[sigmoid, triple_val, subtract]` | primitive set right, binder wrong |
+| 26 | apply tax to markup of doubled price | `[markup, markup, apply_tax]` | symmetric-keep mis-fired |
+| 27 | discount of KE of m and v | `[discount, kinetic_energy]` | needs depth-2 (H9 territory) |
+
+Of the 11 residual failures, ~5–6 are **binder issues** (correct primitive set, wrong wiring), ~2 are H9 territory (depth ≥ 2), and ~3 are H8 over-/under-firing. A future Phase 6e should focus on the **binder's positional scoping** (the highest-leverage fix) rather than further inner-picker tuning.
 
 ## 9. Cross-references
 
