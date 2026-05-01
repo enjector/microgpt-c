@@ -296,3 +296,19 @@ For honest-disclosure discipline, rejections are documented as carefully as acce
 The catalogue itself is intentionally separate from `ORGANELLE_STATE.md` (which describes *where we are*) — this document describes *where we could go*, with the structural discipline that keeps us honest about which moves earn their cost.
 
 — Pre-registered 2026-05-01.
+
+---
+
+## 13. Update — Phase 7 / V1.2.0 graduates two of the OpenMythos experiments
+
+The OpenMythos cross-pollination experiments enumerated in this catalogue (and detailed in `RESEARCH_OPENMYTHOS_CROSS_POLLINATION.md`) have now partially graduated. Per `RESEARCH_DISCLOSURE.md` §9 and `OPA_ADAPTIVE_DEPTH_ROADMAP.md` v1.0:
+
+- **Experiment A (ACT halting at OPA pipeline level) → V1.2.0 implementation commit.** `OpaActHalting` API + 4 unit tests in `src/microgpt_organelle.{h,c}` and `tests/test_microgpt_organelle.c`. Demo integration not shipped — opens with customer signal.
+- **Experiment B-adjacent (frozen-input injection / LTI invariant) → V1.2.0 implementation commit.** `OpaFrozenInput` API + 2 unit tests. Demo integration not shipped.
+- **Experiment C (loop-index step token)** stays in this catalogue — needs a KL-divergence rig over planner softmax or a re-trained planner. Not graduated.
+
+The two-commit shape proposed in §12 step 1 is preserved: V1.2.0 is the **implementation commit with no measurement output**. The follow-on measurement commit (step 2) happens only when (a) a customer signal triggers Phase 7b and (b) someone hooks M1/M2 into a demo and runs the 100-game evaluation. Hypotheses H10 (8-puzzle hard-tier 30 %→80 %) and H11 (Connect-4 cycle-detector trips −30 %) remain falsifiable but **not yet measured**.
+
+Per the methodology, V1.0 demo numbers (90 % 8-puzzle, 88 % Connect-4) are the published baseline until Phase 7b confirms or falsifies the predicted lifts.
+
+— V1.2.0 graduation note, 2026-05-01.

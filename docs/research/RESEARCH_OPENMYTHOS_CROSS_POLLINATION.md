@@ -193,3 +193,34 @@ Per `docs/engineering/CLEAN_ROOM_IMPLEMENTATION/RESEARCH_DISCLOSURE.md` §4 and 
 The next step on any of the three experiments is a `feat(research): pre-registered Experiment A — ACT halting at OPA pipeline level` (or B, or C) commit that lands the implementation **with no measurement output**, followed by a separate `research(openmythos): Experiment A measurement vs §2.1 pre-reg targets` commit that lands the measurement output. The two-commit shape preserves the discipline that pre-registration has to be locked in before the result is known.
 
 — Pre-registered 2026-05-01.
+
+---
+
+## 9. Phase 7 / V1.2.0 — Primitives shipped, measurement deferred (2026-05-01)
+
+The first commit of the two-commit shape proposed in §8 has now landed. Per `RESEARCH_DISCLOSURE.md` §9 and the formal pre-registration in `OPA_ADAPTIVE_DEPTH_ROADMAP.md` v1.0:
+
+### 9.1 What V1.2.0 delivered
+
+| Mechanism | Source | API | Tests | Status |
+|---|---|---|---|---|
+| **M1 — `OpaActHalting`** (Experiment A / GAP-OPA-001) | OpenMythos `ACTHalting` | `opa_act_init` / `opa_act_init_custom` / `opa_act_observe` (survival-style `cum += p * (1 - cum)`) / `opa_act_should_halt` / `opa_act_below_floor` in `src/microgpt_organelle.{h,c}` | 4 unit tests (init, accumulation, threshold-cross, below-floor) PASS | Primitive shipped, demo integration deferred |
+| **M2 — `OpaFrozenInput`** (Experiment B-adjacent / GAP-OPA-002) | OpenMythos `LTI` invariant | `opa_freeze_input` / `opa_prefix_with_frozen` (idempotent — calling twice doesn't double-prefix) | 2 unit tests (freeze-basic, prefix-idempotent) PASS | Primitive shipped, demo integration deferred |
+| **M3 — Loop-index step token** (Experiment C / GAP-OPA-003) | OpenMythos `loop_index_embedding` | (not shipped) | (none) | OPEN — needs KL-divergence rig over planner softmax or planner retraining |
+| **M4 — Depth-extrapolation** (GAP-OPA-004) | OpenMythos depth-extrapolation property | (not shipped) | (none) | OPEN — needs 8×8 Connect-4 board scaffolding (~1 week) |
+
+### 9.2 What V1.2.0 deliberately did NOT do
+
+- **No demo integration of M1/M2.** Per the roadmap's §"Trigger criteria", customer signal is the gate for the full evaluation run (100 games per axis). Shipping primitives without integration:
+  - preserves the V1.0 demo numbers bit-identically (no-regression invariant trivially satisfied);
+  - keeps H10/H11 falsifiable when the integration eventually lands;
+  - gives a customer the half-day work of opting in if they want to measure — the heavy lift (API + tests) is committed.
+- **No measurement.** The §9.7 outcome section in `RESEARCH_DISCLOSURE.md` stays empty until Phase 7b lands. Per the methodology, V1.0 baseline (90 % 8-puzzle, 88 % Connect-4) remains the published number.
+
+### 9.3 Discipline check
+
+The §8 two-commit shape is preserved: V1.2.0 is the **implementation commit with no measurement output**. The follow-on measurement commit happens only when (a) a customer signal triggers Phase 7b, (b) someone hooks M1/M2 into a demo, and (c) the 100-game evaluation runs. Until then, the §2.1/§2.2 pre-registered predictions stand exactly as written, falsifiable and unmeasured.
+
+The pre-registration→implementation→measurement discipline holds. No silent re-tuning. No "victory lap" because the API compiled. Phase 7b is the next checkpoint.
+
+— V1.2.0 / 2026-05-01.

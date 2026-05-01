@@ -39,12 +39,17 @@ Because this is where the architecture met its first honest measurement crisis, 
 | v2 clean | 16/20 (80%) honest baseline | True; subtractive sharpening of clamp families lifted from 15→16 | First solid "what does this architecture actually deliver?" number |
 | Phase 3 broad expansion (40 families) + bigram TF-IDF | Pre-registered v3 ≥ 15/20 + bigram lifts ≥ 18/20 | **Both falsified.** v3 = 3/20 (lean synonyms); bigram doesn't break ceiling | Three independent feature variants (unigram / bigram / char-ngram) all hit the same ~80% ceiling |
 | Post-Phase-3 #1-3 cleanup | Wiring Phase 8 vote-loop regression fixed (rollback); v3 deep tested; char-ngram TF-IDF tested | All landed honestly — vote loop fixed via path-4 rollback (real fix deferred); v3 deep HURT (3→0); char-ngram doesn't move ceiling | Three confirmed structural bounds: curator-, model-, and domain-bounded |
+| Phase 5 compositional held-out (V1.0.5) | Pre-registered ≥ 50 % on 30-prompt leakage-audited compositional set | 9/30 = 30 % — falsified at first run | Pre-registration discipline saved a follow-up from confirmation bias (again) |
+| Phase 6 simple-search (V1.0.6) | Pre-registered ≥ 40 % | 9/30 = 30 % — falsified | Beam-2, drop-name-dedup, geo-prior all measurably no-op or harmful at this corpus scale |
+| Phase 6b argument binder (V1.0.8) | Pre-registered Stream D mechanism shipped | 12/30 = 40 % — PARTIALLY-RESOLVED | Repeated-noun unification + outer-port-keyword inheritance lifted +10 pp |
+| Phase 6c branched-mining (V1.0.9) | Pre-registered ≥ 50 % | 16/30 = 53 % (corrected; published as 50 % at the time) — original SLO-WIRE-005 design goal met | Per-primitive synonym lift + symmetric tie-break + disabling legacy substring bump compounded to +5 prompts |
+| Phase 6d port-aware inner picker (V1.1.0) | Pre-registered ≥ 70 % aggregate; failure floor 60 % | **19/30 = 63 %** — PARTIALLY-RESOLVED in 60–69 % band | H8 captured +3 of predicted +6; H9 not implemented; binder positional-scoping (`GAP-WIRE-010`) is the next-best escalation |
 
 ## The current calibrated claim
 
 This is the version the project's papers, talks, and customer conversations should use:
 
-> **Tiny organelles + deterministic Judge + manifold retrieval reliably handle compositional, audit-required tasks where the family vocabulary is genuinely distinctive. Production-quality numbers: 100% on anchored novel paraphrases (single-family), 70% on multi-stage compositions, ~75-80% on novel-paraphrase retrieval with vocabulary-disjoint test discipline. The ~80% ceiling is structural to bag-of-features classifiers in the curator's vocabulary regime; breaking past it requires either external pretrained embeddings (model class change) or domain-restricted deployment (where families have genuinely distinctive nouns).**
+> **Tiny organelles + deterministic Judge + manifold retrieval reliably handle compositional, audit-required tasks where the family vocabulary is genuinely distinctive. Production-quality numbers: 100% on anchored novel paraphrases (single-family), 70% on multi-stage compositions, **63% on novel compositional generation** (V1.1.0 leakage-audited held-out, +10 pp over V1.0.9), ~75-80% on novel-paraphrase retrieval with vocabulary-disjoint test discipline. The ~80% ceiling is structural to bag-of-features classifiers in the curator's vocabulary regime; breaking past it requires either external pretrained embeddings (model class change) or domain-restricted deployment (where families have genuinely distinctive nouns).**
 
 This is honest, falsifiable, and reproducible. It's also actionable: anyone evaluating whether the architecture fits their problem can read the three bounds and decide.
 
@@ -68,6 +73,10 @@ Three open follow-ups, each documented in its own home but worth listing:
 2. **Whether external pretrained embeddings break the ~80% ceiling** (`docs/research/wiring_scaling_post_phase3.md` §3 follow-up). Three bag-of-features variants (unigram / bigram / char-ngram) all hit the same ceiling on novel-paraphrase tests. The hypothesis "the ceiling is model-bound, not curator-bound" can only be tested by a genuinely semantic feature (sentence-transformer, fastText, GloVe). Untested because it requires breaking the project's "pure C99, zero deps" policy — which is the gating call for productisation (`MIGRATED:DEPENDENCY_POLICY.md → see docs/MIGRATED_TO_ORGANELLES_BIO.md`).
 
 3. **Independent-curator reproducibility.** Every measurement so far has had one author writing both the synonym tables and the held-out paraphrases. A second person rebuilding v2's family library from scratch with their own vocabulary would test whether the 75-80% ceiling is curator-vocabulary-specific or genuinely architectural. No work done; depends on a second engineer's availability.
+
+4. **Whether OPA adaptive-depth (Phase 7) lifts game solve rates.** V1.2.0 ships the API primitives (`OpaActHalting`, `OpaFrozenInput`) per the `OPA_ADAPTIVE_DEPTH_ROADMAP.md` v1.0 pre-registration, but demo integration + measurement is deferred behind a customer-signal trigger. Hypotheses H10 (8-puzzle hard-tier 30 %→80 %) and H11 (Connect-4 cycle-detector trips −30 %) remain falsifiable but not yet measured. Per the methodology, V1.0 demo numbers (90 % 8-puzzle, 88 % Connect-4) remain the published baseline. See `RESEARCH_DISCLOSURE.md` §9, `RESEARCH_OPENMYTHOS_CROSS_POLLINATION.md` §9.
+
+5. **Whether binder positional scoping closes the wiring layer's remaining 11/30 failures.** Identified during V1.1.0 outcome analysis (`GAP-WIRE-010`, OPEN, P3): ~5–6 of 11 residual compositional failures have correct primitive sets but wrong wiring. Predicted lift +13 pp would push the headline to ~76 %. Not scheduled — opens with customer signal that ≥ 70 % is required.
 
 ## What productisation will test
 

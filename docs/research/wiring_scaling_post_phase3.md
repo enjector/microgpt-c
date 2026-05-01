@@ -82,3 +82,30 @@ For deployment scoping: a 100-family library projects to ~75-80 retrievable *if*
 3. **Independent-curator reproducibility** — every measurement so far has had me as both curator (synonym tables) and held-out author. A second person should rebuild v2's family library from scratch with their own synonyms and held-outs. Would test whether the 75-80% ceiling is curator-vocabulary-specific.
 
 None of these is a research breakthrough; all are engineering investments with bounded scope.
+
+---
+
+## Compositional held-out arc — separate from the retrieval arc above
+
+The retrieval ceiling above (75-80 %) is for **paraphrase classification** — picking the right anchor family for a given prompt. There is a separate **compositional generation** arc that asks a different question: given a prompt that names primitives the curator did NOT pre-anchor, can the search machinery emit a verified `@graph` that runs end-to-end through the VM?
+
+This second arc is documented in `RESEARCH_PIPELINE_IR.md` §47 and `RESEARCH_DISCLOSURE.md` §3, §4, §5, §6, §8. The honest cumulative trajectory:
+
+| Iteration | Mechanism | Score | Disposition |
+|---|---|---:|---|
+| V1.0.4 (Phase 4 mechanism shipped) | Type-directed search over 36-prim manifest | (untested) | Mechanism only |
+| V1.0.5 (first measurement) | Honest first run | 9/30 = 30 % | Pre-registered ≥ 50 % FALSIFIED — methodology saved a confirmation-bias trap |
+| V1.0.6 (Phase 6 simple-search) | Beam-2, drop-name-dedup, geo-prior | 9/30 = 30 % | All three variations measurably no-op or harmful |
+| V1.0.8 (Phase 6b argument binder) | Repeated-noun unification + outer-port-keyword inheritance | 12/30 = 40 % | PARTIALLY-RESOLVED |
+| V1.0.9 (Phase 6c branched-mining) | Per-primitive synonym lift + symmetric tie-break + disabled legacy substring bump | 16/30 = 53 % | Original SLO-WIRE-005 design goal met |
+| **V1.1.0 (Phase 6d port-aware inner picker)** | H8 noun-aware picker + dedup fallback + symmetry-aware override + single-letter filter | **19/30 = 63 %** | PARTIALLY-RESOLVED (60–69 % band); 70 % aggregate target NOT met; H9 not implemented |
+
+`GAP-WIRE-010` (binder positional scoping, ~+13 pp predicted) is the highest-leverage residual fix, customer-signal-gated.
+
+This compositional headline (63 %) is now the **second SLO-track** alongside the retrieval ceiling — both honest, both leakage-audited, both falsifiable.
+
+---
+
+## Phase 7 — OPA Adaptive-Depth (V1.2.0, primitives shipped, measurement deferred)
+
+Orthogonal to the wiring layer entirely: V1.2.0 ships the API primitives (`OpaActHalting`, `OpaFrozenInput`) for the four pre-registered mechanisms in `OPA_ADAPTIVE_DEPTH_ROADMAP.md` v1.0. M1 (ACT halting) and M2 (frozen input) have full APIs + 6 unit tests; M3 (loop-index step token) and M4 (depth extrapolation) are explicitly deferred. Demo integration of M1/M2 is also deferred per the roadmap's customer-signal trigger. The §9.7 measurement section in `RESEARCH_DISCLOSURE.md` stays empty until Phase 7b lands. V1.0 demo numbers (90 % 8-puzzle, 88 % Connect-4) remain the published baseline.

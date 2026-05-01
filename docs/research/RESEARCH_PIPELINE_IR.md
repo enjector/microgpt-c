@@ -3806,6 +3806,75 @@ The discipline-of-pre-registration result (third in this arc): §45 was committe
 
 ---
 
+## 47. Phase 6d — Per-port noun-aware inner picker (V1.1.0, 2026-05-01)
+
+After Phase 6c (V1.0.9) hit the original 50% design goal at the wiring layer, the §6.3 stretch gate of 60% remained open as `GAP-WIRE-009`. The two-pattern failure analysis (12/15 wrong = 3+ arity outers + duplicate inner primitives; 3/15 wrong = wrong number of nodes) motivated a Phase 6d roadmap with two pre-registered hypotheses (`COMPOSITIONAL_GENERATOR_PHASE_6D_PLAN.md`, `RESEARCH_DISCLOSURE.md` §8):
+
+- **H8** Per-port noun-aware inner picker — predicted +6/12 prompts on Pattern A.
+- **H9** Depth-2 inner recursion — predicted +2/3 on Pattern B.
+
+### 47.1 Implementation
+
+H8 implemented in `wiring_compositional_search.c::discover_inner_picks_v2`. The picker:
+
+1. Tokenises the prompt into content-word tokens (stop-words filtered).
+2. For each outer input port `ip`, identifies the expected noun via `outer->port_keywords[ip]` among unconsumed tokens.
+3. Picks the highest-scoring inner candidate (excluding outer name) whose own keywords/port_keywords accept that noun. A `port_match` boost (+2 score) prefers noun-affined candidates.
+4. Marks the noun consumed so subsequent outer ports see a different budget.
+
+Three reinforcement passes layered on top:
+
+- **Dedup fallback**: if two ports landed on the same inner and **neither** was noun-driven, mirror V1.0.9's `WIRING_KEEP_DUPS=0` post-pass (re-pick the loser excluding the duplicate). This rescues the cases where outers like `subtract`/`add`/`min_two` have generic `a`/`b` port_keywords that can't disambiguate.
+- **Symmetry-aware override**: when the inner's keyword appears in the prompt **≥ 2 times** (e.g. "gcd of x **squared** and y **squared**"), suppress the dedup — the duplicate is genuinely needed.
+- **Single-letter variable filter**: don't flag a port as `noun_driven` when the matched noun is a single letter (`x`, `y`, `n`, `r`). Many primitives include those in port_keywords for finance/physics manifests, but they don't disambiguate.
+
+Compile-time toggles: `WIRING_PORT_AWARE_INNER` (default ON), `WIRING_INNER_DEPTH=2` (default — H9 stayed unimplemented but the toggle is reserved), `WIRING_NOUN_COVERAGE_BONUS` (default OFF — measured net-zero).
+
+H9 (depth-2 inner recursion) was **not implemented**. Residual analysis after H8 showed ~5–6 of 11 remaining failures are **binder positional-scoping issues** (correct primitive set, wrong wiring), not depth-2 issues. The predicted +2/3 lift from H9 alone wasn't worth the architectural cost (re-architecting `build_graph_for_outer` to add depth-2 nodes).
+
+### 47.2 Pre-registered prediction vs measurement
+
+| Axis | V1.0.9 (re-run) | V1.1.0 (H8) | Δ | Predicted |
+|---|---:|---:|---:|---:|
+| Axis 1 (novel pair) | 6/10 | 7/10 | +1 | +3 |
+| Axis 2 (synonym stress) | 7/10 | 7/10 | 0 | +1 |
+| Axis 3 (outer transform) | 3/10 | 5/10 | +2 | +2 |
+| **Total** | **16/30 (53 %)** | **19/30 (63 %)** | **+3 (+10pp)** | **+6 (70 %)** |
+
+The V1.0.9 number in the §6.5 disclosure was off by one — the actual harness re-run with `WIRING_PORT_AWARE_INNER=0` is 16/30 = 53 %, not 15/30 = 50 %. V1.1.0 disclosure corrects the baseline.
+
+### 47.3 Disposition (per §8.4)
+
+63 % falls in the **60–69 % PARTIALLY-RESOLVED band**. Pre-registered targets:
+- ≥ 70 %: RESOLVED (NOT met).
+- 60–69 %: PARTIALLY-RESOLVED (met).
+- < 60 %: H8/H9 falsified (NOT triggered).
+
+`GAP-WIRE-005`, `GAP-WIRE-006`, `GAP-WIRE-009` all stay PARTIALLY-RESOLVED. New SLO-WIRE-005 baseline = 63 %.
+
+### 47.4 Residual failure analysis
+
+11 wrong-answer prompts cluster as:
+
+| Pattern | Count | Example | Diagnosis |
+|---|---:|---|---|
+| Binder positional scoping | ~5–6 | prompt 25 produces `[sigmoid, triple_val, subtract]` — primitive set CORRECT but match=0/5 | `wiring_arg_binder.c` is order-insensitive within a port — the inner's keyword position should weight which prompt-noun feeds which port |
+| H9 depth-2 territory | ~2 | prompt 19 needs `harmonic(abs(fib(n)))` — depth-3 nesting | Requires re-architecting `build_graph_for_outer` |
+| H8 over-/under-firing | ~3 | prompt 26 keeps duplicate `markup` when it shouldn't | Symmetric-keep over-engages on borderline cases |
+
+The binder positional-scoping pattern is now `GAP-WIRE-010` (OPEN, P3, customer-signal-gated). Predicted lift: +4/11 = ~+13 pp if implemented — would push the headline to ~76 %.
+
+### 47.5 What V1.1.0 honestly preserves
+
+- ctest 15/15 green.
+- Anchor 100 %, fragment 60 %, transformer 35 %, TF-IDF 90 % unchanged.
+- Leakage audit unchanged (held-out file untouched).
+- Compile-time toggles preserve V1.0.9 behaviour bit-identically when `WIRING_PORT_AWARE_INNER=0`.
+
+The 53 → 63 % lift is genuine, modest, and within the methodology's pre-registered tolerance for PARTIALLY-RESOLVED. The pattern of "predict +6, deliver +3" is exactly what honest-disclosure-first is for: H8 captured half its predicted lift, the diagnosis is clean, and the next-best escalation (binder positional scoping) is queued behind a customer-signal trigger rather than implemented speculatively.
+
+---
+
 ## 16. Closing Remark
 
 ---

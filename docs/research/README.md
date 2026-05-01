@@ -23,7 +23,7 @@ After that, choose by audience:
 | Path | Contents |
 |---|---|
 | `RESEARCH_*.md` | Topical research notes (manifold learning, attention mechanisms, intelligence framing, optimisation studies, V4-port stack, organelle applications, etc.) |
-| `wiring_*.md`, `wiring_*.log` | The Wiring Organelle scaling arc (~v1 inflated → v2 clean → Phase 2 sharpening → Phase 3 broad expansion + bigram → post-Phase-3 cleanup → Phase 5/6/6b compositional search) |
+| `wiring_*.md`, `wiring_*.log` | The Wiring Organelle scaling arc (~v1 inflated → v2 clean → Phase 2 sharpening → Phase 3 broad expansion + bigram → post-Phase-3 cleanup → Phase 5/6/6b/6c/6d compositional search; current V1.1.0 = 63 % on the leakage-audited compositional held-out) |
 | `audit_logs/` | Per-eval `*.log` files (leakage audits, scoreboards, classifier runs). Evidence for any cited number. |
 | `papers/` | Referenced external papers (DeepSeek_V4, MSA, RotorQuant, TurboQuant, Attention-Residuals) |
 | `images/` | Diagrams + infographics referenced from the research notes and the book |
