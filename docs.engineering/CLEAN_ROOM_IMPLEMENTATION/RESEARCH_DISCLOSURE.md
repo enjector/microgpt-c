@@ -228,9 +228,55 @@ Combined target (all three streams on): ≥ **15/30 (50 %)** — the original `S
 
 The four pre-existing wiring numbers (anchor 100 %, fragment-chain 60 %, transformer-only 35 %, Phase 4 TF-IDF 90 %) MUST persist. Phase 6b changes touch only `wiring_compositional_search.c`, `wiring_arg_binder.{h,c}` (new), `wiring_primitive_manifest.{h,c}` (extension), `wiring_geo_classifier.{h,c}` (extension), `pipeline_corpus_compositional_test.txt` (annotation only), and `wiring_phase5_harness.c`. No wiring-organelle path is modified.
 
-### 5.5 Outcome (to be filled when results land)
+### 5.5 Outcome (2026-05-01 — Phase 6b first run)
 
-To be populated after re-running `wiring_phase5_harness` post-implementation.
+All three streams landed (Stream D arg-binder + per-port keyword manifest, Stream E `# INPUT_ORDER:` annotation + harness noun-keyed remap, Stream F manifest-driven port-keyword prior). Results on the same 30-prompt leakage-audited held-out:
+
+| Axis | V1.0.5 | V1.0.6 | V1.0.7 (Phase 6b) | Δ vs baseline |
+|---|---:|---:|---:|---:|
+| 1 (novel pair) | 2/10 | 3/10 | **6/10** | **+4** |
+| 2 (synonym stress) | 4/10 | 4/10 | 3/10 | −1 |
+| 3 (outer transform) | 3/10 | 2/10 | **3/10** | 0 |
+| **Total** | **9/30 (30 %)** | **9/30 (30 %)** | **12/30 (40 %)** | **+3 (+10 pp)** |
+| Verified | 30/30 | 30/30 | 30/30 | 0 |
+
+#### Disposition (per §5.3)
+
+40 % is in the **40–49 % range**. Disposition: `GAP-WIRE-005` and `GAP-WIRE-006` stay **`PARTIALLY-RESOLVED`** with the new SLO baseline = **40 % (12/30)**. The 50 % design target persists; the gap is not silently re-tuned.
+
+#### What lifted axis 1
+
+The combined effect of the three improvements:
+- **Stream D** (binder + outer-port-keyword inheritance for inners) fixed the duplicate-inner misrouting (prompts 1, 4, 6, 8 now `[X, abs_val/double_val, OUTER]` wired correctly).
+- **The earliest-keyword-position tie-break** (added to break a stuck case from Stream D alone) corrected the outer-pick on prompts 1, 6, 8 — `abs_val(subtract(x,y))` now wins over `subtract(abs_val(x), abs_val(y))` because "absolute" appears earlier than "difference".
+- **Stream E** correctly remapped `weight,height` for prompt-11-style cases — those prompts were already verified, just mis-mapped under V1.0.6.
+- **Stream F** port-keyword prior didn't measurably lift axis 2 alone (port keywords for `apply_tax` / `compound` did fire, but the bigger fish was the `keep_dups` interaction documented below).
+
+#### What axis 2 lost (−1)
+
+`ref_ke_double_mass` was CORRECT in V1.0.5/V1.0.6 (`[kinetic_energy, double_val]` 2-node) but lost in V1.0.7 (`[double_val, double_val, kinetic_energy]` 3-node, score 0/5). The earliest-keyword-position tie-break promoted `double_val` ("doubled") over `kinetic_energy` ("kinetic energy"), because "doubled" appears earlier in the prompt. The semantic head IS `kinetic_energy` here. This is a known weakness of the earliest-position heuristic for prompts with a leading modifier.
+
+#### Failure mode that persists across Phase 6b
+
+The dominant remaining failure (~10 of the 18 wrong-answer prompts) is **inner-output → outer-input mismapping when keep_dups is on** plus the **3-input-arity outer with multiple keep_dups inners** problem (e.g. prompt 16 `lerp(x, max(y,z), t)` produces `lerp(max(?), max(?), max(?))` because the search picks max_two for ALL three lerp ports). This is structural — the Phase 6b binder cannot recover from a pre-binder-stage mis-pick.
+
+Phase 6c (next-iteration roadmap, NOT scheduled):
+
+- **Limit duplicate inners**: only allow keep_dups when the same primitive's keywords appear ≥ 2 times in the prompt. Prevents `[max_two, max_two, max_two, lerp]`.
+- **Argument-noun-aware outer pick**: include port-keyword hits in the score *with a positive weight on arity-match*. A 1-input primitive with 0 port-noun-hits beats a 3-input primitive with 0 port-noun-hits unfairly.
+- **Multi-stage prompt segmentation**: split the prompt at "of"/"on"/"of-the" and let each segment vote for one node. Closes the lerp-vs-max_two case.
+
+These are documented for a Phase 6c that runs only on customer signal.
+
+#### Why the 50 % target was missed
+
+The hypotheses H4–H7 were partially borne out:
+- **H4** (binder lifts axis 1 to ≥ 5/10) — **CONFIRMED** (6/10).
+- **H5** (repeated-noun unification eliminates duplicate-inner misrouting) — **PARTIALLY** confirmed (axis 1 prompts 1/4/6/8 fixed; axis-3 still has the 3-input outer problem).
+- **H6** (`INPUT_ORDER:` annotation) — **CONFIRMED** for axis 1 prompts where it mattered.
+- **H7** (manifest-driven geo prior) — **NOT CONFIRMED** as a measurable lift in isolation; combines with the rest.
+
+The honest summary: Phase 6b moved the needle from 30 % → 40 %, validating the core direction (binder + earliest-position + per-port keywords) but exposing a new structural limit (3+ arity outers + keep_dups). The 50 % target needs Phase 6c to address the structural limit. The 10pp lift is recorded as the new SLO; the gap stays open.
 
 ## 7. Three-bound consolidation — TF-IDF retrieval ceiling (V1.0.7, 2026-05-01)
 

@@ -1973,7 +1973,8 @@ target_sources(wiring_organelle_demo PRIVATE
   demos/wiring_organelle/wiring_anchor_graphs.c
   demos/wiring_organelle/wiring_fragments.c
   demos/wiring_organelle/wiring_primitive_manifest.c
-  demos/wiring_organelle/wiring_compositional_search.c)
+  demos/wiring_organelle/wiring_compositional_search.c
+  demos/wiring_organelle/wiring_arg_binder.c)
 target_include_directories(wiring_organelle_demo PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/demos/wiring_organelle)
 # Generate the wiring + planner corpus next to the binary as a POST_BUILD step.

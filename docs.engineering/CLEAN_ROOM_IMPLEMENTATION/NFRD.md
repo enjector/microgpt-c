@@ -91,7 +91,7 @@ The following SLOs are reproducible on the dev reference machine (Apple M2 Max, 
 | SLO-WIRE-002 | Wiring transformer alone on the same clean set: ≥ 35 % (7/20). | As above |
 | SLO-WIRE-003 | Phase 3b composition multi-stage prompts: ≥ 60 % (6/10). | `RESEARCH_PIPELINE_IR.md` §43 |
 | SLO-WIRE-004 | Phase 4 TF-IDF on the expanded ≥ 4,000-prompt corpus, adversarial axis-2: ≥ 90 % (18/20), with 100 % (20/20) no-regression on Phase 2c clean. | `RESEARCH_PIPELINE_IR.md` §46 |
-| SLO-WIRE-005 | Phase 5 compositional held-out — pre-registered target was ≥ 50 % (15/30); first-run achieved baseline is **30 % (9/30) verified-and-correct, 100 % (30/30) verified**. The 30 % figure is the V1.0.5 baseline SLO; the 50 % target remains the design goal and is tracked in `GAP-WIRE-006`. | `RESEARCH_DISCLOSURE.md` §3.5 |
+| SLO-WIRE-005 | Phase 5 compositional held-out — pre-registered target was ≥ 50 % (15/30); V1.0.7 (Phase 6b) achieved baseline is **40 % (12/30) verified-and-correct, 100 % (30/30) verified** (lifted from V1.0.5 30 % via four-root-cause fix in `COMPOSITIONAL_GENERATOR_FIX_PLAN.md` v2.0). 40 % is the new SLO baseline; the 50 % target persists in `GAP-WIRE-006`. | `RESEARCH_DISCLOSURE.md` §5.5 |
 | SLO-WIRE-006 | Phase 5 compositional with `--use-expected` ranker gate: pre-registered target ≥ 80 % (24/30) — the gate is not yet implemented (would require ranker integration in V1.0.5; postponed alongside the beam widening per `GAP-WIRE-006`). | As above |
 | SLO-WIRE-007 | Phase 5 no-regression: 100 % (20/20) on Phase 2c clean must persist when the type-directed search is integrated alongside the existing anchor / transformer paths. (Anchor / transformer paths unchanged in V1.0.5; no-regression upheld.) | As above |
 
