@@ -34,7 +34,7 @@ option(ENABLE_ROTORQUANT       "Enable RotorQuant for memory compression (MSA)" 
 #  Core library  (single OBJECT library shared by all targets)
 # ==================================================================
 
-add_library(microgpt_lib STATIC src/microgpt.c src/microgpt_organelle.c src/microgpt_msa.c src/microgpt_turboquant.c src/microgpt_rotorquant.c src/microgpt_pipeline.c src/microgpt_vr.c src/microgpt_geodesic.c)
+add_library(microgpt_lib STATIC src/microgpt.c src/microgpt_organelle.c src/microgpt_msa.c src/microgpt_turboquant.c src/microgpt_rotorquant.c src/microgpt_pipeline.c src/microgpt_vr.c src/microgpt_geodesic.c src/microgpt_eml.c)
 target_include_directories(microgpt_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 # --- Compile-time feature flags ---
@@ -147,7 +147,7 @@ function(_microgpt_lib_for_defines OUT_VAR)
   endif()
 
   # Create a new STATIC library with the same sources + features
-  add_library(${_tgt} STATIC src/microgpt.c src/microgpt_organelle.c src/microgpt_msa.c src/microgpt_turboquant.c src/microgpt_rotorquant.c src/microgpt_pipeline.c src/microgpt_vr.c src/microgpt_geodesic.c)
+  add_library(${_tgt} STATIC src/microgpt.c src/microgpt_organelle.c src/microgpt_msa.c src/microgpt_turboquant.c src/microgpt_rotorquant.c src/microgpt_pipeline.c src/microgpt_vr.c src/microgpt_geodesic.c src/microgpt_eml.c)
   target_include_directories(${_tgt} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
   # Propagate all feature flags from the base target
@@ -239,6 +239,74 @@ add_demo(
   SOURCE demos/character-level/names/main.c
   COPY   demos/character-level/names/c_names.txt
 )
+
+# ==================================================================
+#  EML Organelle demo
+#  Loads a snapped EML tree (recovered offline by the EML SR trainer in
+#  the companion eml research repo) and evaluates it in pure C99 against
+#  a noisy elementary target.  See docs/research/RESEARCH_EML_ORGANELLE.md.
+# ==================================================================
+
+add_demo(
+  NAME   eml_organelle_demo
+  SOURCE demos/character-level/eml_organelle/main.c
+)
+# The demo includes c_eml_tree.h, which lives next to main.c.
+target_include_directories(eml_organelle_demo PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/demos/character-level/eml_organelle)
+
+# ==================================================================
+#  EML Quant Boundary demo — boundary map of where the EML organelle
+#  works on quant-flavored data and where it doesn't.  Mirrors the
+#  lottery negative control's pattern: 3 positive + 3 negative cases.
+#  See docs/research/RESEARCH_EML_ORGANELLE.md §Boundary Map.
+# ==================================================================
+
+add_demo(
+  NAME   eml_quant_boundary_demo
+  SOURCE demos/character-level/eml_quant_boundary/main.c
+)
+target_include_directories(eml_quant_boundary_demo PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/demos/character-level/eml_quant_boundary)
+
+# ==================================================================
+#  EML Hybrid OPA Pipeline demo — neuro-symbolic composition.
+#  Tiny neural direction-predictor + two EML deterministic transforms
+#  routed through Kanban + cycle detector.  Reuses the c_eml_logprice.h
+#  and c_eml_compound.h headers from the boundary demo dir.
+# ==================================================================
+
+add_demo(
+  NAME    eml_hybrid_pipeline_demo
+  SOURCE  demos/character-level/eml_hybrid_pipeline/main.c
+  THREADS
+  COPY    demos/character-level/eml_hybrid_pipeline/c_directions.txt
+  DEFINES N_EMBD=24 N_HEAD=2 N_LAYER=2 BLOCK_SIZE=32 MLP_DIM=48
+          NUM_STEPS=600 LEARNING_RATE=0.01 BATCH_SIZE=4 MAX_DOC_LEN=64
+)
+target_include_directories(eml_hybrid_pipeline_demo PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/demos/character-level/eml_hybrid_pipeline
+  ${CMAKE_CURRENT_SOURCE_DIR}/demos/character-level/eml_quant_boundary)
+
+# ==================================================================
+#  EML Sensor Calibration demo — PWJ pipeline with EML Worker.
+#  Photodiode-style log-amp.  Worker = depth-3 EML log tree (exact),
+#  Judge = deterministic range check, Planner = tiny neural that
+#  sequences MEASURE / REPORT / CALIBRATE actions.  See
+#  docs/research/RESEARCH_EML_ORGANELLE.md §Sensor Calibration.
+# ==================================================================
+
+add_demo(
+  NAME    eml_sensor_calibration_demo
+  SOURCE  demos/character-level/eml_sensor_calibration/main.c
+  THREADS
+  COPY    demos/character-level/eml_sensor_calibration/c_calibration_planner.txt
+  DEFINES N_EMBD=24 N_HEAD=2 N_LAYER=2 BLOCK_SIZE=32 MLP_DIM=48
+          NUM_STEPS=600 LEARNING_RATE=0.01 BATCH_SIZE=4 MAX_DOC_LEN=64
+)
+target_include_directories(eml_sensor_calibration_demo PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/demos/character-level/eml_sensor_calibration
+  ${CMAKE_CURRENT_SOURCE_DIR}/demos/character-level/eml_quant_boundary)
 
 # ==================================================================
 #  Attention Sink A/B benchmark (DeepSeek-V4 §2.3.3 port evaluation)
@@ -1801,6 +1869,16 @@ if(NOT MSVC)
   target_link_libraries(test_microgpt_msa PRIVATE m)
 endif()
 add_test(NAME microgpt_msa_tests COMMAND test_microgpt_msa WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+# EML Organelle — snapped-tree evaluator (microgpt_eml.{h,c}).
+# See docs/research/RESEARCH_EML_ORGANELLE.md for the integration story.
+add_executable(test_microgpt_eml tests/test_microgpt_eml.c)
+target_link_libraries(test_microgpt_eml PRIVATE microgpt_lib)
+target_include_directories(test_microgpt_eml PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests ${CMAKE_CURRENT_SOURCE_DIR}/src)
+if(NOT MSVC)
+  target_link_libraries(test_microgpt_eml PRIVATE m)
+endif()
+add_test(NAME microgpt_eml_tests COMMAND test_microgpt_eml WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
 # Graph Pipeline IR — Phase 1 (RESEARCH_PIPELINE_IR.md).
 add_executable(test_microgpt_pipeline
