@@ -594,24 +594,41 @@ Model *oql_runtime_load_organelle(OqlRuntime *rt, OqlOrganelle *organelle,
     const MicrogptConfig *cfg = rt->cfg ? (const MicrogptConfig *)rt->cfg
                                         : &local_cfg;
 
-    /* The checkpoint format stores its own vocab size in the header — we
-     * pass 0 as `vocab_size` to mean "trust the file" so OQL doesn't have
-     * to know the vocabulary up front.  microgpt's checkpoint_load is
-     * lenient about this when vocab_size == 0 — see microgpt.c. If the
-     * caller's config disagrees with the saved one, load fails cleanly. */
-    int step_out = 0;
-    /* Adam buffers: allocate scratch space sized to the saved model.
-     * We don't keep them — checkpoint_load() requires non-NULL pointers,
-     * but we discard the buffers immediately for inference-only loads. */
-    /* The model parameter count depends on vocab_size which we don't
-     * know until the header is read.  microgpt's checkpoint_load API
-     * insists on caller-provided m/v buffers of model_num_params length.
-     * For OQL we allocate a generous upper bound and trust load to
-     * succeed; on failure we degrade gracefully. */
-    size_t max_vocab = (size_t)cfg->max_vocab;
-    /* Conservative upper bound: vocab * n_embd (wte) + everything else.
-     * Use a 16 MB scratch and bail if checkpoint_load needs more. */
-    size_t scratch_n = (size_t)2 * 1024 * 1024;  /* 2M scalars */
+    /* Peek at the checkpoint header to learn its actual vocab size.
+     * The microgpt checkpoint format is: [int step][size_t vocab][weights].
+     * checkpoint_load() rejects loads where the caller-supplied vocab_size
+     * doesn't match the header — so we read it ourselves first. */
+    FILE *peek = fopen(organelle->checkpoint_path, "rb");
+    if (!peek) {
+        if (out) fprintf(out,
+            "load_organelle: cannot open '%s' (organelle '%s')\n",
+            organelle->checkpoint_path, organelle->name);
+        return NULL;
+    }
+    int header_step = 0;
+    size_t header_vocab = 0;
+    if (fread(&header_step, sizeof(int), 1, peek) != 1 ||
+        fread(&header_vocab, sizeof(size_t), 1, peek) != 1) {
+        if (out) fprintf(out,
+            "load_organelle: failed to read header from '%s'\n",
+            organelle->checkpoint_path);
+        fclose(peek);
+        return NULL;
+    }
+    fclose(peek);
+
+    /* Adam buffers — model_num_params is vocab × N_EMBD × 2 (wte+lm_head)
+     * plus block_size × N_EMBD (wpe) plus per-layer matmul slabs.  For
+     * checkpoint_load we just need buffers large enough; allocate from
+     * the actual param-count formula. */
+    const size_t ne = (size_t)cfg->n_embd;
+    const size_t bs_ = (size_t)cfg->block_size;
+    const size_t md_ = (size_t)cfg->mlp_dim;
+    const int nl_  = cfg->n_layer;
+    size_t scratch_n = header_vocab * ne * 2   /* wte + lm_head */
+                     + bs_ * ne                /* wpe */
+                     + (size_t)nl_ * (4 * ne * ne + 2 * md_ * ne)
+                     + 1024;                   /* slack */
     scalar_t *m = (scalar_t *)calloc(scratch_n, sizeof(scalar_t));
     scalar_t *v = (scalar_t *)calloc(scratch_n, sizeof(scalar_t));
     if (!m || !v) {
@@ -619,21 +636,24 @@ Model *oql_runtime_load_organelle(OqlRuntime *rt, OqlOrganelle *organelle,
         free(m); free(v);
         return NULL;
     }
+    int step_out = 0;
     Model *model = checkpoint_load(organelle->checkpoint_path,
-                                   max_vocab ? max_vocab : 256,
-                                   cfg, m, v, &step_out);
+                                   header_vocab, cfg, m, v, &step_out);
     free(m); free(v);
     if (!model) {
         if (out) fprintf(out,
-            "load_organelle: checkpoint_load('%s') failed for organelle '%s'\n",
-            organelle->checkpoint_path, organelle->name);
+            "load_organelle: checkpoint_load('%s') failed for organelle '%s' "
+            "(header_vocab=%zu, cfg dims n_embd=%d n_head=%d n_layer=%d block=%d mlp=%d)\n",
+            organelle->checkpoint_path, organelle->name,
+            header_vocab, cfg->n_embd, cfg->n_head, cfg->n_layer,
+            cfg->block_size, cfg->mlp_dim);
         return NULL;
     }
     organelle->model = model;
     organelle->loaded = 1;
     if (out) fprintf(out,
-        "load_organelle: loaded '%s' from %s (step %d)\n",
-        organelle->name, organelle->checkpoint_path, step_out);
+        "load_organelle: loaded '%s' from %s (vocab=%zu step=%d)\n",
+        organelle->name, organelle->checkpoint_path, header_vocab, step_out);
     return model;
 }
 
