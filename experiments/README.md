@@ -41,6 +41,7 @@ Each of these directions has a dedicated experiment doc in this folder:
 6. **Pick a real-world public-data application that exercises the three bounds.** The migrated verticals (fraud, finance risk, defence tracking) were the obvious choice but went private. A research-friendly substitute: **medical guideline → typed-treatment-graph** (audit-mandated; distinctive vocabulary; public datasets like SNOMED/UMLS available). It hits the architecture's strongest claim (audit + tiny + composable) on a domain where reviewers can verify the work. → **[E06](E06-medical-guideline-graphs.md)**
 7. **Elevate the operator surface to a SQL-shaped DSL — OQL (Organelle Query Language).** Inspired by [EQL](../../EnX/EnX-Research-Prototypes/aerospike.github/cpp/enx-db/book-eql.v7/The_Expressive_Power_of_EQL.md)'s "the query language is the product" thesis. SQL + 6 verbs (`TRAIN`, `COMPOSE`, `RUN`, `EVALUATE`, `VERIFY`, `AUDIT`) - 4 verbs (`CREATE TRIGGER`, `CREATE FUNCTION`, `DECLARE CURSOR`, `SAVEPOINT`). Re-uses the existing Flex/Bison VM infrastructure. Compounds with E05 — pre-registration becomes a first-class `CREATE EXPERIMENT … WITH TARGETS …` statement instead of prose. Each of E01-E06 rewrites to ≤ 50 lines of OQL. → **[E07](E07-oql-dsl.md)**
 8. **High-level researcher surface — `BEHAVIOUR` objects in OQL whose body is the VM's TypeScript dialect.** Researchers stop writing C wrappers for organelles; they write TS functions (`function eval(board: string): string { ... }`) that bind to engine primitives via `declare function` externs. Connect-4's ~500 LOC C demo collapses to ~80 lines of OQL + 4 small TS bodies. Zero new VM opcodes (extern table only). Worked target: Connect-4 win rate held within ±3 pp, then replicated to 3 more games. → **[E08](E08-oql-behaviours.md)**
+9. **Make OQL actually run things — wire `RUN` / `COMPOSE` / `CREATE ORGANELLE FROM CHECKPOINT` so `connect4.oql` drives a real game loop.** Closes E08's deferred T1 measurement and unblocks E01's System C authoring. `TRAIN` honestly deferred to E10. → **[E09](E09-oql-runtime-wiring.md)**
 
 ### What we explicitly will NOT prioritise
 
@@ -77,7 +78,7 @@ Every experiment doc is a single markdown file with four sections:
 | **3. Implementation + results** | Measurement commit | What was built, raw numbers, links to artefacts |
 | **4. Conclusion** | Measurement commit | Verdict against each pre-reg target, lessons, next moves, traceability updates |
 
-## The eight experiments
+## The nine experiments
 
 | ID | Title | Direction | Cost | Falsification risk |
 |---|---|---|---|---|
@@ -89,6 +90,7 @@ Every experiment doc is a single markdown file with four sections:
 | [E06](E06-medical-guideline-graphs.md) | Medical guideline → typed treatment graph on public data | Real-world public-data application exercising the three bounds | ~8-10 wk | Medium-high |
 | [E07](E07-oql-dsl.md) | OQL — a SQL-shaped DSL for organelles, pipelines, behaviours, and experiments | Replace 3 surfaces (C demos + scripts + markdown specs) with one declarative dialect | ~6-8 wk | Medium |
 | [E08](E08-oql-behaviours.md) | VM TypeScript dialect as the body of OQL `BEHAVIOUR` objects | High-level researcher surface — Connect-4 ~500 LOC C → ~80 lines OQL+TS, zero new VM opcodes | ~4-5 wk | Medium |
+| [E09](E09-oql-runtime-wiring.md) | Wire OQL `RUN` / `COMPOSE` / `CREATE ORGANELLE FROM CHECKPOINT` end-to-end | Make `oql run connect4.oql` actually drive a game loop; closes E08's T1 | ~5-7 wk | Medium |
 
 ## Status legend
 
@@ -109,6 +111,7 @@ Measured (worktree-branch agent runs, all merged into main):
 - E05 ✅ merged at `6aba1c8` — 6/6 targets PASS; methodology paper draft 13 pages
 - E07 ✅ merged at `83e5673` — verb-discipline lock held; 5 PASS, 1 PARTIAL, 2 deferred
 - E08 ✅ merged at `e9b8620` — 3 PASS (T2 18.5% LOC, T3 zero new opcodes, T4 +4 tests); 5 honestly deferred
+- E09 🔬 agent running
 
 Awaiting external inputs:
 - E01 — needs Anthropic API budget (~$100)
