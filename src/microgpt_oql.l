@@ -86,6 +86,8 @@ BEHAVIOUR   { return T_BEHAVIOUR; }
 ORGANELLE   { return T_ORGANELLE; }
 CHECKPOINT  { return T_CHECKPOINT; }
 VM          { return T_VM; }
+ /* E10 — CORPUS already exists below as a source-kind keyword; FILE is new. */
+FILE        { return T_FILE; }
 
  /* Clauses / sub-keywords. */
 ON          { return T_ON; }

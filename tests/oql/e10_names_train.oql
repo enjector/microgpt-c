@@ -1,0 +1,39 @@
+-- experiments/E10-oql-train-wiring.md §3.9 worked example.
+--
+-- Minimal "train + save + load + infer" pipeline in <30 lines (T8).
+-- Exercises every E10 surface in a single OQL script.  Run with:
+--
+--     ./build/oql run tests/oql/e10_names_train.oql
+--
+-- The default `oql` binary is compiled with the names-demo dims by
+-- default (N_EMBD=16 …) so loading the checkpoint via CREATE
+-- ORGANELLE FROM CHECKPOINT after TRAIN ... SAVE round-trips cleanly
+-- — no `oql_<arch>` variant required for this demo.
+
+-- 1. Register the corpus.  CREATE CORPUS is the new E10 object type
+--    that mirrors CREATE BEHAVIOUR / CREATE ORGANELLE — no 7th verb.
+CREATE CORPUS names_tiny FROM FILE 'c_names.txt';
+
+-- 2. Declare the organelle slot.  No FROM CHECKPOINT clause — this is
+--    a *blank* organelle that TRAIN will populate.
+CREATE ORGANELLE poet;
+
+-- 3. Train.  All six locked sub-clauses present:
+--      ROLE       — role label for the audit trail
+--      STEPS      — training steps
+--      LR         — learning rate
+--      BATCH_SIZE — docs per gradient step
+--      SEED       — deterministic RNG seed
+--      SAVE       — checkpoint path (omit for in-memory only)
+TRAIN poet ON names_tiny WITH
+    ROLE       = planner,
+    STEPS      = 100,
+    LR         = 0.01,
+    BATCH_SIZE = 4,
+    SEED       = 1337,
+    SAVE       = 'checkpoints/e10_oql_names_demo.ckpt';
+
+-- 4. Round-trip: re-load the just-saved checkpoint into a fresh slot.
+--    A follow-up RUN against `poet_reload` would produce inference
+--    identical to `poet` within float precision (T4).
+CREATE ORGANELLE poet_reload FROM CHECKPOINT 'checkpoints/e10_oql_names_demo.ckpt';

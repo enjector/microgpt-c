@@ -77,6 +77,12 @@ OqlStmt *oql_y_create_organelle(char *name, char *ckpt, OqlKV *bindings) {
     s->u.create_organelle.bindings = bindings;
     return s;
 }
+OqlStmt *oql_y_create_corpus(char *name, char *path) {
+    OqlStmt *s = oql_stmt_alloc(OQL_VERB_CREATE_CORPUS);
+    s->u.create_corpus.name = name;
+    s->u.create_corpus.file_path = path;
+    return s;
+}
 OqlKV *oql_y_kv(char *key, char *val) {
     OqlKV *k = (OqlKV *)calloc(1, sizeof(OqlKV));
     if (k) { k->key = key; k->value = val; }
@@ -280,6 +286,10 @@ static void oql_stmt_free_inner(OqlStmt *s) {
         free(s->u.create_organelle.checkpoint);
         oql_kv_free(s->u.create_organelle.bindings);
         break;
+    case OQL_VERB_CREATE_CORPUS:
+        free(s->u.create_corpus.name);
+        free(s->u.create_corpus.file_path);
+        break;
     }
 }
 
@@ -466,7 +476,17 @@ void oql_runtime_dispose(OqlRuntime *rt) {
     }
     rt->n_pipelines = 0;
 
+    /* Free slurped corpus contents (path is fixed-size array — no free). */
+    for (int i = 0; i < rt->n_corpora; i++) {
+        free(rt->corpora[i].contents);
+        rt->corpora[i].contents = NULL;
+        rt->corpora[i].contents_len = 0;
+    }
+    rt->n_corpora = 0;
+
     rt->cfg = NULL;
+    rt->loss_log = NULL;
+    rt->loss_log_cap = 0;
 }
 
 OqlBehaviourEntry *oql_runtime_find_behaviour(OqlRuntime *rt, const char *name) {
@@ -500,6 +520,24 @@ OqlPipeline *oql_runtime_find_pipeline(OqlRuntime *rt, const char *name) {
     return NULL;
 }
 
+OqlCorpus *oql_runtime_find_corpus(OqlRuntime *rt, const char *name) {
+    if (!rt || !name) return NULL;
+    for (int i = 0; i < rt->n_corpora; i++) {
+        if (strcmp(rt->corpora[i].name, name) == 0) {
+            return &rt->corpora[i];
+        }
+    }
+    return NULL;
+}
+
+int oql_runtime_attach_loss_log(OqlRuntime *rt, double *buf, int cap) {
+    if (!rt) return -1;
+    if (cap < 0) cap = 0;
+    rt->loss_log = (cap > 0) ? buf : NULL;
+    rt->loss_log_cap = (cap > 0) ? cap : 0;
+    return 0;
+}
+
 /* Register a behaviour (called from CREATE BEHAVIOUR dispatch). */
 static oql_status oql_runtime_register_behaviour(OqlRuntime *rt,
                                                  const char *name,
@@ -519,6 +557,28 @@ static oql_status oql_runtime_register_behaviour(OqlRuntime *rt,
     e->name = oql_dup(name);
     e->vm_body = vm_body ? oql_dup(vm_body) : NULL;
     e->module = NULL;
+    return OQL_OK;
+}
+
+/* Register a corpus (CREATE CORPUS).  Lazy: contents loaded on first
+ * TRAIN reference (oql_runtime_load_corpus). */
+static oql_status oql_runtime_register_corpus(OqlRuntime *rt,
+                                              const OqlCreateCorpus *cc,
+                                              FILE *out) {
+    if (!rt || !cc || !cc->name || !cc->file_path) return OQL_ERR_RUNTIME;
+    if (oql_runtime_find_corpus(rt, cc->name)) {
+        if (out) fprintf(out, "CREATE CORPUS: duplicate name '%s'\n", cc->name);
+        return OQL_ERR_RUNTIME;
+    }
+    if (rt->n_corpora >= OQL_MAX_CORPORA) {
+        if (out) fprintf(out, "CREATE CORPUS: registry full (%d max)\n",
+                         OQL_MAX_CORPORA);
+        return OQL_ERR_RUNTIME;
+    }
+    OqlCorpus *c = &rt->corpora[rt->n_corpora++];
+    memset(c, 0, sizeof(*c));
+    strncpy(c->name, cc->name, sizeof(c->name) - 1);
+    strncpy(c->file_path, cc->file_path, sizeof(c->file_path) - 1);
     return OQL_OK;
 }
 
@@ -800,6 +860,11 @@ oql_status oql_run_game_loop(OqlRuntime *rt,
                              const char *game,
                              FILE *out);
 
+/* E10 — TRAIN dispatcher (concrete impl in src/oql_runtime_train.c). */
+oql_status oql_run_train(OqlRuntime *rt,
+                         const OqlTrainSpec *spec,
+                         FILE *out);
+
 static oql_status oql_exec_run_runtime(OqlRuntime *rt, const OqlStmt *s,
                                        FILE *out) {
     if (!rt || !s) return OQL_ERR_RUNTIME;
@@ -878,8 +943,59 @@ static oql_status oql_execute_core(const OqlScript *script, OqlRuntime *rt,
         oql_status st = OQL_OK;
         switch (s->verb) {
         case OQL_VERB_TRAIN:
-            /* E09 T6 hard-lock: TRAIN stays a stub. */
-            st = oql_exec_pending("TRAIN", out);
+            if (rt) {
+                /* E10 — TRAIN dispatch.  Build an OqlTrainSpec from the AST,
+                 * defaulting every absent sub-clause, then call the adapter
+                 * in src/oql_runtime_train.c (which talks to the engine's
+                 * forward_backward_one + adam_step API).
+                 *
+                 * E07 grammar already parses every WITH kv we need; no new
+                 * verb, no new grammar rule.  Pre-reg §1.3 sub-clauses:
+                 *   STEPS / LR / BATCH_SIZE / SAVE / SEED / ROLE */
+                OqlTrainSpec spec;
+                memset(&spec, 0, sizeof(spec));
+                spec.organelle_name = oql_dup(s->u.train.target);
+                /* ON CORPUS '<path>' or ON <corpus_name>: both supported.  The
+                 * adapter resolves NAME against the registry and PATH/CORPUS
+                 * source via direct file slurp. */
+                if (s->u.train.on_src.value) {
+                    spec.corpus_name = oql_dup(s->u.train.on_src.value);
+                } else {
+                    if (out) fprintf(out, "TRAIN: missing ON <corpus>\n");
+                    free(spec.organelle_name);
+                    st = OQL_ERR_RUNTIME;
+                    break;
+                }
+                const char *vs;
+                /* Engine defaults — match microgpt_default_config(). */
+                spec.steps         = NUM_STEPS;
+                spec.learning_rate = LEARNING_RATE;
+                spec.batch_size    = BATCH_SIZE;
+                spec.seed          = 1337u;
+                spec.save_path     = NULL;
+                spec.role          = NULL;
+                if ((vs = oql_kv_get(s->u.train.with_kv, "STEPS")))
+                    spec.steps = atoi(vs);
+                if ((vs = oql_kv_get(s->u.train.with_kv, "LR")))
+                    spec.learning_rate = atof(vs);
+                if ((vs = oql_kv_get(s->u.train.with_kv, "BATCH_SIZE")))
+                    spec.batch_size = atoi(vs);
+                if ((vs = oql_kv_get(s->u.train.with_kv, "SEED")))
+                    spec.seed = (unsigned int)atoi(vs);
+                if ((vs = oql_kv_get(s->u.train.with_kv, "SAVE")))
+                    spec.save_path = oql_dup(vs);
+                if ((vs = oql_kv_get(s->u.train.with_kv, "ROLE")))
+                    spec.role = oql_dup(vs);
+                st = oql_run_train(rt, &spec, out);
+                free(spec.organelle_name);
+                free(spec.corpus_name);
+                free(spec.save_path);
+                free(spec.role);
+            } else {
+                /* Legacy oql_execute (no runtime): TRAIN remains a stub.
+                 * test_train_stub_is_honest (E07) covers this. */
+                st = oql_exec_pending("TRAIN", out);
+            }
             break;
         case OQL_VERB_COMPOSE:
             if (rt) {
@@ -944,6 +1060,23 @@ static oql_status oql_execute_core(const OqlScript *script, OqlRuntime *rt,
                     "CREATE ORGANELLE %s: parsed (%d bindings)\n",
                     s->u.create_organelle.name ? s->u.create_organelle.name : "?",
                     n_bindings);
+                st = OQL_OK;
+            }
+            break;
+        case OQL_VERB_CREATE_CORPUS:
+            if (rt) {
+                st = oql_runtime_register_corpus(rt, &s->u.create_corpus, out);
+                if (st == OQL_OK && out) {
+                    fprintf(out,
+                        "CREATE CORPUS %s: registered (path '%s', lazy load)\n",
+                        s->u.create_corpus.name ? s->u.create_corpus.name : "?",
+                        s->u.create_corpus.file_path ? s->u.create_corpus.file_path : "?");
+                }
+            } else {
+                if (out) fprintf(out,
+                    "CREATE CORPUS %s: parsed (path '%s')\n",
+                    s->u.create_corpus.name ? s->u.create_corpus.name : "?",
+                    s->u.create_corpus.file_path ? s->u.create_corpus.file_path : "?");
                 st = OQL_OK;
             }
             break;

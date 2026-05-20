@@ -55,9 +55,11 @@ typedef enum {
     /* CREATE is inherited from SQL (not part of the +6 added verbs); it
      * carries an object-type subtag.  See experiments/E08-oql-behaviours.md
      * §1.3.2 — verb count remains +6 / -4 by reusing CREATE for BEHAVIOUR
-     * and ORGANELLE object types. */
+     * and ORGANELLE object types.  E10 adds CORPUS as a third CREATE object
+     * type (FROM FILE '<path>') — still inherits CREATE, still +6 verbs. */
     OQL_VERB_CREATE_BEHAVIOUR,
-    OQL_VERB_CREATE_ORGANELLE
+    OQL_VERB_CREATE_ORGANELLE,
+    OQL_VERB_CREATE_CORPUS
 } OqlVerb;
 
 /* ============================================================
@@ -189,6 +191,15 @@ typedef struct {
     OqlKV *bindings;    /* OqlKV list of *_BEHAVIOUR=name and friends */
 } OqlCreateOrganelle;
 
+/* CREATE CORPUS <name> FROM FILE '<path>';  (E10 — TRAIN's data source.)
+ * The corpus is registered lazily — file contents are slurped only when
+ * a TRAIN statement references the name.  The verb count stays +6/-4 by
+ * reusing CREATE (CORPUS is a new object type, not a new verb). */
+typedef struct {
+    char *name;         /* corpus identifier, owned */
+    char *file_path;    /* source path, owned (must be non-NULL) */
+} OqlCreateCorpus;
+
 /* ============================================================
  *  Statement union
  * ============================================================ */
@@ -204,6 +215,7 @@ typedef struct OqlStmt {
         OqlAudit    audit;
         OqlCreateBehaviour  create_behaviour;
         OqlCreateOrganelle  create_organelle;
+        OqlCreateCorpus     create_corpus;
     } u;
     struct OqlStmt *next;
 } OqlStmt;
@@ -276,6 +288,8 @@ oql_status oql_execute(const OqlScript *script, FILE *out, int *failed_idx);
 #define OQL_MAX_BEHAVIOURS 64
 #define OQL_MAX_PIPELINES  16
 #define OQL_MAX_PIPELINE_CALLS 32
+#define OQL_MAX_CORPORA    8
+#define OQL_MAX_PATH       256
 
 /* Forward-declared so the public header doesn't pull in microgpt.h or
  * pipeline_ir.h. `Model` and `Pipeline` are tagged structs in their own
@@ -312,6 +326,42 @@ typedef struct OqlOrganelle {
     char  cycle_detect_behaviour[64];
 } OqlOrganelle;
 
+/* A registered CORPUS (E10 — TRAIN's data source).  File contents are
+ * slurped lazily on first TRAIN reference and freed by
+ * oql_runtime_dispose.  Path is stored verbatim from CREATE CORPUS
+ * FROM FILE '<path>'. */
+typedef struct OqlCorpus {
+    char   name[64];
+    char   file_path[OQL_MAX_PATH];
+    char  *contents;          /* lazy: filled on first TRAIN reference */
+    size_t contents_len;
+} OqlCorpus;
+
+/* E10 — TRAIN spec parsed from a TRAIN statement.  Captures every
+ * locked sub-clause from experiments/E10-oql-train-wiring.md §1.3:
+ *   TRAIN <organelle> ON <corpus>
+ *       [WITH ROLE { planner | player | judge | <custom> }]
+ *       [STEPS <int>] [LR <float>] [BATCH_SIZE <int>]
+ *       [SAVE <path>] [SEED <int>]
+ *
+ * Defaults: steps = engine's compile-time NUM_STEPS, lr =
+ * LEARNING_RATE, batch_size = BATCH_SIZE, seed = 1337, save_path = NULL
+ * (no save), role = "" (no role label).
+ *
+ * Owned strings: organelle_name, corpus_name, save_path, role.  These
+ * are dup'd from the AST so the spec outlives the statement.
+ */
+typedef struct OqlTrainSpec {
+    char *organelle_name;     /* required; owned */
+    char *corpus_name;        /* required; owned */
+    int   steps;
+    double learning_rate;
+    int   batch_size;
+    unsigned int seed;
+    char *save_path;          /* NULL = no checkpoint save; owned */
+    char *role;               /* NULL or owned label */
+} OqlTrainSpec;
+
 /* A registered COMPOSE pipeline.  `ir` is a parsed Pipeline IR (or NULL
  * if COMPOSE's FROM clause didn't include an inline @graph block — in
  * that case `call_organelles` lists the named organelles in source
@@ -332,6 +382,9 @@ typedef struct OqlRuntime {
     int               n_organelles;
     OqlPipeline       pipelines[OQL_MAX_PIPELINES];
     int               n_pipelines;
+    /* E10 — CORPUS registry. */
+    OqlCorpus         corpora[OQL_MAX_CORPORA];
+    int               n_corpora;
     /* Configuration used when calling checkpoint_load (opaque pointer to
      * MicrogptConfig).  If NULL, the runtime falls back to a default
      * config built from the compile-time macros at OQL-lib build time. */
@@ -344,6 +397,16 @@ typedef struct OqlRuntime {
     double last_p99_ms;
     double last_total_seconds;
     int    last_audit_rows;
+    /* E10 — last TRAIN summary (populated by oql_run_train).  `last_train_loss`
+     * is the loss reported by the last completed step. */
+    int    last_train_steps;
+    double last_train_final_loss;
+    double last_train_total_seconds;
+    /* Optional per-step loss log — populated when caller installs a
+     * buffer via oql_runtime_attach_loss_log() prior to executing a
+     * TRAIN statement.  Used by the loss-curve fidelity smoke test. */
+    double *loss_log;        /* NOT owned; caller-allocated, capacity >= num_steps */
+    int     loss_log_cap;
 } OqlRuntime;
 
 /* Lifecycle. */
@@ -354,6 +417,12 @@ void oql_runtime_dispose(OqlRuntime *rt);
 OqlBehaviourEntry *oql_runtime_find_behaviour(OqlRuntime *rt, const char *name);
 OqlOrganelle      *oql_runtime_find_organelle(OqlRuntime *rt, const char *name);
 OqlPipeline       *oql_runtime_find_pipeline (OqlRuntime *rt, const char *name);
+OqlCorpus         *oql_runtime_find_corpus   (OqlRuntime *rt, const char *name);
+
+/* Optional per-step loss log for the E10 fidelity smoke test.  Caller
+ * supplies the buffer + capacity; the runtime writes one scalar per
+ * completed step.  Returns 0 on success.  Pass cap=0 to detach. */
+int oql_runtime_attach_loss_log(OqlRuntime *rt, double *buf, int cap);
 
 /* Execute a script against a runtime context.  Identical to oql_execute,
  * except CREATE BEHAVIOUR / CREATE ORGANELLE / COMPOSE register into the

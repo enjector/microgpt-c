@@ -306,6 +306,48 @@ enx_test(test_verb_surface_holds_six_plus_create) {
      * of the +6 added verbs.  See OQL_GRAMMAR_REFERENCE.md "Verb surface". */
     enx_assert_equal_int(OQL_VERB_CREATE_BEHAVIOUR, 7);
     enx_assert_equal_int(OQL_VERB_CREATE_ORGANELLE, 8);
+    /* E10 — CORPUS is the third CREATE object type.  Still no new top-level
+     * verb (T7 hard-lock): CREATE is inherited from SQL, CORPUS is a new
+     * object-type tag at slot 9. */
+    enx_assert_equal_int(OQL_VERB_CREATE_CORPUS,    9);
+}
+
+enx_test(test_e10_create_corpus_parses) {
+    OqlScript *s = parse_or_die(
+        "CREATE CORPUS names_tiny FROM FILE 'c_names.txt';");
+    enx_assert_equal_size(oql_script_count(s), 1);
+    enx_assert_equal_int(s->head->verb, OQL_VERB_CREATE_CORPUS);
+    enx_assert_equal_string(s->head->u.create_corpus.name, "names_tiny");
+    enx_assert_equal_string(s->head->u.create_corpus.file_path, "c_names.txt");
+    oql_script_free(s);
+}
+
+/* E10 — TRAIN parses every locked sub-clause from §1.3 (Phase 1):
+ *   WITH ROLE / STEPS / LR / BATCH_SIZE / SAVE / SEED.
+ * Pre-reg target T1.  The clauses arrive as key/value pairs through the
+ * existing E07 kv_list rule — no new grammar productions required. */
+enx_test(test_e10_train_full_clause_list_parses) {
+    OqlScript *s = parse_or_die(
+        "TRAIN poet ON names_tiny WITH "
+        "ROLE = planner, "
+        "STEPS = 2000, "
+        "LR = 0.001, "
+        "BATCH_SIZE = 4, "
+        "SAVE = 'checkpoints/poet.ckpt', "
+        "SEED = 42;");
+    enx_assert_equal_size(oql_script_count(s), 1);
+    enx_assert_equal_int(s->head->verb, OQL_VERB_TRAIN);
+    enx_assert_equal_string(s->head->u.train.target, "poet");
+    enx_assert_equal_int(s->head->u.train.on_src.kind, OQL_SRC_NAME);
+    enx_assert_equal_string(s->head->u.train.on_src.value, "names_tiny");
+    OqlKV *kv = s->head->u.train.with_kv;
+    enx_assert_equal_string(oql_kv_get(kv, "ROLE"),       "planner");
+    enx_assert_equal_string(oql_kv_get(kv, "STEPS"),      "2000");
+    enx_assert_equal_string(oql_kv_get(kv, "LR"),         "0.001");
+    enx_assert_equal_string(oql_kv_get(kv, "BATCH_SIZE"), "4");
+    enx_assert_equal_string(oql_kv_get(kv, "SAVE"),       "checkpoints/poet.ckpt");
+    enx_assert_equal_string(oql_kv_get(kv, "SEED"),       "42");
+    oql_script_free(s);
 }
 
 /* ── E08 Phase 4: Connect-4 worked example end-to-end ────────────────
@@ -632,22 +674,35 @@ enx_test(test_oql_runs_connect4_oql_one_game) {
     oql_script_free(script);
 }
 
-/* T6: TRAIN stub regression — ensure E09's runtime path did NOT silently
- * implement TRAIN.  This is the hard-locked discipline test from
- * experiments/E09-oql-runtime-wiring.md §1.4 T6. */
-enx_test(test_train_stub_still_honest) {
-    OqlScript *s = parse_or_die("TRAIN m WITH STEPS = 1;");
+/* E10 — TRAIN is now wired under the runtime path.  Two invariants
+ * preserved from E09:
+ *   1. Legacy `oql_execute()` (no runtime) still returns
+ *      OQL_ERR_NOT_IMPLEMENTED — TRAIN requires the runtime registry
+ *      (organelle / corpus tables) that the legacy path doesn't expose.
+ *      This is the test_train_stub_is_honest invariant from E07.
+ *   2. The runtime path no longer silently no-ops: TRAIN against an
+ *      unknown organelle returns OQL_ERR_RUNTIME with a clear error
+ *      message — i.e. it actually tried, and reported the misconfig.
+ *
+ * Skip-rule check (E10 T7): the runtime path's OQL_ERR_RUNTIME outcome
+ * here is the *correct* result for an unconfigured TRAIN — full TRAIN
+ * fidelity is measured by tests/test_microgpt_oql_train.c (the loss-curve
+ * smoke test running under the oql_names variant binary).  */
+enx_test(test_train_runtime_dispatch_smoke) {
+    OqlScript *s = parse_or_die("TRAIN m ON 'corpus.txt' WITH STEPS = 1;");
     /* Legacy oql_execute (no runtime): must remain NOT_IMPLEMENTED. */
     int failed_idx = 0;
     oql_status st = oql_execute(s, NULL, &failed_idx);
     enx_assert_equal_int(OQL_ERR_NOT_IMPLEMENTED, st);
     enx_assert_equal_int(1, failed_idx);
-    /* New runtime path: TRAIN must ALSO remain NOT_IMPLEMENTED. */
+    /* New runtime path: TRAIN against an unknown organelle returns
+     * OQL_ERR_RUNTIME (not NOT_IMPLEMENTED) — E10 wired TRAIN, but the
+     * organelle 'm' was never declared via CREATE ORGANELLE. */
     OqlRuntime rt;
     oql_runtime_init(&rt);
     failed_idx = 0;
     st = oql_execute_with_runtime(s, &rt, NULL, &failed_idx);
-    enx_assert_equal_int(OQL_ERR_NOT_IMPLEMENTED, st);
+    enx_assert_equal_int(OQL_ERR_RUNTIME, st);
     enx_assert_equal_int(1, failed_idx);
     oql_runtime_dispose(&rt);
     oql_script_free(s);
@@ -687,7 +742,10 @@ enx_test_case_t oql_tests[] = {
     enx_test_case(test_e09_runtime_compose_pipeline),
     enx_test_case(test_e09_compose_unknown_organelle_errors),
     enx_test_case(test_oql_runs_connect4_oql_one_game),
-    enx_test_case(test_train_stub_still_honest),
+    enx_test_case(test_train_runtime_dispatch_smoke),
+    /* E10 — TRAIN wiring + CREATE CORPUS object type. */
+    enx_test_case(test_e10_create_corpus_parses),
+    enx_test_case(test_e10_train_full_clause_list_parses),
     enx_test_case_end()
 };
 

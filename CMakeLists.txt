@@ -2299,6 +2299,7 @@ endif()
 add_library(microgpt_oql_lib STATIC
     src/microgpt_oql.c
     src/oql_runtime_games.c
+    src/oql_runtime_train.c
     ${OQL_PARSER_SOURCES})
 target_include_directories(microgpt_oql_lib PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -2346,6 +2347,7 @@ _microgpt_lib_for_defines(_C4_LIB ${_C4_DEFINES})
 add_executable(oql_c4
     tools/oql_runner.c
     src/oql_runtime_games.c
+    src/oql_runtime_train.c
     src/microgpt_oql.c
     ${OQL_PARSER_SOURCES})
 target_link_libraries(oql_c4 PRIVATE ${_C4_LIB} microgpt_vm_lib)
@@ -2369,6 +2371,56 @@ if(NOT MSVC)
     target_link_libraries(test_microgpt_oql PRIVATE m)
 endif()
 add_test(NAME microgpt_oql_tests COMMAND test_microgpt_oql WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+# ──────────────────────────────────────────────────────────────────
+#  test_microgpt_oql_train — E10 loss-curve fidelity smoke test.
+#
+#  Links against the *default* microgpt_lib variant (no DEFINES) so
+#  the engine macros (N_EMBD=16 N_LAYER=1 ...) match names_demo's
+#  config exactly.  This avoids the E09 §3.4 compile-time-macro
+#  silent-failure mode that bit the Connect-4 OQL CLI: the smoke
+#  test trains a names-shaped model in OQL and a names-shaped model
+#  in C with byte-identical hyperparameters, and asserts the
+#  per-step loss curves agree within the pre-reg ±10% relative budget.
+#
+#  Copies c_names.txt next to the test binary so it can be run
+#  from build/ as `./test_microgpt_oql_train`.
+# ──────────────────────────────────────────────────────────────────
+add_executable(test_microgpt_oql_train tests/test_microgpt_oql_train.c)
+target_link_libraries(test_microgpt_oql_train PRIVATE microgpt_oql_lib)
+target_include_directories(test_microgpt_oql_train PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests
+    ${CMAKE_CURRENT_SOURCE_DIR}/src)
+if(NOT MSVC)
+    target_link_libraries(test_microgpt_oql_train PRIVATE m)
+endif()
+add_custom_command(TARGET test_microgpt_oql_train POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/demos/character-level/names/c_names.txt"
+        "$<TARGET_FILE_DIR:test_microgpt_oql_train>/c_names.txt"
+    COMMENT "Copying c_names.txt for test_microgpt_oql_train"
+)
+add_test(NAME microgpt_oql_train_tests
+         COMMAND test_microgpt_oql_train
+         WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+# Long-horizon (5000-step) loss-curve benchmark — kept out of ctest
+# (3-10s runtime) but registered so engineers can re-measure when the
+# adapter changes.  Run from build/ as `./bench_microgpt_oql_train`.
+add_executable(bench_microgpt_oql_train tests/bench_microgpt_oql_train.c)
+target_link_libraries(bench_microgpt_oql_train PRIVATE microgpt_oql_lib)
+target_include_directories(bench_microgpt_oql_train PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests
+    ${CMAKE_CURRENT_SOURCE_DIR}/src)
+if(NOT MSVC)
+    target_link_libraries(bench_microgpt_oql_train PRIVATE m)
+endif()
+add_custom_command(TARGET bench_microgpt_oql_train POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/demos/character-level/names/c_names.txt"
+        "$<TARGET_FILE_DIR:bench_microgpt_oql_train>/c_names.txt"
+    COMMENT "Copying c_names.txt for bench_microgpt_oql_train"
+)
 
 # ==================================================================
 #  TurboQuant Integration Evaluation Targets
