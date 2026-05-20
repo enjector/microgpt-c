@@ -1,0 +1,77 @@
+# .github/workflows/leakage-audit.yml
+#
+# Pre-registered as Experiment E05 §3.2 (experiments/E05-prereg-methodology-public.md)
+# and Experiment 7.1 (docs/research/RESEARCH_OPA_DIRECTIONS.md §8.1).
+#
+# Hard-fails the PR if any held-out test file exceeds its calibrated
+# leakage threshold (tools/leakage_audit_thresholds.json) or if any new
+# verbatim leakage is introduced.
+#
+# Fires on PRs touching the wiring corpus, the synonym table, the audit
+# script itself, or the thresholds JSON — the four surfaces that the
+# v1 (commit 5a478bc) and Phase-13 incidents both modified.
+
+name: leakage-audit
+
+on:
+  pull_request:
+    paths:
+      - 'demos/wiring_organelle/pipeline_corpus_*.txt'
+      - 'tools/corpus_expand.c'
+      - 'tools/pipeline_corpus_gen.c'
+      - 'tools/scaling_leakage_audit.sh'
+      - 'tools/leakage_audit_thresholds.json'
+      - 'tools/check_held_out_leakage.sh'
+      - 'tools/run_leakage_audit_ci.sh'
+      - '.github/workflows/leakage-audit.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'demos/wiring_organelle/pipeline_corpus_*.txt'
+      - 'tools/corpus_expand.c'
+      - 'tools/pipeline_corpus_gen.c'
+      - 'tools/scaling_leakage_audit.sh'
+      - 'tools/leakage_audit_thresholds.json'
+      - 'tools/check_held_out_leakage.sh'
+      - 'tools/run_leakage_audit_ci.sh'
+  workflow_dispatch:
+
+jobs:
+  audit:
+    name: Leakage audit (Audit A + B + C)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq cmake build-essential
+
+      - name: Build (Release)
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --config Release --parallel 4
+
+      - name: Generate Phase-4 training corpus
+        run: |
+          cd build
+          if [ -x ./corpus_expand ]; then
+            ./corpus_expand pipeline_corpus_phase4_train.txt 42 > /dev/null
+          fi
+
+      - name: Run leakage audit
+        run: bash tools/run_leakage_audit_ci.sh
+
+      - name: Upload audit log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: leakage-audit-log
+          path: |
+            build/pipeline_corpus_*.txt
+            tools/leakage_audit_thresholds.json
+          if-no-files-found: warn

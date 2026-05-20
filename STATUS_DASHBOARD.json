@@ -1,0 +1,50 @@
+{
+  "schema": "research_status_dashboard.v1",
+  "generator": "tools/research_status_dashboard.c",
+  "summary": {
+    "total": 31,
+    "misses": 1,
+    "PROPOSAL-LOCKED": 18,
+    "PASS": 2,
+    "FALSIFIED": 0,
+    "PARTIAL": 7,
+    "CANCELLED": 3,
+    "EXCEEDED": 1
+  },
+  "blocks": [
+    {"file": "docs/research/RESEARCH_OPA_DIRECTIONS.md", "line": 41, "heading_level": 3, "markers": 2, "status": "PROPOSAL-LOCKED", "heading": "2.2 Experiment 1.2 — Typed-tensor handoffs (audit-preserving alternative to 1.1) | 2. Direction 1 — Inter-organelle protocol"},
+    {"file": "docs/research/RESEARCH_OPA_DIRECTIONS.md", "line": 51, "heading_level": 3, "markers": 2, "status": "PROPOSAL-LOCKED", "heading": "2.3 Experiment 1.3 — Vote-aggregation strategies beyond best-of-N | 2. Direction 1 — Inter-organelle protocol"},
+    {"file": "docs/research/RESEARCH_OPA_DIRECTIONS.md", "line": 69, "heading_level": 3, "markers": 2, "status": "PROPOSAL-LOCKED", "heading": "3.1 Experiment 2.1 — Curator-as-organelle (active learning loop) | 3. Direction 2 — Curator-side automation"},
+    {"file": "docs/research/RESEARCH_OPA_DIRECTIONS.md", "line": 82, "heading_level": 3, "markers": 2, "status": "PROPOSAL-LOCKED", "heading": "3.2 Experiment 2.2 — External-vocabulary ingestion (WordNet / ConceptNet / domain glossaries) | 3. Direction 2 — Curator-side automation"},
+    {"file": "docs/research/RESEARCH_OPA_DIRECTIONS.md", "line": 92, "heading_level": 3, "markers": 2, "status": "PROPOSAL-LOCKED", "heading": "3.3 Experiment 2.3 — Independent-curator reproducibility (already-named follow-up) | 3. Direction 2 — Curator-side automation"},
+    {"file": "docs/research/RESEARCH_OPA_DIRECTIONS.md", "line": 108, "heading_level": 3, "markers": 2, "status": "PROPOSAL-LOCKED", "heading": "4.1 Experiment 3.1 — `pipeline_verify_with_confidence` extension | 4. Direction 3 — Probabilistic Judge (ties to productisation)"},
+    {"file": "docs/research/RESEARCH_OPA_DIRECTIONS.md", "line": 124, "heading_level": 3, "markers": 2, "status": "PROPOSAL-LOCKED", "heading": "5.1 Experiment 4.1 — Distillation from a frontier LLM into role-specialised organelles | 5. Direction 4 — Cross-organelle learning"},
+    {"file": "docs/research/RESEARCH_OPA_DIRECTIONS.md", "line": 134, "heading_level": 3, "markers": 2, "status": "PROPOSAL-LOCKED", "heading": "5.2 Experiment 4.2 — Federated training between independently-trained organelles | 5. Direction 4 — Cross-organelle learning"},
+    {"file": "docs/research/RESEARCH_OPA_DIRECTIONS.md", "line": 150, "heading_level": 3, "markers": 2, "status": "PROPOSAL-LOCKED", "heading": "6.1 Experiment 5.1 — Conditional / branching graphs | 6. Direction 5 — Pipeline IR extensions"},
+    {"file": "docs/research/RESEARCH_OPA_DIRECTIONS.md", "line": 162, "heading_level": 3, "markers": 2, "status": "PROPOSAL-LOCKED", "heading": "6.2 Experiment 5.2 — Recursive sub-graph references | 6. Direction 5 — Pipeline IR extensions"},
+    {"file": "docs/research/RESEARCH_OPA_DIRECTIONS.md", "line": 176, "heading_level": 3, "markers": 2, "status": "PROPOSAL-LOCKED", "heading": "7.1 Experiment 6.1 — Raspberry Pi 4 / 5 reference benchmarks | 7. Direction 6 — Edge-deployment benchmarks (closes a deferred gap)"},
+    {"file": "docs/research/RESEARCH_OPA_DIRECTIONS.md", "line": 190, "heading_level": 3, "markers": 2, "status": "PROPOSAL-LOCKED", "heading": "7.2 Experiment 6.2 — ESP32 micro-deployment of one minimal organelle | 7. Direction 6 — Edge-deployment benchmarks (closes a deferred gap)"},
+    {"file": "docs/research/RESEARCH_OPA_DIRECTIONS.md", "line": 206, "heading_level": 3, "markers": 2, "status": "PROPOSAL-LOCKED", "heading": "8.1 Experiment 7.1 — Auto-audit on every commit | 8. Direction 7 — Honest-claim infrastructure"},
+    {"file": "docs/research/RESEARCH_OPA_DIRECTIONS.md", "line": 214, "heading_level": 3, "markers": 2, "status": "PROPOSAL-LOCKED", "heading": "8.2 Experiment 7.2 — Pre-registration database | 8. Direction 7 — Honest-claim infrastructure"},
+    {"file": "docs/research/RESEARCH_OPENMYTHOS_CROSS_POLLINATION.md", "line": 23, "heading_level": 3, "markers": 3, "status": "PROPOSAL-LOCKED", "heading": "2.1 Experiment A — ACT halting at the OPA pipeline level | 2. Pre-registered experiments — locked targets and skip rules"},
+    {"file": "docs/research/RESEARCH_OPENMYTHOS_CROSS_POLLINATION.md", "line": 51, "heading_level": 3, "markers": 3, "status": "PROPOSAL-LOCKED", "heading": "2.2 Experiment B — LTI-stable scoring for the wiring vote loop | 2. Pre-registered experiments — locked targets and skip rules"},
+    {"file": "docs/research/RESEARCH_OPENMYTHOS_CROSS_POLLINATION.md", "line": 69, "heading_level": 3, "markers": 3, "status": "PROPOSAL-LOCKED", "heading": "2.3 Experiment D — Latent-tensor inter-organelle handoffs (the third level) | 2. Pre-registered experiments — locked targets and skip rules"},
+    {"file": "docs/research/RESEARCH_OPENMYTHOS_CROSS_POLLINATION.md", "line": 105, "heading_level": 3, "markers": 3, "status": "PROPOSAL-LOCKED", "heading": "2.4 Experiment C — Depth extrapolation for game-playing organelles | 2. Pre-registered experiments — locked targets and skip rules"},
+    {"file": "docs/research/RESEARCH_PIPELINE_IR.md", "line": 3404, "heading_level": 3, "markers": 1, "status": "PASS", "heading": "42.3 Pre-registered predictions (locked, copying §40.3) | 42. Phase 3b — Fragment composition: pre-registration (axis 3 multi-stage chains)"},
+    {"file": "docs/research/RESEARCH_PIPELINE_IR.md", "line": 3654, "heading_level": 3, "markers": 1, "status": "EXCEEDED", "heading": "45.2 Pre-registered predictions (locked) | 45. Phase 4 — Corpus expansion: pre-registration (testing the §41 corpus-size hypothesis)"},
+    {"file": "docs/research/RESEARCH_PIPELINE_IR.md", "line": 3835, "heading_level": 3, "markers": 1, "status": "PARTIAL", "heading": "47.2 Pre-registered prediction vs measurement | 47. Phase 6d — Per-port noun-aware inner picker (V1.1.0, 2026-05-01)"},
+    {"file": "docs/engineering/CLEAN_ROOM_IMPLEMENTATION/RESEARCH_DISCLOSURE.md", "line": 18, "heading_level": 3, "markers": 2, "status": "CANCELLED", "heading": "2.1 Phase 3a-full — EKAN-Network classifier | 2. Cancelled phases (pre-registered skip rule honoured)"},
+    {"file": "docs/engineering/CLEAN_ROOM_IMPLEMENTATION/RESEARCH_DISCLOSURE.md", "line": 26, "heading_level": 3, "markers": 2, "status": "CANCELLED", "heading": "2.2 Phase 3c — RAG fallback | 2. Cancelled phases (pre-registered skip rule honoured)"},
+    {"file": "docs/engineering/CLEAN_ROOM_IMPLEMENTATION/RESEARCH_DISCLOSURE.md", "line": 33, "heading_level": 3, "markers": 2, "status": "CANCELLED", "heading": "2.3 Phase 4b-full — EKAN-Network on the expanded corpus | 2. Cancelled phases (pre-registered skip rule honoured)"},
+    {"file": "docs/engineering/CLEAN_ROOM_IMPLEMENTATION/RESEARCH_DISCLOSURE.md", "line": 86, "heading_level": 3, "markers": 1, "status": "PARTIAL", "heading": "3.2 Pre-registered targets | 3. Phase 5 — Compositional generator pre-registration (2026-04-30)"},
+    {"file": "docs/engineering/CLEAN_ROOM_IMPLEMENTATION/RESEARCH_DISCLOSURE.md", "line": 146, "heading_level": 3, "markers": 1, "status": "PARTIAL", "heading": "4.1 Hypotheses (in falsifiable form) | 4. Phase 6 — Compositional search improvements (pre-registration, 2026-05-01)"},
+    {"file": "docs/engineering/CLEAN_ROOM_IMPLEMENTATION/RESEARCH_DISCLOSURE.md", "line": 210, "heading_level": 3, "markers": 1, "status": "PARTIAL", "heading": "5.1 Hypotheses (in falsifiable form) | 5. Phase 6b — Argument-binder + manifest-driven geo (pre-registration, 2026-05-01)"},
+    {"file": "docs/engineering/CLEAN_ROOM_IMPLEMENTATION/RESEARCH_DISCLOSURE.md", "line": 362, "heading_level": 3, "markers": 1, "status": "PARTIAL", "heading": "6.3 Pre-registered Phase 6c plan | 6. Phase 6c — Branched-project mining sketch (pre-registration, 2026-05-01)"},
+    {"file": "docs/engineering/CLEAN_ROOM_IMPLEMENTATION/RESEARCH_DISCLOSURE.md", "line": 449, "heading_level": 3, "markers": 1, "status": "PARTIAL", "heading": "8.2 Hypotheses (in falsifiable form) | 8. Phase 6d — Per-port noun-aware inner picker + depth-2 recursion (pre-registration, 2026-05-01)"},
+    {"file": "docs/engineering/CLEAN_ROOM_IMPLEMENTATION/RESEARCH_DISCLOSURE.md", "line": 533, "heading_level": 3, "markers": 1, "status": "PARTIAL", "heading": "9.1 Hypotheses (verbatim from the roadmap) | 9. Phase 7 — OPA Adaptive-Depth (pre-registration, 2026-05-01)"},
+    {"file": "experiments/E05-prereg-methodology-public.md", "line": 10, "heading_level": 2, "markers": 3, "status": "PASS", "heading": "1. Hypothesis (locked before measurement)"}
+  ],
+  "misses": [
+    {"file": "docs/research/wiring_scaling_curve.md", "line": 18, "snippet": "## Pre-registered hypotheses (locked before any new family was added)"}
+  ]
+}
