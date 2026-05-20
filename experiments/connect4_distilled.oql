@@ -1,0 +1,112 @@
+-- experiments/connect4_distilled.oql
+--
+-- Experiment E13 Phase 4 — evaluate the distilled student organelle
+-- against random opponent on the same 100-game protocol used by
+-- E09/E11 (`experiments/connect4.oql`).
+--
+-- Same behaviour bodies (parse / format / validate / fallback) as
+-- connect4.oql byte-for-byte — only the FROM CHECKPOINT path is
+-- redirected to the distilled checkpoint.  This isolates T1
+-- (win-rate delta) from confounders introduced by behaviour changes.
+--
+-- Run with:
+--     ./build/oql_c4 run experiments/connect4_distilled.oql
+
+-- ──────────────────────────────────────────────────────────────────
+-- BEHAVIOURS — identical to experiments/connect4.oql.  Kept inline
+-- rather than `INCLUDE`d because OQL has no INCLUDE verb (yet).
+-- ──────────────────────────────────────────────────────────────────
+CREATE BEHAVIOUR parse_c4_board AS VM `
+    declare function c4_legal_column_mask(): number;
+    declare function c4_column_is_legal_n(col: number): number;
+    declare function c4_model_propose_column(t: number): number;
+    function eval(): number {
+        var legal  = c4_legal_column_mask();
+        var col    = c4_model_propose_column(20);
+        var result = legal;
+        if (col >= 0) {
+            var ok = c4_column_is_legal_n(col);
+            if (ok > 0) {
+                var bit = 1;
+                var i   = 0;
+                while (i < col) {
+                    bit = bit + bit;
+                    i   = i + 1;
+                }
+                result = bit;
+            }
+        }
+        return result;
+    }
+`;
+
+CREATE BEHAVIOUR format_c4_move AS VM `
+    declare function c4_parse_token(): number;
+    function eval(): number {
+        var col = c4_parse_token();
+        return col;
+    }
+`;
+
+CREATE BEHAVIOUR c4_move_is_legal AS VM `
+    declare function c4_parse_token(): number;
+    declare function c4_column_is_legal_n(col: number): number;
+    function eval(): number {
+        var col = c4_parse_token();
+        var ok  = 0;
+        if (col >= 0) {
+            ok = c4_column_is_legal_n(col);
+        }
+        return ok;
+    }
+`;
+
+CREATE BEHAVIOUR c4_fallback_when_stuck AS VM `
+    declare function c4_last_entropy(): number;
+    declare function c4_centre_col(): number;
+    declare function c4_column_is_legal_n(col: number): number;
+    function eval(): number {
+        var ent    = c4_last_entropy();
+        var result = -1;
+        if (ent > 0.8) {
+            var cc    = c4_centre_col();
+            var legal = c4_column_is_legal_n(cc);
+            if (legal > 0) {
+                result = cc;
+            }
+        }
+        return result;
+    }
+`;
+
+-- ──────────────────────────────────────────────────────────────────
+-- ORGANELLE bindings — the *only* delta from connect4.oql is the
+-- player's checkpoint path.  Everything else (bindings, planner,
+-- compose order, run protocol) is byte-identical so the measurement
+-- isolates the distilled-vs-baseline player effect.
+-- ──────────────────────────────────────────────────────────────────
+CREATE ORGANELLE connect4_player
+  FROM CHECKPOINT 'checkpoints/c4_player_distilled.ckpt'
+  WITH (
+    INPUT_BEHAVIOUR    = parse_c4_board,
+    OUTPUT_BEHAVIOUR   = format_c4_move,
+    VALIDATE_BEHAVIOUR = c4_move_is_legal,
+    FALLBACK_BEHAVIOUR = c4_fallback_when_stuck
+  );
+
+CREATE ORGANELLE connect4_planner
+  FROM CHECKPOINT 'checkpoints/c4_planner.ckpt'
+  WITH (
+    INPUT_BEHAVIOUR  = parse_c4_board,
+    OUTPUT_BEHAVIOUR = format_c4_move
+  );
+
+COMPOSE connect4_pipeline
+  FROM connect4_player, connect4_planner;
+
+RUN connect4_pipeline WITH
+  MODE     = game_loop,
+  GAME     = connect4,
+  OPPONENT = random,
+  GAMES    = 100,
+  SEED     = 42;

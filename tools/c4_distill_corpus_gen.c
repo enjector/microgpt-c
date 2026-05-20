@@ -140,18 +140,26 @@ typedef struct {
     const char *model_id;
     const char *endpoint;
     int   skip_health_check;
+    const char *prepend_path;   /* optional baseline corpus to splice in
+                                   front of the LLM corpus (vocab coverage) */
 } Args;
 
 static void print_usage(const char *argv0) {
     fprintf(stderr,
         "usage: %s [--games=N] [--max-pairs=M] [--opp-seed=K] [--llm-seed=K]\n"
         "          [--out=PATH] [--cache=DIR] [--model=ID] [--endpoint=URL]\n"
-        "          [--skip-health-check]\n"
+        "          [--prepend=PATH] [--skip-health-check]\n"
         "\n"
         "  E13 — LLM-distillation corpus generator.  Plays N Connect-4 games\n"
         "  with the LLM as X (qwen/qwen3.6-35b-a3b via http://127.0.0.1:1234\n"
         "  by default), random as O, and emits (board, move) pairs from the\n"
         "  LLM's wins to OUT.  Stops at min(N games, M pairs).\n"
+        "\n"
+        "  --prepend=PATH copies PATH's contents to OUT before the LLM\n"
+        "    pairs land, so the trained student's char-vocab matches that\n"
+        "    of the baseline checkpoint loader (which requires vocab\n"
+        "    alignment with c_connect4_player.txt — see oql_runtime_games.c\n"
+        "    `build_player_organelle`).  Recommended for E13 training.\n"
         "\n"
         "  defaults: games=%d max_pairs=%d opp_seed=%d llm_seed=%d\n"
         "            out='%s' cache='%s'\n",
@@ -169,6 +177,7 @@ static int parse_args(int argc, char **argv, Args *a) {
     a->model_id = NULL;
     a->endpoint = NULL;
     a->skip_health_check = 0;
+    a->prepend_path = NULL;
     for (int i = 1; i < argc; i++) {
         const char *s = argv[i];
         if (!strncmp(s, "--games=", 8))         a->n_games = atoi(s + 8);
@@ -179,6 +188,7 @@ static int parse_args(int argc, char **argv, Args *a) {
         else if (!strncmp(s, "--cache=", 8))      a->cache_dir = s + 8;
         else if (!strncmp(s, "--model=", 8))      a->model_id = s + 8;
         else if (!strncmp(s, "--endpoint=", 11))  a->endpoint = s + 11;
+        else if (!strncmp(s, "--prepend=", 10))   a->prepend_path = s + 10;
         else if (!strcmp(s, "--skip-health-check")) a->skip_health_check = 1;
         else if (!strcmp(s, "--help") || !strcmp(s, "-h")) {
             print_usage(argv[0]); return -1;
@@ -258,6 +268,43 @@ int main(int argc, char **argv) {
         fprintf(stderr, "FATAL: cannot open %s for writing\n", a.out_path);
         llm_game_player_free(llm);
         return 1;
+    }
+
+    /* Optional: prepend baseline corpus.  Streams bytes verbatim — no
+     * parsing.  Ensures the trained student's vocab covers every char
+     * the baseline c_connect4_player.txt contains.  Per E13 §3.4 the
+     * student trains on the COMBINED corpus (baseline + LLM-distill);
+     * this is augmentation distillation, not pure LLM-only distillation
+     * — documented honestly in the writeup. */
+    int prepend_bytes = 0;
+    if (a.prepend_path && a.prepend_path[0]) {
+        FILE *pf = fopen(a.prepend_path, "rb");
+        if (!pf) {
+            fprintf(stderr,
+                "FATAL: --prepend='%s' could not be opened\n",
+                a.prepend_path);
+            fclose(out);
+            llm_game_player_free(llm);
+            return 1;
+        }
+        char chunk[8192];
+        size_t r;
+        while ((r = fread(chunk, 1, sizeof(chunk), pf)) > 0) {
+            fwrite(chunk, 1, r, out);
+            prepend_bytes += (int)r;
+        }
+        fclose(pf);
+        /* Ensure the prepended file ends with a blank-line separator so
+         * the first LLM record doesn't accidentally fuse with the last
+         * baseline record.  The corpus loader (opa_load_docs_multiline)
+         * splits on blank lines, so two consecutive '\n's are required. */
+        fputc('\n', out);
+        fputc('\n', out);
+        prepend_bytes += 2;
+        fprintf(stderr,
+            "Prepended baseline corpus '%s' (%d bytes)\n",
+            a.prepend_path, prepend_bytes);
+        fflush(out);
     }
 
     /* Stats. */
