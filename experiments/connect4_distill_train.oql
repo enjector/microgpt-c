@@ -40,9 +40,11 @@
 --          win rate above the 88-89% baseline?  Three outcomes still
 --          map cleanly per §4.2.
 --
---    Produced by the shell pre-step:
---      cat build/c_connect4_player.txt \
---          build/data/c4_distill_corpus.txt \
+--    Produced by the shell pre-step (LLM corpus FIRST so the
+--    opa_load_docs_multiline `max_docs` cap consumes LLM moves
+--    preferentially — see E13 §3.3 for the cap-ordering note):
+--      cat build/data/c4_distill_corpus.txt \
+--          build/c_connect4_player.txt \
 --        > build/data/c4_distill_corpus_augmented.txt
 --    (See experiments/E13-llm-game-distillation.md §3.3.)
 CREATE CORPUS c4_distill FROM FILE 'data/c4_distill_corpus_augmented.txt';
