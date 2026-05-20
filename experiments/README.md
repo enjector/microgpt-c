@@ -47,7 +47,8 @@ Each of these directions has a dedicated experiment doc in this folder:
 12. **LLM-as-corpus-source for the wiring organelle.** Local LM Studio + Pipeline IR verifier filter + standing leakage audit. Tests whether the curator-bound ceiling (`INV-WIRE-061`) is architectural or curator-vocabulary-specific — answers E03's open question via a different curator type. Adds one new SOURCE clause (`CREATE CORPUS … FROM LLM …`); zero new build deps beyond curl. → **[E12](E12-llm-wiring-corpus.md)**
 13. **LLM distillation into a Connect-4 player organelle.** Ports `RESEARCH_OPA_DIRECTIONS.md` §5.1 (Experiment 4.1) to the two-commit pre-reg shape. Local LM Studio plays N games; student organelle (≤460K params) trains on (board, move) pairs; target ≥93% (vs 88% C-demo baseline). All three possible outcomes (≥93% / 88-92% / <88%) are publishable. → **[E13](E13-llm-game-distillation.md)**
 14. **Unify E12 + E13's parallel LLM bridges under one OQL `LLM_SOURCE` object + shared `tools/llm_endpoint.{c,h}` transport.** Adds one new first-class object type via the existing `CREATE` verb (no 7th verb). Targets ≤600 LOC combined (current ~1200), bit-identical reproduction of both E12 and E13 outputs via cache replay, plus a third worked `paraphrase` mode demonstrating the dispatch pattern absorbs creation/game-play/transformation shapes cleanly. → **[E14](E14-oql-llm-source-unification.md)**
-15. **Does coordination beat capacity at equal budget?** The project's deepest unmeasured claim. OPA composition (planner+player+judge, ~900K total) vs equal-budget monolithic transformer on hard-search puzzles (Klotski + 15-puzzle) where search depth exceeds single-forward-pass capacity. Leads with a §0 input/output search-space taxonomy: five criteria for when OPA plausibly outperforms. Corpus generation lifted into OQL as a new `FROM ORACLE` source clause. **HIGH-falsification-risk; thesis-falsified outcome is more interesting than confirmation.** → **[E15](E15-composition-vs-monolithic.md)**
+15. **Does coordination beat capacity at equal budget?** The project's deepest unmeasured claim. OPA composition (planner+player+judge, ~900K total) vs equal-budget monolithic transformer on hard-search puzzles (Klotski + 15-puzzle) where search depth exceeds single-forward-pass capacity. Leads with a §0 input/output search-space taxonomy: five criteria for when OPA plausibly outperforms. Corpus generation lifted into OQL as a new `FROM ORACLE` source clause. **T5 FAIL on transformer-only composition** — but E15 was a strawman because the real OPA architecture (Bonsai + Nucleus + Membrane Gate) wasn't included. → **[E15](E15-composition-vs-monolithic.md)**
+16. **The REAL composition test — port Bonsai + Nucleus + Lifecycle from the sibling repo and redo E15.** E15 tested transformer-only OPA; the project's "coordination is the intelligence" claim has always been about the *heterogeneous* OPA — transformers for pattern + Bonsai (8.6ns deterministic classification, 100% audit, calibrated probability) for safety/classification/gating + Nucleus for weighted aggregation. E16 ports the missing half, integrates via a new `CREATE BONSAI` OQL object (no 7th verb), and re-runs E15's evaluation with the architecture the project's narrative has always been *about*. → **[E16](E16-bonsai-augmented-opa.md)**
 
 ### What we explicitly will NOT prioritise
 
@@ -84,7 +85,7 @@ Every experiment doc is a single markdown file with four sections:
 | **3. Implementation + results** | Measurement commit | What was built, raw numbers, links to artefacts |
 | **4. Conclusion** | Measurement commit | Verdict against each pre-reg target, lessons, next moves, traceability updates |
 
-## The fifteen experiments
+## The sixteen experiments
 
 | ID | Title | Direction | Cost | Falsification risk |
 |---|---|---|---|---|
@@ -102,7 +103,8 @@ Every experiment doc is a single markdown file with four sections:
 | [E12](E12-llm-wiring-corpus.md) | LLM-as-corpus-source for wiring (NL → typed-graph), via local LM Studio + verifier filter | Tests curator-bound ceiling from a different curator type; answers E03 indirectly | ~2-3 wk | Medium |
 | [E13](E13-llm-game-distillation.md) | LLM distillation into Connect-4 player organelle, via local LM Studio | Ports `RESEARCH_OPA_DIRECTIONS.md` §5.1; ≥93% Connect-4 target, all outcomes publishable | ~2-4 wk | Medium |
 | [E14](E14-oql-llm-source-unification.md) | Unify E12 + E13's LLM bridges under one `LLM_SOURCE` OQL object + shared transport | One declarative surface for all design-time LLM use; targets >50% LOC reduction + bit-identical reproductions + new paraphrase mode | ~2-3 wk | Medium |
-| [E15](E15-composition-vs-monolithic.md) | Does coordination beat capacity at equal budget? OPA composition vs monolithic on Klotski + 15-puzzle with `FROM ORACLE` corpus generation | **The deepest unmeasured claim.** Leads with a §0 input/output search-space taxonomy. ≥15pp margin = thesis validated; <5pp = falsified — both publishable | ~4-6 wk | **HIGH (intentional)** |
+| [E15](E15-composition-vs-monolithic.md) | Does coordination beat capacity at equal budget? OPA composition vs monolithic on Klotski + 15-puzzle with `FROM ORACLE` corpus generation | **T5 FAIL on transformer-only** (+5.3pp Klotski, +0.6pp 15-puzzle); narrow falsification — E15 tested a strawman of OPA without Bonsai | ~4-6 wk | **HIGH (intentional)** |
+| [E16](E16-bonsai-augmented-opa.md) | **The real composition test** — port Bonsai + Nucleus + Lifecycle from sibling repo, integrate via `CREATE BONSAI` OQL object, redo E15 with heterogeneous OPA | Tests the architecture the project's claims have always been about; if PASS, validates "coordination is the intelligence" against the right control | ~5-7 wk | Medium-low |
 
 ## Status legend
 
