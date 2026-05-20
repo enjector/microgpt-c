@@ -229,6 +229,7 @@ static int is_legacy_h_main_heading(const char *line) {
  */
 static int has_outcome_marker(const PreregBlock *b) {
     return icontains(b->body, "--- sibling outcome ---") ||
+           icontains(b->body, "--- sibling level-2 outcome ---") ||
            icontains(b->body, "--- parent level-2 body ---") ||
            icontains(b->heading, "outcome") ||
            icontains(b->heading, "result") ||
@@ -252,6 +253,16 @@ static Status classify_status(const PreregBlock *b) {
          icontains(b->body, "is **cancelled**"))) {
         return ST_CANCELLED;
     }
+
+    /* Rule 1.5: explicit "all N pre-registered targets meet"
+     * stronger-than-others verdict (used by E05 §3.5 and similar
+     * summary-table outcomes). Fires before EXCEEDED to avoid
+     * misclassifying a passes-the-floor summary as EXCEEDED merely
+     * because the body discusses other experiments that EXCEEDED. */
+    if (has_outcome &&
+        (icontains(b->body, "all six pre-registered targets meet") ||
+         icontains(b->body, "all pre-registered targets meet") ||
+         icontains(b->body, "all targets pass"))) return ST_PASS;
 
     /* Rule 2: EXCEEDED — needs outcome */
     if (has_outcome &&
@@ -354,10 +365,29 @@ static int process_file(const char *path) {
     int cur_block_idx = -1;
     int cur_level2_idx = -1;
     int cur_level = 0;
+    /* Markdown fenced-code-block tracker: triple-backtick opens, next
+     * triple-backtick closes. We treat code-block content as opaque to
+     * heading parsing so example pre-reg blocks inside markdown fences
+     * don't create phantom dashboard entries. */
+    int in_fence = 0;
 
     while (fgets(line, sizeof line, f)) {
         line_no++;
         rtrim(line);
+
+        /* Fenced code-block boundary. */
+        if (strncmp(ltrim(line), "```", 3) == 0) {
+            in_fence = !in_fence;
+            continue;
+        }
+        if (in_fence) {
+            /* Inside a code block: line contributes to the current
+             * section's body (so markdown is preserved in the output)
+             * but cannot open new headings or marker-trigger pre-reg
+             * detection. */
+            if (cur_block_idx >= 0) append_body(&blocks[cur_block_idx], line);
+            continue;
+        }
 
         int hl = heading_level(line);
         if (hl >= 2 && hl <= 3) {
@@ -482,10 +512,12 @@ static void rollup_outcomes(void) {
     for (int i = 0; i < orig_n; i++) {
         PreregBlock *b = &blocks[i];
         if (b->markers == 0) continue;
-        if (b->heading_level != 3) continue;
-        /* Only attempt for blocks whose name contains "Pre-registered" — these
-         * are the §N.M sub-sections inside §N where §(N+1) is the outcome. */
-        if (!icontains(b->heading, "pre-registered")) continue;
+        if (b->heading_level != 2 && b->heading_level != 3) continue;
+        /* Only attempt for blocks whose name contains "Pre-registered" or
+         * "Hypothesis" — these are the §N or §N.M pre-reg sub-sections
+         * inside §N where §(N+1) is the outcome. */
+        if (!icontains(b->heading, "pre-registered") &&
+            !icontains(b->heading, "hypothes")) continue;
         for (int j = 0; j < orig_n; j++) {
             if (j == i) continue;
             PreregBlock *o = &blocks[j];
@@ -494,15 +526,31 @@ static void rollup_outcomes(void) {
             if (o->heading_level != 2) continue;
             /* Walk forward at most 200 lines. */
             if (o->line - b->line > 200) continue;
-            if (icontains(o->heading, "outcome") ||
+            int match = icontains(o->heading, "outcome") ||
                 icontains(o->heading, "phase 4 ") ||
                 icontains(o->heading, "phase 3b") ||
                 icontains(o->heading, "phase 6d") ||
                 icontains(o->heading, "results vs") ||
-                icontains(o->heading, " result")) {
+                icontains(o->heading, " result") ||
+                icontains(o->heading, "implementation") ||
+                icontains(o->heading, "conclusion");
+            if (match) {
                 append_body(b, "--- sibling level-2 outcome ---");
                 append_body(b, o->heading);
                 append_body(b, o->body);
+                /* Also append child level-3 sub-sections of the matched
+                 * level-2 sibling. Since blocks are stored in file order,
+                 * any block immediately after o whose parent_level2_idx
+                 * points back to o is a child. */
+                for (int k = j + 1; k < orig_n; k++) {
+                    PreregBlock *c = &blocks[k];
+                    if (strcmp(c->file, o->file) != 0) break;
+                    if (c->heading_level == 2) break; /* next sibling */
+                    if (c->heading_level >= 3) {
+                        append_body(b, c->heading);
+                        append_body(b, c->body);
+                    }
+                }
                 break;
             }
         }

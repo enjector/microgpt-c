@@ -8,8 +8,8 @@ Status legend: **PROPOSAL-LOCKED** — pre-reg committed, outcome not yet measur
 
 | Status | Count |
 |---|---:|
-| PROPOSAL-LOCKED | 19 |
-| PASS | 1 |
+| PROPOSAL-LOCKED | 18 |
+| PASS | 2 |
 | FALSIFIED | 0 |
 | PARTIAL | 7 |
 | CANCELLED | 3 |
@@ -52,7 +52,7 @@ Parser misses (legacy-format pre-reg blocks NOT silently absorbed): **1**
 | 28 | PARTIAL | 1 | `docs/engineering/CLEAN_ROOM_IMPLEMENTATION/RESEARCH_DISCLOSURE.md` | 362 | 6.3 Pre-registered Phase 6c plan / 6. Phase 6c — Branched-project mining sketch (pre-registration, 2026-05-01) |
 | 29 | PARTIAL | 1 | `docs/engineering/CLEAN_ROOM_IMPLEMENTATION/RESEARCH_DISCLOSURE.md` | 449 | 8.2 Hypotheses (in falsifiable form) / 8. Phase 6d — Per-port noun-aware inner picker + depth-2 recursion (pre-registration, 2026-05-01) |
 | 30 | PARTIAL | 1 | `docs/engineering/CLEAN_ROOM_IMPLEMENTATION/RESEARCH_DISCLOSURE.md` | 533 | 9.1 Hypotheses (verbatim from the roadmap) / 9. Phase 7 — OPA Adaptive-Depth (pre-registration, 2026-05-01) |
-| 31 | PROPOSAL-LOCKED | 3 | `experiments/E05-prereg-methodology-public.md` | 10 | 1. Hypothesis (locked before measurement) |
+| 31 | PASS | 3 | `experiments/E05-prereg-methodology-public.md` | 10 | 1. Hypothesis (locked before measurement) |
 
 ## Parser misses (legacy-format pre-reg blocks)
 

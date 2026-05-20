@@ -4,8 +4,8 @@
   "summary": {
     "total": 31,
     "misses": 1,
-    "PROPOSAL-LOCKED": 19,
-    "PASS": 1,
+    "PROPOSAL-LOCKED": 18,
+    "PASS": 2,
     "FALSIFIED": 0,
     "PARTIAL": 7,
     "CANCELLED": 3,
@@ -42,7 +42,7 @@
     {"file": "docs/engineering/CLEAN_ROOM_IMPLEMENTATION/RESEARCH_DISCLOSURE.md", "line": 362, "heading_level": 3, "markers": 1, "status": "PARTIAL", "heading": "6.3 Pre-registered Phase 6c plan | 6. Phase 6c — Branched-project mining sketch (pre-registration, 2026-05-01)"},
     {"file": "docs/engineering/CLEAN_ROOM_IMPLEMENTATION/RESEARCH_DISCLOSURE.md", "line": 449, "heading_level": 3, "markers": 1, "status": "PARTIAL", "heading": "8.2 Hypotheses (in falsifiable form) | 8. Phase 6d — Per-port noun-aware inner picker + depth-2 recursion (pre-registration, 2026-05-01)"},
     {"file": "docs/engineering/CLEAN_ROOM_IMPLEMENTATION/RESEARCH_DISCLOSURE.md", "line": 533, "heading_level": 3, "markers": 1, "status": "PARTIAL", "heading": "9.1 Hypotheses (verbatim from the roadmap) | 9. Phase 7 — OPA Adaptive-Depth (pre-registration, 2026-05-01)"},
-    {"file": "experiments/E05-prereg-methodology-public.md", "line": 10, "heading_level": 2, "markers": 3, "status": "PROPOSAL-LOCKED", "heading": "1. Hypothesis (locked before measurement)"}
+    {"file": "experiments/E05-prereg-methodology-public.md", "line": 10, "heading_level": 2, "markers": 3, "status": "PASS", "heading": "1. Hypothesis (locked before measurement)"}
   ],
   "misses": [
     {"file": "docs/research/wiring_scaling_curve.md", "line": 18, "snippet": "## Pre-registered hypotheses (locked before any new family was added)"}
