@@ -16,3 +16,10 @@ add_executable(pipeline_ir_example_audit_visualiser
 target_link_libraries(pipeline_ir_example_audit_visualiser
   PRIVATE pipeline_ir
 )
+
+add_executable(pipeline_ir_example_llm_bridge
+  llm_bridge/main.c
+)
+target_link_libraries(pipeline_ir_example_llm_bridge
+  PRIVATE pipeline_ir
+)
