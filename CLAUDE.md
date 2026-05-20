@@ -2,6 +2,29 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Research discipline (load-bearing — read this first)
+
+**Do not synthesise across research documents from excerpts.** When asked to interpret, summarise, or build conclusions from any document in `docs/research/`, `docs/organelles/`, `experiments/`, or the sibling repo at `~/dev/projects/microgpt-c/`, you must either:
+
+1. **Read the document end to end** via the Read tool (with explicit `offset` / `limit` pairs covering the full line count if necessary), OR
+2. **Explicitly state that you have not done so** and refuse to draw conclusions, OR
+3. **List which specific sections you have read in full and which are inferred from excerpts**, and clearly mark inferred-from-excerpts material as **unvalidated** in your output.
+
+The failure mode this rule exists to prevent: reading `head -50` or `head -80` of a document, then writing confident multi-paragraph syntheses, strategic reframes, or experiment proposals based on those excerpts. This produces plausible-sounding output that the user has no way to challenge without reading the documents themselves — which is exactly the work they're delegating to you.
+
+**Specific prohibitions:**
+
+- **Do NOT propose strategic rewrites of `ORGANELLE_STATE.md`, the project README, or any experiment's Section 4 conclusion** without first listing every document you have read in full to support the claim.
+- **Do NOT draft new pre-registered experiments (E1N)** that depend on findings from documents you have only sampled. If the new experiment's framing depends on understanding the prior arc, read the prior arc in full first.
+- **Do NOT summarise or characterise the Markets arc (`ORGANELLE_MARKETS_V1.md` through `V24+`)** from any subset of those files. The arc is a 24-version progression; cherry-picked endpoints distort it.
+- **Do NOT claim the Bonsai engine, Nucleus, or Organelle Lifecycle "does X"** without reading the corresponding `microgpt_bonsai.{h,c}`, `microgpt_nucleus.{h,c}`, `microgpt_organelle_lifecycle.{h,c}` source in full. Header-only reads do not count.
+
+**Required behaviour when uncertain:**
+
+When in doubt about whether you have enough grounding to make a claim, **produce a reading log first**: list every document, with line ranges read, that underpins the claim. If the log is thin, do the reading before continuing.
+
+The user has the right to challenge any synthesis with *"name what you've read in full to support that claim"* and you must answer with a specific list of documents and line ranges — or retract the synthesis.
+
 ## Build
 
 Pure C99, CMake, no required dependencies beyond `libc`/`libm`. Optional Flex/Bison ≥ 3.0 (pre-generated parser sources are committed as a fallback).
