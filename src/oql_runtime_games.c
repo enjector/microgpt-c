@@ -474,11 +474,31 @@ oql_status oql_run_game_loop(OqlRuntime *rt,
         ? (const MicrogptConfig *)rt->cfg
         : (player_model ? model_config(player_model) : NULL);
 
+    /* E11: seed the global RNG (rand_u) so organelle_generate_ensemble's
+     * sampling is reproducible per RUN.  The C demo does the same via
+     * seed_rng(42) at startup; the OQL runtime mirrors that behaviour so
+     * a `RUN ... SEED = 42` clause produces a deterministic trace.
+     * The opponent's rand_r state is initialised from a second constant
+     * to match the C demo's split (seed_rng(42) for model + 12345 for
+     * opponent in demos/character-level/connect4/main.c lines 163, 226).  */
+    seed_rng(seed);
+
     double run_start = now_ms();
     double *latencies = (double *)malloc(sizeof(double) * (size_t)games * 64);
     int n_latencies = 0;
 
-    unsigned int g_seed = seed;
+    /* C-demo-compatible opponent seed.  Overridable via env-var so
+     * researchers can sweep variance / build a Monte-Carlo distribution. */
+    unsigned int g_seed = 12345;
+    {
+        const char *env_opp = getenv("OQL_C4_OPPONENT_SEED");
+        if (env_opp) {
+            char *end = NULL;
+            unsigned long v = strtoul(env_opp, &end, 10);
+            if (end && *end == '\0') g_seed = (unsigned int)v;
+        }
+    }
+    (void)seed;  /* SEED clause now drives only the model RNG. */
     for (int gi = 0; gi < games; gi++) {
         char board[OQL_C4_SIZE + 1];
         memset(board, OQL_C4_EMPTY, OQL_C4_SIZE);
@@ -591,6 +611,22 @@ oql_status oql_run_game_loop(OqlRuntime *rt,
                 }
 
                 if (proposed < 0 || !validated) { draw = 1; break; }
+                /* E11 T4 trace — log first N moves of first M games for the
+                 * token-divergence measurement.  Activate with
+                 *   OQL_TRACE_FIRST_N_MOVES=5 OQL_TRACE_GAMES=10
+                 * and capture stderr.  Off by default. */
+                {
+                    const char *tn = getenv("OQL_TRACE_FIRST_N_MOVES");
+                    const char *tg = getenv("OQL_TRACE_GAMES");
+                    int max_moves = tn ? atoi(tn) : 0;
+                    int max_games = tg ? atoi(tg) : 0;
+                    if (max_moves > 0 && max_games > 0 &&
+                        gi < max_games && moves < max_moves) {
+                        fprintf(stderr, "OQL_TRACE game=%d move=%d col=%d "
+                                        "from_fallback=%d\n",
+                                gi, moves, proposed, from_fallback);
+                    }
+                }
                 oql_c4_drop(board, proposed, OQL_C4_X);
                 moves++;
 
