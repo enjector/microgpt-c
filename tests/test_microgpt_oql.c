@@ -388,8 +388,10 @@ enx_test(test_e08_connect4_behaviours) {
         fprintf(stderr, "connect4.oql parse error: %s\n", script->error);
         enx_assert_fail();
     }
-    /* Expect 6 statements: 4 BEHAVIOURs + 2 ORGANELLEs. */
-    enx_assert_equal_size(oql_script_count(script), 6);
+    /* Expect at least 6 statements: 4 BEHAVIOURs + 2 ORGANELLEs.
+     * E09 added COMPOSE + RUN so the count is now ≥ 6 — see
+     * experiments/connect4.oql tail. */
+    enx_assert_true(oql_script_count(script) >= 6);
 
     /* Confirm the two ORGANELLE bindings reference the four BEHAVIOURs. */
     int found_player = 0, found_planner = 0;
@@ -574,42 +576,38 @@ enx_test(test_e09_compose_unknown_organelle_errors) {
 }
 
 enx_test(test_oql_runs_connect4_oql_one_game) {
-    /* Parse experiments/connect4.oql, append a synthetic RUN, drive one
-     * game.  Asserts RUN completes (T1) with a populated metric row;
-     * does NOT assert a specific win rate (T2 is measured separately
-     * after Pathway A — see experiments/E09-oql-runtime-wiring.md §3.4). */
-    const char *candidates[] = {
-        "experiments/connect4.oql",
-        "../experiments/connect4.oql",
-        NULL
-    };
-    char *src = NULL;
-    for (int i = 0; candidates[i]; ++i) {
-        src = slurp(candidates[i]);
-        if (src) break;
-    }
-    if (!src) {
-        printf("test_oql_runs_connect4_oql_one_game: connect4.oql not found; "
-               "skipping.\n");
-        return;
-    }
-    /* Append a synthetic RUN so the runtime walks the game loop.  We
-     * target connect4_player directly (no COMPOSE needed) and request
-     * GAMES=1 so the test finishes quickly even when the checkpoint
-     * is absent (random-vs-random fallback). */
-    size_t base = strlen(src);
-    const char *run_stmt =
-        "\nRUN connect4_player WITH "
-        "MODE = game_loop, OPPONENT = random, GAMES = 1, "
-        "SEED = 42, GAME = connect4;\n";
-    char *combined = (char *)malloc(base + strlen(run_stmt) + 1);
-    enx_assert_ptr_not_null(combined);
-    memcpy(combined, src, base);
-    memcpy(combined + base, run_stmt, strlen(run_stmt) + 1);
-    free(src);
+    /* Drives a single Connect-4 game end-to-end via the OQL runtime.
+     * Uses an in-test script (not experiments/connect4.oql) so the test
+     * stays fast even when connect4.oql's headline RUN requests 100 games.
+     * Asserts T1 (RUN completes) with a populated metric row; does NOT
+     * assert a specific win rate (T2 is measured separately after Pathway
+     * A — see experiments/E09-oql-runtime-wiring.md §3.4). */
+    const char *script_src =
+        "CREATE BEHAVIOUR parse_c4_board AS VM `\n"
+        "    declare function c4_legal_column_mask(): number;\n"
+        "    function eval(): number {\n"
+        "        var mask = c4_legal_column_mask();\n"
+        "        return mask;\n"
+        "    }\n"
+        "`;\n"
+        "CREATE BEHAVIOUR format_c4_move AS VM `\n"
+        "    declare function c4_parse_token(): number;\n"
+        "    function eval(): number {\n"
+        "        var col = c4_parse_token();\n"
+        "        return col;\n"
+        "    }\n"
+        "`;\n"
+        "CREATE ORGANELLE connect4_player\n"
+        "  FROM CHECKPOINT 'nonexistent.ckpt'\n"
+        "  WITH (\n"
+        "    INPUT_BEHAVIOUR  = parse_c4_board,\n"
+        "    OUTPUT_BEHAVIOUR = format_c4_move\n"
+        "  );\n"
+        "RUN connect4_player WITH "
+        "  MODE = game_loop, OPPONENT = random, GAMES = 1, "
+        "  SEED = 42, GAME = connect4;\n";
 
-    OqlScript *script = oql_parse(combined);
-    free(combined);
+    OqlScript *script = oql_parse(script_src);
     enx_assert_ptr_not_null(script);
     if (script->error) {
         fprintf(stderr, "connect4+RUN parse error: %s\n", script->error);
@@ -622,7 +620,7 @@ enx_test(test_oql_runs_connect4_oql_one_game) {
     oql_status st = oql_execute_with_runtime(script, &rt, NULL, &failed_idx);
     /* T1: completes without error. */
     enx_assert_equal_int(OQL_OK, st);
-    /* T8 (partial): some games were recorded. */
+    /* T8 (partial): exactly 1 game was recorded. */
     enx_assert_equal_int(1, rt.last_games_played);
     /* Outcome must be one of W/D/L (sum to games played). */
     int total = rt.last_wins + rt.last_draws + rt.last_losses;

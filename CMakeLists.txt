@@ -2308,6 +2308,13 @@ target_include_directories(microgpt_oql_lib PUBLIC
 # the E09 runtime (oql_execute_with_runtime + behaviour dispatch).
 target_link_libraries(microgpt_oql_lib PUBLIC microgpt_lib microgpt_vm_lib)
 
+add_executable(oql tools/oql_runner.c)
+target_link_libraries(oql PRIVATE microgpt_oql_lib)
+target_include_directories(oql PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+if(NOT MSVC)
+    target_link_libraries(oql PRIVATE m)
+endif()
+
 add_executable(test_microgpt_oql tests/test_microgpt_oql.c)
 # microgpt_vm_lib is wired in so the E08 connect4 worked-example test can
 # compile + run each parsed CREATE BEHAVIOUR's VM body — see

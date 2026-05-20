@@ -96,3 +96,29 @@ CREATE ORGANELLE connect4_planner
     INPUT_BEHAVIOUR  = parse_c4_board,
     OUTPUT_BEHAVIOUR = format_c4_move
   );
+
+-- ──────────────────────────────────────────────────────────────────
+-- COMPOSE — wire the planner + player as a two-stage linear pipeline.
+-- E09 Phase 2: the linear FROM form resolves each name to an
+-- OqlOrganelle entry; no inline @graph block needed for this game.
+-- ──────────────────────────────────────────────────────────────────
+COMPOSE connect4_pipeline
+  FROM connect4_planner, connect4_player;
+
+-- ──────────────────────────────────────────────────────────────────
+-- RUN — drive the pipeline against a random opponent over 100 games.
+-- E09 Phase 3: oql_run_game_loop dispatches each turn through
+-- INPUT_BEHAVIOUR → forward_inference → OUTPUT_BEHAVIOUR →
+-- VALIDATE_BEHAVIOUR → (FALLBACK_BEHAVIOUR if invalid), then applies
+-- the move to the host's Connect-4 board.  When the player's checkpoint
+-- is absent or fails to load, the runtime degrades to random-vs-random
+-- so the wiring still executes end-to-end (T1) and reports a metric row;
+-- T2 (win rate) is only meaningful with a trained checkpoint — see
+-- experiments/E09-oql-runtime-wiring.md §3.4.
+-- ──────────────────────────────────────────────────────────────────
+RUN connect4_pipeline WITH
+  MODE     = game_loop,
+  GAME     = connect4,
+  OPPONENT = random,
+  GAMES    = 100,
+  SEED     = 42;
