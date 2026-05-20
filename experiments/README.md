@@ -46,6 +46,7 @@ Each of these directions has a dedicated experiment doc in this folder:
 11. **Close E09's Connect-4 win-rate gap (51% → ≥85%).** The wiring is correct; the gap is a prompt-protocol mismatch at `INPUT_BEHAVIOUR`. Pathway A (behaviour-side fix) preferred; Pathway B (one new VM extern, zero new opcodes) as fallback. → **[E11](E11-connect4-win-rate-fix.md)**
 12. **LLM-as-corpus-source for the wiring organelle.** Local LM Studio + Pipeline IR verifier filter + standing leakage audit. Tests whether the curator-bound ceiling (`INV-WIRE-061`) is architectural or curator-vocabulary-specific — answers E03's open question via a different curator type. Adds one new SOURCE clause (`CREATE CORPUS … FROM LLM …`); zero new build deps beyond curl. → **[E12](E12-llm-wiring-corpus.md)**
 13. **LLM distillation into a Connect-4 player organelle.** Ports `RESEARCH_OPA_DIRECTIONS.md` §5.1 (Experiment 4.1) to the two-commit pre-reg shape. Local LM Studio plays N games; student organelle (≤460K params) trains on (board, move) pairs; target ≥93% (vs 88% C-demo baseline). All three possible outcomes (≥93% / 88-92% / <88%) are publishable. → **[E13](E13-llm-game-distillation.md)**
+14. **Unify E12 + E13's parallel LLM bridges under one OQL `LLM_SOURCE` object + shared `tools/llm_endpoint.{c,h}` transport.** Adds one new first-class object type via the existing `CREATE` verb (no 7th verb). Targets ≤600 LOC combined (current ~1200), bit-identical reproduction of both E12 and E13 outputs via cache replay, plus a third worked `paraphrase` mode demonstrating the dispatch pattern absorbs creation/game-play/transformation shapes cleanly. → **[E14](E14-oql-llm-source-unification.md)**
 
 ### What we explicitly will NOT prioritise
 
@@ -82,7 +83,7 @@ Every experiment doc is a single markdown file with four sections:
 | **3. Implementation + results** | Measurement commit | What was built, raw numbers, links to artefacts |
 | **4. Conclusion** | Measurement commit | Verdict against each pre-reg target, lessons, next moves, traceability updates |
 
-## The thirteen experiments
+## The fourteen experiments
 
 | ID | Title | Direction | Cost | Falsification risk |
 |---|---|---|---|---|
@@ -99,6 +100,7 @@ Every experiment doc is a single markdown file with four sections:
 | [E11](E11-connect4-win-rate-fix.md) | Close E09's Connect-4 win-rate gap (51% → ≥85%) | Behaviour-side prompt-protocol fix (Pathway A) or single new VM extern (Pathway B) | ~2-3 wk | Low-medium |
 | [E12](E12-llm-wiring-corpus.md) | LLM-as-corpus-source for wiring (NL → typed-graph), via local LM Studio + verifier filter | Tests curator-bound ceiling from a different curator type; answers E03 indirectly | ~2-3 wk | Medium |
 | [E13](E13-llm-game-distillation.md) | LLM distillation into Connect-4 player organelle, via local LM Studio | Ports `RESEARCH_OPA_DIRECTIONS.md` §5.1; ≥93% Connect-4 target, all outcomes publishable | ~2-4 wk | Medium |
+| [E14](E14-oql-llm-source-unification.md) | Unify E12 + E13's LLM bridges under one `LLM_SOURCE` OQL object + shared transport | One declarative surface for all design-time LLM use; targets >50% LOC reduction + bit-identical reproductions + new paraphrase mode | ~2-3 wk | Medium |
 
 ## Status legend
 
