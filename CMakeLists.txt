@@ -2240,7 +2240,10 @@ else()
         ${CMAKE_CURRENT_SOURCE_DIR}/src/microgpt_vm_parser.tab.c)
 endif()
 
-add_library(microgpt_vm_lib STATIC src/microgpt_vm.c ${VM_PARSER_SOURCES})
+add_library(microgpt_vm_lib STATIC
+    src/microgpt_vm.c
+    src/microgpt_vm_natives.c
+    ${VM_PARSER_SOURCES})
 target_include_directories(microgpt_vm_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_BINARY_DIR})
 
 add_executable(test_microgpt_vm tests/test_microgpt_vm.c)
@@ -2303,7 +2306,10 @@ target_include_directories(microgpt_oql_lib PUBLIC
 target_link_libraries(microgpt_oql_lib PUBLIC microgpt_lib)
 
 add_executable(test_microgpt_oql tests/test_microgpt_oql.c)
-target_link_libraries(test_microgpt_oql PRIVATE microgpt_oql_lib)
+# microgpt_vm_lib is wired in so the E08 connect4 worked-example test can
+# compile + run each parsed CREATE BEHAVIOUR's VM body — see
+# tests/test_microgpt_oql.c::test_e08_connect4_behaviours.
+target_link_libraries(test_microgpt_oql PRIVATE microgpt_oql_lib microgpt_vm_lib)
 target_include_directories(test_microgpt_oql PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/tests
     ${CMAKE_CURRENT_SOURCE_DIR}/src)

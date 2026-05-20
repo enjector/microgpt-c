@@ -35,8 +35,8 @@
    especially those whose name start with YY_ or yy_.  They are
    private implementation details that can be changed or removed.  */
 
-#ifndef YY_OQL_PARSER_MICROGPT_OQL_PARSER_TAB_H_INCLUDED
-# define YY_OQL_PARSER_MICROGPT_OQL_PARSER_TAB_H_INCLUDED
+#ifndef YY_OQL_PARSER_USERS_USER_DEV_PROJECTS_GITHUB_MICROGPT_C_CLAUDE_WORKTREES_AGENT_AD6747715FB24DEB9_BUILD_MICROGPT_OQL_PARSER_TAB_H_INCLUDED
+# define YY_OQL_PARSER_USERS_USER_DEV_PROJECTS_GITHUB_MICROGPT_C_CLAUDE_WORKTREES_AGENT_AD6747715FB24DEB9_BUILD_MICROGPT_OQL_PARSER_TAB_H_INCLUDED
 /* Debug traces.  */
 #ifndef OQL_PARSER_DEBUG
 # if defined YYDEBUG
@@ -68,28 +68,34 @@ extern int oql_parser_debug;
     T_EVALUATE = 261,              /* T_EVALUATE  */
     T_VERIFY = 262,                /* T_VERIFY  */
     T_AUDIT = 263,                 /* T_AUDIT  */
-    T_ON = 264,                    /* T_ON  */
-    T_WITH = 265,                  /* T_WITH  */
-    T_AGAINST = 266,               /* T_AGAINST  */
-    T_USING = 267,                 /* T_USING  */
-    T_WHERE = 268,                 /* T_WHERE  */
-    T_AS = 269,                    /* T_AS  */
-    T_FROM = 270,                  /* T_FROM  */
-    T_GRAPH = 271,                 /* T_GRAPH  */
-    T_CORPUS = 272,                /* T_CORPUS  */
-    T_REPORT = 273,                /* T_REPORT  */
-    T_METRIC = 274,                /* T_METRIC  */
-    T_THRESHOLDS = 275,            /* T_THRESHOLDS  */
-    T_LT = 276,                    /* T_LT  */
-    T_LE = 277,                    /* T_LE  */
-    T_EQ = 278,                    /* T_EQ  */
-    T_NE = 279,                    /* T_NE  */
-    T_GE = 280,                    /* T_GE  */
-    T_GT = 281,                    /* T_GT  */
-    T_IDENT = 282,                 /* T_IDENT  */
-    T_STRING = 283,                /* T_STRING  */
-    T_NUMBER = 284,                /* T_NUMBER  */
-    T_GRAPH_BLOCK = 285            /* T_GRAPH_BLOCK  */
+    T_CREATE = 264,                /* T_CREATE  */
+    T_BEHAVIOUR = 265,             /* T_BEHAVIOUR  */
+    T_ORGANELLE = 266,             /* T_ORGANELLE  */
+    T_CHECKPOINT = 267,            /* T_CHECKPOINT  */
+    T_VM = 268,                    /* T_VM  */
+    T_ON = 269,                    /* T_ON  */
+    T_WITH = 270,                  /* T_WITH  */
+    T_AGAINST = 271,               /* T_AGAINST  */
+    T_USING = 272,                 /* T_USING  */
+    T_WHERE = 273,                 /* T_WHERE  */
+    T_AS = 274,                    /* T_AS  */
+    T_FROM = 275,                  /* T_FROM  */
+    T_GRAPH = 276,                 /* T_GRAPH  */
+    T_CORPUS = 277,                /* T_CORPUS  */
+    T_REPORT = 278,                /* T_REPORT  */
+    T_METRIC = 279,                /* T_METRIC  */
+    T_THRESHOLDS = 280,            /* T_THRESHOLDS  */
+    T_LT = 281,                    /* T_LT  */
+    T_LE = 282,                    /* T_LE  */
+    T_EQ = 283,                    /* T_EQ  */
+    T_NE = 284,                    /* T_NE  */
+    T_GE = 285,                    /* T_GE  */
+    T_GT = 286,                    /* T_GT  */
+    T_IDENT = 287,                 /* T_IDENT  */
+    T_STRING = 288,                /* T_STRING  */
+    T_NUMBER = 289,                /* T_NUMBER  */
+    T_GRAPH_BLOCK = 290,           /* T_GRAPH_BLOCK  */
+    T_VM_BODY = 291                /* T_VM_BODY  */
   };
   typedef enum oql_parser_tokentype oql_parser_token_kind_t;
 #endif
@@ -98,7 +104,7 @@ extern int oql_parser_debug;
 #if ! defined OQL_PARSER_STYPE && ! defined OQL_PARSER_STYPE_IS_DECLARED
 union OQL_PARSER_STYPE
 {
-#line 40 "microgpt_oql.y"
+#line 42 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
 
     char *str;
     int   op;
@@ -108,7 +114,7 @@ union OQL_PARSER_STYPE
     OqlPredicate *pred;
     OqlStmt *stmt;
 
-#line 112 "microgpt_oql_parser.tab.h"
+#line 118 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.h"
 
 };
 typedef union OQL_PARSER_STYPE OQL_PARSER_STYPE;
@@ -123,4 +129,4 @@ extern OQL_PARSER_STYPE oql_parser_lval;
 int oql_parser_parse (oql_parser *parser);
 
 
-#endif /* !YY_OQL_PARSER_MICROGPT_OQL_PARSER_TAB_H_INCLUDED  */
+#endif /* !YY_OQL_PARSER_USERS_USER_DEV_PROJECTS_GITHUB_MICROGPT_C_CLAUDE_WORKTREES_AGENT_AD6747715FB24DEB9_BUILD_MICROGPT_OQL_PARSER_TAB_H_INCLUDED  */

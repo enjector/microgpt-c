@@ -1,0 +1,98 @@
+-- experiments/connect4.oql
+-- E08 Phase 4 worked example.  Adapted from E08-oql-behaviours.md §1.3.2.
+--
+-- Pre-registered claim (E08 T2): this file + its four behaviour bodies
+-- weigh in at ≤ 30% of the LOC cost of demos/character-level/connect4/main.c
+-- (529 LOC).  Measurement in experiments/E08-oql-behaviours.md §3.4.
+--
+-- VM authoring caveat: the existing VM treats `return` as STACK_PUSH (not
+-- early-exit), so every BEHAVIOUR body uses the single-return idiom — assign
+-- to a result var inside any branches, return once at the end.  See
+-- src/microgpt_vm_natives.h header note.
+--
+-- Numeric-handle ABI: the VM's vm_native_fn signature is double(int,double*).
+-- Strings cross the boundary as integer handles into a host-side intern
+-- table; see src/microgpt_vm_natives.{h,c}.
+
+-- ──────────────────────────────────────────────────────────────────
+-- INPUT_BEHAVIOUR — parse the board string into a legal-column mask
+-- ──────────────────────────────────────────────────────────────────
+CREATE BEHAVIOUR parse_c4_board AS VM `
+    declare function c4_legal_column_mask(): number;
+    function eval(): number {
+        var mask = c4_legal_column_mask();
+        return mask;
+    }
+`;
+
+-- ──────────────────────────────────────────────────────────────────
+-- OUTPUT_BEHAVIOUR — extract the proposed column digit from the
+-- model's most-recent next-token output
+-- ──────────────────────────────────────────────────────────────────
+CREATE BEHAVIOUR format_c4_move AS VM `
+    declare function c4_parse_token(): number;
+    function eval(): number {
+        var col = c4_parse_token();
+        return col;
+    }
+`;
+
+-- ──────────────────────────────────────────────────────────────────
+-- VALIDATE_BEHAVIOUR — true iff parsed move is a legal column drop
+-- ──────────────────────────────────────────────────────────────────
+CREATE BEHAVIOUR c4_move_is_legal AS VM `
+    declare function c4_parse_token(): number;
+    declare function c4_column_is_legal_n(col: number): number;
+    function eval(): number {
+        var col = c4_parse_token();
+        var ok  = 0;
+        if (col >= 0) {
+            ok = c4_column_is_legal_n(col);
+        }
+        return ok;
+    }
+`;
+
+-- ──────────────────────────────────────────────────────────────────
+-- FALLBACK_BEHAVIOUR — when entropy is high, prefer the centre column;
+-- otherwise -1 (defer to the model)
+-- ──────────────────────────────────────────────────────────────────
+CREATE BEHAVIOUR c4_fallback_when_stuck AS VM `
+    declare function c4_last_entropy(): number;
+    declare function c4_centre_col(): number;
+    declare function c4_column_is_legal_n(col: number): number;
+    function eval(): number {
+        var ent    = c4_last_entropy();
+        var result = -1;
+        if (ent > 0.8) {
+            var cc    = c4_centre_col();
+            var legal = c4_column_is_legal_n(cc);
+            if (legal > 0) {
+                result = cc;
+            }
+        }
+        return result;
+    }
+`;
+
+-- ──────────────────────────────────────────────────────────────────
+-- ORGANELLE bindings — the player and planner share the parse/format
+-- behaviours; only the player runs the VALIDATE/FALLBACK pair.
+-- (TRAIN/COMPOSE/RUN remain stubbed in E07; the full game loop is
+-- harness-driven for now — see test_e08_connect4_behaviours.)
+-- ──────────────────────────────────────────────────────────────────
+CREATE ORGANELLE connect4_player
+  FROM CHECKPOINT 'checkpoints/c4_player.ckpt'
+  WITH (
+    INPUT_BEHAVIOUR    = parse_c4_board,
+    OUTPUT_BEHAVIOUR   = format_c4_move,
+    VALIDATE_BEHAVIOUR = c4_move_is_legal,
+    FALLBACK_BEHAVIOUR = c4_fallback_when_stuck
+  );
+
+CREATE ORGANELLE connect4_planner
+  FROM CHECKPOINT 'checkpoints/c4_planner.ckpt'
+  WITH (
+    INPUT_BEHAVIOUR  = parse_c4_board,
+    OUTPUT_BEHAVIOUR = format_c4_move
+  );
