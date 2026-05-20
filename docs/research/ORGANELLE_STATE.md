@@ -120,6 +120,7 @@ The closing line above is preserved verbatim because the calibrated three-bound 
 | [E09](../../experiments/E09-oql-runtime-wiring.md) — OQL runtime wiring | `oql run` drives a real game loop; T2 PARTIAL at 51% closed by E11 at 89% | OQL is **executable**, not parse-only |
 | [E10](../../experiments/E10-oql-train-wiring.md) — OQL TRAIN | **Bit-identical loss curves** vs C-demo at every measurement step (0.0000 relative delta) | OQL is **self-sufficient** — corpus -> trained organelle -> running pipeline in one .oql file |
 | [E11](../../experiments/E11-connect4-win-rate-fix.md) — Connect-4 win rate | **51% -> 89%** (+38pp, +1pp above C-demo's 88% baseline); one new extern, zero new opcodes | "OQL competitive with hand-coded C" is **measured** |
+| [E12](../../experiments/E12-llm-wiring-corpus.md) — LLM-as-corpus-source | **T4 = 0/20 (FALSIFIED)** at the 100-example scale; corpus-size confound vs human curator's 400 named as principal limitation; agent built `tools/e12_eval_v2.c` (first v2 evaluator) | LLM-as-curator is **not** a free win at this scale; OQL `FROM LLM` source clause survives as infrastructure |
 | [E13](../../experiments/E13-llm-game-distillation.md) — LLM distillation | T1 = 89% in the §4.2 *neutral band* — teacher (Qwen 3.6 35B) wins 88.4% itself, so cannot lift student beyond that ceiling | Saturated-distillation regime — first publishable negative result about LLM-distillation-into-tiny-specialists |
 
 ### Standing architectural locks (held under cumulative pressure)
@@ -129,11 +130,18 @@ The closing line above is preserved verbatim because the calibrated three-bound 
 - **Engine surface frozen** — `src/microgpt.{c,h}` has 0-line diff across the entire OQL arc
 - **Zero new build deps** — Flex/Bison fallback + curl only; same as the pre-OQL baseline
 
-### Two key cross-experiment architectural findings
+### Three key cross-experiment architectural findings
 
 1. **Compile-time-macro silent failure mode (E09 §3.4).** Loading a checkpoint trained with different `N_EMBD`/`N_HEAD`/`BLOCK_SIZE` macros silently fails because the macros constant-fold into matmul loops. Resolved by `_microgpt_lib_for_defines` binary variant pattern. **Honoured by every downstream experiment** (E10 `oql_names`, E11 `oql_c4`, E13 same).
 
 2. **Hidden coupling only surfaces when separation is attempted.** Two examples: corpus-coupled native references (E02 — `ref_bmi_clamped` exists because the wiring corpus says "BMI clamped"); STACK_PUSH-only `return` opcode (E08 — only visible because the agent tried to use early-exit and worked around it). Both became **named follow-ups** rather than silent expansions.
+
+3. **At the scales tested, a 35B local LLM is not a sufficient design-time signal source for tiny specialists — in EITHER curation or distillation mode.** This is the surprise finding from E12 + E13 measured side-by-side:
+   - **E12 (LLM-as-curator)** at 100 examples: 0/20 on v2 sealed held-out. The corpus-size confound (100 LLM examples vs ~400 human-templated) is the principal limitation; the path to a fair test is a 10k+ scaled corpus (12-15h overnight) or a non-thinking model.
+   - **E13 (LLM-as-teacher distillation)**: 89% in the §4.2 neutral band — but the 35B teacher itself only wins 88.4% vs random. The saturated-distillation regime: a teacher whose own ceiling matches the student's can't lift the student.
+   - Both pre-registered four-corners-style; both landed in their respective "lower" corners. Pre-registration discipline turned what would have been "LLMs didn't help, oh well" into two precise honest findings about the **conditions under which LLMs become useful design-time signal sources**: corpus scale (E12) and teacher-ceiling-must-exceed-student-baseline (E13).
+   - **The OQL infrastructure survives both falsifications intact.** `FROM LLM` source clause, `tools/llm_corpus_source.{c,h}`, `tools/e12_generate.c`, `tools/e12_eval_v2.c`, `tools/llm_game_player.{c,h}`, `tools/c4_distill_corpus_gen.c`, the `oql_wiring` CMake variant — all of these become standing infrastructure for E14 (unified `LLM_SOURCE` object) and any scaled re-run.
+   - **The wider implication:** the tiny-specialist architecture is *robust to LLM design-time pressure at this scale*. The deterministic infrastructure that's actually working — human curator's structural understanding + C-templated corpus generation + the verifier-as-Judge pattern — is what produced E07-E11's clean architectural results. LLMs do not replace any part of that pipeline at the scales tested.
 
 ### What's still pre-registered but not measured
 
