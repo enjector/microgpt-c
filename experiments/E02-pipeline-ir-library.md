@@ -287,10 +287,50 @@ Section 4 (Conclusion) is deliberately **not** written in this commit because T6
 
 ## 4. Conclusion
 
-**TODO** — fill on measurement commit. Sections to populate:
+**Status:** Interim — Five of six targets PASS at E02's merge; T6 (Claude end-to-end smoke) deferred on Anthropic API budget (same gating as E01). The **structural extraction has been validated by every subsequent experiment** using `libpipeline_ir`: E08, E09, E10, E11, E12, E13 all consume the library cleanly without breakage. ABI v0.1.0 has not been formally released, but the in-tree API surface is stable and the shim path keeps OPA compatibility.
 
-- 4.1 Verdict per T1-T6 (PASS / FAIL)
-- 4.2 ABI v0.1.0 released? Y/N
-- 4.3 Lessons (especially: which native primitives turned out to have hidden OPA-coupling?)
-- 4.4 Next moves: announce on Hacker News / r/MachineLearning / Twitter; submit to neurosymbolic AI venues as a tool paper; integrate into [E01](E01-llm-head-to-head.md) and [E06](E06-medical-guideline-graphs.md)
-- 4.5 Traceability updates (`TRACEABILITY.md`, `ORGANELLE_STATE.md`, `RESEARCH_DISCLOSURE.md`)
+### 4.1 Verdict per target
+
+| ID | Target | Final outcome |
+|---|---|---|
+| T1 | Pipeline IR tests pass | PASS — 55/55 (the locked spec said 51; the file had grown to 55 by merge time) |
+| T2 | OPA tests still pass via shim | PASS — 16/16 ctest; held continuously across E07-E13 |
+| T3 | Library <= 200 KB stripped | PASS — 58.4 KB |
+| T4 | LLM bridge p99 <= 5 ms | PASS — 66 us |
+| T5 | ABI per-symbol stability >= 95% | PASS — 100% documented |
+| T6 | Claude end-to-end on 10-prompt set | NOT-MEASURED — deferred on Anthropic API budget |
+
+### 4.2 ABI v0.1.0 release status
+
+**Not formally released as a separate version tag.** Reason: in-tree usage by E08-E13 has stress-tested the API surface enough that the shape is stable. A formal v0.1.0 release would be a 1-day packaging task (vcpkg port + Conan recipe + GitHub release notes) when the project decides to position `libpipeline_ir` as a publicly-discoverable artefact (likely paired with the OQL language paper from E07 §4.6).
+
+### 4.3 Lessons (load-bearing)
+
+- **Native primitives + reference runner were corpus-coupled.** `ref_bmi_clamped` exists because the wiring training corpus contains the "BMI clamped between lo and hi" prompt. The genuinely-separable surface is IR + verifier + DOT + parsers + repair — that's what shipped at 58 KB. The 40 arithmetic natives themselves are reusable as a separate `libpipeline_ir_natives` follow-up (anticipated by §1.5 skip rule).
+- **The 25-line shim** in `src/microgpt_pipeline.h` was sufficient backward compat for 11 in-tree consumers. FetchContent would have been overkill.
+- **`PIPELINE_IR_VM_SOURCE` cache variable** + `PIPELINE_IR_INTERNAL_INCLUDE_DIR` pattern keeps the base library free of VM stubs. The opt-in TU compiles into the consumer target.
+- **Variant libraries** (`microgpt_lib_<md5>`) now link `pipeline_ir` once instead of recompiling `microgpt_pipeline.c` per macro combination — latent build-time speedup, not measured.
+
+### 4.4 Downstream validations
+
+| Where libpipeline_ir was used | Validation outcome |
+|---|---|
+| E08 — BEHAVIOUR verifier dispatch | Clean; verifier-as-Judge works inside BEHAVIOUR pipelines |
+| E09 — RUN's COMPOSE dispatch | Clean; @graph parsing + verification at COMPOSE time |
+| E10 — TRAIN audit trace | Clean; verifier used as a sanity check on training-time emissions |
+| E11 — vm_natives extern bridge | Clean; new extern coexists with libpipeline_ir verifier path |
+| E12 — LLM corpus filter | Clean; verifier is the survival gate for LLM-emitted graphs |
+| E13 — game-loop audit | Clean; pipeline_render_text round-trip survives across all 11 game demos |
+
+### 4.5 Remaining follow-ups
+
+- **T6 measurement** — closes when Anthropic API budget arrives (~$50 for 10-prompt curated set). Also closes E01's System B.
+- **libpipeline_ir_natives extraction** — separate experiment for the 40 arithmetic natives; the corpus-coupled reference runner stays in `demos/wiring_organelle/`.
+- **Formal v0.1.0 release** — vcpkg port + Conan recipe + GitHub release notes; paired with OQL language paper from E07 §4.6.
+- **Clean up two -Wunused-flagged static functions** (`topo_visit`, `ps_read_quoted_string`) — separate PR; not in extraction scope.
+
+### 4.6 Traceability updates
+
+- `ORGANELLE_STATE.md` — adds `libpipeline_ir` as the project's first standalone reusable artefact; cites E08-E13 as the in-tree stress test
+- `TRACEABILITY.md` — link E02 ↔ E08-E13 (every downstream experiment depends on libpipeline_ir)
+- `RESEARCH_DISCLOSURE.md` — record the corpus-coupled-vs-separable finding for the reference runner
