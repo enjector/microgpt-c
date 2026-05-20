@@ -103,12 +103,17 @@ Every experiment doc is a single markdown file with four sections:
 
 All eight: 📋 **Proposal locked** (2026-05-20).
 
-In-flight measurement (worktree-branch agent runs):
-- E02 ✅ merged at `a02a71d` — 5/6 targets PASS, T6 deferred on API key
+Measured (worktree-branch agent runs, all merged into main):
+- E02 ✅ merged at `a02a71d` — 5/6 targets PASS; T6 deferred on API key
 - E04 ✅ merged at `05932dc` — 7/7 targets PASS at σ=0.05
-- E05 🔬 agent still running
+- E05 ✅ merged at `6aba1c8` — 6/6 targets PASS; methodology paper draft 13 pages
 - E07 ✅ merged at `83e5673` — verb-discipline lock held; 5 PASS, 1 PARTIAL, 2 deferred
-- E08 🔬 to be spawned next
+- E08 ✅ merged at `e9b8620` — 3 PASS (T2 18.5% LOC, T3 zero new opcodes, T4 +4 tests); 5 honestly deferred
+
+Awaiting external inputs:
+- E01 — needs Anthropic API budget (~$100)
+- E03 — needs independent human curator
+- E06 — needs clinician reviewer
 
 ## Cross-references
 
