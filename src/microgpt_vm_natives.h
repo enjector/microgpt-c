@@ -84,6 +84,22 @@ typedef struct {
  *  reads via registered externs; the externs in turn read from the mailbox.
  * ============================================================ */
 
+/* Forward decl — the propose-column callback signature.  E11 adds the one
+ * extern `c4_model_propose_column(temp_x100)` so that a BEHAVIOUR body can
+ * trigger a model-driven move proposal.  The natives module deliberately
+ * does NOT include microgpt.h or microgpt_organelle.h (microgpt_vm_lib must
+ * not depend on microgpt_lib), so the call goes through an opaque function
+ * pointer set up by the OQL runtime adapter before each behaviour dispatch.
+ *
+ * Contract:
+ *   - `ctx`         — the running behaviour context (board handle, etc.)
+ *   - `temp_x100`   — base temperature × 100 (e.g. 20 = 0.2; clamped 1..100)
+ *   - returns       — proposed column 0..6, or -1 on failure / model absent
+ */
+struct vm_natives_ctx;
+typedef int (*vm_natives_propose_column_fn)(struct vm_natives_ctx *ctx,
+                                            int temp_x100);
+
 typedef struct vm_natives_ctx {
     vm_natives_str_table strings;
 
@@ -92,6 +108,14 @@ typedef struct vm_natives_ctx {
     int   current_move_handle;      /* handle into strings; -1 if unset */
     double last_entropy;            /* last model-output entropy ∈ [0, log V] */
     int   centre_column;            /* preferred FALLBACK column (default 3) */
+
+    /* E11: host-side model-proposal callback.  NULL when no organelle is
+     * loaded (e.g. tests, runtime startup). The runtime sets this pointer
+     * after lazy-loading the checkpoint and clears it on disposal. */
+    vm_natives_propose_column_fn propose_column;
+    /* Opaque host-state pointer passed through to the callback (e.g. the
+     * loaded Organelle + cfg + a per-game RNG seed).  Owned by the runtime. */
+    void *propose_column_state;
 } vm_natives_ctx;
 
 /* Lifecycle. */
@@ -115,6 +139,11 @@ const char *vm_natives_str_lookup(const vm_natives_ctx *ctx, int handle);
  *    c4_last_entropy()                 → number
  *    c4_token_handle(c)                → number  (intern "<digit>"; returns handle)
  *    c4_board_handle_from_str(h)       → number  (identity passthrough)
+ *    c4_model_propose_column(temp_x100)→ number  (E11: dispatches to the
+ *        host-side propose_column callback set up by the OQL runtime;
+ *        returns proposed column 0..6 or -1 on failure / no model loaded;
+ *        temp_x100 = base sampling temperature × 100, clamped 1..100;
+ *        the C demo's matching call uses ORGANELLE_TEMP=0.2 → 20)
  *
  *  Returns the number of natives registered.  Single-threaded — same
  *  trade-off as the OQL & VM parsers' global YY_INPUT state.

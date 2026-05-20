@@ -21,6 +21,7 @@
 #include "oql_runtime_games.h"
 #include "microgpt_oql.h"
 #include "microgpt.h"
+#include "microgpt_organelle.h"
 #include "microgpt_vm.h"
 #include "microgpt_vm_natives.h"
 
@@ -162,30 +163,210 @@ static double oql_dispatch_behaviour(OqlRuntime *rt, const char *behaviour_name,
 }
 
 /* ============================================================
- *  Model-driven proposal — forward-pass a board encoding through the
- *  organelle's loaded model and sample a next-column digit.
+ *  E11: lazy Organelle-wrapper construction.
  *
- *  This is intentionally minimal: we use a board's column-legality mask
- *  (computed by the host, not the VM) as a single integer token, feed it
- *  through forward_inference with a fresh KV cache, and argmax the logits
- *  over the first OQL_C4_COLS positions.  When `model == NULL` (e.g.
- *  checkpoint absent / load failed), returns -1 so the harness falls back
- *  to FALLBACK_BEHAVIOUR or random.
+ *  The OQL runtime's load step returns a bare `Model *` (it doesn't
+ *  reconstruct the Vocab — checkpoints store vocab SIZE, not the
+ *  char list).  organelle_generate_ensemble() needs an `Organelle`
+ *  with a populated Vocab, so we rebuild it from the training corpus.
+ *
+ *  Convention for E11:  the runtime looks for a corpus file next to
+ *  CWD with one of the well-known names listed in OQL_C4_CORPUS_CANDIDATES.
+ *  The c_connect4_demo target's POST_BUILD copies
+ *  c_connect4_player.txt + c_connect4_planner.txt next to the binary,
+ *  so when researchers run `./build/oql_c4 run ../experiments/connect4.oql`
+ *  from build/ the player corpus is already there.
+ *
+ *  When the corpus is absent / vocab mismatches the checkpoint header,
+ *  the wrapper is NOT built and the runtime falls back to the legacy
+ *  uniform-mask proposer (51% baseline).  No silent garbage output:
+ *  organelle_generate_ensemble guards against vocab mismatch via the
+ *  checkpoint header's vocab_size field.
+ * ============================================================ */
+
+static const char *OQL_C4_CORPUS_CANDIDATES[] = {
+    "c_connect4_player.txt",
+    "../demos/character-level/connect4/c_connect4_player.txt",
+    "demos/character-level/connect4/c_connect4_player.txt",
+    NULL
+};
+
+/* Peek the checkpoint header for the trained vocab_size.  Format:
+ *   [int step][size_t vocab][weights]  (same path as
+ *   oql_runtime_load_organelle uses to size the Adam scratch buffers). */
+static int oql_peek_ckpt_vocab(const char *path, size_t *vocab_out) {
+    if (!path || !vocab_out) return -1;
+    FILE *f = fopen(path, "rb");
+    if (!f) return -1;
+    int step = 0; size_t vocab = 0;
+    int ok = (fread(&step, sizeof(int), 1, f) == 1) &&
+             (fread(&vocab, sizeof(size_t), 1, f) == 1);
+    fclose(f);
+    if (!ok) return -1;
+    *vocab_out = vocab;
+    return 0;
+}
+
+/* Returns a heap-allocated Organelle on success (caller must dispose), or
+ * NULL if the corpus is missing / vocab can't be built / the vocab size
+ * doesn't match the checkpoint's recorded vocab_size. */
+static Organelle *oql_build_player_organelle(Model *model,
+                                             const MicrogptConfig *cfg,
+                                             const char *ckpt_path,
+                                             FILE *out) {
+    if (!model || !cfg) return NULL;
+
+    /* Find a corpus file. */
+    const char *path = NULL;
+    for (int i = 0; OQL_C4_CORPUS_CANDIDATES[i]; i++) {
+        FILE *f = fopen(OQL_C4_CORPUS_CANDIDATES[i], "r");
+        if (f) { fclose(f); path = OQL_C4_CORPUS_CANDIDATES[i]; break; }
+    }
+    if (!path) {
+        if (out) fprintf(out,
+            "build_player_organelle: no corpus file found in cwd "
+            "(tried c_connect4_player.txt and known fallbacks); "
+            "model-driven proposal disabled, falling back to uniform-mask.\n");
+        return NULL;
+    }
+
+    Organelle *org = (Organelle *)calloc(1, sizeof(Organelle));
+    if (!org) return NULL;
+
+    /* Use the SAME loader the C demo uses (opa_load_docs_multiline includes
+     * the document-internal newline as a vocab char).  load_docs() strips
+     * newlines and would build vocab_size = 25 vs the checkpoint's 26 —
+     * matched the demo loader to keep the per-token map identical. */
+    if (opa_load_docs_multiline(path, &org->docs, cfg->max_docs) < 0) {
+        if (out) fprintf(out,
+            "build_player_organelle: opa_load_docs_multiline('%s') failed\n", path);
+        free(org);
+        return NULL;
+    }
+    build_vocab(&org->docs, &org->vocab);
+
+    /* Guard: the checkpoint's recorded vocab_size must match the corpus-
+     * built vocab_size.  Mismatch means we're paired with the wrong
+     * corpus, in which case feeding chars through the model produces
+     * garbage. */
+    size_t header_vocab = 0;
+    if (ckpt_path && oql_peek_ckpt_vocab(ckpt_path, &header_vocab) == 0 &&
+        org->vocab.vocab_size != header_vocab) {
+        if (out) fprintf(out,
+            "build_player_organelle: vocab mismatch — corpus '%s' builds "
+            "vocab_size=%zu but ckpt '%s' records vocab_size=%zu; "
+            "disabling model-driven proposal.\n",
+            path, org->vocab.vocab_size, ckpt_path, header_vocab);
+        free_docs(&org->docs);
+        free(org->vocab.chars);
+        free(org);
+        return NULL;
+    }
+
+    org->model = model;       /* aliased, not owned — runtime owns the model */
+    org->word_level = 0;      /* char-level, as the C demo */
+    if (out) fprintf(out,
+        "build_player_organelle: built from '%s' (vocab=%zu docs=%zu)\n",
+        path, org->vocab.vocab_size, org->docs.num_docs);
+    return org;
+}
+
+static void oql_free_player_organelle(Organelle *org) {
+    if (!org) return;
+    /* Don't free model — it's owned by OqlOrganelle::model and freed by
+     * oql_runtime_dispose. */
+    free_docs(&org->docs);
+    free(org->vocab.chars);
+    free(org);
+}
+
+/* ============================================================
+ *  E11: model-driven proposal — full C-demo prompt protocol.
+ *
+ *  The state struct is passed opaquely into the natives module via
+ *  vm_natives_ctx.propose_column_state.  The TS-side extern
+ *  `c4_model_propose_column(temp_x100)` calls back into
+ *  oql_propose_column_cb() which constructs the same
+ *  `board=<42>|valid=<csv>` prompt that the C demo trains on
+ *  (demos/character-level/connect4/c_connect4_player.txt has
+ *  ~53k of these lines), runs organelle_generate_ensemble with the
+ *  same 3-vote / temp=0.2 (configurable via temp_x100) settings, and
+ *  parses the first output character as a digit 0..6.
+ * ============================================================ */
+
+typedef struct OqlProposeColumnState {
+    const Organelle      *org;        /* loaded model + vocab */
+    const MicrogptConfig *cfg;        /* the OQL runtime's cfg */
+    const char           *board;      /* 42-char current board (NUL-terminated 43-byte buffer) */
+} OqlProposeColumnState;
+
+/* Build the player prompt as the C demo does:
+ *   board=<42>|valid=<csv>
+ *
+ * Returns the byte count written to `out`, or -1 if the buffer is too small
+ * or the board is malformed.  Mirrors lines 311-320 of the demo, sans the
+ * `blocked=` field (the OQL runtime doesn't yet track per-turn blocked
+ * history; closing that gap belongs to a separate ticket — see
+ * E11-diagnosis.md §3.3). */
+static int oql_c4_build_prompt(const char *board, char *out, size_t out_sz) {
+    if (!board || !out || out_sz < 64) return -1;
+    /* valid=<csv> */
+    char valid[32]; size_t vpos = 0;
+    int first = 1;
+    for (int c = 0; c < OQL_C4_COLS; c++) {
+        if (!oql_c4_column_legal(board, c)) continue;
+        if (!first && vpos + 1 < sizeof(valid)) valid[vpos++] = ',';
+        if (vpos + 1 < sizeof(valid)) {
+            valid[vpos++] = (char)('0' + c);
+            first = 0;
+        }
+    }
+    if (vpos >= sizeof(valid)) return -1;
+    valid[vpos] = '\0';
+    int n = snprintf(out, out_sz, "board=%s|valid=%s", board, valid);
+    return (n < 0 || (size_t)n >= out_sz) ? -1 : n;
+}
+
+#define OQL_C4_GEN_LEN     60   /* matches demo INF_GEN_LEN */
+#define OQL_C4_ENSEMBLE     3   /* matches demo ENSEMBLE_VOTES */
+
+static int oql_propose_column_cb(vm_natives_ctx *ctx, int temp_x100) {
+    if (!ctx) return -1;
+    OqlProposeColumnState *st = (OqlProposeColumnState *)ctx->propose_column_state;
+    if (!st || !st->org || !st->cfg || !st->board) return -1;
+
+    /* The board lives on ctx via the interned handle.  Prefer the staged
+     * board in `st->board` since the runtime updates it directly (we don't
+     * need a round-trip through the strings table for the extern call). */
+    char prompt[256];
+    if (oql_c4_build_prompt(st->board, prompt, sizeof(prompt)) < 0) return -1;
+
+    /* Temperature: temp_x100 ∈ [1, 100] → scalar_t ∈ [0.01, 1.0]. */
+    scalar_t temp = (scalar_t)((double)temp_x100 / 100.0);
+    if (temp < (scalar_t)0.01) temp = (scalar_t)0.01;
+
+    char out[OQL_C4_GEN_LEN + 1] = {0};
+    scalar_t conf = 0;
+    organelle_generate_ensemble(st->org, st->cfg, prompt,
+                                out, OQL_C4_GEN_LEN,
+                                OQL_C4_ENSEMBLE, temp, &conf);
+
+    /* The C demo (main.c:338-340) reads the first character as the column
+     * digit.  Match that exactly. */
+    char c = out[0];
+    if (c < '0' || c > '6') return -1;
+    return (int)(c - '0');
+}
+
+/* ============================================================
+ *  Legacy host-side proposer — retained as the fallback when the
+ *  player organelle hasn't been wired with a corpus (e.g. tests that
+ *  only construct an OqlRuntime without staging a vocab).  Picks
+ *  uniformly from the legal mask, matching E09's pre-E11 behaviour.
  * ============================================================ */
 
 static int oql_model_propose_column(const Model *model, unsigned int *seed,
                                     int legal_mask) {
-    if (!model) return -1;
-    /* For E09 we don't yet have a per-game KV state machine — the safe
-     * path is to argmax the model's bias / output logits given a one-shot
-     * forward pass.  A full board→token pipeline lives in the C demo
-     * (~150 LOC of corpus-encoded prompts); replicating that here is
-     * scoped out of E09 (T7 forbids LOC explosion).  Instead we sample
-     * a column uniformly from the legal mask using the model's
-     * RNG-equivalent forward weights as a randomness source — produces
-     * a deterministic-given-seed but model-influenced column.
-     *
-     * E10/E11 will lift the full prompt protocol into oql_runtime_games. */
     (void)model;
     int legal[OQL_C4_COLS];
     int n = 0;
@@ -278,11 +459,46 @@ oql_status oql_run_game_loop(OqlRuntime *rt,
     /* Lazy load — may return NULL if checkpoint missing. */
     Model *player_model = oql_runtime_load_organelle(rt, player, out);
 
+    /* E11: build the Organelle wrapper (model + vocab from corpus) so the
+     * c4_model_propose_column extern can run organelle_generate_ensemble
+     * with the C-demo's prompt protocol.  NULL on corpus-absent / vocab-
+     * mismatch — in that case the legacy uniform-mask proposer fires. */
+    Organelle *player_org = NULL;
+    if (player_model) {
+        const MicrogptConfig *cfg = rt->cfg ? (const MicrogptConfig *)rt->cfg
+                                            : model_config(player_model);
+        player_org = oql_build_player_organelle(player_model, cfg,
+                                                player->checkpoint_path, out);
+    }
+    const MicrogptConfig *runtime_cfg = rt->cfg
+        ? (const MicrogptConfig *)rt->cfg
+        : (player_model ? model_config(player_model) : NULL);
+
+    /* E11: seed the global RNG (rand_u) so organelle_generate_ensemble's
+     * sampling is reproducible per RUN.  The C demo does the same via
+     * seed_rng(42) at startup; the OQL runtime mirrors that behaviour so
+     * a `RUN ... SEED = 42` clause produces a deterministic trace.
+     * The opponent's rand_r state is initialised from a second constant
+     * to match the C demo's split (seed_rng(42) for model + 12345 for
+     * opponent in demos/character-level/connect4/main.c lines 163, 226).  */
+    seed_rng(seed);
+
     double run_start = now_ms();
     double *latencies = (double *)malloc(sizeof(double) * (size_t)games * 64);
     int n_latencies = 0;
 
-    unsigned int g_seed = seed;
+    /* C-demo-compatible opponent seed.  Overridable via env-var so
+     * researchers can sweep variance / build a Monte-Carlo distribution. */
+    unsigned int g_seed = 12345;
+    {
+        const char *env_opp = getenv("OQL_C4_OPPONENT_SEED");
+        if (env_opp) {
+            char *end = NULL;
+            unsigned long v = strtoul(env_opp, &end, 10);
+            if (end && *end == '\0') g_seed = (unsigned int)v;
+        }
+    }
+    (void)seed;  /* SEED clause now drives only the model RNG. */
     for (int gi = 0; gi < games; gi++) {
         char board[OQL_C4_SIZE + 1];
         memset(board, OQL_C4_EMPTY, OQL_C4_SIZE);
@@ -295,14 +511,37 @@ oql_status oql_run_game_loop(OqlRuntime *rt,
         vm_natives_ctx ctx;
         vm_natives_ctx_init(&ctx);
 
+        /* E11: stage the propose-column callback for this game.  The state
+         * is on the stack — its lifetime is the inner game loop. */
+        OqlProposeColumnState propose_state = {0};
+        propose_state.org = player_org;
+        propose_state.cfg = runtime_cfg;
+        propose_state.board = board;
+        if (player_org && runtime_cfg) {
+            ctx.propose_column = oql_propose_column_cb;
+            ctx.propose_column_state = &propose_state;
+        }
+
         while (outcome == OQL_C4_EMPTY && !draw) {
             /* ── Player's turn (X) ─────────────────────────────── */
 
             ctx.current_board_handle = vm_natives_str_intern(&ctx, board);
+            /* Refresh the staged board pointer (memmove-safe — board lives
+             * on the stack but the pointer never changes; this is just
+             * defensive). */
+            propose_state.board = board;
 
             double t0 = now_ms();
 
-            /* INPUT_BEHAVIOUR: legal-column mask. */
+            /* INPUT_BEHAVIOUR: returns either:
+             *   - a one-hot legal mask `1 << col` when the model proposed
+             *     `col` and it's legal (E11 Pathway B fast-path), or
+             *   - the full 7-bit legal mask (E09 baseline / fall-through).
+             *
+             * The runtime treats the result the same way either way — it
+             * uniformly samples from the bits set in the returned mask
+             * (oql_model_propose_column below).  One bit set ⇒ that bit
+             * is chosen deterministically. */
             double mask_d = oql_dispatch_behaviour(rt, player->input_behaviour,
                                                    &ctx, 0.0, out);
             int legal_mask = (int)mask_d;
@@ -372,6 +611,22 @@ oql_status oql_run_game_loop(OqlRuntime *rt,
                 }
 
                 if (proposed < 0 || !validated) { draw = 1; break; }
+                /* E11 T4 trace — log first N moves of first M games for the
+                 * token-divergence measurement.  Activate with
+                 *   OQL_TRACE_FIRST_N_MOVES=5 OQL_TRACE_GAMES=10
+                 * and capture stderr.  Off by default. */
+                {
+                    const char *tn = getenv("OQL_TRACE_FIRST_N_MOVES");
+                    const char *tg = getenv("OQL_TRACE_GAMES");
+                    int max_moves = tn ? atoi(tn) : 0;
+                    int max_games = tg ? atoi(tg) : 0;
+                    if (max_moves > 0 && max_games > 0 &&
+                        gi < max_games && moves < max_moves) {
+                        fprintf(stderr, "OQL_TRACE game=%d move=%d col=%d "
+                                        "from_fallback=%d\n",
+                                gi, moves, proposed, from_fallback);
+                    }
+                }
                 oql_c4_drop(board, proposed, OQL_C4_X);
                 moves++;
 
@@ -429,11 +684,13 @@ oql_status oql_run_game_loop(OqlRuntime *rt,
         fprintf(out,
             "RUN connect4: %d games | wins=%d draws=%d losses=%d "
             "(win_rate=%.1f%%) p99_latency=%.2fms audit_rows=%d "
-            "model_loaded=%s total=%.2fs\n",
+            "model_loaded=%s%s total=%.2fs\n",
             games, rt->last_wins, rt->last_draws, rt->last_losses,
             win_rate, rt->last_p99_ms, rt->last_audit_rows,
             player_model ? "yes" : "NO (fell back to random vs random)",
+            player_org ? " model_driven=yes" : " model_driven=no",
             rt->last_total_seconds);
     }
+    oql_free_player_organelle(player_org);
     return OQL_OK;
 }

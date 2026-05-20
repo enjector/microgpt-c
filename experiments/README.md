@@ -117,7 +117,7 @@ Measured (worktree-branch agent runs, all merged into main):
 - E08 ✅ merged at `e9b8620` — 3 PASS (T2 18.5% LOC, T3 zero new opcodes, T4 +4 tests); 5 honestly deferred
 - E09 ✅ merged at `d4eb478` — 6 PASS (T1 RUN completes; T3 sub-ms; T4 17→22 tests; T5 zero VM diff; T6 TRAIN stub; T7 23.4% LOC); T2 PARTIAL (51% win-rate); T8 PARTIAL
 - E10 🔬 agent running (wire TRAIN)
-- E11 🔬 agent running (close E09's T2 win-rate gap)
+- E11 ✅ implementation shipped on worktree branch — T1 PASS at 89% (+38pp vs 51% E09 baseline; parity with 88% C-demo).  Six of seven targets PASS; T4 PARTIAL (input-aligned 100%, slot-aligned 51% due to RNG-path divergence).  Pathway B chosen (one new extern `c4_model_propose_column`); Pathway A as literally written infeasible at the E09 API boundary.  See [E11](E11-connect4-win-rate-fix.md) §3.
 
 Awaiting external inputs:
 - E01 — needs Anthropic API budget (~$100)

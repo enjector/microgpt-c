@@ -1588,7 +1588,8 @@ static double e08_run_no_arg(vm_natives_ctx *ctx, const char *ts_path) {
     enx_assert_ptr_not_null(source);
 
     int n = vm_natives_register_c4(ctx);
-    enx_assert_equal_int(8, n);
+    /* E08 registered 8 natives.  E11 adds 1 more — c4_model_propose_column. */
+    enx_assert_equal_int(9, n);
 
     vm_module *module = NULL;
     vm_result r = vm_module_compile(NULL, source, &module);
@@ -1656,7 +1657,8 @@ static double e08_run_one_arg(vm_natives_ctx *ctx, const char *ts_path,
     enx_assert_ptr_not_null(source);
 
     int n = vm_natives_register_c4(ctx);
-    enx_assert_equal_int(8, n);
+    /* E08 registered 8 natives.  E11 adds 1 more — c4_model_propose_column. */
+    enx_assert_equal_int(9, n);
 
     vm_module *module = NULL;
     vm_result r = vm_module_compile(NULL, source, &module);
@@ -1785,11 +1787,79 @@ enx_test(should_e08_c4_fallback_when_stuck) {
     vm_natives_ctx_dispose(&ctx);
 }
 
+/* E11 — c4_model_propose_column extern unit test.
+ *
+ * Verifies the extern wiring end-to-end without requiring a real trained
+ * checkpoint or the OQL runtime: install a fake callback on the ctx,
+ * confirm the TS body returns whatever the callback proposes, and that
+ * `propose_column == NULL` (the default state) yields -1.
+ *
+ * The TS body itself is `resources/vm/natives_c4/model_propose_column.ts`.
+ */
+
+typedef struct fake_propose_state {
+    int  returned_col;       /* what the fake callback will return */
+    int  saw_temp_x100;      /* what temp_x100 the callback observed */
+    int  call_count;
+} fake_propose_state;
+
+static int fake_propose_cb(vm_natives_ctx *ctx, int temp_x100) {
+    fake_propose_state *st = (fake_propose_state *)ctx->propose_column_state;
+    if (!st) return -1;
+    st->saw_temp_x100 = temp_x100;
+    st->call_count++;
+    return st->returned_col;
+}
+
+enx_test(should_e11_c4_model_propose_column_dispatch) {
+    vm_natives_ctx ctx;
+    vm_natives_ctx_init(&ctx);
+
+    /* (1) Default state: no callback installed → -1. */
+    double r0 = e08_run_no_arg(&ctx,
+        "resources/vm/natives_c4/model_propose_column.ts");
+    enx_assert_equal_double(-1.0, r0);
+
+    /* (2) Install a fake that returns column 4 — TS sees 4. */
+    fake_propose_state st = {4, 0, 0};
+    ctx.propose_column = fake_propose_cb;
+    ctx.propose_column_state = &st;
+    double r1 = e08_run_no_arg(&ctx,
+        "resources/vm/natives_c4/model_propose_column.ts");
+    enx_assert_equal_double(4.0, r1);
+    enx_assert_equal_int(20, st.saw_temp_x100); /* TS passes 20 = temp 0.2. */
+    enx_assert_equal_int(1, st.call_count);
+
+    /* (3) Fake returns -1 (model declined). */
+    st.returned_col = -1;
+    double r2 = e08_run_no_arg(&ctx,
+        "resources/vm/natives_c4/model_propose_column.ts");
+    enx_assert_equal_double(-1.0, r2);
+
+    /* (4) Fake returns out-of-range 9 — clamped to -1 by extern. */
+    st.returned_col = 9;
+    double r3 = e08_run_no_arg(&ctx,
+        "resources/vm/natives_c4/model_propose_column.ts");
+    enx_assert_equal_double(-1.0, r3);
+
+    /* (5) Each call drives exactly one callback invocation. */
+    st.returned_col = 0;
+    st.call_count = 0;
+    (void)e08_run_no_arg(&ctx,
+        "resources/vm/natives_c4/model_propose_column.ts");
+    (void)e08_run_no_arg(&ctx,
+        "resources/vm/natives_c4/model_propose_column.ts");
+    enx_assert_equal_int(2, st.call_count);
+
+    vm_natives_ctx_dispose(&ctx);
+}
+
 enx_test_case_t vm_e08_natives_tests[] = {
     enx_test_case(should_e08_c4_legal_column_mask),
     enx_test_case(should_e08_c4_column_is_legal),
     enx_test_case(should_e08_c4_parse_token),
     enx_test_case(should_e08_c4_fallback_when_stuck),
+    enx_test_case(should_e11_c4_model_propose_column_dispatch),
     enx_test_case_end()};
 
 // --- main.c ---

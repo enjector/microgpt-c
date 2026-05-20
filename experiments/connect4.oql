@@ -15,13 +15,47 @@
 -- table; see src/microgpt_vm_natives.{h,c}.
 
 -- ──────────────────────────────────────────────────────────────────
--- INPUT_BEHAVIOUR — parse the board string into a legal-column mask
+-- INPUT_BEHAVIOUR — ask the model for a column proposal via the
+-- C-demo prompt protocol, then collapse the result into a one-hot
+-- legal mask the runtime can drop directly.
+--
+-- E11 Pathway B: the new extern c4_model_propose_column(temp_x100)
+-- runs organelle_generate_ensemble against the loaded player
+-- organelle with the corpus-encoded prompt
+--   board=<42>|valid=<csv>
+-- (matches demos/character-level/connect4/main.c lines 311-320 and
+--  the training corpus c_connect4_player.txt verbatim).  Returns
+-- the proposed column 0..6 or -1 on parse / no-model.
+--
+-- When the model proposes a legal column, we return (1 << col) so
+-- the runtime's downstream sampler picks exactly that column.
+-- When the model declines or proposes illegally, we fall back to
+-- the full legal mask (E09 baseline) — the runtime then picks
+-- uniformly and VALIDATE/FALLBACK behave as before.
 -- ──────────────────────────────────────────────────────────────────
 CREATE BEHAVIOUR parse_c4_board AS VM `
     declare function c4_legal_column_mask(): number;
+    declare function c4_column_is_legal_n(col: number): number;
+    declare function c4_model_propose_column(t: number): number;
     function eval(): number {
-        var mask = c4_legal_column_mask();
-        return mask;
+        var legal  = c4_legal_column_mask();
+        var col    = c4_model_propose_column(20);
+        var result = legal;
+        if (col >= 0) {
+            var ok = c4_column_is_legal_n(col);
+            if (ok > 0) {
+                /* One-hot mask: 1 << col, computed by repeated doubling
+                 * because the VM TS dialect has no bit-shift operator. */
+                var bit = 1;
+                var i   = 0;
+                while (i < col) {
+                    bit = bit + bit;
+                    i   = i + 1;
+                }
+                result = bit;
+            }
+        }
+        return result;
     }
 `;
 
@@ -98,12 +132,18 @@ CREATE ORGANELLE connect4_planner
   );
 
 -- ──────────────────────────────────────────────────────────────────
--- COMPOSE — wire the planner + player as a two-stage linear pipeline.
+-- COMPOSE — wire the player + planner as a two-stage linear pipeline.
 -- E09 Phase 2: the linear FROM form resolves each name to an
 -- OqlOrganelle entry; no inline @graph block needed for this game.
+--
+-- E11 Gap-B fix: PLAYER is listed FIRST so the game-loop runtime
+-- (oql_run_game_loop, which takes call_organelles[0] as the move
+-- source) loads c4_player.ckpt and runs inference against player
+-- data.  Pre-E11 the planner was first and its checkpoint was loaded
+-- as the move source — that was Gap B in E11-diagnosis.md.
 -- ──────────────────────────────────────────────────────────────────
 COMPOSE connect4_pipeline
-  FROM connect4_planner, connect4_player;
+  FROM connect4_player, connect4_planner;
 
 -- ──────────────────────────────────────────────────────────────────
 -- RUN — drive the pipeline against a random opponent over 100 games.

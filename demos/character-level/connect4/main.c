@@ -372,6 +372,22 @@ int main(void) {
       else
         total_fallback_sourced++;
 
+      /* E11 T4 trace — log first N X-moves of first M games for token-
+       * divergence comparison vs the OQL run.  Activate with
+       *   OQL_TRACE_FIRST_N_MOVES=5 OQL_TRACE_GAMES=10
+       * (env-vars shared with src/oql_runtime_games.c). */
+      {
+        const char *tn = getenv("OQL_TRACE_FIRST_N_MOVES");
+        const char *tg = getenv("OQL_TRACE_GAMES");
+        int max_moves = tn ? atoi(tn) : 0;
+        int max_games = tg ? atoi(tg) : 0;
+        if (max_moves > 0 && max_games > 0 &&
+            game_idx < max_games && moves_made < max_moves) {
+          fprintf(stderr, "CDEMO_TRACE game=%d move=%d col=%d "
+                          "from_model=%d\n",
+                  game_idx, moves_made, proposed_col, from_model);
+        }
+      }
       /* Deterministic Judge: is column valid? */
       int row = drop_piece(board, proposed_col, PLAYER_X);
       if (row >= 0) {
