@@ -1,5 +1,5 @@
 /*
- * microgpt_pipeline_vm.c — Opt-in VM-backed dispatcher for the Pipeline IR.
+ * pipeline_ir_vm.c — Opt-in VM-backed dispatcher for the Pipeline IR.
  *
  * Copyright (c) 2026 Ajay Soni (ajay.soni@enjector.com), Enjector Software Ltd.
  * SPDX-License-Identifier: MIT
@@ -7,14 +7,15 @@
  * This translation unit implements pipeline_execute_vm() — a convenience
  * dispatcher that resolves each leaf primitive name to a vm_native_fn
  * registered in a vm_engine via vm_engine_find_fn(), marshals
- * PipelineValue ↔ double, and dispatches.
+ * PipelineValue <-> double, and dispatches.
  *
  * Why this lives in a separate TU:
- *   microgpt_lib.a does NOT link the VM (it is a heavy module — ~4 K LOC).
- *   This TU is opt-in: a demo or test that calls pipeline_execute_vm()
- *   must add BOTH microgpt_pipeline_vm.c AND microgpt_vm.c to its target
- *   sources.  microgpt_lib.a is unaware of the VM, keeping its footprint
- *   minimal for the many demos that do not use VM dispatch.
+ *   libpipeline_ir.a does NOT link the VM (it is a heavy module — ~4 K LOC).
+ *   This TU is opt-in: a host application that wants pipeline_execute_vm()
+ *   must add BOTH pipeline_ir_vm.c AND a compatible vm_engine implementation
+ *   (e.g. the MicroGPT-C VM in src/microgpt_vm.c) to its target sources.
+ *   libpipeline_ir.a is unaware of the VM, keeping its footprint minimal
+ *   for the many consumers that do not use VM dispatch.
  *
  * Constraints (per BS_pipeline_ir.md INV-PIPE-024):
  *   - INT/FLOAT/VOID ports only.  STRING/LIST/TENSOR/RECORD ports cause
@@ -29,8 +30,8 @@
 
 #define _CRT_SECURE_NO_WARNINGS 1
 
-#include "microgpt_pipeline.h"
-#include "microgpt_pipeline_internal.h"
+#include "pipeline_ir/pipeline_ir.h"
+#include "pipeline_ir_internal.h"
 #include "microgpt_vm.h"
 
 #include <stdint.h>

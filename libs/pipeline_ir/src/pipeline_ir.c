@@ -1,16 +1,23 @@
 /*
- * MicroGPT-C — Graph Pipeline IR — Implementation
+ * libpipeline_ir — Graph Pipeline IR — Implementation
  *
  * Copyright (c) 2026 Ajay Soni (ajay.soni@enjector.com), Enjector Software Ltd.
  * SPDX-License-Identifier: MIT
  *
- * Pure C99, libc + libm only. Single TU. Public API in microgpt_pipeline.h.
+ * Pure C99, libc + libm only. Single TU. Public API in
+ * include/pipeline_ir/pipeline_ir.h.
+ *
+ * Originally lived at src/microgpt_pipeline.c inside the MicroGPT-C
+ * repo; extracted to libs/pipeline_ir/ for standalone reuse per
+ * Experiment E02.  The MicroGPT-C tree retains a one-line shim at
+ * src/microgpt_pipeline.h that forwards #include "microgpt_pipeline.h"
+ * to <pipeline_ir/pipeline_ir.h> for backward compatibility.
  */
 
 #define _CRT_SECURE_NO_WARNINGS 1
 
-#include "microgpt_pipeline.h"
-#include "microgpt_pipeline_internal.h"
+#include "pipeline_ir/pipeline_ir.h"
+#include "pipeline_ir_internal.h"
 
 #include <stdio.h>
 #include <stdlib.h>

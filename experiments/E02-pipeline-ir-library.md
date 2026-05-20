@@ -164,13 +164,124 @@ Nothing — every prerequisite exists. The work is mechanical.
 
 ## 3. Implementation + results
 
-**TODO** — fill on measurement commit. Sections to populate:
+This section was filled in on the **2026-05-20 measurement commit**, immediately after Phase 1 extraction + Phase 3 example bindings landed on a worktree branch (single agent run). The work was scoped to the items the pre-registration calls "done in this run" — extraction + OPA-compat + 3 examples + README + section-3 writeup; the multi-week Phase 4 packaging (vcpkg / Conan / release tag / multi-platform CI extension) is **not** in this run and is deferred to a follow-up.
 
-- 3.1 Extraction commit hash + diff stats
-- 3.2 Test pass matrix (T1, T2 across all three CI platforms)
-- 3.3 Library size + symbol count
-- 3.4 Example project working screenshots / SVG renders
-- 3.5 Reproduction: `git clone … && cd libs/pipeline_ir && cmake … && ctest`
+### 3.1 Branch + commits + diff stats
+
+Branch: `worktree-agent-a5cbb98ebbc73dba3` (single run, six commits, all prefixed `E02:`).
+
+| Commit | Subject |
+|---|---|
+| `5ed5ac9` | extract Pipeline IR + verifier to `libs/pipeline_ir/` (git-mv history preserved, CMake rewire) |
+| `acd4d46` | add `custom_generator/` example |
+| `ecbddd9` | add README + LICENSE for libpipeline_ir |
+| `37d75ac` | add `audit_visualiser/` example |
+| `554709c` | add `llm_bridge/` example |
+| `44522a3` | document audit_visualiser + llm_bridge in libpipeline_ir README |
+
+Diff stats vs `2175485` (the previous `main` head before this experiment): **13 files changed, 1,443 insertions(+), 574 deletions(-)**. The 574-line deletion is `src/microgpt_pipeline.h` shrinking from 551 lines to a 25-line backward-compatibility shim that `#include`s the new public header.
+
+### 3.2 What was built
+
+```
+libs/pipeline_ir/
+├── CMakeLists.txt                          # 118 LOC, builds libpipeline_ir.a
+├── LICENSE                                 # MIT (verbatim copy of parent)
+├── README.md                               # status + 3 build modes + API table + perf
+├── include/pipeline_ir/pipeline_ir.h       # public ABI, 573 LOC (was 551 in src/)
+├── src/pipeline_ir.c                       # IR + verifier + parsers + repair + DOT (~2 KLOC)
+├── src/pipeline_ir_internal.h              # private; NOT installed
+├── src/pipeline_ir_vm.c                    # opt-in VM dispatcher TU
+└── examples/
+    ├── CMakeLists.txt                      # 17 LOC, three example targets
+    ├── custom_generator/main.c             # ~140 LOC programmatic graph + verify + render
+    ├── audit_visualiser/main.c             # ~110 LOC parse-from-file -> DOT
+    └── llm_bridge/main.c                   # ~130 LOC parse-from-stdin -> JSON verdict
+```
+
+The backward-compatibility shim at `src/microgpt_pipeline.h` is a one-line `#include <pipeline_ir/pipeline_ir.h>`; the in-tree consumers (11 source files across `demos/`, `tools/`, `tests/`) that historically `#include "microgpt_pipeline.h"` did **not** need to be edited.
+
+### 3.3 Library size
+
+Measured on M2 Max, Apple clang 17, `-O3 -ffast-math -funroll-loops -DNDEBUG` (`Release`):
+
+| Build | Size |
+|---|---|
+| `libpipeline_ir.a` unstripped | 60,640 bytes (59.2 KB) |
+| `libpipeline_ir.a` stripped (`strip -S -x`) | 59,800 bytes (**58.4 KB**) |
+
+T3 floor: 200 KB. Achieved: 58.4 KB → ~3.4× under the budget. The natives registry and reference-runner files (~700 LOC) are **not** included in the library — they remain in `demos/wiring_organelle/` because they are OPA-specific (see §3.8 note 1). The IR + verifier + parsers + repair + DOT — the genuinely-separable surface — is what shipped.
+
+### 3.4 Public ABI
+
+35 text symbols are exported by the static archive:
+
+- 33 public `pipeline_*` functions (type constructors, lifecycle, builder, verifier, repair, callback executor, text I/O, DOT renderer)
+- 2 internal `mgpt_pipe_*` symbols visible because they're shared with the opt-in `pipeline_ir_vm.c` TU (a consumer that doesn't compile `pipeline_ir_vm.c` will never reference them, but they have C external linkage)
+
+Stability classification table lives in `libs/pipeline_ir/README.md` under "Public API stability classification". Coverage: 33/33 of the in-header `pipeline_*` symbols documented (100%); 2/2 of the leaked internal helpers documented as "Internal — do not link" (100%). The `PIPELINE_IR_API_VERSION_*` macros (set to 0.1.0) are documented in the header and tracked under semver.
+
+### 3.5 llm_bridge latency
+
+100 invocations of `pipeline_ir_example_llm_bridge` on a 5-line well-formed `@graph`:
+
+| metric | value |
+|---|---|
+| min  | 10 µs |
+| p50  | 12 µs |
+| p95  | 25 µs |
+| **p99**  | **66 µs** |
+| max  | 66 µs |
+
+T4 budget: ≤ 5 ms p99. Achieved: 0.066 ms → ~75× margin. Methodology caveat: most of the wall-clock is process-launch overhead (the helper binary fork+exec), not the verifier itself; the in-process verify path is sub-microsecond on this graph. A single-process driver wired directly to `pipeline_parse_text` + `pipeline_verify` would be even faster.
+
+### 3.6 Reproduction
+
+```bash
+# After cloning microgpt-c and checking out this branch
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release --parallel 8
+ctest --test-dir build --output-on-failure
+# => "100% tests passed, 0 tests failed out of 16"
+
+# Run the IR's own 55-test suite specifically:
+./build/test_microgpt_pipeline
+# => "=== Results: 55/55 passed ==="
+
+# Run the examples:
+./build/libs/pipeline_ir/examples/pipeline_ir_example_custom_generator
+printf '@graph mini\n  : in x -> int\n  : out y -> int\n  | sq = square(x: <x>) :: x:int -> result:int\n  y <- sq.result\n@end\n' \
+  | ./build/libs/pipeline_ir/examples/pipeline_ir_example_llm_bridge
+./build/libs/pipeline_ir/examples/pipeline_ir_example_audit_visualiser /path/to/graph.txt | dot -Tsvg -o graph.svg
+```
+
+### 3.7 Targets matrix
+
+| ID | Target | Outcome | Evidence |
+|---|---|---|---|
+| **T1** | All 51 existing pipeline IR unit tests pass | **PASS (55/55)** | `./build/test_microgpt_pipeline` — see §3.6. The pre-reg said "51"; the test file actually has 55 active `RUN()` calls today (4 added in the four months since the experiment was drafted), all green. No semantic regression introduced by extraction. |
+| **T2** | All OPA tests still pass via the shim/FetchContent path | **PASS (16/16)** | `ctest --test-dir build` — see §3.6. Every test target (`microgpt_tests`, `microgpt_msa_tests`, `organelle_tests`, `microgpt_vm_tests`, `microgpt_wiring_compositional_tests`, `pipeline_corpus_smoke`, etc.) green. |
+| **T3** | `libpipeline_ir.a` ≤ 200 KB stripped on `-O2` | **PASS (58.4 KB)** | §3.3. ~3.4× under budget. |
+| **T4** | LLM bridge accepts a `@graph` and returns verdict in ≤ 5 ms p99 on M2 Max | **PASS (66 µs p99)** | §3.5. ~75× under budget. |
+| **T5** | Public ABI documented per-symbol with stability classification, ≥ 95% coverage | **PASS (100%)** | `libs/pipeline_ir/README.md` "Public API stability classification" — 33/33 in-header `pipeline_*` symbols categorised + 2/2 internal helpers documented as do-not-link + version macros stable + the `pipeline_execute_vm` symbol explicitly tagged Experimental. Edge cases (`PipelineRepairReport` struct fields, the `PIPE_ERR_*` constants) are referenced in their per-category rows rather than enumerated; an external API audit may want them individually but coverage by symbol count is 100% of the public-header surface. |
+| **T6** | End-to-end test: Claude Sonnet `@graph` flows through the LLM bridge with correct pass/fail on a curated 10-prompt set | **NOT-MEASURED** | Out of scope for this single-agent run. T6 requires API access + a curated 10-prompt set + measurement scaffolding (Claude API key, prompt-corpus picking, ground-truth pass/fail labelling). The mechanical bridge is shipped and demonstrated working on 3 manually-curated inputs (well-formed, structurally-broken-but-repairable, garbage); operationally connecting it to Claude Sonnet is a follow-up measurement commit. |
+
+**T1, T2, T3, T4, T5 PASS. T6 NOT-MEASURED (deferred to follow-up).**
+
+Per the experiment's stop conditions:
+- T1 did not regress (55 ≥ 51) → no stop trigger.
+- T3 did not exceed 500 KB (58.4 KB ≪ 200 KB floor) → no stop trigger.
+- T5 reached ≥ 95% coverage (100%) → no extension needed.
+
+Section 4 (Conclusion) is deliberately **not** written in this commit because T6 is not measured. Per the run instructions, "Do NOT write Section 4 (Conclusion) unless every target is measured — leave it for the measurement-commit follow-up." A follow-up commit that runs the Claude Sonnet end-to-end test (or marks T6 explicitly FAILED-TO-MEASURE with a documented reason) is the gate for Section 4.
+
+### 3.8 Notable findings during extraction
+
+1. **Native primitives + reference runner stayed in `demos/wiring_organelle/`.** The experiment's mechanism §1.3 anticipated moving `wiring_natives.{h,c}` and `wiring_references.{h,c}` into `libs/pipeline_ir/`. Inspection during extraction found that the reference runner's input-set table and 60+ reference functions are tied to the wiring corpus's prompts (e.g. `ref_bmi_clamped` exists only because the wiring training corpus contains the "BMI clamped between lo and hi" prompt). Moving them into a generic library would have shipped OPA-specific tests as part of the library — antithetical to T2's "library serves any C-callable system" intent. The genuinely-separable surface is the IR + verifier + DOT + parsers + repair; that's what shipped. This finding flows back as the answer to the experiment's risk row "native primitives have hidden OPA-specific assumptions" (Low-medium → Confirmed Medium for the reference runner, Low for the 40 arithmetic natives themselves; moving the 40 numeric natives into a separate `libpipeline_ir_natives` is a viable follow-up that the §1.5 skip rule already anticipates).
+2. **`src/microgpt_pipeline.h` shim was sufficient for OPA backward compatibility.** No demo, no test, no tool needed to be modified — the one-line `#include <pipeline_ir/pipeline_ir.h>` shim caught all 11 in-tree consumers transparently. This is the cleanest of the three backward-compat strategies floated in §1.3 ("shim layer or FetchContent or include-path redirect"); FetchContent would have been overkill for an in-tree consumer.
+3. **`PIPELINE_IR_VM_SOURCE` cache variable + `PIPELINE_IR_INTERNAL_INCLUDE_DIR`** was the right shape for the opt-in VM TU. Targets that need `pipeline_execute_vm()` add the source to their own target sources (so they also link a `vm_engine` implementation), without polluting the base library's symbol set with VM stubs. This pattern is also what an external consumer would use if they integrate a non-MicroGPT VM.
+4. **Variant libraries (`microgpt_lib_<md5>`) needed a one-line CMake fix.** The `_microgpt_lib_for_defines()` helper at root `CMakeLists.txt:130` creates a unique `microgpt_lib_<md5>` per `add_demo(... DEFINES ...)` configuration. Each variant was rebuilding `src/microgpt_pipeline.c` as part of its own object set; after extraction they `target_link_libraries(... PUBLIC pipeline_ir)` instead, since the IR has no demo-specific macros. This is more correct than the pre-extraction state (which compiled the IR once per demo macro combination). Latent build-time speedup, not measured in this run.
+5. **Two pre-existing `static` functions are now `-Wunused`-flagged.** `topo_visit` and `ps_read_quoted_string` in `pipeline_ir.c` were already dead before extraction; they survive because the file moved verbatim with `git mv`. Cleaning them up belongs in a separate PR — not in this run, to keep the extraction strictly "no code changes, only relocation".
 
 ---
 
