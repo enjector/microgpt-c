@@ -1,5 +1,13 @@
 -- E12 Phase 4: train wiring organelle on the LLM-generated corpus.
+--
+-- Run from build/ as:
+--     ./build/oql_wiring run ../experiments/E12-train.oql
+--
+-- oql_wiring (not the default `oql`) is required because the engine's
+-- matmul dimensions are compile-time constants and the wiring config is
+-- N_EMBD=96 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=384 MLP_DIM=384 MAX_VOCAB=1500.
 
+CREATE ORGANELLE wiring_llm_v3;
 CREATE CORPUS llm_corpus_v3 FROM FILE 'llm_corpus_v3.txt';
 
 TRAIN wiring_llm_v3
