@@ -158,9 +158,69 @@ static int random_opponent_move(const char *board, unsigned int *seed) {
 
 /* ---- Main ---- */
 
-int main(void) {
+/* E13 Pathway B — minimal CLI to override the player corpus + ckpt path
+ * and optionally skip planner re-training / game playback.  Default
+ * (no flags) reproduces the original C demo's behaviour byte-for-byte.
+ *
+ * Flags:
+ *   --player-corpus=PATH  override the player corpus path used by
+ *                         organelle_train (default: c_connect4_player.txt).
+ *                         Uses opa_load_docs_multiline — same loader that
+ *                         the OQL C4 inference runtime uses, so vocab is
+ *                         compatible by construction.
+ *   --player-ckpt=PATH    override the saved player checkpoint path
+ *                         (default: c_connect4_player.ckpt).
+ *   --skip-planner-train  reuse the existing planner checkpoint instead
+ *                         of re-training it (saves ~5min on the E13 run).
+ *   --skip-play           train only; do not run the 100-game playback.
+ *
+ * No new build deps; no engine-surface change.  E13 §1.5 / T9 / T5 hold. */
+typedef struct {
+  const char *player_corpus;
+  const char *player_ckpt;
+  int skip_planner_train;
+  int skip_play;
+  int max_docs;       /* 0 = use compile-time default (5000) */
+} C4Args;
+
+static void parse_c4_args(int argc, char **argv, C4Args *a) {
+  a->player_corpus = NULL;
+  a->player_ckpt = NULL;
+  a->skip_planner_train = 0;
+  a->skip_play = 0;
+  a->max_docs = 0;
+  for (int i = 1; i < argc; i++) {
+    const char *s = argv[i];
+    if (!strncmp(s, "--player-corpus=", 16))      a->player_corpus = s + 16;
+    else if (!strncmp(s, "--player-ckpt=", 14))   a->player_ckpt = s + 14;
+    else if (!strncmp(s, "--max-docs=", 11))      a->max_docs = atoi(s + 11);
+    else if (!strcmp(s, "--skip-planner-train")) a->skip_planner_train = 1;
+    else if (!strcmp(s, "--skip-play"))           a->skip_play = 1;
+    else if (!strcmp(s, "--help") || !strcmp(s, "-h")) {
+      fprintf(stderr,
+        "usage: %s [--player-corpus=PATH] [--player-ckpt=PATH]\n"
+        "          [--max-docs=N] [--skip-planner-train] [--skip-play]\n"
+        "  Default: trains planner+player from corpora next to the binary\n"
+        "           and plays 100 games vs random.  E13 Pathway B uses the\n"
+        "           --player-corpus / --player-ckpt flags to train the\n"
+        "           distillation student.  --max-docs lifts the 5000-doc\n"
+        "           cap so an augmented corpus's LLM moves AND baseline\n"
+        "           records both fit in the training window.\n", argv[0]);
+      exit(0);
+    } else {
+      fprintf(stderr, "warn: unknown arg '%s' (use --help)\n", s);
+    }
+  }
+}
+
+int main(int argc, char **argv) {
   setbuf(stdout, NULL);
   seed_rng(42);
+
+  C4Args cli;
+  parse_c4_args(argc, argv, &cli);
+  const char *player_corpus = cli.player_corpus ? cli.player_corpus : PLAYER_CORPUS;
+  const char *player_ckpt   = cli.player_ckpt   ? cli.player_ckpt   : PLAYER_CKPT;
 
   /* Runtime configuration */
   g_cfg = microgpt_default_config();
@@ -173,7 +233,7 @@ int main(void) {
   g_cfg.num_steps = 25000;
   g_cfg.learning_rate = 0.001;
   g_cfg.max_vocab = 50;
-  g_cfg.max_docs = 5000;
+  g_cfg.max_docs = (cli.max_docs > 0) ? cli.max_docs : 5000;
   g_cfg.max_doc_len = 128;
   microgpt_print_config("MicroGPT-C - Connect-4 Kanban Pipeline Demo", &g_cfg);
 
@@ -186,19 +246,38 @@ int main(void) {
 
   int train_steps = g_cfg.num_steps;
   printf("--- PHASE 1: TRAINING (%d steps each) ---\n", train_steps);
+  printf("  player corpus    : %s\n", player_corpus);
+  printf("  player ckpt      : %s\n", player_ckpt);
+  printf("  skip planner train: %s\n", cli.skip_planner_train ? "yes" : "no");
+  printf("  skip play         : %s\n", cli.skip_play ? "yes" : "no");
 
-  Organelle *planner = organelle_train("Planner", PLANNER_CORPUS, PLANNER_CKPT,
-                                       &g_cfg, train_steps);
-  if (!planner) {
-    fprintf(stderr, "FATAL: Planner training failed\n");
-    return 1;
+  Organelle *planner = NULL;
+  if (!cli.skip_planner_train) {
+    planner = organelle_train("Planner", PLANNER_CORPUS, PLANNER_CKPT,
+                              &g_cfg, train_steps);
+    if (!planner) {
+      fprintf(stderr, "FATAL: Planner training failed\n");
+      return 1;
+    }
+  } else {
+    printf("(planner training skipped — assumes %s already on disk)\n",
+           PLANNER_CKPT);
   }
 
-  Organelle *player = organelle_train("Player", PLAYER_CORPUS, PLAYER_CKPT,
+  Organelle *player = organelle_train("Player", player_corpus, player_ckpt,
                                       &g_cfg, train_steps);
   if (!player) {
     fprintf(stderr, "FATAL: Player training failed\n");
     return 1;
+  }
+
+  /* E13: optionally exit after training (the 100-game playback is owned
+   * by ./oql_c4 run experiments/connect4_distilled.oql). */
+  if (cli.skip_play) {
+    printf("\n--- PHASE 1 complete; --skip-play set, exiting before playback ---\n");
+    if (planner) organelle_free(planner);
+    organelle_free(player);
+    return 0;
   }
 
   /* ================================================================
@@ -538,7 +617,7 @@ int main(void) {
   printf("================================================================\n");
 
   /* Cleanup */
-  organelle_free(planner);
+  if (planner) organelle_free(planner);
   organelle_free(player);
 
   return 0;

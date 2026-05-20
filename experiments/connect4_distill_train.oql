@@ -1,0 +1,70 @@
+-- experiments/connect4_distill_train.oql
+--
+-- Experiment E13 Phase 3 (preferred Pathway A): train a new
+-- Connect-4 player organelle on the LLM-distillation corpus emitted
+-- by tools/c4_distill_corpus_gen.c (Phase 2).
+--
+-- Run with the C4-shaped variant of the OQL CLI so the compile-time
+-- macros match c_connect4_player.ckpt's geometry:
+--
+--     ./build/oql_c4 run experiments/connect4_distill_train.oql
+--
+-- That binary's compile-time defines (from CMakeLists.txt §oql_c4):
+--     N_EMBD=96 N_HEAD=8 N_LAYER=4 BLOCK_SIZE=128 MLP_DIM=384
+--     NUM_STEPS=25000 LR=0.001 BATCH_SIZE=8 MAX_VOCAB=50 ...
+-- These match c_connect4_demo (`demos/character-level/connect4/main.c`)
+-- byte-for-byte, so the saved checkpoint is shape-compatible with
+-- the baseline c4_player.ckpt and loadable by oql_c4 unchanged.
+--
+-- Pre-registered targets exercised here:
+--   T2 — student stays ≤ 460K params (geometry locked above).
+--   T7 — deterministic re-runs (SEED=1337 locked, matches E10).
+--   T9 — engine surface untouched.
+
+-- 1. Register the AUGMENTED corpus = baseline c_connect4_player.txt
+--    + LLM-distillation pairs.  We use the concatenation rather than
+--    the pure LLM corpus because:
+--
+--      (a) The baseline corpus contains `|blocked=N` records with
+--          three extra characters ('c','e','k') that the LLM never
+--          emits — pure-LLM training produces a 22-char vocab that
+--          mismatches the inference-time vocab-build in
+--          oql_runtime_games.c::build_player_organelle (which uses
+--          c_connect4_player.txt to build the tokenizer at load time
+--          for the C4 OQL CLI).  Vocab mismatch → model disabled.
+--
+--      (b) Augmentation distillation is a recognised distillation
+--          pattern (cf. data-augmentation-style distillation).  The
+--          measurement still answers E13's question: does adding the
+--          LLM-teacher's moves to the existing C-curated corpus lift
+--          win rate above the 88-89% baseline?  Three outcomes still
+--          map cleanly per §4.2.
+--
+--    Produced by the shell pre-step (LLM corpus FIRST so the
+--    opa_load_docs_multiline `max_docs` cap consumes LLM moves
+--    preferentially — see E13 §3.3 for the cap-ordering note):
+--      cat build/data/c4_distill_corpus.txt \
+--          build/c_connect4_player.txt \
+--        > build/data/c4_distill_corpus_augmented.txt
+--    (See experiments/E13-llm-game-distillation.md §3.3.)
+CREATE CORPUS c4_distill FROM FILE 'data/c4_distill_corpus_augmented.txt';
+
+-- 2. Declare a blank player slot.  TRAIN will populate it.
+CREATE ORGANELLE c4_distill_player;
+
+-- 3. Train.  Mirrors c_connect4_demo's hyperparameters exactly so
+--    the produced checkpoint can be evaluated under identical
+--    inference conditions to the baseline c4_player.ckpt.
+--
+--    Note: STEPS / LR / BATCH_SIZE here are loop-counter overrides;
+--    the engine's matmul shapes (N_EMBD / N_HEAD / …) come from the
+--    binary's compile-time macros and CANNOT be tuned at runtime —
+--    see CLAUDE.md "Compile-time architecture".  Run via oql_c4 to
+--    match c_connect4_player's geometry.
+TRAIN c4_distill_player ON c4_distill WITH
+    ROLE       = player,
+    STEPS      = 25000,
+    LR         = 0.001,
+    BATCH_SIZE = 8,
+    SEED       = 1337,
+    SAVE       = 'checkpoints/c4_player_distilled.ckpt';

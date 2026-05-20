@@ -2062,6 +2062,23 @@ target_include_directories(reeval_parser PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
 if(NOT MSVC)
   target_link_libraries(reeval_parser PRIVATE m)
 endif()
+
+# ──────────────────────────────────────────────────────────────────
+# E13 — LLM-as-Connect-4-teacher distillation corpus generator.
+#
+# Pre-registered in experiments/E13-llm-game-distillation.md §1.3.
+# Standalone CLI: plays N Connect-4 games with the LLM as X, random
+# as O, and emits (board, move) pairs from the LLM's wins to a
+# corpus file the OQL TRAIN adapter consumes unchanged.
+#
+# No engine link, no microgpt_lib variant — talks to LM Studio via
+# curl subprocess only.  Zero new build deps (T8).
+# ──────────────────────────────────────────────────────────────────
+add_executable(c4_distill_corpus_gen
+    tools/c4_distill_corpus_gen.c
+    tools/llm_game_player.c)
+target_include_directories(c4_distill_corpus_gen PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/tools)
 # Smoke test — generator runs end-to-end with zero failures.
 add_test(NAME pipeline_corpus_smoke
          COMMAND pipeline_corpus_gen ${CMAKE_BINARY_DIR}/_corpus_smoke.txt
