@@ -40,6 +40,7 @@ Each of these directions has a dedicated experiment doc in this folder:
 5. **Open the pre-registration methodology as a public artefact.** Experiment 7.2 (pre-reg database) and 7.1 (auto-audit on commit) cost 3 weeks combined, and the output — a tool other ML projects can adopt to leakage-audit their held-out sets and track pre-reg outcomes — has reach well beyond MicroGPT-C. Reviewers love this kind of side contribution. → **[E05](E05-prereg-methodology-public.md)**
 6. **Pick a real-world public-data application that exercises the three bounds.** The migrated verticals (fraud, finance risk, defence tracking) were the obvious choice but went private. A research-friendly substitute: **medical guideline → typed-treatment-graph** (audit-mandated; distinctive vocabulary; public datasets like SNOMED/UMLS available). It hits the architecture's strongest claim (audit + tiny + composable) on a domain where reviewers can verify the work. → **[E06](E06-medical-guideline-graphs.md)**
 7. **Elevate the operator surface to a SQL-shaped DSL — OQL (Organelle Query Language).** Inspired by [EQL](../../EnX/EnX-Research-Prototypes/aerospike.github/cpp/enx-db/book-eql.v7/The_Expressive_Power_of_EQL.md)'s "the query language is the product" thesis. SQL + 6 verbs (`TRAIN`, `COMPOSE`, `RUN`, `EVALUATE`, `VERIFY`, `AUDIT`) - 4 verbs (`CREATE TRIGGER`, `CREATE FUNCTION`, `DECLARE CURSOR`, `SAVEPOINT`). Re-uses the existing Flex/Bison VM infrastructure. Compounds with E05 — pre-registration becomes a first-class `CREATE EXPERIMENT … WITH TARGETS …` statement instead of prose. Each of E01-E06 rewrites to ≤ 50 lines of OQL. → **[E07](E07-oql-dsl.md)**
+8. **High-level researcher surface — `BEHAVIOUR` objects in OQL whose body is the VM's TypeScript dialect.** Researchers stop writing C wrappers for organelles; they write TS functions (`function eval(board: string): string { ... }`) that bind to engine primitives via `declare function` externs. Connect-4's ~500 LOC C demo collapses to ~80 lines of OQL + 4 small TS bodies. Zero new VM opcodes (extern table only). Worked target: Connect-4 win rate held within ±3 pp, then replicated to 3 more games. → **[E08](E08-oql-behaviours.md)**
 
 ### What we explicitly will NOT prioritise
 
@@ -76,7 +77,7 @@ Every experiment doc is a single markdown file with four sections:
 | **3. Implementation + results** | Measurement commit | What was built, raw numbers, links to artefacts |
 | **4. Conclusion** | Measurement commit | Verdict against each pre-reg target, lessons, next moves, traceability updates |
 
-## The seven experiments
+## The eight experiments
 
 | ID | Title | Direction | Cost | Falsification risk |
 |---|---|---|---|---|
@@ -87,6 +88,7 @@ Every experiment doc is a single markdown file with four sections:
 | [E05](E05-prereg-methodology-public.md) | Open the pre-reg + leakage-audit methodology as a public artefact | Methodology paper + tooling — reach beyond MicroGPT-C | ~3 wk | Low |
 | [E06](E06-medical-guideline-graphs.md) | Medical guideline → typed treatment graph on public data | Real-world public-data application exercising the three bounds | ~8-10 wk | Medium-high |
 | [E07](E07-oql-dsl.md) | OQL — a SQL-shaped DSL for organelles, pipelines, behaviours, and experiments | Replace 3 surfaces (C demos + scripts + markdown specs) with one declarative dialect | ~6-8 wk | Medium |
+| [E08](E08-oql-behaviours.md) | VM TypeScript dialect as the body of OQL `BEHAVIOUR` objects | High-level researcher surface — Connect-4 ~500 LOC C → ~80 lines OQL+TS, zero new VM opcodes | ~4-5 wk | Medium |
 
 ## Status legend
 
@@ -99,7 +101,13 @@ Every experiment doc is a single markdown file with four sections:
 
 ## Current status
 
-All seven: 📋 **Proposal locked** (2026-05-20).
+All eight: 📋 **Proposal locked** (2026-05-20).
+
+In-flight measurement (worktree-branch agent runs):
+- E02 ⏳ agent complete; awaiting merge
+- E04 ⏳ agent complete; awaiting merge
+- E05 🔬 agent still running
+- E07 ✅ merged at `83e5673`
 
 ## Cross-references
 
