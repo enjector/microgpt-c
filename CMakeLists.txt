@@ -2401,6 +2401,21 @@ if(NOT MSVC)
     target_link_libraries(e15_generate PRIVATE m)
 endif()
 
+# Unit tests for the oracle corpus-source adapter.  Exercises the
+# JSON-line parser, bigram-Jaccard, and cache-path derivation without
+# invoking any solver binary.
+add_executable(test_oracle_corpus_source
+    tests/test_oracle_corpus_source.c
+    tools/oracle_corpus_source.c)
+target_include_directories(test_oracle_corpus_source PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/tools)
+if(NOT MSVC)
+    target_link_libraries(test_oracle_corpus_source PRIVATE m)
+endif()
+add_test(NAME oracle_corpus_source_tests
+    COMMAND test_oracle_corpus_source
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
 
 # ──────────────────────────────────────────────────────────────────
 #  oql_c4 — Connect-4-dims variant of the `oql` CLI.
