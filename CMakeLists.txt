@@ -2372,6 +2372,38 @@ if(NOT MSVC)
 endif()
 add_test(NAME microgpt_oql_tests COMMAND test_microgpt_oql WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
+# ──────────────────────────────────────────────────────────────────
+#  test_microgpt_oql_train — E10 loss-curve fidelity smoke test.
+#
+#  Links against the *default* microgpt_lib variant (no DEFINES) so
+#  the engine macros (N_EMBD=16 N_LAYER=1 ...) match names_demo's
+#  config exactly.  This avoids the E09 §3.4 compile-time-macro
+#  silent-failure mode that bit the Connect-4 OQL CLI: the smoke
+#  test trains a names-shaped model in OQL and a names-shaped model
+#  in C with byte-identical hyperparameters, and asserts the
+#  per-step loss curves agree within the pre-reg ±10% relative budget.
+#
+#  Copies c_names.txt next to the test binary so it can be run
+#  from build/ as `./test_microgpt_oql_train`.
+# ──────────────────────────────────────────────────────────────────
+add_executable(test_microgpt_oql_train tests/test_microgpt_oql_train.c)
+target_link_libraries(test_microgpt_oql_train PRIVATE microgpt_oql_lib)
+target_include_directories(test_microgpt_oql_train PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests
+    ${CMAKE_CURRENT_SOURCE_DIR}/src)
+if(NOT MSVC)
+    target_link_libraries(test_microgpt_oql_train PRIVATE m)
+endif()
+add_custom_command(TARGET test_microgpt_oql_train POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/demos/character-level/names/c_names.txt"
+        "$<TARGET_FILE_DIR:test_microgpt_oql_train>/c_names.txt"
+    COMMENT "Copying c_names.txt for test_microgpt_oql_train"
+)
+add_test(NAME microgpt_oql_train_tests
+         COMMAND test_microgpt_oql_train
+         WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
 # ==================================================================
 #  TurboQuant Integration Evaluation Targets
 # ==================================================================
