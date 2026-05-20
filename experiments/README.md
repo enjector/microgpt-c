@@ -115,9 +115,9 @@ Measured (worktree-branch agent runs, all merged into main):
 - E05 ✅ merged at `6aba1c8` — 6/6 targets PASS; methodology paper draft 13 pages
 - E07 ✅ merged at `83e5673` — verb-discipline lock held; 5 PASS, 1 PARTIAL, 2 deferred
 - E08 ✅ merged at `e9b8620` — 3 PASS (T2 18.5% LOC, T3 zero new opcodes, T4 +4 tests); 5 honestly deferred
-- E09 ✅ merged at `d4eb478` — 6 PASS (T1 RUN completes; T3 sub-ms; T4 17→22 tests; T5 zero VM diff; T6 TRAIN stub; T7 23.4% LOC); T2 PARTIAL (51% win-rate); T8 PARTIAL
-- E10 🔬 agent running (wire TRAIN)
-- E11 ✅ implementation shipped on worktree branch — T1 PASS at 89% (+38pp vs 51% E09 baseline; parity with 88% C-demo).  Six of seven targets PASS; T4 PARTIAL (input-aligned 100%, slot-aligned 51% due to RNG-path divergence).  Pathway B chosen (one new extern `c4_model_propose_column`); Pathway A as literally written infeasible at the E09 API boundary.  See [E11](E11-connect4-win-rate-fix.md) §3.
+- E09 ✅ merged at `d4eb478` — 6 PASS; T2 PARTIAL (51% win-rate) and T8 PARTIAL — both closed by E11/follow-ups below
+- E10 ✅ merged at `4824900` — **all 8 targets PASS; T3 and T4 bit-identical to C-demo baseline** (0.0000 relative delta at every loss-curve sample step, 0.000000e+00 per-logit on round-trip)
+- E11 ✅ merged at `d6593aa` — **6 PASS, T1 = 89%** (+38pp vs 51% E09 baseline, +1pp parity with 88% C-demo baseline); T4 PARTIAL (RNG-path artefact, documented); Pathway B chosen (one new extern `c4_model_propose_column`)
 
 Awaiting external inputs:
 - E01 — needs Anthropic API budget (~$100)
