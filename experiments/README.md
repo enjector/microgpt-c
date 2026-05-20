@@ -44,6 +44,8 @@ Each of these directions has a dedicated experiment doc in this folder:
 9. **Make OQL actually run things — wire `RUN` / `COMPOSE` / `CREATE ORGANELLE FROM CHECKPOINT` so `connect4.oql` drives a real game loop.** Closes E08's deferred T1 measurement and unblocks E01's System C authoring. `TRAIN` honestly deferred to E10. → **[E09](E09-oql-runtime-wiring.md)**
 10. **Wire OQL `TRAIN` — the last `OQL_ERR_NOT_IMPLEMENTED` stub.** OQL scripts go from "load a checkpoint and run" to "train + save + load + run" in one file. Loss-curve fidelity locked at ±10% vs the C-demo equivalent. → **[E10](E10-oql-train-wiring.md)**
 11. **Close E09's Connect-4 win-rate gap (51% → ≥85%).** The wiring is correct; the gap is a prompt-protocol mismatch at `INPUT_BEHAVIOUR`. Pathway A (behaviour-side fix) preferred; Pathway B (one new VM extern, zero new opcodes) as fallback. → **[E11](E11-connect4-win-rate-fix.md)**
+12. **LLM-as-corpus-source for the wiring organelle.** Local LM Studio + Pipeline IR verifier filter + standing leakage audit. Tests whether the curator-bound ceiling (`INV-WIRE-061`) is architectural or curator-vocabulary-specific — answers E03's open question via a different curator type. Adds one new SOURCE clause (`CREATE CORPUS … FROM LLM …`); zero new build deps beyond curl. → **[E12](E12-llm-wiring-corpus.md)**
+13. **LLM distillation into a Connect-4 player organelle.** Ports `RESEARCH_OPA_DIRECTIONS.md` §5.1 (Experiment 4.1) to the two-commit pre-reg shape. Local LM Studio plays N games; student organelle (≤460K params) trains on (board, move) pairs; target ≥93% (vs 88% C-demo baseline). All three possible outcomes (≥93% / 88-92% / <88%) are publishable. → **[E13](E13-llm-game-distillation.md)**
 
 ### What we explicitly will NOT prioritise
 
@@ -80,7 +82,7 @@ Every experiment doc is a single markdown file with four sections:
 | **3. Implementation + results** | Measurement commit | What was built, raw numbers, links to artefacts |
 | **4. Conclusion** | Measurement commit | Verdict against each pre-reg target, lessons, next moves, traceability updates |
 
-## The eleven experiments
+## The thirteen experiments
 
 | ID | Title | Direction | Cost | Falsification risk |
 |---|---|---|---|---|
@@ -95,6 +97,8 @@ Every experiment doc is a single markdown file with four sections:
 | [E09](E09-oql-runtime-wiring.md) | Wire OQL `RUN` / `COMPOSE` / `CREATE ORGANELLE FROM CHECKPOINT` end-to-end | Make `oql run connect4.oql` actually drive a game loop; closes E08's T1 | ~5-7 wk | Medium |
 | [E10](E10-oql-train-wiring.md) | Wire OQL `TRAIN` so scripts can train organelles from scratch | Last `OQL_ERR_NOT_IMPLEMENTED` stub closes; loss-curve fidelity ±10% vs C-demo | ~3-5 wk | Medium |
 | [E11](E11-connect4-win-rate-fix.md) | Close E09's Connect-4 win-rate gap (51% → ≥85%) | Behaviour-side prompt-protocol fix (Pathway A) or single new VM extern (Pathway B) | ~2-3 wk | Low-medium |
+| [E12](E12-llm-wiring-corpus.md) | LLM-as-corpus-source for wiring (NL → typed-graph), via local LM Studio + verifier filter | Tests curator-bound ceiling from a different curator type; answers E03 indirectly | ~2-3 wk | Medium |
+| [E13](E13-llm-game-distillation.md) | LLM distillation into Connect-4 player organelle, via local LM Studio | Ports `RESEARCH_OPA_DIRECTIONS.md` §5.1; ≥93% Connect-4 target, all outcomes publishable | ~2-4 wk | Medium |
 
 ## Status legend
 
@@ -118,6 +122,8 @@ Measured (worktree-branch agent runs, all merged into main):
 - E09 ✅ merged at `d4eb478` — 6 PASS; T2 PARTIAL (51% win-rate) and T8 PARTIAL — both closed by E11/follow-ups below
 - E10 ✅ merged at `4824900` — **all 8 targets PASS; T3 and T4 bit-identical to C-demo baseline** (0.0000 relative delta at every loss-curve sample step, 0.000000e+00 per-logit on round-trip)
 - E11 ✅ merged at `d6593aa` — **6 PASS, T1 = 89%** (+38pp vs 51% E09 baseline, +1pp parity with 88% C-demo baseline); T4 PARTIAL (RNG-path artefact, documented); Pathway B chosen (one new extern `c4_model_propose_column`)
+- E12 🔬 agent running — LLM-as-corpus-source for wiring (via local LM Studio + Qwen 3.6 35B)
+- E13 🔬 agent running — LLM distillation into Connect-4 player (same endpoint)
 
 Awaiting external inputs:
 - E01 — needs Anthropic API budget (~$100)
