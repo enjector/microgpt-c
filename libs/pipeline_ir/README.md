@@ -186,11 +186,31 @@ libs/pipeline_ir/
 │   └── pipeline_ir_vm.c         # opt-in VM dispatcher (requires vm_engine)
 ├── examples/
 │   ├── CMakeLists.txt
-│   └── custom_generator/
-│       └── main.c               # ~140 LOC working example
+│   ├── custom_generator/
+│   │   └── main.c               # hand-written graph -> verify -> text + DOT
+│   ├── audit_visualiser/
+│   │   └── main.c               # parse from file/stdin -> verify -> DOT
+│   └── llm_bridge/
+│       └── main.c               # parse from stdin -> verify -> JSON verdict
 ├── CMakeLists.txt               # builds pipeline_ir target
 └── README.md                    # this file
 ```
+
+## Examples
+
+| Example | What it shows | Lines | Build target |
+|---|---|---|---|
+| `custom_generator/` | Programmatic graph construction via the builder API, verify, render text + DOT | ~140 | `pipeline_ir_example_custom_generator` |
+| `audit_visualiser/` | Parse @graph from file or stdin, run the full tolerant-parse → repair → verify chain, emit DOT for `dot -Tsvg` | ~110 | `pipeline_ir_example_audit_visualiser` |
+| `llm_bridge/` | Read @graph from stdin (assumed LLM-emitted), emit single-line JSON verdict `{verdict, stage, error, elapsed_us, repair{...}}` | ~130 | `pipeline_ir_example_llm_bridge` |
+
+Each example links **only** `pipeline_ir` — no transformer, no VM,
+no thread runtime — so they double as a smoke test that the library
+is self-contained from a consumer's perspective.
+
+Latency check on `llm_bridge` (M2 Max, Release, 100 invocations on a
+5-line graph): min 10 µs, p50 12 µs, p95 25 µs, p99 66 µs — well
+under the 5 ms target from the experiment's T4.
 
 ## See also
 
