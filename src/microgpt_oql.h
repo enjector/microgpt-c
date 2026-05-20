@@ -1,0 +1,249 @@
+/*
+ * microgpt_oql.h  —  OQL (Organelle Query Language) front-end (public header)
+ *
+ * Copyright (c) 2026 Ajay Soni.  MIT License.
+ *
+ * OQL is a small SQL-shaped DSL with a hard-locked +6 / -4 verb surface
+ * (TRAIN, COMPOSE, RUN, EVALUATE, VERIFY, AUDIT). See
+ * docs/research/OQL_GRAMMAR_REFERENCE.md for the full grammar and
+ * experiments/E07-oql-dsl.md for the pre-registration.
+ *
+ * The header exposes:
+ *   - the AST types one verb at a time (one struct per verb),
+ *   - oql_parse(source) -> OqlScript* (a Flex/Bison front-end),
+ *   - oql_execute(script) -> oql_status (a thin interpreter that dispatches
+ *     verified verbs to existing C primitives and stubs the rest with a
+ *     clear "implementation pending in follow-up commit" message).
+ *
+ * Construction and execution are separate: oql_parse() never executes; it
+ * only builds an AST. Tests can therefore exercise the parser without any
+ * side effects (no shell-out, no filesystem writes).
+ */
+
+#ifndef MICROGPT_OQL_H
+#define MICROGPT_OQL_H
+
+#include <stddef.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* ============================================================
+ *  Status codes
+ * ============================================================ */
+
+typedef enum {
+    OQL_OK = 0,
+    OQL_ERR_PARSE = -1,         /* syntax error in source */
+    OQL_ERR_NOT_IMPLEMENTED = -2, /* verb parsed but interpreter stub */
+    OQL_ERR_RUNTIME = -3,       /* dispatch into C primitive failed */
+    OQL_ERR_OOM = -4
+} oql_status;
+
+/* ============================================================
+ *  Locked verb tags (+6)
+ * ============================================================ */
+
+typedef enum {
+    OQL_VERB_TRAIN = 1,
+    OQL_VERB_COMPOSE,
+    OQL_VERB_RUN,
+    OQL_VERB_EVALUATE,
+    OQL_VERB_VERIFY,
+    OQL_VERB_AUDIT
+} OqlVerb;
+
+/* ============================================================
+ *  Key-value list (used by WITH clauses)
+ * ============================================================ */
+
+typedef struct OqlKV {
+    char *key;          /* identifier, owned */
+    char *value;        /* string / number lexeme, owned */
+    struct OqlKV *next;
+} OqlKV;
+
+/* Append a kv to the list (returns new head). Takes ownership of strings. */
+OqlKV *oql_kv_append(OqlKV *head, char *key, char *value);
+/* Look up a key; returns the value string (not owned by caller) or NULL. */
+const char *oql_kv_get(const OqlKV *head, const char *key);
+void oql_kv_free(OqlKV *head);
+
+/* Name list (used by COMPOSE ... FROM a, b, c). */
+typedef struct OqlNameList {
+    char *name;                     /* owned */
+    struct OqlNameList *next;
+} OqlNameList;
+
+OqlNameList *oql_namelist_append(OqlNameList *head, char *name);
+void oql_namelist_free(OqlNameList *head);
+
+/* ============================================================
+ *  Source descriptor (for TRAIN ON, EVALUATE AGAINST, AUDIT ...)
+ *
+ *  A source is one of:
+ *    - CORPUS '<path>'  -> kind = OQL_SRC_CORPUS, value = path
+ *    - '<bare-path>'    -> kind = OQL_SRC_PATH,   value = path
+ *    - <name>           -> kind = OQL_SRC_NAME,   value = name
+ * ============================================================ */
+
+typedef enum {
+    OQL_SRC_CORPUS = 1,
+    OQL_SRC_PATH,
+    OQL_SRC_NAME
+} OqlSourceKind;
+
+typedef struct {
+    OqlSourceKind kind;
+    char *value;        /* owned */
+} OqlSource;
+
+void oql_source_free(OqlSource *s);
+
+/* ============================================================
+ *  Predicate (used by VERIFY ... WHERE)
+ * ============================================================ */
+
+typedef enum {
+    OQL_OP_LT = 1, OQL_OP_LE, OQL_OP_EQ, OQL_OP_NE, OQL_OP_GE, OQL_OP_GT
+} OqlOp;
+
+typedef struct {
+    char *lhs;          /* identifier, owned */
+    OqlOp op;
+    char *rhs;          /* literal lexeme, owned */
+} OqlPredicate;
+
+void oql_predicate_free(OqlPredicate *p);
+
+/* ============================================================
+ *  Per-verb statement payloads (one struct per verb — discipline visible)
+ * ============================================================ */
+
+typedef struct {
+    char *target;       /* model / organelle name, owned */
+    OqlSource on_src;   /* ON CORPUS ... (kind=0 if absent) */
+    OqlKV  *with_kv;    /* WITH ... (NULL if absent) */
+} OqlTrain;
+
+typedef struct {
+    char *target;       /* composed-pipeline name, owned */
+    OqlNameList *from;  /* FROM a, b, c (required) */
+    OqlKV *with_kv;     /* WITH ... (NULL if absent) */
+} OqlCompose;
+
+typedef struct {
+    char *target;       /* experiment / harness name, owned */
+    OqlKV *with_kv;     /* WITH ... (NULL if absent) */
+} OqlRun;
+
+typedef struct {
+    char *target;       /* model / pipeline name, owned */
+    OqlSource against_src; /* AGAINST ... (required) */
+    char *metric;       /* USING METRIC ... (NULL if absent) */
+    char *report_path;  /* REPORT AS '...'  (NULL if absent) */
+} OqlEvaluate;
+
+typedef enum {
+    OQL_VS_GRAPH = 1,   /* VERIFY GRAPH @graph...@end */
+    OQL_VS_PATH,        /* VERIFY '<path>' */
+    OQL_VS_NAME         /* VERIFY <name> */
+} OqlVerifySubjectKind;
+
+typedef struct {
+    OqlVerifySubjectKind kind;
+    char *subject;      /* inline graph text, or path, or name; owned */
+    OqlPredicate *where;/* optional WHERE; NULL if absent */
+} OqlVerify;
+
+typedef struct {
+    OqlSource a;        /* first corpus / source (required) */
+    OqlSource b;        /* AGAINST source (required) */
+    char *thresholds;   /* USING THRESHOLDS '...' (NULL if absent) */
+    char *report_path;  /* REPORT AS '...' (NULL if absent) */
+} OqlAudit;
+
+/* ============================================================
+ *  Statement union
+ * ============================================================ */
+
+typedef struct OqlStmt {
+    OqlVerb verb;
+    union {
+        OqlTrain    train;
+        OqlCompose  compose;
+        OqlRun      run;
+        OqlEvaluate evaluate;
+        OqlVerify   verify;
+        OqlAudit    audit;
+    } u;
+    struct OqlStmt *next;
+} OqlStmt;
+
+/* ============================================================
+ *  Script (top-level container)
+ * ============================================================ */
+
+typedef struct OqlScript {
+    OqlStmt *head;      /* linked list of statements in source order */
+    char *error;        /* parse error message (NULL on success); owned */
+    int   error_line;
+} OqlScript;
+
+OqlScript *oql_script_create(void);
+void       oql_script_free(OqlScript *s);
+size_t     oql_script_count(const OqlScript *s);
+
+/* ============================================================
+ *  Parser API
+ * ============================================================ */
+
+/* Parse OQL source text into an AST. Returns a NEW OqlScript (caller owns).
+ * On parse failure, the script's `error` field is populated and `head` is
+ * NULL. Never returns NULL itself (allocation failure aside). */
+OqlScript *oql_parse(const char *source);
+
+/* ============================================================
+ *  Interpreter API
+ *
+ *  oql_execute() walks the AST in source order and dispatches each verb to
+ *  its handler:
+ *     VERIFY GRAPH ...  -> microgpt_pipeline (pipeline_parse_text + verify)
+ *     AUDIT a AGAINST b -> shell-out to tools/scaling_leakage_audit.sh
+ *     TRAIN/COMPOSE/RUN/EVALUATE -> stub returning OQL_ERR_NOT_IMPLEMENTED
+ *
+ *  On first failing statement, execution halts and the index of the failing
+ *  statement is written to *failed_idx (1-based; 0 if success).
+ *  Caller-supplied `out` is used for human-readable progress / error
+ *  messages (may be NULL to suppress).
+ * ============================================================ */
+
+#include <stdio.h>
+
+oql_status oql_execute(const OqlScript *script, FILE *out, int *failed_idx);
+
+/* ============================================================
+ *  Parser-internal handle (exposed only for the Flex/Bison plumbing).
+ *  Production code should not touch this directly.
+ * ============================================================ */
+
+typedef struct oql_parser {
+    const char *source;
+    size_t source_len;
+    size_t source_index;
+    int    line_number;
+    OqlScript *script;
+} oql_parser;
+
+/* Lexer's character-fetch callback (called by Flex's YY_INPUT). */
+int oql_parser_char_fetch_next(oql_parser *p);
+
+/* Bison error callback. */
+void oql_parser_error(oql_parser *parser, const char *msg);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* MICROGPT_OQL_H */
