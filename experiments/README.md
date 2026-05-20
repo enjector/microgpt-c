@@ -122,8 +122,8 @@ Measured (worktree-branch agent runs, all merged into main):
 - E09 ✅ merged at `d4eb478` — 6 PASS; T2 PARTIAL (51% win-rate) and T8 PARTIAL — both closed by E11/follow-ups below
 - E10 ✅ merged at `4824900` — **all 8 targets PASS; T3 and T4 bit-identical to C-demo baseline** (0.0000 relative delta at every loss-curve sample step, 0.000000e+00 per-logit on round-trip)
 - E11 ✅ merged at `d6593aa` — **6 PASS, T1 = 89%** (+38pp vs 51% E09 baseline, +1pp parity with 88% C-demo baseline); T4 PARTIAL (RNG-path artefact, documented); Pathway B chosen (one new extern `c4_model_propose_column`)
-- E12 🔬 agent running — LLM-as-corpus-source for wiring (via local LM Studio + Qwen 3.6 35B)
-- E13 🔬 agent running — LLM distillation into Connect-4 player (same endpoint)
+- E12 ✅ merged at `de9ea6d` — 5 PASS, T4 BLOCKED (no on-disk v2 evaluator), T7 falsified-as-framed (Qwen3 thinking-model ~43s/emission → mitigated to 100 examples per §1.6). Key finding: thinking-model output lands in `reasoning_content`, not `content`, when max_tokens hits — useful precedent for E14
+- E13 ✅ merged at `c7f030d` — 7 PASS, 2 PARTIAL. **T1 = 89% in §4.2 neutral band**. LLM teacher itself wins 88.4% vs random → saturated-distillation regime → tiny-specialist thesis robust but unboosted. E13d (OQL TRAIN vocab-mismatch bug) named as follow-up
 
 Awaiting external inputs:
 - E01 — needs Anthropic API budget (~$100)
