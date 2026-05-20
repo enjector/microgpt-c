@@ -1,0 +1,59 @@
+[e15_train] prepared 2000 role-tagged docs -> checkpoints/klotski_judge_e15.ckpt.docs.tmp
+[e15_train] role=judge tag='J:' corpus=build/klotski_optimal.tsv save=checkpoints/klotski_judge_e15.ckpt steps=25000 batch=8 lr=0.001 seed=1339
+[e15_train] compile-time arch: N_EMBD=64 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=128 MLP_DIM=160
+[e15_train] docs=2000 vocab=16
+[e15_train] vocab -> checkpoints/klotski_judge_e15.vocab
+[e15_train] params=157696
+[e15_train] step 1/25000 | loss 3.0642 | best 3.0642 | 0.0s
+[e15_train] step 500/25000 | loss 0.5503 | best 0.3632 | 4.0s
+[e15_train] step 1000/25000 | loss 0.4848 | best 0.3184 | 8.0s
+[e15_train] step 1500/25000 | loss 0.4528 | best 0.3047 | 12.0s
+[e15_train] step 2000/25000 | loss 0.4071 | best 0.2828 | 16.0s
+[e15_train] step 2500/25000 | loss 0.3756 | best 0.2758 | 20.1s
+[e15_train] step 3000/25000 | loss 0.3877 | best 0.2612 | 24.1s
+[e15_train] step 3500/25000 | loss 0.3846 | best 0.2572 | 28.2s
+[e15_train] step 4000/25000 | loss 0.4066 | best 0.2572 | 32.5s
+[e15_train] step 4500/25000 | loss 0.3786 | best 0.2552 | 36.6s
+[e15_train] step 5000/25000 | loss 0.3662 | best 0.2552 | 40.7s
+[e15_train] step 5500/25000 | loss 0.3451 | best 0.2552 | 44.9s
+[e15_train] step 6000/25000 | loss 0.3515 | best 0.2552 | 49.1s
+[e15_train] step 6500/25000 | loss 0.3344 | best 0.2552 | 53.5s
+[e15_train] step 7000/25000 | loss 0.3465 | best 0.2450 | 58.0s
+[e15_train] step 7500/25000 | loss 0.3572 | best 0.2450 | 62.5s
+[e15_train] step 8000/25000 | loss 0.3528 | best 0.2450 | 66.9s
+[e15_train] step 8500/25000 | loss 0.3555 | best 0.2450 | 71.3s
+[e15_train] step 9000/25000 | loss 0.3472 | best 0.2410 | 75.8s
+[e15_train] step 9500/25000 | loss 0.3481 | best 0.2367 | 80.2s
+[e15_train] step 10000/25000 | loss 0.3310 | best 0.2263 | 84.7s
+[e15_train] step 10500/25000 | loss 0.3345 | best 0.2263 | 89.2s
+[e15_train] step 11000/25000 | loss 0.3181 | best 0.2263 | 93.6s
+[e15_train] step 11500/25000 | loss 0.3267 | best 0.2263 | 98.0s
+[e15_train] step 12000/25000 | loss 0.3391 | best 0.2170 | 102.5s
+[e15_train] step 12500/25000 | loss 0.3004 | best 0.2170 | 107.1s
+[e15_train] step 13000/25000 | loss 0.3565 | best 0.2170 | 111.6s
+[e15_train] step 13500/25000 | loss 0.2994 | best 0.2170 | 116.1s
+[e15_train] step 14000/25000 | loss 0.3091 | best 0.2170 | 120.6s
+[e15_train] step 14500/25000 | loss 0.3159 | best 0.2170 | 125.1s
+[e15_train] step 15000/25000 | loss 0.3106 | best 0.2170 | 129.6s
+[e15_train] step 15500/25000 | loss 0.3056 | best 0.2170 | 134.1s
+[e15_train] step 16000/25000 | loss 0.3086 | best 0.2129 | 138.7s
+[e15_train] step 16500/25000 | loss 0.2929 | best 0.2129 | 143.2s
+[e15_train] step 17000/25000 | loss 0.2938 | best 0.2129 | 147.8s
+[e15_train] step 17500/25000 | loss 0.3408 | best 0.2129 | 152.3s
+[e15_train] step 18000/25000 | loss 0.3184 | best 0.2081 | 156.9s
+[e15_train] step 18500/25000 | loss 0.3042 | best 0.2081 | 161.4s
+[e15_train] step 19000/25000 | loss 0.2923 | best 0.2081 | 165.8s
+[e15_train] step 19500/25000 | loss 0.2985 | best 0.2081 | 170.1s
+[e15_train] step 20000/25000 | loss 0.2873 | best 0.2081 | 174.3s
+[e15_train] step 20500/25000 | loss 0.3035 | best 0.2035 | 178.6s
+[e15_train] step 21000/25000 | loss 0.2542 | best 0.2028 | 182.8s
+[e15_train] step 21500/25000 | loss 0.2752 | best 0.2028 | 187.0s
+[e15_train] step 22000/25000 | loss 0.2512 | best 0.2028 | 191.2s
+[e15_train] step 22500/25000 | loss 0.2630 | best 0.2028 | 195.4s
+[e15_train] step 23000/25000 | loss 0.2824 | best 0.2028 | 199.7s
+[e15_train] step 23500/25000 | loss 0.2552 | best 0.1975 | 203.9s
+[e15_train] step 24000/25000 | loss 0.2597 | best 0.1975 | 208.1s
+[e15_train] step 24500/25000 | loss 0.2381 | best 0.1961 | 212.3s
+[e15_train] step 25000/25000 | loss 0.2310 | best 0.1961 | 216.4s
+[e15_train] DONE: 25000 steps, final_loss=0.2310, best_loss=0.1961, 216.4s total, params=157696, vocab=16, role=judge
+[e15_train] checkpoint -> checkpoints/klotski_judge_e15.ckpt

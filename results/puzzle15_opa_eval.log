@@ -1,0 +1,12 @@
+[e15_eval] task=puzzle15 heldout=build/puzzle15_heldout_large.tsv positions=948 max_moves=200
+[e15_eval] loaded ckpt=checkpoints/puzzle15_planner_e15.ckpt vocab=24 params=158720 role='P:' step=25000
+[e15_eval] loaded ckpt=checkpoints/puzzle15_player_e15.ckpt vocab=24 params=158720 role='M:' step=25000
+[e15_eval] loaded ckpt=checkpoints/puzzle15_judge_e15.ckpt vocab=24 params=158720 role='J:' step=25000
+
+[e15_eval] RESULT task=puzzle15 arch=OPA heldout=948/948
+  solved          = 7 (0.7%)
+  mean_moves(solved) = 11.1
+  max_moves_solved   = 12
+  mean_latency       = 1.89 ms
+  p99_latency        = 2.87 ms
+  total_eval_wall    = 1.79 s

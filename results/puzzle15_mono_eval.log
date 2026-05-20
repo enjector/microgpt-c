@@ -1,0 +1,10 @@
+[e15_eval] task=puzzle15 heldout=build/puzzle15_heldout_large.tsv positions=948 max_moves=200
+[e15_eval] loaded ckpt=checkpoints/puzzle15_mono_e15.ckpt vocab=22 params=471168 role='' step=25000
+
+[e15_eval] RESULT task=puzzle15 arch=MONO heldout=948/948
+  solved          = 1 (0.1%)
+  mean_moves(solved) = 12.0
+  max_moves_solved   = 12
+  mean_latency       = 1.52 ms
+  p99_latency        = 2.44 ms
+  total_eval_wall    = 1.44 s

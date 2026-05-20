@@ -1,0 +1,59 @@
+[e15_train] prepared 2000 role-tagged docs -> checkpoints/puzzle15_judge_e15.ckpt.docs.tmp
+[e15_train] role=judge tag='J:' corpus=build/puzzle15_optimal.tsv save=checkpoints/puzzle15_judge_e15.ckpt steps=25000 batch=8 lr=0.001 seed=1339
+[e15_train] compile-time arch: N_EMBD=64 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=128 MLP_DIM=160
+[e15_train] docs=2000 vocab=24
+[e15_train] vocab -> checkpoints/puzzle15_judge_e15.vocab
+[e15_train] params=158720
+[e15_train] step 1/25000 | loss 3.4537 | best 3.4537 | 0.0s
+[e15_train] step 500/25000 | loss 1.2679 | best 1.1013 | 6.7s
+[e15_train] step 1000/25000 | loss 1.1778 | best 0.9479 | 13.5s
+[e15_train] step 1500/25000 | loss 1.1326 | best 0.8993 | 20.2s
+[e15_train] step 2000/25000 | loss 1.1044 | best 0.8662 | 27.1s
+[e15_train] step 2500/25000 | loss 1.0889 | best 0.8379 | 34.1s
+[e15_train] step 3000/25000 | loss 1.0590 | best 0.8194 | 41.0s
+[e15_train] step 3500/25000 | loss 1.0441 | best 0.7956 | 48.1s
+[e15_train] step 4000/25000 | loss 1.0022 | best 0.7760 | 55.6s
+[e15_train] step 4500/25000 | loss 0.9775 | best 0.7641 | 63.0s
+[e15_train] step 5000/25000 | loss 0.9618 | best 0.7529 | 70.5s
+[e15_train] step 5500/25000 | loss 1.0684 | best 0.7529 | 77.9s
+[e15_train] step 6000/25000 | loss 1.0034 | best 0.7510 | 85.4s
+[e15_train] step 6500/25000 | loss 1.0084 | best 0.7416 | 92.9s
+[e15_train] step 7000/25000 | loss 1.0078 | best 0.7416 | 100.3s
+[e15_train] step 7500/25000 | loss 1.0033 | best 0.7416 | 108.1s
+[e15_train] step 8000/25000 | loss 0.9690 | best 0.7416 | 115.6s
+[e15_train] step 8500/25000 | loss 0.9586 | best 0.7416 | 123.2s
+[e15_train] step 9000/25000 | loss 0.9562 | best 0.7415 | 130.7s
+[e15_train] step 9500/25000 | loss 0.9136 | best 0.7203 | 138.3s
+[e15_train] step 10000/25000 | loss 0.9199 | best 0.7123 | 145.9s
+[e15_train] step 10500/25000 | loss 0.9347 | best 0.7041 | 153.4s
+[e15_train] step 11000/25000 | loss 0.9427 | best 0.6879 | 161.1s
+[e15_train] step 11500/25000 | loss 0.9097 | best 0.6657 | 168.3s
+[e15_train] step 12000/25000 | loss 0.9273 | best 0.6440 | 175.5s
+[e15_train] step 12500/25000 | loss 0.9416 | best 0.6367 | 182.6s
+[e15_train] step 13000/25000 | loss 0.9084 | best 0.6367 | 189.7s
+[e15_train] step 13500/25000 | loss 0.8981 | best 0.6367 | 196.8s
+[e15_train] step 14000/25000 | loss 0.8958 | best 0.6367 | 203.8s
+[e15_train] step 14500/25000 | loss 0.8876 | best 0.6021 | 210.9s
+[e15_train] step 15000/25000 | loss 0.8710 | best 0.6021 | 217.9s
+[e15_train] step 15500/25000 | loss 0.8468 | best 0.5769 | 224.6s
+[e15_train] step 16000/25000 | loss 0.8895 | best 0.5636 | 231.3s
+[e15_train] step 16500/25000 | loss 0.9238 | best 0.5636 | 238.0s
+[e15_train] step 17000/25000 | loss 0.8435 | best 0.5636 | 244.7s
+[e15_train] step 17500/25000 | loss 0.9104 | best 0.5636 | 251.4s
+[e15_train] step 18000/25000 | loss 0.8974 | best 0.5636 | 258.1s
+[e15_train] step 18500/25000 | loss 0.8677 | best 0.5636 | 264.8s
+[e15_train] step 19000/25000 | loss 0.9077 | best 0.5472 | 271.5s
+[e15_train] step 19500/25000 | loss 0.8775 | best 0.5359 | 278.2s
+[e15_train] step 20000/25000 | loss 0.8700 | best 0.5359 | 284.9s
+[e15_train] step 20500/25000 | loss 0.8524 | best 0.5359 | 291.6s
+[e15_train] step 21000/25000 | loss 0.8465 | best 0.5316 | 298.3s
+[e15_train] step 21500/25000 | loss 0.8239 | best 0.5210 | 305.0s
+[e15_train] step 22000/25000 | loss 0.7716 | best 0.5210 | 311.6s
+[e15_train] step 22500/25000 | loss 0.7781 | best 0.4936 | 318.3s
+[e15_train] step 23000/25000 | loss 0.7462 | best 0.4728 | 324.9s
+[e15_train] step 23500/25000 | loss 0.7419 | best 0.4661 | 331.5s
+[e15_train] step 24000/25000 | loss 0.7064 | best 0.4661 | 338.2s
+[e15_train] step 24500/25000 | loss 0.7015 | best 0.4626 | 344.9s
+[e15_train] step 25000/25000 | loss 0.6721 | best 0.4626 | 351.5s
+[e15_train] DONE: 25000 steps, final_loss=0.6721, best_loss=0.4626, 351.5s total, params=158720, vocab=24, role=judge
+[e15_train] checkpoint -> checkpoints/puzzle15_judge_e15.ckpt

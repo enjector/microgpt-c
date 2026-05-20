@@ -1,0 +1,10 @@
+[e15_eval] task=klotski heldout=build/klotski_heldout_large.tsv positions=113 max_moves=200
+[e15_eval] loaded ckpt=checkpoints/klotski_mono_e15.ckpt vocab=14 params=469632 role='' step=25000
+
+[e15_eval] RESULT task=klotski arch=MONO heldout=113/113
+  solved          = 73 (64.6%)
+  mean_moves(solved) = 1.7
+  max_moves_solved   = 5
+  mean_latency       = 0.83 ms
+  p99_latency        = 1.17 ms
+  total_eval_wall    = 0.09 s
