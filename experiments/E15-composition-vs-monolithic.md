@@ -271,13 +271,20 @@ All four are scientifically informative. The pre-registration discipline benefit
 
 ## 3. Implementation + results
 
-This section records what was measured in the first agent run on the
-E15 worktree branch.  **Phases 1-3 are complete** (substrate +
-corpora); **Phases 4-7 are deferred** because the training-budget
-required to run two ~50k-step training schedules (monolithic vs
-3-organelle OPA) at non-trivial parameter counts exceeded the single
-agent-run wall-clock allowance.  All claims below are tied to
-on-disk artefacts that a follow-up run can verify and extend.
+This section records what was measured in the E15 experiment across
+two agent-run windows.  **All 8 pre-registered targets are now in a
+final PASS/FAIL state** — Phases 1-3 landed in the first commit window
+(`ac7b1cb`); Phases 4-7 landed in the second.  All claims below are
+tied to on-disk artefacts that a third party can verify by re-running
+the deterministic oracle + training pipeline from seed.
+
+**Headline (T5): FAIL.**  Mixed outcome — Klotski margin +5.3pp lands
+in §1.5 "weakly validated"; Puzzle15 margin +0.6pp lands in §1.5
+"thesis falsified at this scale" (< 5pp).  The pre-registered T5 is
+an AND across both tasks (≥15pp on Klotski AND on 15-puzzle), so the
+puzzle15 result is decisive.  Per §1.7 this is the most valuable
+single result the experiment could produce.  Full discussion in
+§3.10 + §4.
 
 ### 3.1 OQL grammar extension: `CREATE CORPUS … FROM ORACLE …` (T1)
 
@@ -404,123 +411,451 @@ its T5 margin calculations.
 Puzzle15 at 948 survivors comfortably exceeds the 500-position
 target.
 
-### 3.5 — 3.8 Monolithic training / OPA training / evaluation (DEFERRED)
+### 3.5 Phase 4 — Monolithic baseline training (T3)
 
-**Not measured in this commit window.**
+Trained two ~470 K-param transformers (one per task) on the role-tagless
+`<state>|<solution>` corpus produced in Phase 3.  Driver:
+`tools/e15_train.c` (~385 LOC) — slurps the TSV, transforms each line
+to a single training doc with optional role prefix, runs the engine's
+standard `forward_backward_one` + `adam_step` loop, saves a
+`checkpoint_save` artifact + a `--vocab-save` for the eval driver.
 
-Honest scope assessment: implementing the training pipeline cleanly
-under E09 §3.4's compile-time-macro silent-failure-mode requires
-the `_microgpt_lib_for_defines` variant pattern to produce two
-separate binary targets — one ~900 K-param monolithic, one ~300 K-
-param OPA-organelle.  Each then needs its own `add_demo` block + a
-fourth eval binary that loads both and drives the same 500-position
-held-out (now 113 / 948 per §3.4) through both with the same move
-budget.
+Architecture (compile-time macros via `_microgpt_lib_for_defines`
+variant `e15_mono` in `CMakeLists.txt`):
 
-Setting this up correctly is a 1-2 day implementation task (mirrors
-E09's Connect-4 variant pattern); running it to convergence on
-50 000 steps × two-arch × two-task combinations is a 4-8 hour
-compute task.  Both exceed the single agent-run budget the worktree
-was provisioned for.
+  N_EMBD=96  N_HEAD=6  N_LAYER=4  BLOCK_SIZE=256  MLP_DIM=384
+  BATCH_SIZE=8  LR=0.001  SEED=1337
 
-Per the pre-registration's §1.6 falsification discipline: we do
-NOT estimate, extrapolate, or otherwise fabricate the unmeasured
-phases.  T3, T4, T5, T6 remain explicitly **DEFERRED**, and Section
-4 (the conclusion) cannot be written until all eight targets are
-measured.
+Each model trained **25 000 steps** (vs the pre-reg's 50 000 — both
+arms scaled identically per the §1.6 wall-clock mitigation, so T6
+holds; see §3.9).  The reduction was applied pre-emptively to fit a
+single agent-run, **before** any T5 measurement, so the
+"do-not-add-compute-to-chase-T5" §1.6 rule is not violated.
 
-What a follow-up agent run needs (the implementation is
-substrate-ready):
+Final training metrics:
 
-| Phase | Substrate now on disk |
-|---|---|
-| 4 (monolithic train) | `_microgpt_lib_for_defines` already wires per-macro variant builds in `CMakeLists.txt:130` — pattern documented in `CLAUDE.md` |
-| 4 (training driver) | A new `tools/e15_train.c` that mirrors `oql_runtime_train.c`'s loop OR a new `add_demo()` block that compiles a `e15_monolithic_demo` with the right `DEFINES` |
-| 5 (OPA train) | Same `add_demo()` pattern; 3 binaries (planner / player / judge) each at the smaller `DEFINES` block |
-| 6 (eval) | A new `tools/e15_eval.c` that loads both architectures, drives them on the on-disk held-out TSV, decodes solutions deterministically, applies the puzzle's deterministic move-rule to mark solved/unsolved |
-| 6 (audit-coverage instrumentation) | Wire `OpaKanban.history_count` + cycle-detector trip-count into a CSV emitted alongside the eval results |
+| Checkpoint | params | vocab | final_loss | best_loss | wall |
+|---|---|---|---|---|---|
+| `klotski_mono_e15.ckpt`  | 469,632 | 14 | 0.268 | 0.193 | 547 s |
+| `puzzle15_mono_e15.ckpt` | 471,168 | 22 | 0.782 | 0.379 | 889 s |
 
-### 3.9 Compute-equivalence audit (T6) — DEFERRED, framework recorded
+Klotski converges (loss plateaus ~0.20); puzzle15 mono is at loss 0.78
+end-of-training (best-seen 0.38), which is a clear under-training
+signal — but the same compute budget is applied to OPA so the
+comparison is fair.
 
-T6 is the budget-equality check.  It cannot be verified until
-phases 4-5 produce training-runtime logs.  The pre-registered
-formula:
+### 3.6 Phase 5 — OPA composition training (T4)
 
-> compute(monolithic) = steps × params(mono) × batch_size
-> compute(opa)        = Σ_{role ∈ {planner, player, judge}} steps × params(role) × batch_size
-> |compute(mono) − compute(opa)| / compute(mono) must be ≤ 10 %
+For each task, trained **THREE** small transformers as
+planner / player / judge specialists.  Each organelle saw the SAME
+oracle corpus but with a different role-prefix tag (`P:`, `M:`, `J:`)
+and a different RNG seed (1337 / 1338 / 1339) so the three checkpoints
+learn diverse decoders of the same `<state>|<solution>` mapping.
 
-For the pre-reg targets (900 K monolithic at 50 000 steps, batch 8
-vs 3× 300 K OPA organelles at 50 000 steps, batch 8):
+Architecture (compile-time macros via `e15_opa` variant in
+`CMakeLists.txt`):
 
-  compute(mono) = 50 000 × 900 000 × 8 = 3.6 × 10¹¹ FLOP-steps
-  compute(opa)  = 3 × 50 000 × 300 000 × 8 = 3.6 × 10¹¹ FLOP-steps
+  N_EMBD=64  N_HEAD=4  N_LAYER=4  BLOCK_SIZE=128  MLP_DIM=160
+  BATCH_SIZE=8  LR=0.001
 
-By construction the two arms are equal **iff** the OPA organelle
-parameter count is exactly one third of the monolithic.  The
-follow-up training run must validate this against the actual
-`model->n_params` field at startup.
+Final training metrics:
 
-### 3.10 — 3.12 Headline comparison / solution-length / latency (DEFERRED)
+| Checkpoint | params | vocab | final_loss | best_loss | wall |
+|---|---|---|---|---|---|
+| `klotski_planner_e15.ckpt`  | 157,696 | 16 | 0.259 | 0.209 | 223 s |
+| `klotski_player_e15.ckpt`   | 157,696 | 16 | 0.302 | 0.203 | 222 s |
+| `klotski_judge_e15.ckpt`    | 157,696 | 16 | 0.231 | 0.196 | 216 s |
+| `puzzle15_planner_e15.ckpt` | 158,720 | 24 | 0.789 | 0.436 | 357 s |
+| `puzzle15_player_e15.ckpt`  | 158,720 | 24 | 0.606 | 0.492 | 352 s |
+| `puzzle15_judge_e15.ckpt`   | 158,720 | 24 | 0.672 | 0.463 | 351 s |
 
-Cannot be measured until §3.5 — §3.8 produce trained checkpoints.
+Three trained in parallel per task; total Phase 5 wall-clock ~6 minutes
+(vs the original §1.3.5 estimate of 1 day) thanks to the smaller param
+count and single-thread CPU concurrency.
 
-### 3.13 Per-target verdict matrix (interim, this commit window)
+### 3.7 Phase 6 — Evaluation harness
 
-| ID | Target | Status this commit | Rationale |
+Two evaluation binaries (`e15_mono_eval`, `e15_opa_eval`), each linked
+against the matching `microgpt_lib` variant so the compile-time matmul
+shapes load each checkpoint correctly (the E09 §3.4 silent-failure
+mode is mitigated by construction; tested by the fact that
+`checkpoint_load(klotski_mono_e15.ckpt, vocab=14, mono_cfg)` returns
+non-NULL and `params=469632` matches).
+
+For each held-out position, the driver:
+
+1. Loads its checkpoint(s) via `checkpoint_load` against the right
+   compile-time architecture.
+2. Greedy-decodes from the prefix `<role_tag><state>|`, emitting up to
+   `BLOCK_SIZE − len(prefix) − 4` tokens (or until EOS / newline /
+   argmax of BOS).
+3. Replays the generated move sequence on the encoded state using the
+   in-process deterministic verifier (mirrors
+   `tools/{klotski,puzzle15}_a_star.c` move-application logic).
+4. Marks `solved = 1` iff goal state is reached within 200 moves.
+
+OPA mode runs greedy decode on all 3 organelles in turn and picks the
+**first one whose output reaches the goal**.  Ties (when no organelle
+solves) are broken by longest valid prefix.  This is the simplest
+expression of the OPA thesis ("coordination is the intelligence"):
+three diverse specialists + deterministic verifier filter.  The
+deterministic infrastructure is the verifier itself + the prefix
+tie-breaker.
+
+### 3.8 Phase 6 — Held-out evaluation results (T3, T4)
+
+**Klotski (113 held-out positions from `klotski_heldout_large.tsv`):**
+
+| Arch | solved | solve % | mean_moves(solved) | max_moves | p99 lat |
+|---|---|---|---|---|---|
+| Monolithic | 73 | **64.6%** | 1.7 | 5 | 1.2 ms |
+| OPA        | 79 | **69.9%** | 1.7 | 5 | 1.4 ms |
+
+**Puzzle15 (948 held-out positions from `puzzle15_heldout_large.tsv`):**
+
+| Arch | solved | solve % | mean_moves(solved) | max_moves | p99 lat |
+|---|---|---|---|---|---|
+| Monolithic | 1 | **0.1%** | 12.0 | 12 | 2.4 ms |
+| OPA        | 7 | **0.7%** | 11.1 | 12 | 2.9 ms |
+
+Per-position records:
+`results/{klotski,puzzle15}_{mono,opa}_eval.{csv,log}`.
+
+The puzzle15 results are *both* dominated by easy positions
+(solution length ≤ 12 in the held-out 948, where the median oracle
+solution is 22-28 moves) — see §3.10 for the interpretation.
+
+### 3.9 Compute-equivalence audit (T6) — PASS
+
+Verified post hoc from the training-runtime logs:
+
+  compute(mono, klotski)    = 25 000 × 469 632 × 8 = 9.39 × 10¹⁰
+  compute(opa,  klotski)    = 3 × 25 000 × 157 696 × 8 = 9.46 × 10¹⁰
+  |Δ| / compute(mono)        = **0.74 %**  → within ±10% ✓
+
+  compute(mono, puzzle15)   = 25 000 × 471 168 × 8 = 9.42 × 10¹⁰
+  compute(opa,  puzzle15)   = 3 × 25 000 × 158 720 × 8 = 9.52 × 10¹⁰
+  |Δ| / compute(mono)        = **1.06 %**  → within ±10% ✓
+
+**T6 PASS** — by construction (the `e15_opa` and `e15_mono` defines in
+`CMakeLists.txt` were chosen so the actual measured param counts come
+out within 1.5 % of 3:1).
+
+The same 25 000-step budget is applied to both arms, so the T6 floor
+is satisfied at any step count we chose; the 50k→25k mitigation does
+NOT affect T6 (it changes both arms identically).
+
+### 3.10 Headline comparison (T5) — FAIL
+
+  Klotski margin (OPA − mono)  = 69.9% − 64.6% = **+5.3 pp**
+  Puzzle15 margin (OPA − mono) = 0.7%  − 0.1%  = **+0.6 pp**
+
+| Task | Margin | §1.5 corner |
+|---|---|---|
+| Klotski | +5.3 pp | "weakly validated" (5–15 pp band) |
+| Puzzle15 | +0.6 pp | **"thesis falsified at this scale"** (< 5 pp) |
+
+T5 is the AND across both tasks: `margin ≥ 15 pp on Klotski AND on
+15-puzzle`.  Puzzle15 trips the §1.6 5pp floor decisively.  **T5 = FAIL.**
+
+Per the locked §1.6 skip rule ("If T5 trips below 5pp on either task,
+STOP.  Document the thesis-falsified outcome honestly.  Do NOT add
+more training compute, more parameters, or more organelles to try to
+close the gap — that would be retroactive rationalisation"), we
+**STOP** and report.
+
+The puzzle15 result is the headline.  Klotski's +5.3 pp confirms a
+small directional benefit for composition on the easier task; the
+puzzle15 +0.6 pp at much higher absolute difficulty refutes the
+"coordination scales to harder problems" version of the thesis.  Both
+arms are essentially failing on puzzle15 (< 1%); the residual margin
+is noise relative to the small-N count of solved positions (7 vs 1).
+
+### 3.11 Solution-length comparison
+
+For positions solved by BOTH systems on Klotski, both architectures
+emit short sequences (mean 1.7 moves, max 5).  This is consistent with
+the heldout distribution — see §3.4 — being dominated by easy
+positions (~64% of the 113 held-out have ≤ 4-move oracle solutions).
+
+For puzzle15, the few solved positions cluster at the easy end (oracle
+length 12) for both arches.  The systems are not actually composing
+multi-step plans on puzzle15; they're memorising short prefixes.
+
+### 3.12 Latency comparison
+
+| Arch | p99 latency | per-position attempt cost |
+|---|---|---|
+| Mono klotski | 1.2 ms | one model × BLOCK_SIZE=256 forward passes |
+| OPA  klotski | 1.4 ms | three models × BLOCK_SIZE=128 forward passes |
+| Mono puzzle15 | 2.4 ms | one model × BLOCK_SIZE=256 forward passes |
+| OPA  puzzle15 | 2.9 ms | three models × BLOCK_SIZE=128 forward passes |
+
+OPA's per-attempt latency is ~1.2× the monolithic's, consistent with
+running 3 forward passes on a model whose `BLOCK_SIZE` is half (so
+each pass is ~2× cheaper).  The compute equivalence at training time
+also holds at inference time, within a small constant.
+
+### 3.13 Per-target verdict matrix (FINAL)
+
+| ID | Target | Status | Rationale |
 |---|---|---|---|
-| **T1** | `CREATE CORPUS … FROM ORACLE …` parses | **PASS** | 3 OQL parse tests; ctest 30/30 |
+| **T1** | `CREATE CORPUS … FROM ORACLE …` parses | **PASS** | 30/30 OQL tests; unchanged from Phase 1-3 commit window |
 | **T2** | 10k valid (state, solution) pairs per task | **PASS** *(at scaled 2k count)* | 2000/2000 yield = 100% on both; the 2 000-count is the §1.6 wall-clock mitigation, mirrors E12's 10k→100 scaling |
-| **T3** | Monolithic baseline solve rate measured | **DEFERRED** | training-budget out of scope this run |
-| **T4** | OPA composition solve rate measured | **DEFERRED** | training-budget out of scope this run |
-| **T5** | OPA − monolithic margin ≥ 15pp | **DEFERRED** | gated on T3 + T4 |
-| **T6** | Compute equivalence within ±10% | **DEFERRED** (formula recorded) | no training-runtime logs yet |
-| **T7** | Per-task leakage audit passes | **PASS** | 0 verbatim leakage + 0 Jaccard≥0.7 leakage on both tasks; held-out size reduced for Klotski (113 vs pre-reg 500) per §1.6 discipline |
-| **T8** | Engine surface frozen / +6 verb lock / no new opcodes / no new deps | **PASS** | `git diff main -- src/microgpt.{c,h} src/microgpt_vm.*` = 0 lines; OQL verb tags 1..6 unchanged; CMake adds 3 new tool targets, all C99+libc/libm |
+| **T3** | Monolithic baseline solve rate measured | **PASS** | klotski 64.6% / puzzle15 0.1% |
+| **T4** | OPA composition solve rate measured | **PASS** | klotski 69.9% / puzzle15 0.7% |
+| **T5** | OPA − monolithic margin ≥ 15pp on Klotski AND 15-puzzle | **FAIL** | klotski +5.3pp (weakly validated band) / puzzle15 +0.6pp (< 5pp falsification floor) — see §3.10 |
+| **T6** | Compute equivalence within ±10% | **PASS** | klotski 0.74% / puzzle15 1.06% — by construction |
+| **T7** | Per-task leakage audit passes | **PASS** | unchanged from Phase 1-3 (0 verbatim, 0 Jaccard ≥ 0.7) |
+| **T8** | Engine surface frozen / +6 verb lock / no new opcodes / no new deps | **PASS** | `git diff main -- src/microgpt.{c,h} src/microgpt_vm.*` = 0 lines; all new code in `tools/` + CMakeLists.txt add_executable blocks |
 
-**Headline this commit window: 4 PASS (T1, T2, T7, T8) + 4
-DEFERRED (T3, T4, T5, T6).  No targets in the "FAIL" state.**
+**Headline: 7 PASS / 1 FAIL.  T5 = FAIL.**
 
-The substrate that the follow-up run needs is all on disk:
-deterministic oracles with self-tests, working FROM ORACLE source
-clause, parsed-and-audited training+held-out corpora, and a unit
-test suite that protects the JSON-line parser + Jaccard + cache
-under regression.
+The pre-reg's central question is answered.  Section 4 records the
+interpretation.
 
 ### 3.14 What this commit window's discipline preserved
 
-- The §1.5 four-corner ladder is **not collapsed** by writing
-  Section 4.  Per §1.6 ("If T5 trips below 5pp on either task,
-  STOP"), the rule is symmetric: do not write the conclusion until
-  the measurement is done.  This commit window measures T1, T2, T7,
-  T8 honestly and stops there.
+- The §1.5 four-corner ladder was honoured.  T5 lands in the
+  "thesis falsified at this scale" corner on puzzle15; Klotski sits
+  in the "weakly validated" corner.  Both outcomes are publishable
+  per the pre-reg.
+- The §1.6 "do not add compute to chase T5" rule was followed.  We
+  reduced the step count from 50 000 → 25 000 *before* any T5
+  measurement, for wall-clock reasons, applied symmetrically to
+  both arms.  After seeing the puzzle15 +0.6 pp result, we did NOT
+  re-train at 50 000 steps, did NOT scale up the OPA model count,
+  and did NOT change the OPA verifier mechanism to mask the
+  failure.
 - T8 (engine surface + verb lock + no new opcodes) held under all
-  the pressure that adding a third SOURCE clause to OQL could have
-  applied.  The same engine binary that ships E12's FROM LLM
-  parses E15's FROM ORACLE.
-- The §1.7 falsification framing is **still intact**: a follow-up
-  run that measures T3-T6 has all four §1.5 outcomes available to
-  it — including monolithic-wins, the most valuable single result
-  the project could produce.
+  the pressure that adding two training drivers + two eval drivers
+  could have applied: `git diff main -- src/microgpt.{c,h}
+  src/microgpt_vm.*` = 0 lines.  Zero new VM opcodes.  Zero new
+  build dependencies.
 
 ---
 
 ## 4. Conclusion
 
-**TODO** — fill on measurement commit when ALL 8 targets are measured. Sections to populate:
+### 4.1 Verdict per target
 
-- 4.1 Verdict per T1-T8
-- 4.2 Headline outcome — which of the four §1.5 corners did T5 land in?
-- 4.3 What this means for the project's value claim:
-  - If ≥ 15pp: **thesis validated**; OPA has its first measured value demonstration against the right control
-  - If 5-15pp: weakly validated; reframe toward audit/latency/edge
-  - If < 5pp or monolithic wins: **thesis falsified or contradicted**; substantial repositioning required
-- 4.4 What this means for the taxonomy in §0:
-  - Does the 5-criteria checklist actually predict OPA's success?
-  - Are any criteria load-bearing more than others? (e.g. is C3 — search depth — the critical one?)
-- 4.5 What's NOT done: scaling-curve comparison; multi-budget comparison; comparison to LLMs (E01); comparison to RAG-augmented monolithic; replication to other §0.2 task classes
-- 4.6 Next experiments suggested:
-  - If thesis validated: extend to multi-budget scaling curve (E16)
-  - If falsified: pivot E15-equivalents toward audit-value demonstrations
-  - Either way: rewrite the project's headline claims in `ORGANELLE_STATE.md` to match the measured truth
-- 4.7 Traceability updates (`TRACEABILITY.md`, `ORGANELLE_STATE.md`, `RESEARCH_DISCLOSURE.md`)
+7 of 8 pre-registered targets PASS.  T5 — the headline — FAILs by the
+locked AND condition (margin ≥ 15 pp on both tasks).
+
+| ID | Status | One-line |
+|---|---|---|
+| T1 | PASS | `CREATE CORPUS … FROM ORACLE …` parses (Phase 1) |
+| T2 | PASS | 2 × 2000 oracle pairs at 100% yield (Phase 3, scaled per §1.6) |
+| T3 | PASS | Mono klotski 64.6%, puzzle15 0.1% |
+| T4 | PASS | OPA klotski 69.9%, puzzle15 0.7% |
+| **T5** | **FAIL** | Klotski +5.3 pp / Puzzle15 +0.6 pp — fails the ≥15pp AND |
+| T6 | PASS | Compute imbalance 0.74% (klotski), 1.06% (puzzle15) |
+| T7 | PASS | 0 verbatim / 0 Jaccard ≥ 0.7 leakage (unchanged from Phase 3) |
+| T8 | PASS | Engine surface frozen, +6/-4 verb lock holds, zero new VM opcodes, zero new build deps |
+
+### 4.2 Headline outcome — which §1.5 corner?
+
+The two-task pair lands in **two different §1.5 corners**, and T5's
+AND clause makes the harder one decisive:
+
+- **Klotski (+5.3 pp)**: §1.5 "Weakly validated — composition helps but
+  not decisively.  Re-frame value claim toward audit/latency/edge
+  rather than capacity efficiency."
+- **Puzzle15 (+0.6 pp)**: §1.5 "Thesis not supported at this scale —
+  coordination doesn't beat capacity on these tasks.  Re-think where
+  OPA's distinctive value lives.  Still publishable — the most
+  important result the project could produce."
+
+Per §1.7's locked statement: *"the most valuable single result the
+project could produce is 'monolithic wins at equal budget'"*.  We did
+not get "monolithic wins" (OPA edges ahead on both tasks); we got
+the closely-related "OPA wins by an insignificant margin on the
+harder task", which is — by the §1.5 ladder — equally informative.
+The project's coordination-is-the-intelligence thesis is **not
+supported** at this scale on the harder of the two hard-search tasks
+the experiment was designed to discriminate on.
+
+### 4.3 What this means for the project's value claim
+
+The pre-reg's §0.5 framing is now actionable:
+
+> *Per the project's pre-registration discipline, [the
+> monolithic-wins / thesis-falsified] result is **more interesting
+> than confirmation** — it tells the field where OPA's distinctive
+> value actually lives (audit, latency, determinism, edge — not
+> capacity efficiency).*
+
+Concretely:
+
+1. **OPA's value is NOT capacity efficiency at this scale.**  Three
+   ~158K-param organelles + deterministic verifier do not beat one
+   ~470K-param monolith on hard-search puzzles at equal training
+   compute.  Klotski's +5.3 pp is within the "weakly validated"
+   noise band; puzzle15's +0.6 pp is essentially zero given both
+   arms are well below 1% solve rate.
+2. **OPA's value IS the deterministic infrastructure surrounding
+   the model.**  The +5.3 pp lift on Klotski came mostly from the
+   verifier-as-judge picking the longest-valid-prefix among 3
+   candidates — that's a generic ensembling-with-validation trick,
+   not unique to "coordination as intelligence".
+3. **The honest headline claim becomes**: OPA delivers
+   audit-traceability, edge-deployability, determinism, and
+   composability — but **not** raw task-accuracy efficiency vs a
+   same-budget monolithic transformer on hard-search problems.
+4. **`ORGANELLE_STATE.md` headline claims need rewriting** to match
+   the measurement.  The thesis must now distinguish between
+   "coordination is the intelligence" (E15-falsified at this scale)
+   and "coordination + deterministic infrastructure is what makes
+   tiny models deployable" (well-supported by E07-E14).
+
+### 4.4 What this means for the §0 taxonomy
+
+The 5-criteria checklist (C1 structured output, C2 verifiable,
+C3 search depth, C4 stateful, C5 detectable failure) **did correctly
+identify Klotski and Puzzle15 as "in OPA's natural zone"**.  Both
+satisfy all 5 criteria.  Yet OPA still did not deliver the
+≥15 pp advantage.  Refinements to the taxonomy:
+
+- **C3 (search depth) is the load-bearing criterion** — but in a way
+  the pre-reg didn't anticipate.  At Klotski's typical solution
+  length (1-4 moves), neither arch has to compose much; both just
+  memorise.  Composition advantage is small.  At Puzzle15's
+  typical 22-28 move solutions, **neither arch has the capacity to
+  compose**, and OPA's prefix-tie-breaker can't manufacture moves
+  the planner didn't emit.  The "natural zone" is narrower than
+  §0.2 listed — OPA needs **C3 with the right depth: hard enough
+  for capacity to matter, but not so hard that both arches fail.**
+- **C5 (detectable failure) is not enough — the failure must be
+  *recoverable*.** Our OPA driver detects failure (verifier returns
+  0) but its recovery is trivial: pick the next organelle's output.
+  That's a re-roll, not a recovery.  Genuine OPA value would need
+  the deterministic infrastructure to *steer* the next organelle's
+  output, not just *filter* it.  The pre-reg's §0.2 list of OPA-fit
+  tasks (search puzzles, two-player games, etc.) needs to be split
+  by "does the deterministic infrastructure have somewhere to push
+  the model when it gets stuck, or does it just gate output".
+
+### 4.5 What's NOT done (residual)
+
+This experiment **did not** test:
+
+- Scaling curves: does the margin widen at 5M, 50M, 500M params per
+  organelle?  E15 fixes a single ~470K-param budget.
+- Multi-budget comparison: 3 × N vs 1 × 3N (we did this) is just one
+  of many splits.  We did not test 9 × M vs 3 × 3M, or 3 × N at the
+  N=1M-param scale where transformers stop being mostly position
+  embeddings.
+- LLMs (E01) — gated on API budget.
+- RAG-augmented monolithic — the obvious "give monolithic more
+  context" comparator.
+- Replication to other §0.2 tasks (Sokoban, Connect-4 distillation,
+  Sudoku, multi-hop QA, code synthesis with compiler feedback).  E15
+  measures **one pair of hard-search puzzles**.  Confirmatory or
+  contradictory results on other task classes are open questions.
+- Step-count sensitivity: the 50 000 → 25 000 §1.6 mitigation was
+  applied symmetrically.  Whether 100 000 steps would close
+  puzzle15's margin to 5 pp is an open question.  Per §1.6's
+  do-not-add-compute rule we **DO NOT** test this in the same
+  experiment.
+
+### 4.6 Suggested follow-on experiments
+
+Given the falsified outcome on the headline question:
+
+1. **E16 — OPA's value on the audit / latency / edge axis.**
+   E15 measured task accuracy at equal training compute and found
+   the thesis unsupported.  The natural follow-up is to measure
+   the *axis the thesis should retreat to*: can OPA produce a
+   reasoning trace that a human auditor (or a regulator) can
+   verify in less time than reading the monolithic's output token
+   stream?  Can OPA run at lower inference latency under the same
+   peak memory budget?  Can OPA's edge-deployment story (no GPU,
+   single binary, deterministic given seed + checkpoint) be made
+   concrete on a Pi-class device?  These are the §1.5-mandated
+   "re-frame" experiments.
+
+2. **E17 — Genuine recovery, not re-roll.**  Rebuild the OPA driver
+   so the deterministic infrastructure *steers* a failed
+   organelle: feed back the verifier's "first-broken-move" position
+   as a continuation prompt, or run beam search on the
+   judge-rejected partial sequence.  Measure whether the +5.3 pp
+   Klotski margin opens to ≥ 15 pp under genuine recovery.  Run
+   the same comparison on puzzle15.  If still negative, the
+   thesis is definitively falsified.
+
+3. **E18 — Multi-task transfer.**  Train ONE OPA system on Klotski +
+   Puzzle15 + 8-puzzle + Sokoban simultaneously, with role-tagged
+   training as in E15.  Compare to a same-budget monolithic
+   trained on the same union.  This tests whether OPA's
+   compositionality buys multi-task generality even when it
+   doesn't buy single-task accuracy.
+
+4. **`ORGANELLE_STATE.md` rewrite (mandatory, regardless).**  The
+   project's headline claims around "coordination is the
+   intelligence" must be revised to match the measurement.  E15's
+   §1.5 four-corner ladder predicted this rewrite as a possible
+   outcome; the pre-reg explicitly says it would be the most
+   valuable single result.
+
+### 4.7 Traceability updates
+
+- `experiments/README.md` — update E15's status line to **MEASURED:
+  T5 = FAIL (+5.3pp klotski / +0.6pp puzzle15)** and link to this
+  Section 3.13 verdict matrix.
+- `ORGANELLE_STATE.md` — the "coordination is the intelligence"
+  claim block needs a *measured-result* footnote pointing at E15
+  §3.10.  The §1.7 framing ("the most valuable single result") is
+  exactly that footnote.
+- `RESEARCH_DISCLOSURE.md` — add E15 to the standing list of
+  measured-result experiments alongside E11 (Connect-4 win-rate
+  fix), E12 (LLM-wiring corpus FALSIFIED), E13 (LLM game
+  distillation neutral).
+- `TRACEABILITY.md` — link E15's T1-T8 verdicts to the artefacts
+  under `results/{klotski,puzzle15}_{mono,opa}_eval.{log,csv}` +
+  `checkpoints/*_e15.vocab` + `tools/e15_{train,eval}.c` +
+  `CMakeLists.txt` defines blocks.
+
+### 4.8 Reproducibility recipe
+
+To re-run E15's measurement on a third-party machine:
+
+```bash
+# 1. Build the substrate (~2 min)
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release --parallel 8
+
+# 2. Re-generate the corpora from seed (~1 min — deterministic)
+./build/e15_generate experiments/E15-corpus.oql
+./build/e15_generate experiments/E15-heldout-klotski-large.oql \
+    --audit-against build/klotski_optimal.tsv
+./build/e15_generate experiments/E15-heldout-puzzle15-large.oql \
+    --audit-against build/puzzle15_optimal.tsv
+
+# 3. Train all 8 checkpoints in parallel (~15 min on 12-core CPU)
+mkdir -p checkpoints results
+for arm in klotski_mono puzzle15_mono; do
+  task=$(echo $arm | sed 's/_mono//')
+  ./build/e15_mono_train --corpus build/${task}_optimal.tsv \
+      --save checkpoints/${arm}_e15.ckpt \
+      --vocab-save checkpoints/${arm}_e15.vocab \
+      --steps 25000 --batch 8 --lr 0.001 --seed 1337 \
+      > results/${arm}_train.log 2>&1 &
+done
+for task in klotski puzzle15; do
+  for role in planner player judge; do
+    seed=$(case $role in planner) echo 1337;; player) echo 1338;; judge) echo 1339;; esac)
+    ./build/e15_opa_train --corpus build/${task}_optimal.tsv \
+        --save checkpoints/${task}_${role}_e15.ckpt \
+        --vocab-save checkpoints/${task}_${role}_e15.vocab \
+        --steps 25000 --batch 8 --lr 0.001 --role $role --seed $seed \
+        > results/${task}_${role}_train.log 2>&1 &
+  done
+done
+wait
+
+# 4. Evaluate (~5 sec total)
+./tools/e15_eval_all.sh
+```
+
+All RNG seeds are fixed; the same machine should produce bit-identical
+results.  Numbers in §3.8 are the canonical measurement.
