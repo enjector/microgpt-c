@@ -104,10 +104,11 @@ Every experiment doc is a single markdown file with four sections:
 All eight: 📋 **Proposal locked** (2026-05-20).
 
 In-flight measurement (worktree-branch agent runs):
-- E02 ⏳ agent complete; awaiting merge
-- E04 ⏳ agent complete; awaiting merge
+- E02 ✅ merged at `a02a71d` — 5/6 targets PASS, T6 deferred on API key
+- E04 ✅ merged at `05932dc` — 7/7 targets PASS at σ=0.05
 - E05 🔬 agent still running
-- E07 ✅ merged at `83e5673`
+- E07 ✅ merged at `83e5673` — verb-discipline lock held; 5 PASS, 1 PARTIAL, 2 deferred
+- E08 🔬 to be spawned next
 
 ## Cross-references
 
