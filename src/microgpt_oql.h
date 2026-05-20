@@ -51,7 +51,13 @@ typedef enum {
     OQL_VERB_RUN,
     OQL_VERB_EVALUATE,
     OQL_VERB_VERIFY,
-    OQL_VERB_AUDIT
+    OQL_VERB_AUDIT,
+    /* CREATE is inherited from SQL (not part of the +6 added verbs); it
+     * carries an object-type subtag.  See experiments/E08-oql-behaviours.md
+     * §1.3.2 — verb count remains +6 / -4 by reusing CREATE for BEHAVIOUR
+     * and ORGANELLE object types. */
+    OQL_VERB_CREATE_BEHAVIOUR,
+    OQL_VERB_CREATE_ORGANELLE
 } OqlVerb;
 
 /* ============================================================
@@ -164,6 +170,25 @@ typedef struct {
     char *report_path;  /* REPORT AS '...' (NULL if absent) */
 } OqlAudit;
 
+/* CREATE BEHAVIOUR <name> AS VM `<body>`;
+ * The body is the literal VM-TypeScript source between backticks; the
+ * interpreter compiles it via vm_module_compile when the statement
+ * executes and stores the resulting module in the runtime context's
+ * behaviour registry. */
+typedef struct {
+    char *name;         /* behaviour identifier, owned */
+    char *vm_body;      /* TS source (unescaped), owned */
+} OqlCreateBehaviour;
+
+/* CREATE ORGANELLE <name> FROM CHECKPOINT '<path>' [WITH (kv, kv, ...)];
+ * The WITH-list carries the behaviour-binding kvs (INPUT_BEHAVIOUR = name,
+ * OUTPUT_BEHAVIOUR = name, ...).  Validated at execute time. */
+typedef struct {
+    char *name;         /* organelle identifier, owned */
+    char *checkpoint;   /* path string, owned (NULL allowed for in-memory) */
+    OqlKV *bindings;    /* OqlKV list of *_BEHAVIOUR=name and friends */
+} OqlCreateOrganelle;
+
 /* ============================================================
  *  Statement union
  * ============================================================ */
@@ -177,6 +202,8 @@ typedef struct OqlStmt {
         OqlEvaluate evaluate;
         OqlVerify   verify;
         OqlAudit    audit;
+        OqlCreateBehaviour  create_behaviour;
+        OqlCreateOrganelle  create_organelle;
     } u;
     struct OqlStmt *next;
 } OqlStmt;

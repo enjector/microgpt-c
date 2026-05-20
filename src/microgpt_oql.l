@@ -67,16 +67,25 @@ number  -?[0-9]+(\.[0-9]+)?
 string  \'([^'\\]|\\.)*\'
 comment --[^\n\r]*
 graph   @graph[^@]*@end
+vmbody  `[^`]*`
 
 %%
 
- /* Verbs (the +6 — hard-locked). */
+ /* Verbs (the +6 — hard-locked).  CREATE is inherited from SQL — not a
+  * 7th verb; subtype carried by following object-type keyword. */
 TRAIN       { return T_TRAIN; }
 COMPOSE     { return T_COMPOSE; }
 RUN         { return T_RUN; }
 EVALUATE    { return T_EVALUATE; }
 VERIFY      { return T_VERIFY; }
 AUDIT       { return T_AUDIT; }
+CREATE      { return T_CREATE; }
+
+ /* Object-type keywords (for CREATE). */
+BEHAVIOUR   { return T_BEHAVIOUR; }
+ORGANELLE   { return T_ORGANELLE; }
+CHECKPOINT  { return T_CHECKPOINT; }
+VM          { return T_VM; }
 
  /* Clauses / sub-keywords. */
 ON          { return T_ON; }
@@ -94,6 +103,18 @@ THRESHOLDS  { return T_THRESHOLDS; }
 
  /* Inline @graph...@end as a single opaque token. */
 {graph}     { oql_parser_lval.str = oql_strclone(yytext); return T_GRAPH_BLOCK; }
+ /* Backtick-delimited VM body (TS source) — stripped of the delimiters. */
+{vmbody}    {
+                /* yytext includes the bracketing backticks; strip them. */
+                size_t n = strlen(yytext);
+                char *body = (char *)malloc(n - 1);
+                if (body) {
+                    memcpy(body, yytext + 1, n - 2);
+                    body[n - 2] = '\0';
+                }
+                oql_parser_lval.str = body;
+                return T_VM_BODY;
+            }
 
 {string}    { oql_parser_lval.str = oql_str_unquote(yytext); return T_STRING; }
 {number}    { oql_parser_lval.str = oql_strclone(yytext); return T_NUMBER; }

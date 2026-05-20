@@ -75,7 +75,7 @@
 #define yychar          oql_parser_char
 
 /* First part of user prologue.  */
-#line 13 "microgpt_oql.y"
+#line 13 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
 
     #include "microgpt_oql.h"
     #include <stdio.h>
@@ -92,6 +92,8 @@
     OqlStmt *oql_y_evaluate(char *name, OqlSource against, char *metric, char *report);
     OqlStmt *oql_y_verify(OqlVerifySubjectKind k, char *subject, OqlPredicate *where);
     OqlStmt *oql_y_audit(OqlSource a, OqlSource b, char *thr, char *report);
+    OqlStmt *oql_y_create_behaviour(char *name, char *vm_body);
+    OqlStmt *oql_y_create_organelle(char *name, char *ckpt, OqlKV *bindings);
     OqlKV   *oql_y_kv(char *key, char *val);
     OqlKV   *oql_y_kv_concat(OqlKV *head, OqlKV *tail);
     OqlNameList *oql_y_name(char *n);
@@ -99,7 +101,7 @@
     OqlPredicate *oql_y_pred(char *lhs, OqlOp op, char *rhs);
     void oql_y_append(oql_parser *p, OqlStmt *s);
 
-#line 103 "microgpt_oql_parser.tab.c"
+#line 105 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
 
 # ifndef YY_CAST
 #  ifdef __cplusplus
@@ -136,52 +138,66 @@ enum yysymbol_kind_t
   YYSYMBOL_T_EVALUATE = 6,                 /* T_EVALUATE  */
   YYSYMBOL_T_VERIFY = 7,                   /* T_VERIFY  */
   YYSYMBOL_T_AUDIT = 8,                    /* T_AUDIT  */
-  YYSYMBOL_T_ON = 9,                       /* T_ON  */
-  YYSYMBOL_T_WITH = 10,                    /* T_WITH  */
-  YYSYMBOL_T_AGAINST = 11,                 /* T_AGAINST  */
-  YYSYMBOL_T_USING = 12,                   /* T_USING  */
-  YYSYMBOL_T_WHERE = 13,                   /* T_WHERE  */
-  YYSYMBOL_T_AS = 14,                      /* T_AS  */
-  YYSYMBOL_T_FROM = 15,                    /* T_FROM  */
-  YYSYMBOL_T_GRAPH = 16,                   /* T_GRAPH  */
-  YYSYMBOL_T_CORPUS = 17,                  /* T_CORPUS  */
-  YYSYMBOL_T_REPORT = 18,                  /* T_REPORT  */
-  YYSYMBOL_T_METRIC = 19,                  /* T_METRIC  */
-  YYSYMBOL_T_THRESHOLDS = 20,              /* T_THRESHOLDS  */
-  YYSYMBOL_T_LT = 21,                      /* T_LT  */
-  YYSYMBOL_T_LE = 22,                      /* T_LE  */
-  YYSYMBOL_T_EQ = 23,                      /* T_EQ  */
-  YYSYMBOL_T_NE = 24,                      /* T_NE  */
-  YYSYMBOL_T_GE = 25,                      /* T_GE  */
-  YYSYMBOL_T_GT = 26,                      /* T_GT  */
-  YYSYMBOL_T_IDENT = 27,                   /* T_IDENT  */
-  YYSYMBOL_T_STRING = 28,                  /* T_STRING  */
-  YYSYMBOL_T_NUMBER = 29,                  /* T_NUMBER  */
-  YYSYMBOL_T_GRAPH_BLOCK = 30,             /* T_GRAPH_BLOCK  */
-  YYSYMBOL_31_ = 31,                       /* ';'  */
-  YYSYMBOL_32_ = 32,                       /* ','  */
-  YYSYMBOL_YYACCEPT = 33,                  /* $accept  */
-  YYSYMBOL_script = 34,                    /* script  */
-  YYSYMBOL_stmt = 35,                      /* stmt  */
-  YYSYMBOL_train_stmt = 36,                /* train_stmt  */
-  YYSYMBOL_opt_on = 37,                    /* opt_on  */
-  YYSYMBOL_compose_stmt = 38,              /* compose_stmt  */
-  YYSYMBOL_run_stmt = 39,                  /* run_stmt  */
-  YYSYMBOL_evaluate_stmt = 40,             /* evaluate_stmt  */
-  YYSYMBOL_opt_metric = 41,                /* opt_metric  */
-  YYSYMBOL_opt_report = 42,                /* opt_report  */
-  YYSYMBOL_verify_stmt = 43,               /* verify_stmt  */
-  YYSYMBOL_opt_where = 44,                 /* opt_where  */
-  YYSYMBOL_predicate = 45,                 /* predicate  */
-  YYSYMBOL_op = 46,                        /* op  */
-  YYSYMBOL_audit_stmt = 47,                /* audit_stmt  */
-  YYSYMBOL_opt_thresholds = 48,            /* opt_thresholds  */
-  YYSYMBOL_opt_with = 49,                  /* opt_with  */
-  YYSYMBOL_kv_list = 50,                   /* kv_list  */
-  YYSYMBOL_kv = 51,                        /* kv  */
-  YYSYMBOL_value = 52,                     /* value  */
-  YYSYMBOL_source = 53,                    /* source  */
-  YYSYMBOL_name_list = 54                  /* name_list  */
+  YYSYMBOL_T_CREATE = 9,                   /* T_CREATE  */
+  YYSYMBOL_T_BEHAVIOUR = 10,               /* T_BEHAVIOUR  */
+  YYSYMBOL_T_ORGANELLE = 11,               /* T_ORGANELLE  */
+  YYSYMBOL_T_CHECKPOINT = 12,              /* T_CHECKPOINT  */
+  YYSYMBOL_T_VM = 13,                      /* T_VM  */
+  YYSYMBOL_T_ON = 14,                      /* T_ON  */
+  YYSYMBOL_T_WITH = 15,                    /* T_WITH  */
+  YYSYMBOL_T_AGAINST = 16,                 /* T_AGAINST  */
+  YYSYMBOL_T_USING = 17,                   /* T_USING  */
+  YYSYMBOL_T_WHERE = 18,                   /* T_WHERE  */
+  YYSYMBOL_T_AS = 19,                      /* T_AS  */
+  YYSYMBOL_T_FROM = 20,                    /* T_FROM  */
+  YYSYMBOL_T_GRAPH = 21,                   /* T_GRAPH  */
+  YYSYMBOL_T_CORPUS = 22,                  /* T_CORPUS  */
+  YYSYMBOL_T_REPORT = 23,                  /* T_REPORT  */
+  YYSYMBOL_T_METRIC = 24,                  /* T_METRIC  */
+  YYSYMBOL_T_THRESHOLDS = 25,              /* T_THRESHOLDS  */
+  YYSYMBOL_T_LT = 26,                      /* T_LT  */
+  YYSYMBOL_T_LE = 27,                      /* T_LE  */
+  YYSYMBOL_T_EQ = 28,                      /* T_EQ  */
+  YYSYMBOL_T_NE = 29,                      /* T_NE  */
+  YYSYMBOL_T_GE = 30,                      /* T_GE  */
+  YYSYMBOL_T_GT = 31,                      /* T_GT  */
+  YYSYMBOL_T_IDENT = 32,                   /* T_IDENT  */
+  YYSYMBOL_T_STRING = 33,                  /* T_STRING  */
+  YYSYMBOL_T_NUMBER = 34,                  /* T_NUMBER  */
+  YYSYMBOL_T_GRAPH_BLOCK = 35,             /* T_GRAPH_BLOCK  */
+  YYSYMBOL_T_VM_BODY = 36,                 /* T_VM_BODY  */
+  YYSYMBOL_37_ = 37,                       /* ';'  */
+  YYSYMBOL_38_ = 38,                       /* '('  */
+  YYSYMBOL_39_ = 39,                       /* ')'  */
+  YYSYMBOL_40_ = 40,                       /* ','  */
+  YYSYMBOL_YYACCEPT = 41,                  /* $accept  */
+  YYSYMBOL_script = 42,                    /* script  */
+  YYSYMBOL_stmt = 43,                      /* stmt  */
+  YYSYMBOL_train_stmt = 44,                /* train_stmt  */
+  YYSYMBOL_opt_on = 45,                    /* opt_on  */
+  YYSYMBOL_compose_stmt = 46,              /* compose_stmt  */
+  YYSYMBOL_run_stmt = 47,                  /* run_stmt  */
+  YYSYMBOL_evaluate_stmt = 48,             /* evaluate_stmt  */
+  YYSYMBOL_opt_metric = 49,                /* opt_metric  */
+  YYSYMBOL_opt_report = 50,                /* opt_report  */
+  YYSYMBOL_verify_stmt = 51,               /* verify_stmt  */
+  YYSYMBOL_opt_where = 52,                 /* opt_where  */
+  YYSYMBOL_predicate = 53,                 /* predicate  */
+  YYSYMBOL_op = 54,                        /* op  */
+  YYSYMBOL_audit_stmt = 55,                /* audit_stmt  */
+  YYSYMBOL_opt_thresholds = 56,            /* opt_thresholds  */
+  YYSYMBOL_create_stmt = 57,               /* create_stmt  */
+  YYSYMBOL_create_behaviour_stmt = 58,     /* create_behaviour_stmt  */
+  YYSYMBOL_create_organelle_stmt = 59,     /* create_organelle_stmt  */
+  YYSYMBOL_opt_with_bindings = 60,         /* opt_with_bindings  */
+  YYSYMBOL_binding_list = 61,              /* binding_list  */
+  YYSYMBOL_binding = 62,                   /* binding  */
+  YYSYMBOL_opt_with = 63,                  /* opt_with  */
+  YYSYMBOL_kv_list = 64,                   /* kv_list  */
+  YYSYMBOL_kv = 65,                        /* kv  */
+  YYSYMBOL_value = 66,                     /* value  */
+  YYSYMBOL_source = 67,                    /* source  */
+  YYSYMBOL_name_list = 68                  /* name_list  */
 };
 typedef enum yysymbol_kind_t yysymbol_kind_t;
 
@@ -509,19 +525,19 @@ union yyalloc
 /* YYFINAL -- State number of the termination state.  */
 #define YYFINAL  2
 /* YYLAST -- Last index in YYTABLE.  */
-#define YYLAST   63
+#define YYLAST   84
 
 /* YYNTOKENS -- Number of terminals.  */
-#define YYNTOKENS  33
+#define YYNTOKENS  41
 /* YYNNTS -- Number of nonterminals.  */
-#define YYNNTS  22
+#define YYNNTS  28
 /* YYNRULES -- Number of rules.  */
-#define YYNRULES  47
+#define YYNRULES  58
 /* YYNSTATES -- Number of states.  */
-#define YYNSTATES  83
+#define YYNSTATES  109
 
 /* YYMAXUTOK -- Last valid token kind.  */
-#define YYMAXUTOK   285
+#define YYMAXUTOK   291
 
 
 /* YYTRANSLATE(TOKEN-NUM) -- Symbol number corresponding to TOKEN-NUM
@@ -539,8 +555,8 @@ static const yytype_int8 yytranslate[] =
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-       2,     2,     2,     2,    32,     2,     2,     2,     2,     2,
-       2,     2,     2,     2,     2,     2,     2,     2,     2,    31,
+      38,    39,     2,     2,    40,     2,     2,     2,     2,     2,
+       2,     2,     2,     2,     2,     2,     2,     2,     2,    37,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
@@ -563,18 +579,20 @@ static const yytype_int8 yytranslate[] =
        2,     2,     2,     2,     2,     2,     1,     2,     3,     4,
        5,     6,     7,     8,     9,    10,    11,    12,    13,    14,
       15,    16,    17,    18,    19,    20,    21,    22,    23,    24,
-      25,    26,    27,    28,    29,    30
+      25,    26,    27,    28,    29,    30,    31,    32,    33,    34,
+      35,    36
 };
 
 #if OQL_PARSER_DEBUG
 /* YYRLINE[YYN] -- Source line where rule number YYN was defined.  */
 static const yytype_uint8 yyrline[] =
 {
-       0,    67,    67,    67,    70,    71,    72,    73,    74,    75,
-      80,    83,    84,    89,    94,    99,   103,   104,   107,   108,
-     113,   114,   115,   118,   119,   122,   125,   125,   126,   126,
-     127,   127,   132,   136,   137,   142,   143,   146,   147,   150,
-     153,   153,   153,   156,   157,   158,   161,   162
+       0,    71,    71,    71,    74,    75,    76,    77,    78,    79,
+      80,    85,    88,    89,    94,    99,   104,   108,   109,   112,
+     113,   118,   119,   120,   123,   124,   127,   130,   130,   131,
+     131,   132,   132,   137,   141,   142,   147,   148,   151,   155,
+     157,   161,   162,   165,   166,   169,   174,   175,   178,   179,
+     182,   185,   185,   185,   188,   189,   190,   193,   194
 };
 #endif
 
@@ -591,14 +609,17 @@ static const char *yysymbol_name (yysymbol_kind_t yysymbol) YY_ATTRIBUTE_UNUSED;
 static const char *const yytname[] =
 {
   "\"end of file\"", "error", "\"invalid token\"", "T_TRAIN", "T_COMPOSE",
-  "T_RUN", "T_EVALUATE", "T_VERIFY", "T_AUDIT", "T_ON", "T_WITH",
-  "T_AGAINST", "T_USING", "T_WHERE", "T_AS", "T_FROM", "T_GRAPH",
-  "T_CORPUS", "T_REPORT", "T_METRIC", "T_THRESHOLDS", "T_LT", "T_LE",
-  "T_EQ", "T_NE", "T_GE", "T_GT", "T_IDENT", "T_STRING", "T_NUMBER",
-  "T_GRAPH_BLOCK", "';'", "','", "$accept", "script", "stmt", "train_stmt",
-  "opt_on", "compose_stmt", "run_stmt", "evaluate_stmt", "opt_metric",
-  "opt_report", "verify_stmt", "opt_where", "predicate", "op",
-  "audit_stmt", "opt_thresholds", "opt_with", "kv_list", "kv", "value",
+  "T_RUN", "T_EVALUATE", "T_VERIFY", "T_AUDIT", "T_CREATE", "T_BEHAVIOUR",
+  "T_ORGANELLE", "T_CHECKPOINT", "T_VM", "T_ON", "T_WITH", "T_AGAINST",
+  "T_USING", "T_WHERE", "T_AS", "T_FROM", "T_GRAPH", "T_CORPUS",
+  "T_REPORT", "T_METRIC", "T_THRESHOLDS", "T_LT", "T_LE", "T_EQ", "T_NE",
+  "T_GE", "T_GT", "T_IDENT", "T_STRING", "T_NUMBER", "T_GRAPH_BLOCK",
+  "T_VM_BODY", "';'", "'('", "')'", "','", "$accept", "script", "stmt",
+  "train_stmt", "opt_on", "compose_stmt", "run_stmt", "evaluate_stmt",
+  "opt_metric", "opt_report", "verify_stmt", "opt_where", "predicate",
+  "op", "audit_stmt", "opt_thresholds", "create_stmt",
+  "create_behaviour_stmt", "create_organelle_stmt", "opt_with_bindings",
+  "binding_list", "binding", "opt_with", "kv_list", "kv", "value",
   "source", "name_list", YY_NULLPTR
 };
 
@@ -609,7 +630,7 @@ yysymbol_name (yysymbol_kind_t yysymbol)
 }
 #endif
 
-#define YYPACT_NINF (-29)
+#define YYPACT_NINF (-35)
 
 #define yypact_value_is_default(Yyn) \
   ((Yyn) == YYPACT_NINF)
@@ -623,15 +644,17 @@ yysymbol_name (yysymbol_kind_t yysymbol)
    STATE-NUM.  */
 static const yytype_int8 yypact[] =
 {
-     -29,    20,   -29,   -24,   -20,   -17,   -15,   -14,    -9,   -26,
-     -29,   -29,   -29,   -29,   -29,   -29,     0,     6,    25,    28,
-      10,    29,    29,    13,   -29,   -29,    32,   -29,    -9,    25,
-      17,    18,   -29,    -9,    29,    19,   -29,   -29,   -29,    -9,
-     -29,   -29,   -29,   -10,    24,    16,   -29,    37,   -29,     8,
-     -29,    38,    26,   -29,     9,    18,    33,    36,   -29,   -29,
-     -29,   -29,   -29,   -29,     9,    31,    36,   -29,   -29,   -29,
-     -29,   -29,   -29,    30,    41,   -29,   -29,    34,   -29,   -29,
-      35,   -29,   -29
+     -35,    30,   -35,   -20,   -19,   -12,    -8,   -18,   -14,     0,
+     -10,   -35,   -35,   -35,   -35,   -35,   -35,   -35,   -35,   -35,
+      15,     8,    16,    31,    11,    32,    32,    18,   -35,   -35,
+      33,    20,    21,   -35,   -14,    16,    22,    23,   -35,   -14,
+      32,    24,   -35,   -35,   -35,   -14,    29,   -11,   -35,   -35,
+     -35,   -15,    34,    17,   -35,    41,   -35,    14,   -35,    42,
+      47,    25,    49,   -35,    35,   -35,   -27,    23,    40,    43,
+     -35,   -35,   -35,   -35,   -35,   -35,   -27,    44,    43,    36,
+      38,    45,   -35,   -35,   -35,   -35,   -35,   -35,    39,    46,
+     -35,   -35,    48,   -35,   -35,    51,   -17,   -35,    53,   -35,
+      50,   -35,    52,   -35,    38,   -35,   -35,   -35,   -35
 };
 
 /* YYDEFACT[STATE-NUM] -- Default reduction number in state STATE-NUM.
@@ -640,30 +663,32 @@ static const yytype_int8 yypact[] =
 static const yytype_int8 yydefact[] =
 {
        2,     0,     1,     0,     0,     0,     0,     0,     0,     0,
-       4,     5,     6,     7,     8,     9,    11,     0,    35,     0,
-       0,    23,    23,     0,    45,    44,     0,     3,     0,    35,
-       0,     0,    14,     0,    23,     0,    22,    21,    43,     0,
-      12,    10,    46,    35,     0,    36,    37,    16,    20,     0,
-      24,    33,     0,    13,     0,     0,     0,    18,    26,    27,
-      28,    29,    30,    31,     0,     0,    18,    47,    42,    40,
-      41,    39,    38,     0,     0,    15,    25,     0,    32,    17,
-       0,    34,    19
+       0,     4,     5,     6,     7,     8,     9,    10,    36,    37,
+      12,     0,    46,     0,     0,    24,    24,     0,    56,    55,
+       0,     0,     0,     3,     0,    46,     0,     0,    15,     0,
+      24,     0,    23,    22,    54,     0,     0,    41,    13,    11,
+      57,    46,     0,    47,    48,    17,    21,     0,    25,    34,
+       0,     0,     0,    40,     0,    14,     0,     0,     0,    19,
+      27,    28,    29,    30,    31,    32,     0,     0,    19,     0,
+       0,     0,    58,    53,    51,    52,    50,    49,     0,     0,
+      16,    26,     0,    33,    38,     0,     0,    43,    41,    18,
+       0,    35,     0,    42,     0,    39,    20,    45,    44
 };
 
 /* YYPGOTO[NTERM-NUM].  */
 static const yytype_int8 yypgoto[] =
 {
-     -29,   -29,   -29,   -29,   -29,   -29,   -29,   -29,   -29,    -8,
-     -29,   -18,   -29,   -29,   -29,   -29,   -28,   -29,     1,    -5,
-     -22,   -29
+     -35,   -35,   -35,   -35,   -35,   -35,   -35,   -35,   -35,    -5,
+     -35,   -24,   -35,   -35,   -35,   -35,   -35,   -35,   -35,   -23,
+     -35,   -30,   -34,   -35,     9,     1,   -13,   -35
 };
 
 /* YYDEFGOTO[NTERM-NUM].  */
 static const yytype_int8 yydefgoto[] =
 {
-       0,     1,     9,    10,    29,    11,    12,    13,    57,    75,
-      14,    36,    50,    64,    15,    66,    32,    45,    46,    71,
-      26,    43
+       0,     1,    10,    11,    35,    12,    13,    14,    69,    90,
+      15,    42,    58,    76,    16,    78,    17,    18,    19,    63,
+      96,    97,    38,    53,    54,    86,    30,    51
 };
 
 /* YYTABLE[YYPACT[STATE-NUM]] -- What to do in state STATE-NUM.  If
@@ -671,59 +696,67 @@ static const yytype_int8 yydefgoto[] =
    number is the opposite.  If YYTABLE_NINF, syntax error.  */
 static const yytype_int8 yytable[] =
 {
-      31,    41,    20,    16,    37,    27,    40,    17,    23,    28,
-      18,    47,    19,    21,    22,    53,    48,    51,    24,    25,
-       2,    30,    52,     3,     4,     5,     6,     7,     8,    58,
-      59,    60,    61,    62,    63,    31,    68,    69,    70,    33,
-      34,    38,    35,    39,    42,    44,    49,    54,    55,    56,
-      65,    77,    73,    67,    74,    80,    72,    79,    78,    76,
-       0,     0,    81,    82
+      37,    49,    43,    24,    61,    83,    84,    85,    27,    62,
+      31,    32,    20,    21,    25,    26,    56,    65,    28,    29,
+      22,    48,   103,   104,    23,    64,    55,    33,    36,    34,
+       2,    37,    59,     3,     4,     5,     6,     7,     8,     9,
+      70,    71,    72,    73,    74,    75,    40,    39,    60,    45,
+      41,    44,    46,    47,    50,    52,    57,    67,    68,    77,
+      79,    81,    66,    80,    88,   100,    89,    82,    61,    92,
+      95,    99,    94,    93,   108,   105,    87,    91,    98,   102,
+       0,   101,     0,   106,   107
 };
 
 static const yytype_int8 yycheck[] =
 {
-      10,    29,    16,    27,    22,    31,    28,    27,    17,     9,
-      27,    33,    27,    27,    28,    43,    34,    39,    27,    28,
-       0,    15,    32,     3,     4,     5,     6,     7,     8,    21,
-      22,    23,    24,    25,    26,    10,    27,    28,    29,    11,
-      30,    28,    13,    11,    27,    27,    27,    23,    32,    12,
-      12,    20,    19,    27,    18,    14,    55,    27,    66,    64,
-      -1,    -1,    28,    28
+      15,    35,    26,    21,    15,    32,    33,    34,    22,    20,
+      10,    11,    32,    32,    32,    33,    40,    51,    32,    33,
+      32,    34,    39,    40,    32,    40,    39,    37,    20,    14,
+       0,    15,    45,     3,     4,     5,     6,     7,     8,     9,
+      26,    27,    28,    29,    30,    31,    35,    16,    19,    16,
+      18,    33,    32,    32,    32,    32,    32,    40,    17,    17,
+      13,    12,    28,    38,    24,    19,    23,    32,    15,    25,
+      32,    32,    36,    78,   104,    98,    67,    76,    33,    28,
+      -1,    33,    -1,    33,    32
 };
 
 /* YYSTOS[STATE-NUM] -- The symbol kind of the accessing symbol of
    state STATE-NUM.  */
 static const yytype_int8 yystos[] =
 {
-       0,    34,     0,     3,     4,     5,     6,     7,     8,    35,
-      36,    38,    39,    40,    43,    47,    27,    27,    27,    27,
-      16,    27,    28,    17,    27,    28,    53,    31,     9,    37,
-      15,    10,    49,    11,    30,    13,    44,    44,    28,    11,
-      53,    49,    27,    54,    27,    50,    51,    53,    44,    27,
-      45,    53,    32,    49,    23,    32,    12,    41,    21,    22,
-      23,    24,    25,    26,    46,    12,    48,    27,    27,    28,
-      29,    52,    51,    19,    18,    42,    52,    20,    42,    27,
-      14,    28,    28
+       0,    42,     0,     3,     4,     5,     6,     7,     8,     9,
+      43,    44,    46,    47,    48,    51,    55,    57,    58,    59,
+      32,    32,    32,    32,    21,    32,    33,    22,    32,    33,
+      67,    10,    11,    37,    14,    45,    20,    15,    63,    16,
+      35,    18,    52,    52,    33,    16,    32,    32,    67,    63,
+      32,    68,    32,    64,    65,    67,    52,    32,    53,    67,
+      19,    15,    20,    60,    40,    63,    28,    40,    17,    49,
+      26,    27,    28,    29,    30,    31,    54,    17,    56,    13,
+      38,    12,    32,    32,    33,    34,    66,    65,    24,    23,
+      50,    66,    25,    50,    36,    32,    61,    62,    33,    32,
+      19,    33,    28,    39,    40,    60,    33,    32,    62
 };
 
 /* YYR1[RULE-NUM] -- Symbol kind of the left-hand side of rule RULE-NUM.  */
 static const yytype_int8 yyr1[] =
 {
-       0,    33,    34,    34,    35,    35,    35,    35,    35,    35,
-      36,    37,    37,    38,    39,    40,    41,    41,    42,    42,
-      43,    43,    43,    44,    44,    45,    46,    46,    46,    46,
-      46,    46,    47,    48,    48,    49,    49,    50,    50,    51,
-      52,    52,    52,    53,    53,    53,    54,    54
+       0,    41,    42,    42,    43,    43,    43,    43,    43,    43,
+      43,    44,    45,    45,    46,    47,    48,    49,    49,    50,
+      50,    51,    51,    51,    52,    52,    53,    54,    54,    54,
+      54,    54,    54,    55,    56,    56,    57,    57,    58,    59,
+      59,    60,    60,    61,    61,    62,    63,    63,    64,    64,
+      65,    66,    66,    66,    67,    67,    67,    68,    68
 };
 
 /* YYR2[RULE-NUM] -- Number of symbols on the right-hand side of rule RULE-NUM.  */
 static const yytype_int8 yyr2[] =
 {
        0,     2,     0,     3,     1,     1,     1,     1,     1,     1,
-       4,     0,     2,     5,     3,     6,     0,     3,     0,     3,
-       4,     3,     3,     0,     2,     3,     1,     1,     1,     1,
-       1,     1,     6,     0,     3,     0,     2,     1,     3,     3,
-       1,     1,     1,     2,     1,     1,     1,     3
+       1,     4,     0,     2,     5,     3,     6,     0,     3,     0,
+       3,     4,     3,     3,     0,     2,     3,     1,     1,     1,
+       1,     1,     1,     6,     0,     3,     1,     1,     6,     7,
+       4,     0,     4,     1,     3,     3,     0,     2,     1,     3,
+       3,     1,     1,     1,     2,     1,     1,     1,     3
 };
 
 
@@ -1189,277 +1222,343 @@ yyreduce:
   switch (yyn)
     {
   case 3: /* script: script stmt ';'  */
-#line 67 "microgpt_oql.y"
+#line 71 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
                                        { oql_y_append(parser, (yyvsp[-1].stmt)); }
-#line 1195 "microgpt_oql_parser.tab.c"
+#line 1228 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
     break;
 
   case 4: /* stmt: train_stmt  */
-#line 70 "microgpt_oql.y"
+#line 74 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
                     { (yyval.stmt) = (yyvsp[0].stmt); }
-#line 1201 "microgpt_oql_parser.tab.c"
+#line 1234 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
     break;
 
   case 5: /* stmt: compose_stmt  */
-#line 71 "microgpt_oql.y"
+#line 75 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
                     { (yyval.stmt) = (yyvsp[0].stmt); }
-#line 1207 "microgpt_oql_parser.tab.c"
+#line 1240 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
     break;
 
   case 6: /* stmt: run_stmt  */
-#line 72 "microgpt_oql.y"
+#line 76 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
                     { (yyval.stmt) = (yyvsp[0].stmt); }
-#line 1213 "microgpt_oql_parser.tab.c"
+#line 1246 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
     break;
 
   case 7: /* stmt: evaluate_stmt  */
-#line 73 "microgpt_oql.y"
+#line 77 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
                     { (yyval.stmt) = (yyvsp[0].stmt); }
-#line 1219 "microgpt_oql_parser.tab.c"
+#line 1252 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
     break;
 
   case 8: /* stmt: verify_stmt  */
-#line 74 "microgpt_oql.y"
+#line 78 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
                     { (yyval.stmt) = (yyvsp[0].stmt); }
-#line 1225 "microgpt_oql_parser.tab.c"
+#line 1258 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
     break;
 
   case 9: /* stmt: audit_stmt  */
-#line 75 "microgpt_oql.y"
+#line 79 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
                     { (yyval.stmt) = (yyvsp[0].stmt); }
-#line 1231 "microgpt_oql_parser.tab.c"
+#line 1264 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 10: /* train_stmt: T_TRAIN T_IDENT opt_on opt_with  */
-#line 80 "microgpt_oql.y"
+  case 10: /* stmt: create_stmt  */
+#line 80 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
+                    { (yyval.stmt) = (yyvsp[0].stmt); }
+#line 1270 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
+    break;
+
+  case 11: /* train_stmt: T_TRAIN T_IDENT opt_on opt_with  */
+#line 85 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
                                                       { (yyval.stmt) = oql_y_train((yyvsp[-2].str), (yyvsp[-1].src), (yyvsp[0].kv)); }
-#line 1237 "microgpt_oql_parser.tab.c"
+#line 1276 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 11: /* opt_on: %empty  */
-#line 83 "microgpt_oql.y"
+  case 12: /* opt_on: %empty  */
+#line 88 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
                                                       { OqlSource z = {0, NULL}; (yyval.src) = z; }
-#line 1243 "microgpt_oql_parser.tab.c"
+#line 1282 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 12: /* opt_on: T_ON source  */
-#line 84 "microgpt_oql.y"
+  case 13: /* opt_on: T_ON source  */
+#line 89 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
                                                       { (yyval.src) = (yyvsp[0].src); }
-#line 1249 "microgpt_oql_parser.tab.c"
+#line 1288 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 13: /* compose_stmt: T_COMPOSE T_IDENT T_FROM name_list opt_with  */
-#line 89 "microgpt_oql.y"
+  case 14: /* compose_stmt: T_COMPOSE T_IDENT T_FROM name_list opt_with  */
+#line 94 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
                                                       { (yyval.stmt) = oql_y_compose((yyvsp[-3].str), (yyvsp[-1].names), (yyvsp[0].kv)); }
-#line 1255 "microgpt_oql_parser.tab.c"
+#line 1294 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 14: /* run_stmt: T_RUN T_IDENT opt_with  */
-#line 94 "microgpt_oql.y"
+  case 15: /* run_stmt: T_RUN T_IDENT opt_with  */
+#line 99 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
                                                       { (yyval.stmt) = oql_y_run((yyvsp[-1].str), (yyvsp[0].kv)); }
-#line 1261 "microgpt_oql_parser.tab.c"
+#line 1300 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 15: /* evaluate_stmt: T_EVALUATE T_IDENT T_AGAINST source opt_metric opt_report  */
-#line 100 "microgpt_oql.y"
+  case 16: /* evaluate_stmt: T_EVALUATE T_IDENT T_AGAINST source opt_metric opt_report  */
+#line 105 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
       { (yyval.stmt) = oql_y_evaluate((yyvsp[-4].str), (yyvsp[-2].src), (yyvsp[-1].str), (yyvsp[0].str)); }
-#line 1267 "microgpt_oql_parser.tab.c"
+#line 1306 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 16: /* opt_metric: %empty  */
-#line 103 "microgpt_oql.y"
+  case 17: /* opt_metric: %empty  */
+#line 108 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
                                                       { (yyval.str) = NULL; }
-#line 1273 "microgpt_oql_parser.tab.c"
+#line 1312 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 17: /* opt_metric: T_USING T_METRIC T_IDENT  */
-#line 104 "microgpt_oql.y"
+  case 18: /* opt_metric: T_USING T_METRIC T_IDENT  */
+#line 109 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
                                                       { (yyval.str) = (yyvsp[0].str); }
-#line 1279 "microgpt_oql_parser.tab.c"
+#line 1318 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 18: /* opt_report: %empty  */
-#line 107 "microgpt_oql.y"
+  case 19: /* opt_report: %empty  */
+#line 112 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
                                                       { (yyval.str) = NULL; }
-#line 1285 "microgpt_oql_parser.tab.c"
+#line 1324 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 19: /* opt_report: T_REPORT T_AS T_STRING  */
-#line 108 "microgpt_oql.y"
+  case 20: /* opt_report: T_REPORT T_AS T_STRING  */
+#line 113 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
                                                       { (yyval.str) = (yyvsp[0].str); }
-#line 1291 "microgpt_oql_parser.tab.c"
+#line 1330 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 20: /* verify_stmt: T_VERIFY T_GRAPH T_GRAPH_BLOCK opt_where  */
-#line 113 "microgpt_oql.y"
+  case 21: /* verify_stmt: T_VERIFY T_GRAPH T_GRAPH_BLOCK opt_where  */
+#line 118 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
                                                       { (yyval.stmt) = oql_y_verify(OQL_VS_GRAPH, (yyvsp[-1].str), (yyvsp[0].pred)); }
-#line 1297 "microgpt_oql_parser.tab.c"
+#line 1336 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 21: /* verify_stmt: T_VERIFY T_STRING opt_where  */
-#line 114 "microgpt_oql.y"
+  case 22: /* verify_stmt: T_VERIFY T_STRING opt_where  */
+#line 119 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
                                                       { (yyval.stmt) = oql_y_verify(OQL_VS_PATH,  (yyvsp[-1].str), (yyvsp[0].pred)); }
-#line 1303 "microgpt_oql_parser.tab.c"
+#line 1342 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 22: /* verify_stmt: T_VERIFY T_IDENT opt_where  */
-#line 115 "microgpt_oql.y"
+  case 23: /* verify_stmt: T_VERIFY T_IDENT opt_where  */
+#line 120 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
                                                       { (yyval.stmt) = oql_y_verify(OQL_VS_NAME,  (yyvsp[-1].str), (yyvsp[0].pred)); }
-#line 1309 "microgpt_oql_parser.tab.c"
+#line 1348 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 23: /* opt_where: %empty  */
-#line 118 "microgpt_oql.y"
+  case 24: /* opt_where: %empty  */
+#line 123 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
                                                       { (yyval.pred) = NULL; }
-#line 1315 "microgpt_oql_parser.tab.c"
+#line 1354 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 24: /* opt_where: T_WHERE predicate  */
-#line 119 "microgpt_oql.y"
+  case 25: /* opt_where: T_WHERE predicate  */
+#line 124 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
                                                       { (yyval.pred) = (yyvsp[0].pred); }
-#line 1321 "microgpt_oql_parser.tab.c"
+#line 1360 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 25: /* predicate: T_IDENT op value  */
-#line 122 "microgpt_oql.y"
+  case 26: /* predicate: T_IDENT op value  */
+#line 127 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
                                                       { (yyval.pred) = oql_y_pred((yyvsp[-2].str), (OqlOp)(yyvsp[-1].op), (yyvsp[0].str)); }
-#line 1327 "microgpt_oql_parser.tab.c"
+#line 1366 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 26: /* op: T_LT  */
-#line 125 "microgpt_oql.y"
+  case 27: /* op: T_LT  */
+#line 130 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
            { (yyval.op) = OQL_OP_LT; }
-#line 1333 "microgpt_oql_parser.tab.c"
+#line 1372 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 27: /* op: T_LE  */
-#line 125 "microgpt_oql.y"
+  case 28: /* op: T_LE  */
+#line 130 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
                                       { (yyval.op) = OQL_OP_LE; }
-#line 1339 "microgpt_oql_parser.tab.c"
+#line 1378 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 28: /* op: T_EQ  */
-#line 126 "microgpt_oql.y"
+  case 29: /* op: T_EQ  */
+#line 131 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
            { (yyval.op) = OQL_OP_EQ; }
-#line 1345 "microgpt_oql_parser.tab.c"
+#line 1384 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 29: /* op: T_NE  */
-#line 126 "microgpt_oql.y"
+  case 30: /* op: T_NE  */
+#line 131 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
                                       { (yyval.op) = OQL_OP_NE; }
-#line 1351 "microgpt_oql_parser.tab.c"
+#line 1390 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 30: /* op: T_GE  */
-#line 127 "microgpt_oql.y"
+  case 31: /* op: T_GE  */
+#line 132 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
            { (yyval.op) = OQL_OP_GE; }
-#line 1357 "microgpt_oql_parser.tab.c"
+#line 1396 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 31: /* op: T_GT  */
-#line 127 "microgpt_oql.y"
+  case 32: /* op: T_GT  */
+#line 132 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
                                       { (yyval.op) = OQL_OP_GT; }
-#line 1363 "microgpt_oql_parser.tab.c"
+#line 1402 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 32: /* audit_stmt: T_AUDIT source T_AGAINST source opt_thresholds opt_report  */
-#line 133 "microgpt_oql.y"
+  case 33: /* audit_stmt: T_AUDIT source T_AGAINST source opt_thresholds opt_report  */
+#line 138 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
       { (yyval.stmt) = oql_y_audit((yyvsp[-4].src), (yyvsp[-2].src), (yyvsp[-1].str), (yyvsp[0].str)); }
-#line 1369 "microgpt_oql_parser.tab.c"
+#line 1408 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 33: /* opt_thresholds: %empty  */
-#line 136 "microgpt_oql.y"
+  case 34: /* opt_thresholds: %empty  */
+#line 141 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
                                                       { (yyval.str) = NULL; }
-#line 1375 "microgpt_oql_parser.tab.c"
+#line 1414 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 34: /* opt_thresholds: T_USING T_THRESHOLDS T_STRING  */
-#line 137 "microgpt_oql.y"
+  case 35: /* opt_thresholds: T_USING T_THRESHOLDS T_STRING  */
+#line 142 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
                                                       { (yyval.str) = (yyvsp[0].str); }
-#line 1381 "microgpt_oql_parser.tab.c"
+#line 1420 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 35: /* opt_with: %empty  */
-#line 142 "microgpt_oql.y"
+  case 36: /* create_stmt: create_behaviour_stmt  */
+#line 147 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
+                                                       { (yyval.stmt) = (yyvsp[0].stmt); }
+#line 1426 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
+    break;
+
+  case 37: /* create_stmt: create_organelle_stmt  */
+#line 148 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
+                                                       { (yyval.stmt) = (yyvsp[0].stmt); }
+#line 1432 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
+    break;
+
+  case 38: /* create_behaviour_stmt: T_CREATE T_BEHAVIOUR T_IDENT T_AS T_VM T_VM_BODY  */
+#line 152 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
+      { (yyval.stmt) = oql_y_create_behaviour((yyvsp[-3].str), (yyvsp[0].str)); }
+#line 1438 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
+    break;
+
+  case 39: /* create_organelle_stmt: T_CREATE T_ORGANELLE T_IDENT T_FROM T_CHECKPOINT T_STRING opt_with_bindings  */
+#line 156 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
+      { (yyval.stmt) = oql_y_create_organelle((yyvsp[-4].str), (yyvsp[-1].str), (yyvsp[0].kv)); }
+#line 1444 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
+    break;
+
+  case 40: /* create_organelle_stmt: T_CREATE T_ORGANELLE T_IDENT opt_with_bindings  */
+#line 158 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
+      { (yyval.stmt) = oql_y_create_organelle((yyvsp[-1].str), NULL, (yyvsp[0].kv)); }
+#line 1450 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
+    break;
+
+  case 41: /* opt_with_bindings: %empty  */
+#line 161 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
+                                                       { (yyval.kv) = NULL; }
+#line 1456 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
+    break;
+
+  case 42: /* opt_with_bindings: T_WITH '(' binding_list ')'  */
+#line 162 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
+                                                       { (yyval.kv) = (yyvsp[-1].kv); }
+#line 1462 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
+    break;
+
+  case 43: /* binding_list: binding  */
+#line 165 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
+                                                       { (yyval.kv) = (yyvsp[0].kv); }
+#line 1468 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
+    break;
+
+  case 44: /* binding_list: binding_list ',' binding  */
+#line 166 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
+                                                       { (yyval.kv) = oql_y_kv_concat((yyvsp[-2].kv), (yyvsp[0].kv)); }
+#line 1474 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
+    break;
+
+  case 45: /* binding: T_IDENT T_EQ T_IDENT  */
+#line 169 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
+                                                       { (yyval.kv) = oql_y_kv((yyvsp[-2].str), (yyvsp[0].str)); }
+#line 1480 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
+    break;
+
+  case 46: /* opt_with: %empty  */
+#line 174 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
                                                       { (yyval.kv) = NULL; }
-#line 1387 "microgpt_oql_parser.tab.c"
+#line 1486 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 36: /* opt_with: T_WITH kv_list  */
-#line 143 "microgpt_oql.y"
+  case 47: /* opt_with: T_WITH kv_list  */
+#line 175 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
                                                       { (yyval.kv) = (yyvsp[0].kv); }
-#line 1393 "microgpt_oql_parser.tab.c"
+#line 1492 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 37: /* kv_list: kv  */
-#line 146 "microgpt_oql.y"
+  case 48: /* kv_list: kv  */
+#line 178 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
                                                       { (yyval.kv) = (yyvsp[0].kv); }
-#line 1399 "microgpt_oql_parser.tab.c"
+#line 1498 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 38: /* kv_list: kv_list ',' kv  */
-#line 147 "microgpt_oql.y"
+  case 49: /* kv_list: kv_list ',' kv  */
+#line 179 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
                                                       { (yyval.kv) = oql_y_kv_concat((yyvsp[-2].kv), (yyvsp[0].kv)); }
-#line 1405 "microgpt_oql_parser.tab.c"
+#line 1504 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 39: /* kv: T_IDENT T_EQ value  */
-#line 150 "microgpt_oql.y"
+  case 50: /* kv: T_IDENT T_EQ value  */
+#line 182 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
                                                       { (yyval.kv) = oql_y_kv((yyvsp[-2].str), (yyvsp[0].str)); }
-#line 1411 "microgpt_oql_parser.tab.c"
+#line 1510 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 40: /* value: T_STRING  */
-#line 153 "microgpt_oql.y"
+  case 51: /* value: T_STRING  */
+#line 185 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
                { (yyval.str) = (yyvsp[0].str); }
-#line 1417 "microgpt_oql_parser.tab.c"
+#line 1516 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 41: /* value: T_NUMBER  */
-#line 153 "microgpt_oql.y"
+  case 52: /* value: T_NUMBER  */
+#line 185 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
                                        { (yyval.str) = (yyvsp[0].str); }
-#line 1423 "microgpt_oql_parser.tab.c"
+#line 1522 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 42: /* value: T_IDENT  */
-#line 153 "microgpt_oql.y"
+  case 53: /* value: T_IDENT  */
+#line 185 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
                                                               { (yyval.str) = (yyvsp[0].str); }
-#line 1429 "microgpt_oql_parser.tab.c"
+#line 1528 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 43: /* source: T_CORPUS T_STRING  */
-#line 156 "microgpt_oql.y"
+  case 54: /* source: T_CORPUS T_STRING  */
+#line 188 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
                                                       { OqlSource s = {OQL_SRC_CORPUS, (yyvsp[0].str)}; (yyval.src) = s; }
-#line 1435 "microgpt_oql_parser.tab.c"
+#line 1534 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 44: /* source: T_STRING  */
-#line 157 "microgpt_oql.y"
+  case 55: /* source: T_STRING  */
+#line 189 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
                                                       { OqlSource s = {OQL_SRC_PATH,   (yyvsp[0].str)}; (yyval.src) = s; }
-#line 1441 "microgpt_oql_parser.tab.c"
+#line 1540 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 45: /* source: T_IDENT  */
-#line 158 "microgpt_oql.y"
+  case 56: /* source: T_IDENT  */
+#line 190 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
                                                       { OqlSource s = {OQL_SRC_NAME,   (yyvsp[0].str)}; (yyval.src) = s; }
-#line 1447 "microgpt_oql_parser.tab.c"
+#line 1546 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 46: /* name_list: T_IDENT  */
-#line 161 "microgpt_oql.y"
+  case 57: /* name_list: T_IDENT  */
+#line 193 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
                                                       { (yyval.names) = oql_y_name((yyvsp[0].str)); }
-#line 1453 "microgpt_oql_parser.tab.c"
+#line 1552 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 47: /* name_list: name_list ',' T_IDENT  */
-#line 162 "microgpt_oql.y"
+  case 58: /* name_list: name_list ',' T_IDENT  */
+#line 194 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
                                                       { (yyval.names) = oql_y_name_concat((yyvsp[-2].names), oql_y_name((yyvsp[0].str))); }
-#line 1459 "microgpt_oql_parser.tab.c"
+#line 1558 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
     break;
 
 
-#line 1463 "microgpt_oql_parser.tab.c"
+#line 1562 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/build/microgpt_oql_parser.tab.c"
 
       default: break;
     }
@@ -1652,5 +1751,5 @@ yyreturnlab:
   return yyresult;
 }
 
-#line 164 "microgpt_oql.y"
+#line 196 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ad6747715fb24deb9/src/microgpt_oql.y"
 

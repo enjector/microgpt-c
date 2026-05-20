@@ -228,6 +228,84 @@ enx_test(test_verb_surface_locked_at_six) {
     enx_assert_equal_int(OQL_VERB_AUDIT,    6);
 }
 
+/* ── E08: CREATE BEHAVIOUR + CREATE ORGANELLE parse tests ───────── */
+
+enx_test(test_create_behaviour_parses) {
+    /* The VM body is a backtick-delimited block; OQL stores it verbatim
+     * minus the bracketing backticks.  Compile to the VM is harness-driven
+     * (see test_e08_connect4_behaviours). */
+    OqlScript *s = parse_or_die(
+        "CREATE BEHAVIOUR parse_c4 AS VM `\n"
+        "    declare function c4_legal_column_mask(): number;\n"
+        "    function eval(): number {\n"
+        "        var m = c4_legal_column_mask();\n"
+        "        return m;\n"
+        "    }\n"
+        "`;");
+    enx_assert_equal_size(oql_script_count(s), 1);
+    enx_assert_equal_int(s->head->verb, OQL_VERB_CREATE_BEHAVIOUR);
+    enx_assert_equal_string(s->head->u.create_behaviour.name, "parse_c4");
+    enx_assert_ptr_not_null(s->head->u.create_behaviour.vm_body);
+    enx_assert_true(strstr(s->head->u.create_behaviour.vm_body,
+                           "function eval") != NULL);
+    oql_script_free(s);
+}
+
+enx_test(test_create_organelle_with_behaviours_parses) {
+    OqlScript *s = parse_or_die(
+        "CREATE ORGANELLE connect4_player\n"
+        "  FROM CHECKPOINT 'checkpoints/c4_player.ckpt'\n"
+        "  WITH (\n"
+        "    INPUT_BEHAVIOUR    = parse_c4_board,\n"
+        "    OUTPUT_BEHAVIOUR   = format_c4_move,\n"
+        "    VALIDATE_BEHAVIOUR = c4_move_is_legal,\n"
+        "    FALLBACK_BEHAVIOUR = c4_fallback_when_stuck\n"
+        "  );");
+    enx_assert_equal_size(oql_script_count(s), 1);
+    enx_assert_equal_int(s->head->verb, OQL_VERB_CREATE_ORGANELLE);
+    enx_assert_equal_string(s->head->u.create_organelle.name, "connect4_player");
+    enx_assert_equal_string(s->head->u.create_organelle.checkpoint,
+                            "checkpoints/c4_player.ckpt");
+    enx_assert_equal_string(
+        oql_kv_get(s->head->u.create_organelle.bindings, "INPUT_BEHAVIOUR"),
+        "parse_c4_board");
+    enx_assert_equal_string(
+        oql_kv_get(s->head->u.create_organelle.bindings, "OUTPUT_BEHAVIOUR"),
+        "format_c4_move");
+    enx_assert_equal_string(
+        oql_kv_get(s->head->u.create_organelle.bindings, "VALIDATE_BEHAVIOUR"),
+        "c4_move_is_legal");
+    enx_assert_equal_string(
+        oql_kv_get(s->head->u.create_organelle.bindings, "FALLBACK_BEHAVIOUR"),
+        "c4_fallback_when_stuck");
+    oql_script_free(s);
+}
+
+enx_test(test_create_organelle_without_bindings_parses) {
+    /* Bindings are optional — e.g. an organelle that delegates to defaults. */
+    OqlScript *s = parse_or_die(
+        "CREATE ORGANELLE bare FROM CHECKPOINT 'bare.ckpt';");
+    enx_assert_equal_int(s->head->verb, OQL_VERB_CREATE_ORGANELLE);
+    enx_assert_equal_string(s->head->u.create_organelle.name, "bare");
+    enx_assert_true(s->head->u.create_organelle.bindings == NULL);
+    oql_script_free(s);
+}
+
+enx_test(test_verb_surface_holds_six_plus_create) {
+    /* The +6 verb lock holds: TRAIN..AUDIT remain at 1..6.  CREATE is
+     * inherited from SQL (not added) and carries an object-type subtag. */
+    enx_assert_equal_int(OQL_VERB_TRAIN,    1);
+    enx_assert_equal_int(OQL_VERB_COMPOSE,  2);
+    enx_assert_equal_int(OQL_VERB_RUN,      3);
+    enx_assert_equal_int(OQL_VERB_EVALUATE, 4);
+    enx_assert_equal_int(OQL_VERB_VERIFY,   5);
+    enx_assert_equal_int(OQL_VERB_AUDIT,    6);
+    /* CREATE_* subtags occupy 7+ but they're inherited from SQL — not part
+     * of the +6 added verbs.  See OQL_GRAMMAR_REFERENCE.md "Verb surface". */
+    enx_assert_equal_int(OQL_VERB_CREATE_BEHAVIOUR, 7);
+    enx_assert_equal_int(OQL_VERB_CREATE_ORGANELLE, 8);
+}
+
 /* ── Parse error path ─────────────────────────────────────────── */
 
 enx_test(test_bad_syntax_reports_error) {
@@ -252,6 +330,10 @@ enx_test_case_t oql_tests[] = {
     enx_test_case(test_train_stub_is_honest),
     enx_test_case(test_verb_surface_locked_at_six),
     enx_test_case(test_bad_syntax_reports_error),
+    enx_test_case(test_create_behaviour_parses),
+    enx_test_case(test_create_organelle_with_behaviours_parses),
+    enx_test_case(test_create_organelle_without_bindings_parses),
+    enx_test_case(test_verb_surface_holds_six_plus_create),
     enx_test_case_end()
 };
 

@@ -62,6 +62,19 @@ OqlStmt *oql_y_audit(OqlSource a, OqlSource b, char *thr, char *report) {
     s->u.audit.thresholds = thr; s->u.audit.report_path = report;
     return s;
 }
+OqlStmt *oql_y_create_behaviour(char *name, char *vm_body) {
+    OqlStmt *s = oql_stmt_alloc(OQL_VERB_CREATE_BEHAVIOUR);
+    s->u.create_behaviour.name = name;
+    s->u.create_behaviour.vm_body = vm_body;
+    return s;
+}
+OqlStmt *oql_y_create_organelle(char *name, char *ckpt, OqlKV *bindings) {
+    OqlStmt *s = oql_stmt_alloc(OQL_VERB_CREATE_ORGANELLE);
+    s->u.create_organelle.name = name;
+    s->u.create_organelle.checkpoint = ckpt;
+    s->u.create_organelle.bindings = bindings;
+    return s;
+}
 OqlKV *oql_y_kv(char *key, char *val) {
     OqlKV *k = (OqlKV *)calloc(1, sizeof(OqlKV));
     if (k) { k->key = key; k->value = val; }
@@ -256,6 +269,15 @@ static void oql_stmt_free_inner(OqlStmt *s) {
         free(s->u.audit.thresholds);
         free(s->u.audit.report_path);
         break;
+    case OQL_VERB_CREATE_BEHAVIOUR:
+        free(s->u.create_behaviour.name);
+        free(s->u.create_behaviour.vm_body);
+        break;
+    case OQL_VERB_CREATE_ORGANELLE:
+        free(s->u.create_organelle.name);
+        free(s->u.create_organelle.checkpoint);
+        oql_kv_free(s->u.create_organelle.bindings);
+        break;
     }
 }
 
@@ -439,6 +461,31 @@ oql_status oql_execute(const OqlScript *script, FILE *out, int *failed_idx) {
         case OQL_VERB_EVALUATE: st = oql_exec_pending("EVALUATE", out); break;
         case OQL_VERB_VERIFY:   st = oql_exec_verify(s, out); break;
         case OQL_VERB_AUDIT:    st = oql_exec_audit (s, out); break;
+        case OQL_VERB_CREATE_BEHAVIOUR:
+            /* Parsing is the contract here.  The interpreter's behaviour
+             * registry + VM compile step lives in the test harness (see
+             * tests/test_microgpt_oql.c::test_e08_connect4_behaviours);
+             * the OQL interpreter alone does not know about VM modules
+             * and would pull a heavyweight dep — left as a follow-up. */
+            if (out) fprintf(out,
+                "CREATE BEHAVIOUR %s: parsed (vm body %zu bytes); "
+                "compile step is harness-driven — see "
+                "tests/test_microgpt_oql.c\n",
+                s->u.create_behaviour.name ? s->u.create_behaviour.name : "?",
+                s->u.create_behaviour.vm_body
+                    ? strlen(s->u.create_behaviour.vm_body) : 0);
+            st = OQL_OK;
+            break;
+        case OQL_VERB_CREATE_ORGANELLE: {
+            int n_bindings = 0;
+            for (const OqlKV *k = s->u.create_organelle.bindings; k; k = k->next) n_bindings++;
+            if (out) fprintf(out,
+                "CREATE ORGANELLE %s: parsed (%d bindings)\n",
+                s->u.create_organelle.name ? s->u.create_organelle.name : "?",
+                n_bindings);
+            st = OQL_OK;
+            break;
+        }
         }
         if (st != OQL_OK) {
             if (failed_idx) *failed_idx = idx;
