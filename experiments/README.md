@@ -111,7 +111,7 @@ Measured (worktree-branch agent runs, all merged into main):
 - E05 ✅ merged at `6aba1c8` — 6/6 targets PASS; methodology paper draft 13 pages
 - E07 ✅ merged at `83e5673` — verb-discipline lock held; 5 PASS, 1 PARTIAL, 2 deferred
 - E08 ✅ merged at `e9b8620` — 3 PASS (T2 18.5% LOC, T3 zero new opcodes, T4 +4 tests); 5 honestly deferred
-- E09 🔬 agent running
+- E09 ✅ merged at `d4eb478` — 6 PASS (T1 RUN completes; T3 sub-ms; T4 17→22 tests; T5 zero VM diff; T6 TRAIN stub; T7 23.4% LOC); T2 PARTIAL (51% win-rate, two named E10 paths); T8 PARTIAL
 
 Awaiting external inputs:
 - E01 — needs Anthropic API budget (~$100)
