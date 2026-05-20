@@ -88,6 +88,12 @@ CHECKPOINT  { return T_CHECKPOINT; }
 VM          { return T_VM; }
  /* E10 — CORPUS already exists below as a source-kind keyword; FILE is new. */
 FILE        { return T_FILE; }
+ /* E12 — LLM source: new keywords for FROM LLM <model>@<endpoint> PROMPT ... */
+LLM            { return T_LLM; }
+PROMPT         { return T_PROMPT; }
+VERIFY_VIA     { return T_VERIFY_VIA; }
+AUDIT_AGAINST  { return T_AUDIT_AGAINST; }
+pipeline_ir    { return T_PIPELINE_IR; }
 
  /* Clauses / sub-keywords. */
 ON          { return T_ON; }
@@ -122,6 +128,7 @@ THRESHOLDS  { return T_THRESHOLDS; }
 {number}    { oql_parser_lval.str = oql_strclone(yytext); return T_NUMBER; }
 {ident}     { oql_parser_lval.str = oql_strclone(yytext); return T_IDENT; }
 
+"@"         { return T_AT; }
 "<="        { return T_LE; }
 ">="        { return T_GE; }
 "!="        { return T_NE; }

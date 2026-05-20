@@ -29,6 +29,13 @@
     OqlStmt *oql_y_create_behaviour(char *name, char *vm_body);
     OqlStmt *oql_y_create_organelle(char *name, char *ckpt, OqlKV *bindings);
     OqlStmt *oql_y_create_corpus(char *name, char *path);
+    /* E12 — CREATE CORPUS <name> FROM LLM '<model>'[@'<endpoint>']
+     *           PROMPT '<text>' [WITH (...)] [VERIFY_VIA pipeline_ir]
+     *           [AUDIT_AGAINST <held_out_name>]; */
+    OqlStmt *oql_y_create_corpus_llm(char *name, char *model_id,
+                                     char *endpoint_url, char *prompt,
+                                     OqlKV *with_kv, int verify_via_pipeline_ir,
+                                     char *audit_held_out, OqlKV *audit_with);
     OqlKV   *oql_y_kv(char *key, char *val);
     OqlKV   *oql_y_kv_concat(OqlKV *head, OqlKV *tail);
     OqlNameList *oql_y_name(char *n);
@@ -55,15 +62,19 @@
 %token T_ON T_WITH T_AGAINST T_USING T_WHERE T_AS T_FROM
 %token T_GRAPH T_CORPUS T_REPORT T_METRIC T_THRESHOLDS
 %token T_LT T_LE T_EQ T_NE T_GE T_GT
+%token T_LLM T_PROMPT T_VERIFY_VIA T_AUDIT_AGAINST T_PIPELINE_IR T_AT
 %token <str> T_IDENT T_STRING T_NUMBER T_GRAPH_BLOCK T_VM_BODY
 
 %type <stmt>  stmt train_stmt compose_stmt run_stmt evaluate_stmt verify_stmt audit_stmt
 %type <stmt>  create_stmt create_behaviour_stmt create_organelle_stmt create_corpus_stmt
+%type <stmt>  create_corpus_llm_stmt
 %type <kv>    opt_with kv_list kv opt_with_bindings binding_list binding
+%type <kv>    opt_llm_audit_with
 %type <names> name_list
 %type <src>   source opt_on
 %type <pred>  opt_where predicate
 %type <str>   value opt_metric opt_report opt_thresholds
+%type <str>   opt_llm_endpoint
 %type <op>    op
 
 %start script
@@ -143,11 +154,12 @@ opt_thresholds
     | T_USING T_THRESHOLDS T_STRING                   { $$ = $3; }
     ;
 
-/* ── CREATE BEHAVIOUR / CREATE ORGANELLE / CREATE CORPUS (E08 + E10) ─ */
+/* ── CREATE BEHAVIOUR / CREATE ORGANELLE / CREATE CORPUS (E08 + E10 + E12) ─ */
 create_stmt
     : create_behaviour_stmt                            { $$ = $1; }
     | create_organelle_stmt                            { $$ = $1; }
     | create_corpus_stmt                               { $$ = $1; }
+    | create_corpus_llm_stmt                           { $$ = $1; }
     ;
 create_behaviour_stmt
     : T_CREATE T_BEHAVIOUR T_IDENT T_AS T_VM T_VM_BODY
@@ -165,6 +177,40 @@ create_organelle_stmt
 create_corpus_stmt
     : T_CREATE T_CORPUS T_IDENT T_FROM T_FILE T_STRING
       { $$ = oql_y_create_corpus($3, $6); }
+    ;
+
+/* E12 — CREATE CORPUS <name> FROM LLM '<model>'[@'<endpoint>']
+ *           PROMPT '<text>' [WITH (k=v,...)]
+ *           [VERIFY_VIA pipeline_ir]
+ *           [AUDIT_AGAINST <held_out_name> [WITH (mode=jaccard, threshold=N)]];
+ *
+ * FROM LLM is a new SOURCE clause inside CREATE CORPUS — not a new top-
+ * level verb.  The +6/-4 verb lock from E07 holds (T1 of E12). */
+create_corpus_llm_stmt
+    : T_CREATE T_CORPUS T_IDENT T_FROM T_LLM T_STRING opt_llm_endpoint
+      T_PROMPT T_STRING opt_with
+      { $$ = oql_y_create_corpus_llm($3, $6, $7, $9, $10, 0, NULL, NULL); }
+    | T_CREATE T_CORPUS T_IDENT T_FROM T_LLM T_STRING opt_llm_endpoint
+      T_PROMPT T_STRING opt_with
+      T_VERIFY_VIA T_PIPELINE_IR
+      { $$ = oql_y_create_corpus_llm($3, $6, $7, $9, $10, 1, NULL, NULL); }
+    | T_CREATE T_CORPUS T_IDENT T_FROM T_LLM T_STRING opt_llm_endpoint
+      T_PROMPT T_STRING opt_with
+      T_AUDIT_AGAINST T_IDENT opt_llm_audit_with
+      { $$ = oql_y_create_corpus_llm($3, $6, $7, $9, $10, 0, $12, $13); }
+    | T_CREATE T_CORPUS T_IDENT T_FROM T_LLM T_STRING opt_llm_endpoint
+      T_PROMPT T_STRING opt_with
+      T_VERIFY_VIA T_PIPELINE_IR
+      T_AUDIT_AGAINST T_IDENT opt_llm_audit_with
+      { $$ = oql_y_create_corpus_llm($3, $6, $7, $9, $10, 1, $14, $15); }
+    ;
+opt_llm_endpoint
+    : /* empty */                                      { $$ = NULL; }
+    | T_AT T_STRING                                    { $$ = $2; }
+    ;
+opt_llm_audit_with
+    : /* empty */                                      { $$ = NULL; }
+    | T_WITH '(' kv_list ')'                           { $$ = $3; }
     ;
 
 opt_with_bindings
