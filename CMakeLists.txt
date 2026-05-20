@@ -2240,7 +2240,10 @@ else()
         ${CMAKE_CURRENT_SOURCE_DIR}/src/microgpt_vm_parser.tab.c)
 endif()
 
-add_library(microgpt_vm_lib STATIC src/microgpt_vm.c ${VM_PARSER_SOURCES})
+add_library(microgpt_vm_lib STATIC
+    src/microgpt_vm.c
+    src/microgpt_vm_natives.c
+    ${VM_PARSER_SOURCES})
 target_include_directories(microgpt_vm_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_BINARY_DIR})
 
 add_executable(test_microgpt_vm tests/test_microgpt_vm.c)

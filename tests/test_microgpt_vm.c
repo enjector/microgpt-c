@@ -1572,6 +1572,226 @@ enx_test_case_t vm_verb_opaque_handle_tests[] = {
     enx_test_case(should_opaque_handle_invalid_returns_error),
     enx_test_case_end()};
 
+// --- E08 Phase 2 — VM extern-table extensions for OQL BEHAVIOUR bodies ---
+//
+// Each test loads a .ts behaviour body, compiles it through
+// vm_module_compile (which validates `declare function` refs against a
+// verb_context built by vm_natives_register_c4), registers the native
+// dispatcher on the runtime, stages the host-side mailbox, runs the
+// behaviour, and asserts the numeric/boolean return.  T3 lock holds —
+// no new VM opcodes; only opCALL_EXT_METHOD into newly-registered externs.
+#include "../src/microgpt_vm_natives.h"
+
+/* Helper — compile + run a no-arg behaviour, returning the popped result. */
+static double e08_run_no_arg(vm_natives_ctx *ctx, const char *ts_path) {
+    char *source = load_file_content(ts_path);
+    enx_assert_ptr_not_null(source);
+
+    int n = vm_natives_register_c4(ctx);
+    enx_assert_equal_int(8, n);
+
+    vm_module *module = NULL;
+    vm_result r = vm_module_compile(NULL, source, &module);
+    free(source);
+    TEST_ASSERT_EQUAL_RESULT_FATAL(VM_OK, r);
+    enx_assert_ptr_not_null(module);
+    enx_assert_equal_size(0, vm_list_count(module->errors));
+
+    if (getenv("E08_DBG_IL")) {
+        char *il = vm_module_to_string(module);
+        if (il) { fprintf(stderr, "==IL %s==\n%s\n==\n", ts_path, il); free(il); }
+    }
+    vm_module_runtime *runtime = vm_module_runtime_create(module);
+    enx_assert_ptr_not_null(runtime);
+    vm_module_runtime_set_call_ext_method_callback(runtime, vm_natives_dispatch);
+    vm_module_runtime_clear(runtime);  /* mirror existing test pattern */
+
+    vm_function *fn = vm_module_fetch_function(module, "eval");
+    enx_assert_ptr_not_null(fn);
+
+    r = vm_module_runtime_run(runtime, fn);
+    TEST_ASSERT_EQUAL_RESULT_FATAL(VM_OK, r);
+
+    vm_variable *ret = NULL;
+    vm_module_runtime_stack_pop(runtime, &ret);
+    enx_assert_ptr_not_null(ret);
+    double value = (ret->type_class == ptcBOOLEAN)
+        ? (ret->value.boolean ? 1.0 : 0.0)
+        : ret->value.number;
+    vm_variable_dispose(ret);
+
+    vm_module_runtime_dispose(runtime);
+    vm_module_dispose(module);
+    return value;
+}
+
+
+enx_test(should_e08_c4_legal_column_mask) {
+    vm_natives_ctx ctx;
+    vm_natives_ctx_init(&ctx);
+
+    // Empty board: all 7 columns legal -> mask = 0b1111111 = 127.
+    char board[43];
+    memset(board, '.', 42);
+    board[42] = '\0';
+    ctx.current_board_handle = vm_natives_str_intern(&ctx, board);
+    double r1 = e08_run_no_arg(&ctx,
+        "resources/vm/natives_c4/parse_board_legal_mask.ts");
+    enx_assert_equal_double(127.0, r1);
+
+    // Fill column 0 -> bit 0 cleared -> mask = 126.
+    for (int r = 0; r < 6; r++) board[r * 7 + 0] = 'X';
+    ctx.current_board_handle = vm_natives_str_intern(&ctx, board);
+    double r2 = e08_run_no_arg(&ctx,
+        "resources/vm/natives_c4/parse_board_legal_mask.ts");
+    enx_assert_equal_double(126.0, r2);
+
+    vm_natives_ctx_dispose(&ctx);
+}
+
+/* Helper — compile + run a 1-arg behaviour, returning the popped result. */
+static double e08_run_one_arg(vm_natives_ctx *ctx, const char *ts_path,
+                              double arg) {
+    char *source = load_file_content(ts_path);
+    enx_assert_ptr_not_null(source);
+
+    int n = vm_natives_register_c4(ctx);
+    enx_assert_equal_int(8, n);
+
+    vm_module *module = NULL;
+    vm_result r = vm_module_compile(NULL, source, &module);
+    free(source);
+    TEST_ASSERT_EQUAL_RESULT_FATAL(VM_OK, r);
+    enx_assert_ptr_not_null(module);
+    enx_assert_equal_size(0, vm_list_count(module->errors));
+
+    vm_module_runtime *runtime = vm_module_runtime_create(module);
+    enx_assert_ptr_not_null(runtime);
+    vm_module_runtime_set_call_ext_method_callback(runtime, vm_natives_dispatch);
+
+    vm_module_runtime_stack_push_number(runtime, arg);
+
+    vm_function *fn = vm_module_fetch_function(module, "eval");
+    enx_assert_ptr_not_null(fn);
+
+    r = vm_module_runtime_run(runtime, fn);
+    TEST_ASSERT_EQUAL_RESULT_FATAL(VM_OK, r);
+
+    vm_variable *ret = NULL;
+    vm_module_runtime_stack_pop(runtime, &ret);
+    enx_assert_ptr_not_null(ret);
+    double value = (ret->type_class == ptcBOOLEAN)
+        ? (ret->value.boolean ? 1.0 : 0.0)
+        : ret->value.number;
+    vm_variable_dispose(ret);
+
+    vm_module_runtime_dispose(runtime);
+    vm_module_dispose(module);
+    return value;
+}
+
+enx_test(should_e08_c4_column_is_legal) {
+    vm_natives_ctx ctx;
+    vm_natives_ctx_init(&ctx);
+
+    // Board with column 4 full.
+    char board[43];
+    memset(board, '.', 42);
+    board[42] = '\0';
+    for (int r = 0; r < 6; r++) board[r * 7 + 4] = 'O';
+    ctx.current_board_handle = vm_natives_str_intern(&ctx, board);
+
+    // Direct call: col 0 legal -> 1.
+    double r1 = e08_run_one_arg(&ctx,
+        "resources/vm/natives_c4/column_is_legal_direct.ts", 0.0);
+    enx_assert_equal_double(1.0, r1);
+
+    // Direct call: col 4 illegal -> 0.
+    double r2 = e08_run_one_arg(&ctx,
+        "resources/vm/natives_c4/column_is_legal_direct.ts", 4.0);
+    enx_assert_equal_double(0.0, r2);
+
+    // Compound (parse_token + is_legal): "0" -> 1.
+    ctx.current_move_handle = vm_natives_str_intern(&ctx, "0");
+    double r3 = e08_run_no_arg(&ctx,
+        "resources/vm/natives_c4/column_is_legal.ts");
+    enx_assert_equal_double(1.0, r3);
+
+    // Compound: "4" -> 0.
+    ctx.current_move_handle = vm_natives_str_intern(&ctx, "4");
+    double r4 = e08_run_no_arg(&ctx,
+        "resources/vm/natives_c4/column_is_legal.ts");
+    enx_assert_equal_double(0.0, r4);
+
+    // Compound: "x" (parse fail) -> 0.
+    ctx.current_move_handle = vm_natives_str_intern(&ctx, "x");
+    double r5 = e08_run_no_arg(&ctx,
+        "resources/vm/natives_c4/column_is_legal.ts");
+    enx_assert_equal_double(0.0, r5);
+
+    vm_natives_ctx_dispose(&ctx);
+}
+
+enx_test(should_e08_c4_parse_token) {
+    vm_natives_ctx ctx;
+    vm_natives_ctx_init(&ctx);
+
+    ctx.current_move_handle = vm_natives_str_intern(&ctx, "3");
+    double r1 = e08_run_no_arg(&ctx, "resources/vm/natives_c4/format_move.ts");
+    enx_assert_equal_double(3.0, r1);
+
+    // Out-of-range '9' -> -1.
+    ctx.current_move_handle = vm_natives_str_intern(&ctx, "9");
+    double r2 = e08_run_no_arg(&ctx, "resources/vm/natives_c4/format_move.ts");
+    enx_assert_equal_double(-1.0, r2);
+
+    // Garbage 'x' -> -1.
+    ctx.current_move_handle = vm_natives_str_intern(&ctx, "x");
+    double r3 = e08_run_no_arg(&ctx, "resources/vm/natives_c4/format_move.ts");
+    enx_assert_equal_double(-1.0, r3);
+
+    vm_natives_ctx_dispose(&ctx);
+}
+
+enx_test(should_e08_c4_fallback_when_stuck) {
+    vm_natives_ctx ctx;
+    vm_natives_ctx_init(&ctx);
+
+    // Empty board so centre (col 3) is legal.
+    char board[43];
+    memset(board, '.', 42);
+    board[42] = '\0';
+    ctx.current_board_handle = vm_natives_str_intern(&ctx, board);
+
+    // Low entropy: defer to model -> -1.
+    ctx.last_entropy = 0.2;
+    double r1 = e08_run_no_arg(&ctx,
+        "resources/vm/natives_c4/fallback_when_stuck.ts");
+    enx_assert_equal_double(-1.0, r1);
+
+    // High entropy, centre legal: return 3.
+    ctx.last_entropy = 1.5;
+    double r2 = e08_run_no_arg(&ctx,
+        "resources/vm/natives_c4/fallback_when_stuck.ts");
+    enx_assert_equal_double(3.0, r2);
+
+    // High entropy, centre column full: -1.
+    for (int r = 0; r < 6; r++) board[r * 7 + 3] = 'X';
+    ctx.current_board_handle = vm_natives_str_intern(&ctx, board);
+    double r3 = e08_run_no_arg(&ctx,
+        "resources/vm/natives_c4/fallback_when_stuck.ts");
+    enx_assert_equal_double(-1.0, r3);
+
+    vm_natives_ctx_dispose(&ctx);
+}
+
+enx_test_case_t vm_e08_natives_tests[] = {
+    enx_test_case(should_e08_c4_legal_column_mask),
+    enx_test_case(should_e08_c4_column_is_legal),
+    enx_test_case(should_e08_c4_parse_token),
+    enx_test_case(should_e08_c4_fallback_when_stuck),
+    enx_test_case_end()};
+
 // --- main.c ---
 /*
  * main.c
@@ -1600,6 +1820,8 @@ static test_suite tests[] = {
 
     enx_test_case(vm_verb_tests), enx_test_case(vm_verb_opaque_handle_tests),
     enx_test_case(vm_ts_wiring_tests),
+
+    enx_test_case(vm_e08_natives_tests),
 
     enx_test_case_end()};
 
