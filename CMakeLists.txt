@@ -2413,6 +2413,24 @@ if(NOT MSVC)
     target_link_libraries(oql_wiring PRIVATE m)
 endif()
 
+# ──────────────────────────────────────────────────────────────────
+#  e12_eval_v2 — Phase 5 evaluator for the LLM-trained wiring organelle.
+#
+#  Loads a wiring-dim checkpoint, rebuilds the WordVocab from the same
+#  training corpus, generates completions for each pipeline_corpus_scaling_
+#  heldout_v2.txt prompt, parses+verifies via libpipeline_ir, and reports
+#  the T4 (verified rate) headline.
+# ──────────────────────────────────────────────────────────────────
+add_executable(e12_eval_v2 tools/e12_eval_v2.c)
+target_link_libraries(e12_eval_v2 PRIVATE ${_WIRING_LIB})
+target_include_directories(e12_eval_v2 PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/libs/pipeline_ir/include)
+target_compile_definitions(e12_eval_v2 PRIVATE ${_WIRING_DEFINES})
+if(NOT MSVC)
+    target_link_libraries(e12_eval_v2 PRIVATE m)
+endif()
+
 add_executable(test_microgpt_oql tests/test_microgpt_oql.c)
 # microgpt_vm_lib is wired in so the E08 connect4 worked-example test can
 # compile + run each parsed CREATE BEHAVIOUR's VM body — see
