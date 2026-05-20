@@ -1,0 +1,25 @@
+-- Experiment E15 — held-out generation via the OQL FROM ORACLE source clause.
+--
+-- Distinct seed (4242) so the held-out positions are disjoint from the
+-- training corpus (which used seed=1337).  Per-task count scaled to 100
+-- per the §1.6 wall-clock mitigation.  T7 (leakage audit) verifies the
+-- disjointness against the on-disk training corpora when e15_generate is
+-- invoked with --audit-against build/{klotski,puzzle15}_optimal.tsv.
+
+CREATE CORPUS klotski_heldout
+  FROM ORACLE 'tools/klotski_a_star.c'
+  WITH count = 100,
+       difficulty = 'mixed',
+       seed = 4242,
+       cache = '.oql_oracle_cache/',
+       output = 'build/klotski_heldout.tsv'
+  PROMPT 'klotski held-out (disjoint from training seed)';
+
+CREATE CORPUS puzzle15_heldout
+  FROM ORACLE 'tools/puzzle15_a_star.c'
+  WITH count = 100,
+       difficulty = 'mixed',
+       seed = 4242,
+       cache = '.oql_oracle_cache/',
+       output = 'build/puzzle15_heldout.tsv'
+  PROMPT 'puzzle15 held-out (disjoint from training seed)';

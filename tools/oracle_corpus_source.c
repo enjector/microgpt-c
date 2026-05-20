@@ -213,8 +213,14 @@ int oracle_emit(const OracleSource *src,
  * The buffer is mutated in place (newlines and inner quotes are
  * substituted with NULs as we slice the strings out). */
 
-static char *find_quoted_value(char *p, const char *key, size_t *out_len) {
-    size_t klen = strlen(key);
+/* Find the value of `key` in a JSON-shaped string `p`.  Returns a
+ * pointer to the value's first character and the value's length via
+ * *out_len AND a pointer to its closing quote via *out_close (the
+ * caller is expected to NUL-terminate by writing '\0' to *out_close
+ * AFTER all keys have been extracted, so each strstr sees the full
+ * line). */
+static char *find_quoted_value(char *p, const char *key,
+                               size_t *out_len, char **out_close) {
     char target[64];
     snprintf(target, sizeof(target), "\"%s\":\"", key);
     size_t tlen = strlen(target);
@@ -228,8 +234,7 @@ static char *find_quoted_value(char *p, const char *key, size_t *out_len) {
     }
     if (*end != '"') return NULL;
     *out_len = (size_t)(end - start);
-    *end = '\0';
-    (void)klen;
+    if (out_close) *out_close = end;
     return start;
 }
 
@@ -258,16 +263,23 @@ int oracle_parse_jsonl(char *buf, size_t buf_len,
         }
         if (*line == '{') {
             size_t st_len = 0, sol_len = 0;
-            char *st = find_quoted_value(line, "state", &st_len);
-            char *sol = find_quoted_value(line, "solution", &sol_len);
+            char *st_close = NULL, *sol_close = NULL;
+            char *st  = find_quoted_value(line, "state",    &st_len, &st_close);
+            char *sol = find_quoted_value(line, "solution", &sol_len, &sol_close);
+            /* Optional moves field — extract BEFORE we NUL-terminate
+             * the state/solution values, since strstr would otherwise
+             * see a truncated line. */
+            char *mv = strstr(line, "\"moves\":");
+            int moves = mv ? atoi(mv + 8) : -1;
             if (st && sol) {
+                /* Now NUL-terminate both values in place. */
+                if (st_close)  *st_close  = '\0';
+                if (sol_close) *sol_close = '\0';
                 pairs[n].state        = st;
                 pairs[n].state_len    = st_len;
                 pairs[n].solution     = sol;
                 pairs[n].solution_len = sol_len;
-                /* Optional moves field. */
-                char *mv = strstr(line, "\"moves\":");
-                pairs[n].moves = mv ? atoi(mv + 8) : -1;
+                pairs[n].moves        = moves;
                 n++;
             }
         }

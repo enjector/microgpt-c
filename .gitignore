@@ -27,6 +27,10 @@ build.old/
 experiments/organelles/puzzle8_reasoning/puzzle8_mover_combined.txt
 experiments/organelles/puzzle8_reasoning/puzzle8_mover_enriched.txt
 
+# E12 LLM bridge / E15 oracle bridge caches (regenerated from seeds)
+.oql_llm_cache/
+.oql_oracle_cache/
+
 # Python
 __pycache__/
 

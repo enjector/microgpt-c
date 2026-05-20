@@ -1,0 +1,29 @@
+-- Experiment E15 — corpus generation via the OQL FROM ORACLE source clause.
+--
+-- Generates the training corpora for both tasks.  Held-out generation is
+-- a separate script (E15-heldout.oql) so the leakage audit can run after
+-- training corpora exist on disk.
+--
+-- Compute-budget mitigation per pre-reg §1.6: the original 10k-per-task
+-- target is scaled down to 2000 to fit a single agent-run wall-clock.
+-- This mirrors the E12 falsification-discipline (10k -> 100) and is
+-- documented in Section 3 of the E15 writeup as a T7-style scaling
+-- adjustment.
+
+CREATE CORPUS klotski_optimal
+  FROM ORACLE 'tools/klotski_a_star.c'
+  WITH count = 2000,
+       difficulty = 'mixed',
+       seed = 1337,
+       cache = '.oql_oracle_cache/',
+       output = 'build/klotski_optimal.tsv'
+  PROMPT 'klotski_state -> optimal move sequence (BFS shortest path)';
+
+CREATE CORPUS puzzle15_optimal
+  FROM ORACLE 'tools/puzzle15_a_star.c'
+  WITH count = 2000,
+       difficulty = 'mixed',
+       seed = 1337,
+       cache = '.oql_oracle_cache/',
+       output = 'build/puzzle15_optimal.tsv'
+  PROMPT 'puzzle15_state -> optimal move sequence (IDA* shortest path)';

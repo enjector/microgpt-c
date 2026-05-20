@@ -1,0 +1,12 @@
+-- E15 — Puzzle15 held-out, audited against training corpus.
+-- Generated separately so each FROM ORACLE statement gets the right
+-- audit file.
+
+CREATE CORPUS puzzle15_heldout_large
+  FROM ORACLE 'tools/puzzle15_a_star.c'
+  WITH count = 1000,
+       difficulty = 'mixed',
+       seed = 4242,
+       cache = '.oql_oracle_cache/',
+       output = 'build/puzzle15_heldout_large.tsv'
+  PROMPT 'puzzle15 large held-out pool';
