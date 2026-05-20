@@ -2219,6 +2219,53 @@ target_include_directories(bench_microgpt_vm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
 if(NOT MSVC)
   target_link_libraries(bench_microgpt_vm PRIVATE m)
 endif()
+
+# ==================================================================
+#  OQL Engine — Experiment E07 (Organelle Query Language)
+# ==================================================================
+#
+# See experiments/E07-oql-dsl.md and docs/research/OQL_GRAMMAR_REFERENCE.md.
+# Mirrors the VM's Flex/Bison wiring: regenerate if Bison >= 3.0 is found,
+# otherwise fall back to the committed pre-generated parser sources.
+
+set(OQL_PARSER_SOURCES)
+if(FLEX_FOUND AND BISON_FOUND AND BISON_VERSION VERSION_GREATER_EQUAL "3.0")
+    flex_target(oql_scanner
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/microgpt_oql.l
+        ${CMAKE_CURRENT_BINARY_DIR}/microgpt_oql_parser.l.c)
+    bison_target(oql_parser
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/microgpt_oql.y
+        ${CMAKE_CURRENT_BINARY_DIR}/microgpt_oql_parser.tab.c
+        DEFINES_FILE ${CMAKE_CURRENT_BINARY_DIR}/microgpt_oql_parser.tab.h)
+    add_flex_bison_dependency(oql_scanner oql_parser)
+    list(APPEND OQL_PARSER_SOURCES
+        ${FLEX_oql_scanner_OUTPUTS}
+        ${BISON_oql_parser_OUTPUTS})
+else()
+    list(APPEND OQL_PARSER_SOURCES
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/microgpt_oql_parser.l.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/microgpt_oql_parser.tab.c)
+endif()
+
+add_library(microgpt_oql_lib STATIC
+    src/microgpt_oql.c
+    ${OQL_PARSER_SOURCES})
+target_include_directories(microgpt_oql_lib PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_BINARY_DIR})
+# pipeline_verify lives in microgpt_lib (microgpt_pipeline.c); link it in.
+target_link_libraries(microgpt_oql_lib PUBLIC microgpt_lib)
+
+add_executable(test_microgpt_oql tests/test_microgpt_oql.c)
+target_link_libraries(test_microgpt_oql PRIVATE microgpt_oql_lib)
+target_include_directories(test_microgpt_oql PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests
+    ${CMAKE_CURRENT_SOURCE_DIR}/src)
+if(NOT MSVC)
+    target_link_libraries(test_microgpt_oql PRIVATE m)
+endif()
+add_test(NAME microgpt_oql_tests COMMAND test_microgpt_oql WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
 # ==================================================================
 #  TurboQuant Integration Evaluation Targets
 # ==================================================================
