@@ -94,6 +94,10 @@ PROMPT         { return T_PROMPT; }
 VERIFY_VIA     { return T_VERIFY_VIA; }
 AUDIT_AGAINST  { return T_AUDIT_AGAINST; }
 pipeline_ir    { return T_PIPELINE_IR; }
+ /* E15 — ORACLE source: new keyword for FROM ORACLE '<path>' WITH (...) PROMPT '...'
+  * deterministic-solver corpus generation (klotski_a_star, puzzle15_a_star).
+  * Like LLM, ORACLE is a SOURCE clause, NOT a 7th top-level verb. */
+ORACLE         { return T_ORACLE; }
 
  /* Clauses / sub-keywords. */
 ON          { return T_ON; }

@@ -35,8 +35,8 @@
    especially those whose name start with YY_ or yy_.  They are
    private implementation details that can be changed or removed.  */
 
-#ifndef YY_OQL_PARSER_USERS_USER_DEV_PROJECTS_GITHUB_MICROGPT_C_CLAUDE_WORKTREES_AGENT_AB15B6223CD4CFF1F_BUILD_MICROGPT_OQL_PARSER_TAB_H_INCLUDED
-# define YY_OQL_PARSER_USERS_USER_DEV_PROJECTS_GITHUB_MICROGPT_C_CLAUDE_WORKTREES_AGENT_AB15B6223CD4CFF1F_BUILD_MICROGPT_OQL_PARSER_TAB_H_INCLUDED
+#ifndef YY_OQL_PARSER_USERS_USER_DEV_PROJECTS_GITHUB_MICROGPT_C_CLAUDE_WORKTREES_AGENT_A6675DE2724280A4E_BUILD_MICROGPT_OQL_PARSER_TAB_H_INCLUDED
+# define YY_OQL_PARSER_USERS_USER_DEV_PROJECTS_GITHUB_MICROGPT_C_CLAUDE_WORKTREES_AGENT_A6675DE2724280A4E_BUILD_MICROGPT_OQL_PARSER_TAB_H_INCLUDED
 /* Debug traces.  */
 #ifndef OQL_PARSER_DEBUG
 # if defined YYDEBUG
@@ -98,11 +98,12 @@ extern int oql_parser_debug;
     T_AUDIT_AGAINST = 291,         /* T_AUDIT_AGAINST  */
     T_PIPELINE_IR = 292,           /* T_PIPELINE_IR  */
     T_AT = 293,                    /* T_AT  */
-    T_IDENT = 294,                 /* T_IDENT  */
-    T_STRING = 295,                /* T_STRING  */
-    T_NUMBER = 296,                /* T_NUMBER  */
-    T_GRAPH_BLOCK = 297,           /* T_GRAPH_BLOCK  */
-    T_VM_BODY = 298                /* T_VM_BODY  */
+    T_ORACLE = 294,                /* T_ORACLE  */
+    T_IDENT = 295,                 /* T_IDENT  */
+    T_STRING = 296,                /* T_STRING  */
+    T_NUMBER = 297,                /* T_NUMBER  */
+    T_GRAPH_BLOCK = 298,           /* T_GRAPH_BLOCK  */
+    T_VM_BODY = 299                /* T_VM_BODY  */
   };
   typedef enum oql_parser_tokentype oql_parser_token_kind_t;
 #endif
@@ -111,7 +112,7 @@ extern int oql_parser_debug;
 #if ! defined OQL_PARSER_STYPE && ! defined OQL_PARSER_STYPE_IS_DECLARED
 union OQL_PARSER_STYPE
 {
-#line 50 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+#line 53 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
 
     char *str;
     int   op;
@@ -121,7 +122,7 @@ union OQL_PARSER_STYPE
     OqlPredicate *pred;
     OqlStmt *stmt;
 
-#line 125 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.h"
+#line 126 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.h"
 
 };
 typedef union OQL_PARSER_STYPE OQL_PARSER_STYPE;
@@ -136,4 +137,4 @@ extern OQL_PARSER_STYPE oql_parser_lval;
 int oql_parser_parse (oql_parser *parser);
 
 
-#endif /* !YY_OQL_PARSER_USERS_USER_DEV_PROJECTS_GITHUB_MICROGPT_C_CLAUDE_WORKTREES_AGENT_AB15B6223CD4CFF1F_BUILD_MICROGPT_OQL_PARSER_TAB_H_INCLUDED  */
+#endif /* !YY_OQL_PARSER_USERS_USER_DEV_PROJECTS_GITHUB_MICROGPT_C_CLAUDE_WORKTREES_AGENT_A6675DE2724280A4E_BUILD_MICROGPT_OQL_PARSER_TAB_H_INCLUDED  */

@@ -36,6 +36,9 @@
                                      char *endpoint_url, char *prompt,
                                      OqlKV *with_kv, int verify_via_pipeline_ir,
                                      char *audit_held_out, OqlKV *audit_with);
+    /* E15 — CREATE CORPUS <name> FROM ORACLE '<path>' [WITH (...)] [PROMPT '<text>']; */
+    OqlStmt *oql_y_create_corpus_oracle(char *name, char *oracle_path,
+                                        OqlKV *with_kv, char *prompt);
     OqlKV   *oql_y_kv(char *key, char *val);
     OqlKV   *oql_y_kv_concat(OqlKV *head, OqlKV *tail);
     OqlNameList *oql_y_name(char *n);
@@ -63,18 +66,19 @@
 %token T_GRAPH T_CORPUS T_REPORT T_METRIC T_THRESHOLDS
 %token T_LT T_LE T_EQ T_NE T_GE T_GT
 %token T_LLM T_PROMPT T_VERIFY_VIA T_AUDIT_AGAINST T_PIPELINE_IR T_AT
+%token T_ORACLE
 %token <str> T_IDENT T_STRING T_NUMBER T_GRAPH_BLOCK T_VM_BODY
 
 %type <stmt>  stmt train_stmt compose_stmt run_stmt evaluate_stmt verify_stmt audit_stmt
 %type <stmt>  create_stmt create_behaviour_stmt create_organelle_stmt create_corpus_stmt
-%type <stmt>  create_corpus_llm_stmt
+%type <stmt>  create_corpus_llm_stmt create_corpus_oracle_stmt
 %type <kv>    opt_with kv_list kv opt_with_bindings binding_list binding
 %type <kv>    opt_llm_audit_with
 %type <names> name_list
 %type <src>   source opt_on
 %type <pred>  opt_where predicate
 %type <str>   value opt_metric opt_report opt_thresholds
-%type <str>   opt_llm_endpoint
+%type <str>   opt_llm_endpoint opt_oracle_prompt
 %type <op>    op
 
 %start script
@@ -160,6 +164,7 @@ create_stmt
     | create_organelle_stmt                            { $$ = $1; }
     | create_corpus_stmt                               { $$ = $1; }
     | create_corpus_llm_stmt                           { $$ = $1; }
+    | create_corpus_oracle_stmt                        { $$ = $1; }
     ;
 create_behaviour_stmt
     : T_CREATE T_BEHAVIOUR T_IDENT T_AS T_VM T_VM_BODY
@@ -211,6 +216,21 @@ opt_llm_endpoint
 opt_llm_audit_with
     : /* empty */                                      { $$ = NULL; }
     | T_WITH '(' kv_list ')'                           { $$ = $3; }
+    ;
+
+/* E15 — CREATE CORPUS <name> FROM ORACLE '<path>' [WITH (k=v,...)] [PROMPT '<text>'];
+ *
+ * FROM ORACLE is a new SOURCE clause inside CREATE CORPUS — not a new
+ * top-level verb.  The +6/-4 verb lock from E07 holds.  The optional
+ * PROMPT is human-readable documentation only; the deterministic
+ * solver does not consume it. */
+create_corpus_oracle_stmt
+    : T_CREATE T_CORPUS T_IDENT T_FROM T_ORACLE T_STRING opt_with opt_oracle_prompt
+      { $$ = oql_y_create_corpus_oracle($3, $6, $7, $8); }
+    ;
+opt_oracle_prompt
+    : /* empty */                                      { $$ = NULL; }
+    | T_PROMPT T_STRING                                { $$ = $2; }
     ;
 
 opt_with_bindings
