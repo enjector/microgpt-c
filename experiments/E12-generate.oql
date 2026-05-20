@@ -35,6 +35,6 @@ d <- n2.out
 @end
 
 Now produce ONE distinct training example using a different primitive composition. Use 1 to 4 nodes. Output ONLY the // line, then the @graph block, then nothing else.'
-    WITH count = 200, seed = 1337, cache = '.oql_llm_cache/', max_retries = 2, output = 'llm_corpus_v3.txt'
+    WITH count = 100, seed = 1337, cache = '.oql_llm_cache/', max_retries = 2, output = 'llm_corpus_v3.txt'
     VERIFY_VIA pipeline_ir
     AUDIT_AGAINST scaling_heldout_v2;
