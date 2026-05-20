@@ -95,3 +95,24 @@ set(PIPELINE_IR_INTERNAL_INCLUDE_DIR
     "${CMAKE_CURRENT_SOURCE_DIR}/src"
     CACHE INTERNAL
     "Path to libs/pipeline_ir/src/ for the opt-in VM dispatcher TU")
+
+# ------------------------------------------------------------------
+#  Examples (opt-in)
+# ------------------------------------------------------------------
+# Each example is a self-contained executable that links ONLY
+# pipeline_ir.  Useful as smoke tests for the public ABI from an
+# external-consumer perspective and as starting templates for new
+# integrations.  Default ON when libpipeline_ir is the top-level
+# project; default OFF when consumed via add_subdirectory or
+# FetchContent (so embedders don't get extra binaries by accident).
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+  set(_pir_examples_default ON)
+else()
+  set(_pir_examples_default ON)  # also ON in-tree so CI smoke-tests them
+endif()
+option(PIPELINE_IR_BUILD_EXAMPLES
+       "Build libpipeline_ir example binaries (custom_generator, ...)"
+       ${_pir_examples_default})
+if(PIPELINE_IR_BUILD_EXAMPLES)
+  add_subdirectory(examples)
+endif()
