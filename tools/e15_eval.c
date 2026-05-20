@@ -546,7 +546,7 @@ int main(int argc, char **argv) {
         if (!csv) {
             fprintf(stderr, "e15_eval: cannot open out '%s'\n", out_csv);
         } else {
-            fprintf(csv, "idx,state,oracle_sol,arch,gen_sol,solved,moves_consumed,latency_ms\n");
+            fprintf(csv, "idx\tstate\toracle_sol\tarch\tgen_sol\tsolved\tmoves_consumed\tlatency_ms\n");
         }
     }
 
@@ -626,7 +626,7 @@ int main(int argc, char **argv) {
                 i, state, oracle, best_gen, best_solved, best_moves, lat_ms);
         }
         if (csv) {
-            fprintf(csv, "%zu,%s,%s,%s,%s,%d,%d,%.1f\n",
+            fprintf(csv, "%zu\t%s\t%s\t%s\t%s\t%d\t%d\t%.1f\n",
                 i, state, oracle, best_arch, best_gen, best_solved,
                 best_moves, lat_ms);
         }

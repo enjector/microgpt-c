@@ -1,0 +1,59 @@
+[e15_train] prepared 2000 role-tagged docs -> checkpoints/klotski_planner_e15.ckpt.docs.tmp
+[e15_train] role=planner tag='P:' corpus=build/klotski_optimal.tsv save=checkpoints/klotski_planner_e15.ckpt steps=25000 batch=8 lr=0.001 seed=1337
+[e15_train] compile-time arch: N_EMBD=64 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=128 MLP_DIM=160
+[e15_train] docs=2000 vocab=16
+[e15_train] vocab -> checkpoints/klotski_planner_e15.vocab
+[e15_train] params=157696
+[e15_train] step 1/25000 | loss 3.0103 | best 3.0103 | 0.0s
+[e15_train] step 500/25000 | loss 0.4759 | best 0.3618 | 4.1s
+[e15_train] step 1000/25000 | loss 0.4143 | best 0.3161 | 8.2s
+[e15_train] step 1500/25000 | loss 0.3935 | best 0.2757 | 12.4s
+[e15_train] step 2000/25000 | loss 0.3829 | best 0.2736 | 16.5s
+[e15_train] step 2500/25000 | loss 0.3932 | best 0.2736 | 21.2s
+[e15_train] step 3000/25000 | loss 0.3504 | best 0.2736 | 26.5s
+[e15_train] step 3500/25000 | loss 0.3277 | best 0.2616 | 31.9s
+[e15_train] step 4000/25000 | loss 0.3232 | best 0.2559 | 36.9s
+[e15_train] step 4500/25000 | loss 0.3234 | best 0.2559 | 41.7s
+[e15_train] step 5000/25000 | loss 0.3191 | best 0.2559 | 46.2s
+[e15_train] step 5500/25000 | loss 0.3072 | best 0.2559 | 50.8s
+[e15_train] step 6000/25000 | loss 0.3163 | best 0.2559 | 55.3s
+[e15_train] step 6500/25000 | loss 0.3320 | best 0.2488 | 59.8s
+[e15_train] step 7000/25000 | loss 0.2954 | best 0.2488 | 64.3s
+[e15_train] step 7500/25000 | loss 0.3019 | best 0.2488 | 68.8s
+[e15_train] step 8000/25000 | loss 0.3097 | best 0.2488 | 73.3s
+[e15_train] step 8500/25000 | loss 0.2891 | best 0.2417 | 77.8s
+[e15_train] step 9000/25000 | loss 0.3392 | best 0.2417 | 82.3s
+[e15_train] step 9500/25000 | loss 0.3185 | best 0.2411 | 86.8s
+[e15_train] step 10000/25000 | loss 0.3344 | best 0.2411 | 91.2s
+[e15_train] step 10500/25000 | loss 0.2909 | best 0.2411 | 95.7s
+[e15_train] step 11000/25000 | loss 0.2985 | best 0.2411 | 100.2s
+[e15_train] step 11500/25000 | loss 0.2929 | best 0.2376 | 104.7s
+[e15_train] step 12000/25000 | loss 0.2886 | best 0.2370 | 109.3s
+[e15_train] step 12500/25000 | loss 0.2769 | best 0.2302 | 113.8s
+[e15_train] step 13000/25000 | loss 0.2632 | best 0.2302 | 118.4s
+[e15_train] step 13500/25000 | loss 0.2918 | best 0.2302 | 123.0s
+[e15_train] step 14000/25000 | loss 0.2649 | best 0.2302 | 127.5s
+[e15_train] step 14500/25000 | loss 0.2862 | best 0.2288 | 132.1s
+[e15_train] step 15000/25000 | loss 0.2703 | best 0.2288 | 136.7s
+[e15_train] step 15500/25000 | loss 0.2841 | best 0.2288 | 141.2s
+[e15_train] step 16000/25000 | loss 0.2637 | best 0.2240 | 145.8s
+[e15_train] step 16500/25000 | loss 0.2901 | best 0.2240 | 150.4s
+[e15_train] step 17000/25000 | loss 0.2628 | best 0.2240 | 155.0s
+[e15_train] step 17500/25000 | loss 0.2678 | best 0.2240 | 159.6s
+[e15_train] step 18000/25000 | loss 0.2733 | best 0.2224 | 164.0s
+[e15_train] step 18500/25000 | loss 0.2878 | best 0.2224 | 168.3s
+[e15_train] step 19000/25000 | loss 0.2849 | best 0.2202 | 172.6s
+[e15_train] step 19500/25000 | loss 0.2726 | best 0.2191 | 176.9s
+[e15_train] step 20000/25000 | loss 0.2840 | best 0.2191 | 181.2s
+[e15_train] step 20500/25000 | loss 0.2887 | best 0.2179 | 185.4s
+[e15_train] step 21000/25000 | loss 0.2767 | best 0.2179 | 189.7s
+[e15_train] step 21500/25000 | loss 0.2644 | best 0.2179 | 194.0s
+[e15_train] step 22000/25000 | loss 0.2498 | best 0.2151 | 198.2s
+[e15_train] step 22500/25000 | loss 0.2790 | best 0.2151 | 202.4s
+[e15_train] step 23000/25000 | loss 0.2667 | best 0.2128 | 206.8s
+[e15_train] step 23500/25000 | loss 0.2433 | best 0.2094 | 211.0s
+[e15_train] step 24000/25000 | loss 0.2465 | best 0.2094 | 215.2s
+[e15_train] step 24500/25000 | loss 0.2475 | best 0.2094 | 219.2s
+[e15_train] step 25000/25000 | loss 0.2587 | best 0.2094 | 223.3s
+[e15_train] DONE: 25000 steps, final_loss=0.2587, best_loss=0.2094, 223.3s total, params=157696, vocab=16, role=planner
+[e15_train] checkpoint -> checkpoints/klotski_planner_e15.ckpt

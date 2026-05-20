@@ -1,0 +1,59 @@
+[e15_train] prepared 2000 role-tagged docs -> checkpoints/puzzle15_planner_e15.ckpt.docs.tmp
+[e15_train] role=planner tag='P:' corpus=build/puzzle15_optimal.tsv save=checkpoints/puzzle15_planner_e15.ckpt steps=25000 batch=8 lr=0.001 seed=1337
+[e15_train] compile-time arch: N_EMBD=64 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=128 MLP_DIM=160
+[e15_train] docs=2000 vocab=24
+[e15_train] vocab -> checkpoints/puzzle15_planner_e15.vocab
+[e15_train] params=158720
+[e15_train] step 1/25000 | loss 3.4276 | best 3.4276 | 0.0s
+[e15_train] step 500/25000 | loss 1.2923 | best 1.0589 | 6.9s
+[e15_train] step 1000/25000 | loss 1.2107 | best 0.9246 | 13.7s
+[e15_train] step 1500/25000 | loss 1.1760 | best 0.8574 | 21.4s
+[e15_train] step 2000/25000 | loss 1.1390 | best 0.7895 | 30.0s
+[e15_train] step 2500/25000 | loss 1.1188 | best 0.7569 | 38.6s
+[e15_train] step 3000/25000 | loss 1.1012 | best 0.7454 | 46.2s
+[e15_train] step 3500/25000 | loss 1.0914 | best 0.7413 | 53.9s
+[e15_train] step 4000/25000 | loss 1.0796 | best 0.7138 | 61.4s
+[e15_train] step 4500/25000 | loss 1.0745 | best 0.7026 | 68.9s
+[e15_train] step 5000/25000 | loss 1.0543 | best 0.6837 | 76.4s
+[e15_train] step 5500/25000 | loss 1.0359 | best 0.6837 | 83.8s
+[e15_train] step 6000/25000 | loss 1.0265 | best 0.6837 | 91.3s
+[e15_train] step 6500/25000 | loss 1.0194 | best 0.6655 | 98.8s
+[e15_train] step 7000/25000 | loss 1.0312 | best 0.6576 | 106.5s
+[e15_train] step 7500/25000 | loss 0.9942 | best 0.6576 | 114.1s
+[e15_train] step 8000/25000 | loss 0.9671 | best 0.6576 | 121.7s
+[e15_train] step 8500/25000 | loss 0.9809 | best 0.6446 | 129.2s
+[e15_train] step 9000/25000 | loss 0.9735 | best 0.6219 | 136.8s
+[e15_train] step 9500/25000 | loss 0.9342 | best 0.6192 | 144.4s
+[e15_train] step 10000/25000 | loss 0.9485 | best 0.6185 | 152.0s
+[e15_train] step 10500/25000 | loss 0.9214 | best 0.6138 | 159.6s
+[e15_train] step 11000/25000 | loss 0.9375 | best 0.5874 | 166.9s
+[e15_train] step 11500/25000 | loss 0.9373 | best 0.5874 | 174.1s
+[e15_train] step 12000/25000 | loss 0.9507 | best 0.5874 | 181.2s
+[e15_train] step 12500/25000 | loss 0.9552 | best 0.5874 | 188.3s
+[e15_train] step 13000/25000 | loss 0.9572 | best 0.5874 | 195.4s
+[e15_train] step 13500/25000 | loss 0.9541 | best 0.5874 | 202.4s
+[e15_train] step 14000/25000 | loss 0.9629 | best 0.5874 | 209.6s
+[e15_train] step 14500/25000 | loss 0.9192 | best 0.5874 | 216.5s
+[e15_train] step 15000/25000 | loss 0.9492 | best 0.5874 | 223.3s
+[e15_train] step 15500/25000 | loss 0.9343 | best 0.5874 | 229.9s
+[e15_train] step 16000/25000 | loss 0.9700 | best 0.5874 | 236.6s
+[e15_train] step 16500/25000 | loss 0.9423 | best 0.5874 | 243.3s
+[e15_train] step 17000/25000 | loss 0.9652 | best 0.5874 | 250.0s
+[e15_train] step 17500/25000 | loss 0.9630 | best 0.5821 | 256.6s
+[e15_train] step 18000/25000 | loss 0.9832 | best 0.5821 | 263.3s
+[e15_train] step 18500/25000 | loss 0.9134 | best 0.5635 | 270.0s
+[e15_train] step 19000/25000 | loss 0.9153 | best 0.5302 | 276.7s
+[e15_train] step 19500/25000 | loss 0.9041 | best 0.5302 | 283.4s
+[e15_train] step 20000/25000 | loss 0.8997 | best 0.5302 | 290.1s
+[e15_train] step 20500/25000 | loss 0.9244 | best 0.5285 | 296.9s
+[e15_train] step 21000/25000 | loss 0.8826 | best 0.5149 | 303.6s
+[e15_train] step 21500/25000 | loss 0.8770 | best 0.5019 | 310.3s
+[e15_train] step 22000/25000 | loss 0.8569 | best 0.5019 | 317.0s
+[e15_train] step 22500/25000 | loss 0.8610 | best 0.4672 | 323.7s
+[e15_train] step 23000/25000 | loss 0.8372 | best 0.4566 | 330.3s
+[e15_train] step 23500/25000 | loss 0.8333 | best 0.4362 | 337.0s
+[e15_train] step 24000/25000 | loss 0.7825 | best 0.4362 | 343.8s
+[e15_train] step 24500/25000 | loss 0.7976 | best 0.4362 | 350.5s
+[e15_train] step 25000/25000 | loss 0.7894 | best 0.4362 | 357.1s
+[e15_train] DONE: 25000 steps, final_loss=0.7894, best_loss=0.4362, 357.1s total, params=158720, vocab=24, role=planner
+[e15_train] checkpoint -> checkpoints/puzzle15_planner_e15.ckpt

@@ -1,0 +1,12 @@
+[e15_eval] task=klotski heldout=build/klotski_heldout_large.tsv positions=113 max_moves=200
+[e15_eval] loaded ckpt=checkpoints/klotski_planner_e15.ckpt vocab=16 params=157696 role='P:' step=25000
+[e15_eval] loaded ckpt=checkpoints/klotski_player_e15.ckpt vocab=16 params=157696 role='M:' step=25000
+[e15_eval] loaded ckpt=checkpoints/klotski_judge_e15.ckpt vocab=16 params=157696 role='J:' step=25000
+
+[e15_eval] RESULT task=klotski arch=OPA heldout=113/113
+  solved          = 79 (69.9%)
+  mean_moves(solved) = 1.7
+  max_moves_solved   = 5
+  mean_latency       = 0.66 ms
+  p99_latency        = 1.38 ms
+  total_eval_wall    = 0.07 s
