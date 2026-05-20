@@ -31,11 +31,22 @@ option(ENABLE_TURBOQUANT       "Enable TurboQuant for memory compression (MSA)" 
 option(ENABLE_ROTORQUANT       "Enable RotorQuant for memory compression (MSA)" OFF)
 
 # ==================================================================
+#  Sub-libraries — extracted standalone modules
+# ==================================================================
+#
+# libpipeline_ir lives in libs/pipeline_ir/ as a self-contained C99
+# library; the parent microgpt_lib links it so existing demos that
+# `#include "microgpt_pipeline.h"` keep working via the shim header at
+# src/microgpt_pipeline.h.  Experiment E02 documents the extraction.
+add_subdirectory(libs/pipeline_ir)
+
+# ==================================================================
 #  Core library  (single OBJECT library shared by all targets)
 # ==================================================================
 
-add_library(microgpt_lib STATIC src/microgpt.c src/microgpt_organelle.c src/microgpt_msa.c src/microgpt_turboquant.c src/microgpt_rotorquant.c src/microgpt_pipeline.c src/microgpt_vr.c src/microgpt_geodesic.c src/microgpt_eml.c)
+add_library(microgpt_lib STATIC src/microgpt.c src/microgpt_organelle.c src/microgpt_msa.c src/microgpt_turboquant.c src/microgpt_rotorquant.c src/microgpt_vr.c src/microgpt_geodesic.c src/microgpt_eml.c)
 target_include_directories(microgpt_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(microgpt_lib PUBLIC pipeline_ir)
 
 # --- Compile-time feature flags ---
 if(MICROGPT_USE_FLOAT)
@@ -146,9 +157,13 @@ function(_microgpt_lib_for_defines OUT_VAR)
     return()
   endif()
 
-  # Create a new STATIC library with the same sources + features
-  add_library(${_tgt} STATIC src/microgpt.c src/microgpt_organelle.c src/microgpt_msa.c src/microgpt_turboquant.c src/microgpt_rotorquant.c src/microgpt_pipeline.c src/microgpt_vr.c src/microgpt_geodesic.c src/microgpt_eml.c)
+  # Create a new STATIC library with the same sources + features.
+  # The Pipeline IR lives in libs/pipeline_ir/ as a separate target;
+  # variant libs reuse the SAME pipeline_ir target — the IR has no
+  # demo-specific macros so a single compiled copy is correct.
+  add_library(${_tgt} STATIC src/microgpt.c src/microgpt_organelle.c src/microgpt_msa.c src/microgpt_turboquant.c src/microgpt_rotorquant.c src/microgpt_vr.c src/microgpt_geodesic.c src/microgpt_eml.c)
   target_include_directories(${_tgt} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+  target_link_libraries(${_tgt} PUBLIC pipeline_ir)
 
   # Propagate all feature flags from the base target
   get_target_property(_base_defs microgpt_lib INTERFACE_COMPILE_DEFINITIONS)
@@ -1881,14 +1896,20 @@ endif()
 add_test(NAME microgpt_eml_tests COMMAND test_microgpt_eml WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
 # Graph Pipeline IR — Phase 1 (RESEARCH_PIPELINE_IR.md).
+# pipeline_ir_vm.c is the opt-in VM-backed dispatcher exposed by the
+# libs/pipeline_ir/ subtree; consumers compile it into their own
+# target alongside a vm_engine implementation (here: microgpt_vm.c).
 add_executable(test_microgpt_pipeline
   tests/test_microgpt_pipeline.c
-  src/microgpt_pipeline_vm.c
+  ${PIPELINE_IR_VM_SOURCE}
   src/microgpt_vm.c
   src/microgpt_vm_parser.l.c
   src/microgpt_vm_parser.tab.c)
 target_link_libraries(test_microgpt_pipeline PRIVATE microgpt_lib)
-target_include_directories(test_microgpt_pipeline PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_include_directories(test_microgpt_pipeline PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/tests
+  ${CMAKE_CURRENT_SOURCE_DIR}/src
+  ${PIPELINE_IR_INTERNAL_INCLUDE_DIR})
 if(NOT MSVC)
   target_link_libraries(test_microgpt_pipeline PRIVATE m)
 endif()
@@ -1946,7 +1967,7 @@ add_executable(test_microgpt_wiring_compositional
   demos/wiring_organelle/wiring_arg_binder.c
   demos/wiring_organelle/wiring_geo_classifier.c
   demos/wiring_organelle/wiring_natives.c
-  src/microgpt_pipeline_vm.c
+  ${PIPELINE_IR_VM_SOURCE}
   src/microgpt_vm.c
   src/microgpt_vm_parser.l.c
   src/microgpt_vm_parser.tab.c)
@@ -1954,7 +1975,8 @@ target_link_libraries(test_microgpt_wiring_compositional PRIVATE microgpt_lib)
 target_include_directories(test_microgpt_wiring_compositional PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/tests
   ${CMAKE_CURRENT_SOURCE_DIR}/src
-  ${CMAKE_CURRENT_SOURCE_DIR}/demos/wiring_organelle)
+  ${CMAKE_CURRENT_SOURCE_DIR}/demos/wiring_organelle
+  ${PIPELINE_IR_INTERNAL_INCLUDE_DIR})
 if(NOT MSVC)
   target_link_libraries(test_microgpt_wiring_compositional PRIVATE m)
 endif()
@@ -1972,14 +1994,15 @@ add_executable(wiring_phase5_harness
   demos/wiring_organelle/wiring_arg_binder.c
   demos/wiring_organelle/wiring_geo_classifier.c
   demos/wiring_organelle/wiring_references.c
-  src/microgpt_pipeline_vm.c
+  ${PIPELINE_IR_VM_SOURCE}
   src/microgpt_vm.c
   src/microgpt_vm_parser.l.c
   src/microgpt_vm_parser.tab.c)
 target_link_libraries(wiring_phase5_harness PRIVATE microgpt_lib)
 target_include_directories(wiring_phase5_harness PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/src
-  ${CMAKE_CURRENT_SOURCE_DIR}/demos/wiring_organelle)
+  ${CMAKE_CURRENT_SOURCE_DIR}/demos/wiring_organelle
+  ${PIPELINE_IR_INTERNAL_INCLUDE_DIR})
 if(NOT MSVC)
   target_link_libraries(wiring_phase5_harness PRIVATE m)
 endif()

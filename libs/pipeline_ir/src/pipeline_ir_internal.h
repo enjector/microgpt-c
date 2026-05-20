@@ -1,8 +1,8 @@
 /*
- * microgpt_pipeline_internal.h — Private helpers shared between
- *   microgpt_pipeline.c (core IR + verifier + callback executor)
+ * pipeline_ir_internal.h — Private helpers shared between
+ *   pipeline_ir.c     (core IR + verifier + callback executor)
  * and
- *   microgpt_pipeline_vm.c  (VM-backed dispatcher, opt-in module)
+ *   pipeline_ir_vm.c  (VM-backed dispatcher, opt-in module)
  *
  * NOT a public API.  Do NOT include from user code; do NOT install.
  *
@@ -10,10 +10,10 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef MICROGPT_PIPELINE_INTERNAL_H
-#define MICROGPT_PIPELINE_INTERNAL_H
+#ifndef PIPELINE_IR_INTERNAL_H
+#define PIPELINE_IR_INTERNAL_H
 
-#include "microgpt_pipeline.h"
+#include "pipeline_ir/pipeline_ir.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -24,16 +24,16 @@ extern "C" {
 #define MGPT_PIPE_SIG_OUT_NODE (-2)
 
 /* Set the thread-local last-error message (printf-style).
- * Implemented in microgpt_pipeline.c. */
+ * Implemented in pipeline_ir.c. */
 void mgpt_pipe_set_err(const char *fmt, ...);
 
 /* Find the unique incoming edge for (dst_node, dst_port). Returns the edge
  * index in p->edges[], or -1 if no such edge.  Implemented in
- * microgpt_pipeline.c. */
+ * pipeline_ir.c. */
 int mgpt_pipe_find_incoming_edge(const Pipeline *p, int dst_node, int dst_port);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* MICROGPT_PIPELINE_INTERNAL_H */
+#endif /* PIPELINE_IR_INTERNAL_H */
