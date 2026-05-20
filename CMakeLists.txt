@@ -324,6 +324,29 @@ target_include_directories(eml_sensor_calibration_demo PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/demos/character-level/eml_quant_boundary)
 
 # ==================================================================
+#  E04 — Neural + EML hybrid demo on synthetic pendulum data.
+#  Implements the end-to-end pipeline pre-registered in
+#  experiments/E04-eml-neural-hybrid.md:
+#    noisy (L, theta_obs) → neural regime classifier
+#                       → per-regime EML node
+#                       → IR-verified bounds judge
+#                       → (period, regime, sympy audit)
+#  Includes a same-architecture pure-neural baseline for the T4
+#  contrast. The EML tree headers are placeholders pending offline
+#  retraining; see c_eml_smallangle.h header docstring.
+# ==================================================================
+
+add_demo(
+  NAME    eml_neural_hybrid_demo
+  SOURCE  demos/character-level/eml_neural_hybrid/main.c
+  THREADS
+  DEFINES N_EMBD=32 N_HEAD=4 N_LAYER=2 BLOCK_SIZE=16 MLP_DIM=64
+          NUM_STEPS=3000 LEARNING_RATE=0.005 BATCH_SIZE=16 MAX_DOC_LEN=16
+)
+target_include_directories(eml_neural_hybrid_demo PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/demos/character-level/eml_neural_hybrid)
+
+# ==================================================================
 #  Attention Sink A/B benchmark (DeepSeek-V4 §2.3.3 port evaluation)
 #  Two binaries with identical seeds & data; only ATTN_SINK differs.
 #  See docs/research/RESEARCH_DEEPSEEK_V4_PORTING_ATTENTION_SINK.md
