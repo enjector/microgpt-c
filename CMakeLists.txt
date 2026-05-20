@@ -2298,12 +2298,64 @@ endif()
 
 add_library(microgpt_oql_lib STATIC
     src/microgpt_oql.c
+    src/oql_runtime_games.c
     ${OQL_PARSER_SOURCES})
 target_include_directories(microgpt_oql_lib PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_BINARY_DIR})
 # pipeline_verify lives in microgpt_lib (microgpt_pipeline.c); link it in.
-target_link_libraries(microgpt_oql_lib PUBLIC microgpt_lib)
+# microgpt_vm_lib provides vm_module_compile / vm_module_dispose used by
+# the E09 runtime (oql_execute_with_runtime + behaviour dispatch).
+target_link_libraries(microgpt_oql_lib PUBLIC microgpt_lib microgpt_vm_lib)
+
+add_executable(oql tools/oql_runner.c)
+target_link_libraries(oql PRIVATE microgpt_oql_lib)
+target_include_directories(oql PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+if(NOT MSVC)
+    target_link_libraries(oql PRIVATE m)
+endif()
+
+# ──────────────────────────────────────────────────────────────────
+#  oql_c4 — Connect-4-dims variant of the `oql` CLI.
+#
+#  E09 Pathway A: the engine's matmul hot loops constant-fold N_EMBD,
+#  N_HEAD, etc. as compile-time #define macros (CLAUDE.md "Compile-time
+#  architecture").  Loading a Connect-4 checkpoint (trained with
+#  N_EMBD=96 N_HEAD=8 N_LAYER=4 BLOCK_SIZE=128 MLP_DIM=384) into the
+#  default OQL binary (N_EMBD=16) would silently produce garbage —
+#  the matmul shapes don't match.
+#
+#  This variant builds a SECOND oql_runtime_games.o + oql_runner.o pair
+#  against the Connect-4-shaped microgpt_lib variant, so the OQL CLI
+#  can load c_connect4_player.ckpt without dimension mismatch.
+#
+#  Researchers run:
+#      ./build/c_connect4_demo                   # trains + saves the ckpt
+#      cp c_connect4_player.ckpt build/checkpoints/   # (one-time copy)
+#      ./build/oql_c4 run ../experiments/connect4.oql
+# ──────────────────────────────────────────────────────────────────
+set(_C4_DEFINES
+    N_EMBD=96 N_HEAD=8 N_LAYER=4 BLOCK_SIZE=128 MLP_DIM=384
+    NUM_STEPS=25000 LEARNING_RATE=0.001 BATCH_SIZE=8
+    MAX_VOCAB=50 MAX_DOCS=5000 MAX_DOC_LEN=128
+    GRAD_CLIP=1.0 LABEL_SMOOTH=0.1 WEIGHT_DECAY=0.01)
+_microgpt_lib_for_defines(_C4_LIB ${_C4_DEFINES})
+
+# Rebuild oql_runtime_games.c + microgpt_oql.c with the C4 macros so
+# oql_default_cfg() returns matching dims for checkpoint_load.
+add_executable(oql_c4
+    tools/oql_runner.c
+    src/oql_runtime_games.c
+    src/microgpt_oql.c
+    ${OQL_PARSER_SOURCES})
+target_link_libraries(oql_c4 PRIVATE ${_C4_LIB} microgpt_vm_lib)
+target_include_directories(oql_c4 PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_BINARY_DIR})
+target_compile_definitions(oql_c4 PRIVATE ${_C4_DEFINES})
+if(NOT MSVC)
+    target_link_libraries(oql_c4 PRIVATE m)
+endif()
 
 add_executable(test_microgpt_oql tests/test_microgpt_oql.c)
 # microgpt_vm_lib is wired in so the E08 connect4 worked-example test can

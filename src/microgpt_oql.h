@@ -251,6 +251,123 @@ OqlScript *oql_parse(const char *source);
 oql_status oql_execute(const OqlScript *script, FILE *out, int *failed_idx);
 
 /* ============================================================
+ *  Runtime registries (E09 — Phase 1 / Phase 2)
+ *
+ *  When `oql_execute` runs a script that contains CREATE ORGANELLE,
+ *  CREATE BEHAVIOUR, or COMPOSE statements, those statements populate a
+ *  runtime context — a small in-memory registry of organelles, behaviours,
+ *  and pipelines that subsequent statements (notably RUN) can resolve
+ *  against.
+ *
+ *  Organelle storage is lazy: CREATE ORGANELLE only records the checkpoint
+ *  path and behaviour bindings. The first RUN that references the
+ *  organelle triggers checkpoint_load().
+ *
+ *  Behaviours are stored as raw VM body strings (not compiled until first
+ *  dispatch). The VM compile step is deferred to allow E09's runtime to
+ *  link against microgpt_vm_lib while keeping pure-parsing tests free of
+ *  the VM dependency.
+ *
+ *  Pipeline storage holds a parsed Pipeline IR per COMPOSE; call-node
+ *  resolution against the organelle table happens at COMPOSE time.
+ * ============================================================ */
+
+#define OQL_MAX_ORGANELLES 16
+#define OQL_MAX_BEHAVIOURS 64
+#define OQL_MAX_PIPELINES  16
+#define OQL_MAX_PIPELINE_CALLS 32
+
+/* Forward-declared so the public header doesn't pull in microgpt.h or
+ * pipeline_ir.h. `Model` and `Pipeline` are tagged structs in their own
+ * headers (typedef'd to themselves), so we use the struct tag form here
+ * to avoid C11 typedef-redefinition diagnostics when the consumer
+ * includes both microgpt_oql.h and microgpt.h / pipeline_ir.h.
+ * `MicrogptConfig` and `vm_module` are typedefs of anonymous structs;
+ * we expose them via opaque `void *` and cast at the implementation
+ * boundary. */
+struct Model;
+struct Pipeline;
+
+/* A registered BEHAVIOUR. Body is owned; compiled module is lazily built
+ * on first dispatch. `module` is an opaque pointer to a `vm_module`
+ * (typedef of an anonymous struct in microgpt_vm.h). */
+typedef struct OqlBehaviourEntry {
+    char       *name;        /* identifier, owned */
+    char       *vm_body;     /* TS source, owned */
+    void       *module;      /* lazily compiled vm_module*; freed by oql_runtime_dispose */
+} OqlBehaviourEntry;
+
+/* A registered ORGANELLE with lazy checkpoint load. */
+typedef struct OqlOrganelle {
+    char  name[64];
+    char  checkpoint_path[256];
+    int   loaded;             /* lazy: load on first RUN reference */
+    struct Model *model;      /* checkpoint-loaded; freed by oql_runtime_dispose */
+    /* Behaviour bindings (names; resolved against behaviour table at RUN time). */
+    char  input_behaviour[64];
+    char  output_behaviour[64];
+    char  validate_behaviour[64];
+    char  fallback_behaviour[64];
+    char  score_behaviour[64];
+    char  cycle_detect_behaviour[64];
+} OqlOrganelle;
+
+/* A registered COMPOSE pipeline.  `ir` is a parsed Pipeline IR (or NULL
+ * if COMPOSE's FROM clause didn't include an inline @graph block — in
+ * that case `call_organelles` lists the named organelles in source
+ * order so RUN can sequence them as a linear chain). */
+typedef struct OqlPipeline {
+    char      name[64];
+    struct Pipeline *ir;          /* parsed/verified pipeline IR, NULL if linear */
+    /* Linear-chain fallback: ordered list of organelle names (for the
+     * FROM a, b, c style without an inline @graph). */
+    char      call_organelles[OQL_MAX_PIPELINE_CALLS][64];
+    int       n_calls;
+} OqlPipeline;
+
+typedef struct OqlRuntime {
+    OqlBehaviourEntry behaviours[OQL_MAX_BEHAVIOURS];
+    int               n_behaviours;
+    OqlOrganelle      organelles[OQL_MAX_ORGANELLES];
+    int               n_organelles;
+    OqlPipeline       pipelines[OQL_MAX_PIPELINES];
+    int               n_pipelines;
+    /* Configuration used when calling checkpoint_load (opaque pointer to
+     * MicrogptConfig).  If NULL, the runtime falls back to a default
+     * config built from the compile-time macros at OQL-lib build time. */
+    const void *cfg;
+    /* Metrics accumulated by oql_run_game_loop. */
+    int    last_games_played;
+    int    last_wins;
+    int    last_draws;
+    int    last_losses;
+    double last_p99_ms;
+    double last_total_seconds;
+    int    last_audit_rows;
+} OqlRuntime;
+
+/* Lifecycle. */
+void oql_runtime_init(OqlRuntime *rt);
+void oql_runtime_dispose(OqlRuntime *rt);
+
+/* Lookup helpers (returns NULL if not found). */
+OqlBehaviourEntry *oql_runtime_find_behaviour(OqlRuntime *rt, const char *name);
+OqlOrganelle      *oql_runtime_find_organelle(OqlRuntime *rt, const char *name);
+OqlPipeline       *oql_runtime_find_pipeline (OqlRuntime *rt, const char *name);
+
+/* Execute a script against a runtime context.  Identical to oql_execute,
+ * except CREATE BEHAVIOUR / CREATE ORGANELLE / COMPOSE register into the
+ * runtime, and RUN can resolve organelle / pipeline / behaviour names. */
+oql_status oql_execute_with_runtime(const OqlScript *script,
+                                    OqlRuntime *rt,
+                                    FILE *out, int *failed_idx);
+
+/* Lazy checkpoint-load helper.  Idempotent: returns the already-loaded
+ * model if `organelle->loaded` is non-zero. Returns NULL on load failure. */
+struct Model *oql_runtime_load_organelle(OqlRuntime *rt, OqlOrganelle *organelle,
+                                         FILE *out);
+
+/* ============================================================
  *  Parser-internal handle (exposed only for the Flex/Bison plumbing).
  *  Production code should not touch this directly.
  * ============================================================ */

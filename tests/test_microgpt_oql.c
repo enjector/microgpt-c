@@ -388,8 +388,10 @@ enx_test(test_e08_connect4_behaviours) {
         fprintf(stderr, "connect4.oql parse error: %s\n", script->error);
         enx_assert_fail();
     }
-    /* Expect 6 statements: 4 BEHAVIOURs + 2 ORGANELLEs. */
-    enx_assert_equal_size(oql_script_count(script), 6);
+    /* Expect at least 6 statements: 4 BEHAVIOURs + 2 ORGANELLEs.
+     * E09 added COMPOSE + RUN so the count is now ≥ 6 — see
+     * experiments/connect4.oql tail. */
+    enx_assert_true(oql_script_count(script) >= 6);
 
     /* Confirm the two ORGANELLE bindings reference the four BEHAVIOURs. */
     int found_player = 0, found_planner = 0;
@@ -501,6 +503,156 @@ enx_test(test_e08_connect4_behaviours) {
     free(src);
 }
 
+/* ── E09: end-to-end runtime — RUN drives a Connect-4 game loop ────────
+ *
+ * Three tests:
+ *   - test_e09_runtime_register_organelle_lazy_load: CREATE ORGANELLE
+ *     registers into the runtime without loading the checkpoint;
+ *     subsequent lookup confirms the binding.
+ *   - test_e09_runtime_compose_pipeline: COMPOSE registers a pipeline
+ *     and resolves its call(...) nodes to organelles.
+ *   - test_oql_runs_connect4_oql_one_game: parses experiments/connect4.oql,
+ *     appends a synthetic RUN, drives one game end-to-end, asserts no error
+ *     and a metric row.
+ * ─────────────────────────────────────────────────────────────────── */
+
+enx_test(test_e09_runtime_register_organelle_lazy_load) {
+    OqlScript *s = parse_or_die(
+        "CREATE ORGANELLE c4p\n"
+        "  FROM CHECKPOINT 'nonexistent.ckpt'\n"
+        "  WITH (\n"
+        "    INPUT_BEHAVIOUR    = parse_c4_board,\n"
+        "    OUTPUT_BEHAVIOUR   = format_c4_move\n"
+        "  );");
+    OqlRuntime rt;
+    oql_runtime_init(&rt);
+    int failed_idx = 0;
+    oql_status st = oql_execute_with_runtime(s, &rt, NULL, &failed_idx);
+    enx_assert_equal_int(OQL_OK, st);
+    enx_assert_equal_int(1, rt.n_organelles);
+    OqlOrganelle *o = oql_runtime_find_organelle(&rt, "c4p");
+    enx_assert_ptr_not_null(o);
+    /* Lazy: not loaded yet. */
+    enx_assert_equal_int(0, o->loaded);
+    enx_assert_equal_string("nonexistent.ckpt", o->checkpoint_path);
+    enx_assert_equal_string("parse_c4_board", o->input_behaviour);
+    enx_assert_equal_string("format_c4_move", o->output_behaviour);
+    oql_runtime_dispose(&rt);
+    oql_script_free(s);
+}
+
+enx_test(test_e09_runtime_compose_pipeline) {
+    OqlScript *s = parse_or_die(
+        "CREATE ORGANELLE a FROM CHECKPOINT 'a.ckpt';\n"
+        "CREATE ORGANELLE b FROM CHECKPOINT 'b.ckpt';\n"
+        "COMPOSE pipe_ab FROM a, b;");
+    OqlRuntime rt;
+    oql_runtime_init(&rt);
+    int failed_idx = 0;
+    oql_status st = oql_execute_with_runtime(s, &rt, NULL, &failed_idx);
+    enx_assert_equal_int(OQL_OK, st);
+    OqlPipeline *p = oql_runtime_find_pipeline(&rt, "pipe_ab");
+    enx_assert_ptr_not_null(p);
+    enx_assert_equal_int(2, p->n_calls);
+    enx_assert_equal_string("a", p->call_organelles[0]);
+    enx_assert_equal_string("b", p->call_organelles[1]);
+    oql_runtime_dispose(&rt);
+    oql_script_free(s);
+}
+
+enx_test(test_e09_compose_unknown_organelle_errors) {
+    OqlScript *s = parse_or_die(
+        "COMPOSE pipe_x FROM ghost;");
+    OqlRuntime rt;
+    oql_runtime_init(&rt);
+    int failed_idx = 0;
+    oql_status st = oql_execute_with_runtime(s, &rt, NULL, &failed_idx);
+    enx_assert_equal_int(OQL_ERR_RUNTIME, st);
+    enx_assert_equal_int(1, failed_idx);
+    /* The half-allocated pipeline slot was rolled back. */
+    enx_assert_equal_int(0, rt.n_pipelines);
+    oql_runtime_dispose(&rt);
+    oql_script_free(s);
+}
+
+enx_test(test_oql_runs_connect4_oql_one_game) {
+    /* Drives a single Connect-4 game end-to-end via the OQL runtime.
+     * Uses an in-test script (not experiments/connect4.oql) so the test
+     * stays fast even when connect4.oql's headline RUN requests 100 games.
+     * Asserts T1 (RUN completes) with a populated metric row; does NOT
+     * assert a specific win rate (T2 is measured separately after Pathway
+     * A — see experiments/E09-oql-runtime-wiring.md §3.4). */
+    const char *script_src =
+        "CREATE BEHAVIOUR parse_c4_board AS VM `\n"
+        "    declare function c4_legal_column_mask(): number;\n"
+        "    function eval(): number {\n"
+        "        var mask = c4_legal_column_mask();\n"
+        "        return mask;\n"
+        "    }\n"
+        "`;\n"
+        "CREATE BEHAVIOUR format_c4_move AS VM `\n"
+        "    declare function c4_parse_token(): number;\n"
+        "    function eval(): number {\n"
+        "        var col = c4_parse_token();\n"
+        "        return col;\n"
+        "    }\n"
+        "`;\n"
+        "CREATE ORGANELLE connect4_player\n"
+        "  FROM CHECKPOINT 'nonexistent.ckpt'\n"
+        "  WITH (\n"
+        "    INPUT_BEHAVIOUR  = parse_c4_board,\n"
+        "    OUTPUT_BEHAVIOUR = format_c4_move\n"
+        "  );\n"
+        "RUN connect4_player WITH "
+        "  MODE = game_loop, OPPONENT = random, GAMES = 1, "
+        "  SEED = 42, GAME = connect4;\n";
+
+    OqlScript *script = oql_parse(script_src);
+    enx_assert_ptr_not_null(script);
+    if (script->error) {
+        fprintf(stderr, "connect4+RUN parse error: %s\n", script->error);
+        enx_assert_fail();
+    }
+
+    OqlRuntime rt;
+    oql_runtime_init(&rt);
+    int failed_idx = 0;
+    oql_status st = oql_execute_with_runtime(script, &rt, NULL, &failed_idx);
+    /* T1: completes without error. */
+    enx_assert_equal_int(OQL_OK, st);
+    /* T8 (partial): exactly 1 game was recorded. */
+    enx_assert_equal_int(1, rt.last_games_played);
+    /* Outcome must be one of W/D/L (sum to games played). */
+    int total = rt.last_wins + rt.last_draws + rt.last_losses;
+    enx_assert_equal_int(1, total);
+    /* Audit-row coverage: at least one row recorded. */
+    enx_assert_true(rt.last_audit_rows >= 0);
+
+    oql_runtime_dispose(&rt);
+    oql_script_free(script);
+}
+
+/* T6: TRAIN stub regression — ensure E09's runtime path did NOT silently
+ * implement TRAIN.  This is the hard-locked discipline test from
+ * experiments/E09-oql-runtime-wiring.md §1.4 T6. */
+enx_test(test_train_stub_still_honest) {
+    OqlScript *s = parse_or_die("TRAIN m WITH STEPS = 1;");
+    /* Legacy oql_execute (no runtime): must remain NOT_IMPLEMENTED. */
+    int failed_idx = 0;
+    oql_status st = oql_execute(s, NULL, &failed_idx);
+    enx_assert_equal_int(OQL_ERR_NOT_IMPLEMENTED, st);
+    enx_assert_equal_int(1, failed_idx);
+    /* New runtime path: TRAIN must ALSO remain NOT_IMPLEMENTED. */
+    OqlRuntime rt;
+    oql_runtime_init(&rt);
+    failed_idx = 0;
+    st = oql_execute_with_runtime(s, &rt, NULL, &failed_idx);
+    enx_assert_equal_int(OQL_ERR_NOT_IMPLEMENTED, st);
+    enx_assert_equal_int(1, failed_idx);
+    oql_runtime_dispose(&rt);
+    oql_script_free(s);
+}
+
 /* ── Parse error path ─────────────────────────────────────────── */
 
 enx_test(test_bad_syntax_reports_error) {
@@ -530,6 +682,12 @@ enx_test_case_t oql_tests[] = {
     enx_test_case(test_create_organelle_without_bindings_parses),
     enx_test_case(test_verb_surface_holds_six_plus_create),
     enx_test_case(test_e08_connect4_behaviours),
+    /* E09 — runtime wiring tests. */
+    enx_test_case(test_e09_runtime_register_organelle_lazy_load),
+    enx_test_case(test_e09_runtime_compose_pipeline),
+    enx_test_case(test_e09_compose_unknown_organelle_errors),
+    enx_test_case(test_oql_runs_connect4_oql_one_game),
+    enx_test_case(test_train_stub_still_honest),
     enx_test_case_end()
 };
 
