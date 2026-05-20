@@ -2334,6 +2334,26 @@ if(NOT MSVC)
 endif()
 
 # ──────────────────────────────────────────────────────────────────
+#  Experiment E15 deterministic oracles — puzzle15_a_star + klotski_a_star.
+#
+#  Standalone C99 binaries that emit JSON-line (state, solution) pairs
+#  to stdout.  Used by tools/e15_generate (the OQL `FROM ORACLE`
+#  corpus driver) via popen + a deterministic seed.
+#
+#  No new build deps: libc + libm only.
+# ──────────────────────────────────────────────────────────────────
+add_executable(puzzle15_a_star tools/puzzle15_a_star.c)
+if(NOT MSVC)
+    target_link_libraries(puzzle15_a_star PRIVATE m)
+endif()
+
+add_executable(klotski_a_star tools/klotski_a_star.c)
+if(NOT MSVC)
+    target_link_libraries(klotski_a_star PRIVATE m)
+endif()
+
+
+# ──────────────────────────────────────────────────────────────────
 #  e12_generate — LLM-as-corpus-source bridge (Experiment E12).
 #
 #  Reads an OQL script containing a CREATE CORPUS … FROM LLM …
@@ -2355,6 +2375,30 @@ target_include_directories(e12_generate PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/tools)
 if(NOT MSVC)
     target_link_libraries(e12_generate PRIVATE m)
+endif()
+
+
+# ──────────────────────────────────────────────────────────────────
+#  e15_generate — Oracle-as-corpus-source bridge (Experiment E15).
+#
+#  Reads an OQL script containing CREATE CORPUS … FROM ORACLE …
+#  statements, invokes the corresponding deterministic-solver binary
+#  (build/puzzle15_a_star or build/klotski_a_star) via popen, parses
+#  the JSON-line output, applies the leakage audit, and writes
+#  TSV-format training corpora to the output= path.
+#
+#  Tool-only — never linked into any organelle runtime binary.  T8
+#  hard-lock holds: zero new build deps.
+# ──────────────────────────────────────────────────────────────────
+add_executable(e15_generate
+    tools/e15_generate.c
+    tools/oracle_corpus_source.c)
+target_link_libraries(e15_generate PRIVATE microgpt_oql_lib)
+target_include_directories(e15_generate PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/tools)
+if(NOT MSVC)
+    target_link_libraries(e15_generate PRIVATE m)
 endif()
 
 
