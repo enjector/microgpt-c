@@ -461,14 +461,50 @@ experiment (E10), not a defect in E09.**
 
 ## 4. Conclusion
 
-**TODO** — fill on measurement commit, when ALL eight targets are measured. Sections to populate:
+**Status:** Final — interim conclusion at first merge, completed via downstream closures from E10, E11, E13. Six of eight pre-reg targets PASS as originally measured; T2 (Connect-4 win rate) closed at 89% by E11; T8 (audit-trace JSON export) remains an explicit follow-up.
 
-- 4.1 Verdict per T1-T8 (PASS / FAIL / FLOOR-TRIGGER)
-- 4.2 Headline outcome — does `oql run` actually drive a game?
-- 4.3 Compound benefits realised:
-  - E08's T1 (Connect-4 win rate via OQL+TS) now MEASURED, not deferred
-  - E01's System C authoring cost collapsed to a small OQL file
-  - The "single OQL file reproduces a published experiment" claim becomes true
-- 4.4 What's NOT done — TRAIN, EVALUATE-on-file, replication across other games
-- 4.5 Next experiment (E10): wire TRAIN, with locked targets around training-loop fidelity vs C-demo baseline
-- 4.6 Traceability updates (`TRACEABILITY.md`, `ORGANELLE_STATE.md`, `RESEARCH_DISCLOSURE.md`)
+### 4.1 Verdict per target
+
+| ID | Target | Final outcome |
+|---|---|---|
+| T1 | RUN completes 100 games | ✅ PASS — ~10.65 moves/game, no errors |
+| T2 | Connect-4 win rate ≥ 85% | ✅ **CLOSED via E11 at 89%** (51% at E09 merge → 89% via E11's prompt-protocol fix) |
+| T3 | Per-move latency p99 ≤ 50 ms | ✅ PASS — sub-millisecond |
+| T4 | Existing tests pass | ✅ PASS — 17 → 22 OQL tests |
+| T5 | Zero new VM opcodes | ✅ PASS — held by E10/E11/E12/E13 thereafter |
+| T6 | TRAIN stub remains honest | ✅ PASS — `test_train_stub_still_honest` added; TRAIN later wired by E10 with bit-identical loss curves |
+| T7 | OQL+TS LOC ≤ 30% of C demo | ✅ PASS — 23.4% |
+| T8 | Audit-trace per-move coverage | ⚠️ PARTIAL — 100% in-memory; JSON sidecar export still deferred |
+
+### 4.2 Headline outcome
+
+**OQL crossed from a parser-only DSL to an executable research substrate.** The single most-cited finding from this experiment — the **compile-time-macro silent failure mode** when loading a checkpoint trained with different `N_EMBD`/`N_HEAD`/`BLOCK_SIZE` macros — became standing prior art and was honoured by every downstream experiment (E10 reused `_microgpt_lib_for_defines`; E11 used the existing `oql_c4` variant; E13 caught a related vocab-mismatch in E10's TRAIN as the **E13d** follow-up).
+
+### 4.3 Lessons (load-bearing)
+
+- **The wiring vs game-loop runtime separation** (`src/oql_runtime_games.{h,c}` distinct from the wiring path) was the right factoring — kept E10's TRAIN integration trivial.
+- **Lazy-load of organelles** (defer `microgpt_load_checkpoint` to first RUN reference) avoids the dim-mismatch silent failure in the common "create-then-discard" case.
+- **The four stubbed verbs from E07 had to land one at a time, not all at once** — E09 wired RUN/COMPOSE/CREATE-ORGANELLE-FROM-CHECKPOINT honestly; E10 wired TRAIN cleanly afterwards; EVALUATE on file/streaming remains deliberately deferred.
+- **Section 3.4's compile-time-macro finding** is the architectural insight worth lifting into `ORGANELLE_STATE.md`.
+
+### 4.4 Downstream closures from this experiment
+
+| Closure | Where it happened |
+|---|---|
+| T2 (51% → 89%) | [E11](E11-connect4-win-rate-fix.md) — Pathway B, one new VM extern, ZERO new opcodes |
+| TRAIN wiring (named follow-up) | [E10](E10-oql-train-wiring.md) — all 8 PASS, bit-identical loss curves |
+| Replication to other games | [E13](E13-llm-game-distillation.md) — Connect-4 distillation at 89% (Mastermind/Pentago/8-puzzle still deferred) |
+| LLM corpus generation (E10 enabler) | [E12](E12-llm-wiring-corpus.md) — `CREATE CORPUS … FROM LLM …` |
+| OQL TRAIN vocab-mismatch bug | Surfaced organically by [E13](E13-llm-game-distillation.md) — named E13d for follow-up |
+
+### 4.5 Remaining follow-ups
+
+- **T8 closure** — JSON sidecar export from `EVALUATE … REPORT AS '...'`. Small follow-up (~1 wk).
+- **E13d** — OQL TRAIN vocab-mismatch bug: `oql_run_train()` uses `load_docs` (single-line) while inference uses `opa_load_docs_multiline` (blank-line). One-commit alignment fix.
+- **EVALUATE on file / streaming** — out of scope for E09; named for E14+ if streaming workloads emerge.
+
+### 4.6 Traceability updates
+
+- `ORGANELLE_STATE.md` — adds the compile-time-macro finding as a stable engineering note; adds OQL runtime + game-loop dispatch to the architectural surface
+- `RESEARCH_DISCLOSURE.md` — record T2 closure path (E11) and the E13d follow-up
+- `TRACEABILITY.md` — link E09 ↔ E11 (T2 closure), E09 ↔ E13 (replication path), E09 ↔ E10 (TRAIN wiring)
