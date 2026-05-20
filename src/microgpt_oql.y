@@ -28,6 +28,7 @@
     OqlStmt *oql_y_audit(OqlSource a, OqlSource b, char *thr, char *report);
     OqlStmt *oql_y_create_behaviour(char *name, char *vm_body);
     OqlStmt *oql_y_create_organelle(char *name, char *ckpt, OqlKV *bindings);
+    OqlStmt *oql_y_create_corpus(char *name, char *path);
     OqlKV   *oql_y_kv(char *key, char *val);
     OqlKV   *oql_y_kv_concat(OqlKV *head, OqlKV *tail);
     OqlNameList *oql_y_name(char *n);
@@ -50,14 +51,14 @@
 }
 
 %token T_TRAIN T_COMPOSE T_RUN T_EVALUATE T_VERIFY T_AUDIT
-%token T_CREATE T_BEHAVIOUR T_ORGANELLE T_CHECKPOINT T_VM
+%token T_CREATE T_BEHAVIOUR T_ORGANELLE T_CHECKPOINT T_VM T_FILE
 %token T_ON T_WITH T_AGAINST T_USING T_WHERE T_AS T_FROM
 %token T_GRAPH T_CORPUS T_REPORT T_METRIC T_THRESHOLDS
 %token T_LT T_LE T_EQ T_NE T_GE T_GT
 %token <str> T_IDENT T_STRING T_NUMBER T_GRAPH_BLOCK T_VM_BODY
 
 %type <stmt>  stmt train_stmt compose_stmt run_stmt evaluate_stmt verify_stmt audit_stmt
-%type <stmt>  create_stmt create_behaviour_stmt create_organelle_stmt
+%type <stmt>  create_stmt create_behaviour_stmt create_organelle_stmt create_corpus_stmt
 %type <kv>    opt_with kv_list kv opt_with_bindings binding_list binding
 %type <names> name_list
 %type <src>   source opt_on
@@ -142,10 +143,11 @@ opt_thresholds
     | T_USING T_THRESHOLDS T_STRING                   { $$ = $3; }
     ;
 
-/* ── CREATE BEHAVIOUR / CREATE ORGANELLE (E08) ───────────────────── */
+/* ── CREATE BEHAVIOUR / CREATE ORGANELLE / CREATE CORPUS (E08 + E10) ─ */
 create_stmt
     : create_behaviour_stmt                            { $$ = $1; }
     | create_organelle_stmt                            { $$ = $1; }
+    | create_corpus_stmt                               { $$ = $1; }
     ;
 create_behaviour_stmt
     : T_CREATE T_BEHAVIOUR T_IDENT T_AS T_VM T_VM_BODY
@@ -157,6 +159,14 @@ create_organelle_stmt
     | T_CREATE T_ORGANELLE T_IDENT opt_with_bindings
       { $$ = oql_y_create_organelle($3, NULL, $4); }
     ;
+/* E10 — CREATE CORPUS <name> FROM FILE '<path>'; (no WITH list).
+ * CORPUS is a new object type via the existing CREATE verb — it does NOT
+ * add a 7th top-level verb (T7 hard-lock from experiments/E10-...). */
+create_corpus_stmt
+    : T_CREATE T_CORPUS T_IDENT T_FROM T_FILE T_STRING
+      { $$ = oql_y_create_corpus($3, $6); }
+    ;
+
 opt_with_bindings
     : /* empty */                                      { $$ = NULL; }
     | T_WITH '(' binding_list ')'                      { $$ = $3; }

@@ -2299,6 +2299,7 @@ endif()
 add_library(microgpt_oql_lib STATIC
     src/microgpt_oql.c
     src/oql_runtime_games.c
+    src/oql_runtime_train.c
     ${OQL_PARSER_SOURCES})
 target_include_directories(microgpt_oql_lib PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -2346,6 +2347,7 @@ _microgpt_lib_for_defines(_C4_LIB ${_C4_DEFINES})
 add_executable(oql_c4
     tools/oql_runner.c
     src/oql_runtime_games.c
+    src/oql_runtime_train.c
     src/microgpt_oql.c
     ${OQL_PARSER_SOURCES})
 target_link_libraries(oql_c4 PRIVATE ${_C4_LIB} microgpt_vm_lib)
