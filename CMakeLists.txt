@@ -2417,6 +2417,64 @@ add_test(NAME oracle_corpus_source_tests
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
 
+# E15 Phase 4-6: training + evaluation drivers.
+#
+# Two binary variants per role (mono vs opa) per phase (train vs eval),
+# each linked against its own microgpt_lib variant compiled with the
+# right architecture macros (E09 section 3.4 compile-time-macro
+# silent-failure mitigation).  T6 (compute-equivalence within +-10%)
+# enforced by construction: params(mono) ~= 3 * params(opa).
+# T8 (engine surface frozen): no changes to src/microgpt.{c,h}.
+
+set(_E15_MONO_DEFINES
+    N_EMBD=96 N_HEAD=6 N_LAYER=4 BLOCK_SIZE=256 MLP_DIM=384
+    NUM_STEPS=50000 LEARNING_RATE=0.001 BATCH_SIZE=8
+    MAX_VOCAB=64 MAX_DOCS=4000 MAX_DOC_LEN=512
+    GRAD_CLIP=1.0 LABEL_SMOOTH=0.0 WEIGHT_DECAY=0.01)
+
+set(_E15_OPA_DEFINES
+    N_EMBD=64 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=128 MLP_DIM=160
+    NUM_STEPS=50000 LEARNING_RATE=0.001 BATCH_SIZE=8
+    MAX_VOCAB=64 MAX_DOCS=4000 MAX_DOC_LEN=512
+    GRAD_CLIP=1.0 LABEL_SMOOTH=0.0 WEIGHT_DECAY=0.01)
+
+_microgpt_lib_for_defines(_E15_MONO_LIB ${_E15_MONO_DEFINES})
+_microgpt_lib_for_defines(_E15_OPA_LIB ${_E15_OPA_DEFINES})
+
+add_executable(e15_mono_train tools/e15_train.c)
+target_link_libraries(e15_mono_train PRIVATE ${_E15_MONO_LIB})
+target_include_directories(e15_mono_train PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_compile_definitions(e15_mono_train PRIVATE ${_E15_MONO_DEFINES})
+if(NOT MSVC)
+    target_link_libraries(e15_mono_train PRIVATE m)
+endif()
+
+add_executable(e15_opa_train tools/e15_train.c)
+target_link_libraries(e15_opa_train PRIVATE ${_E15_OPA_LIB})
+target_include_directories(e15_opa_train PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_compile_definitions(e15_opa_train PRIVATE ${_E15_OPA_DEFINES})
+if(NOT MSVC)
+    target_link_libraries(e15_opa_train PRIVATE m)
+endif()
+
+add_executable(e15_mono_eval tools/e15_eval.c)
+target_link_libraries(e15_mono_eval PRIVATE ${_E15_MONO_LIB})
+target_include_directories(e15_mono_eval PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_compile_definitions(e15_mono_eval PRIVATE ${_E15_MONO_DEFINES})
+if(NOT MSVC)
+    target_link_libraries(e15_mono_eval PRIVATE m)
+endif()
+
+add_executable(e15_opa_eval tools/e15_eval.c)
+target_link_libraries(e15_opa_eval PRIVATE ${_E15_OPA_LIB})
+target_include_directories(e15_opa_eval PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_compile_definitions(e15_opa_eval PRIVATE ${_E15_OPA_DEFINES})
+if(NOT MSVC)
+    target_link_libraries(e15_opa_eval PRIVATE m)
+endif()
+
+
+
 # ──────────────────────────────────────────────────────────────────
 #  oql_c4 — Connect-4-dims variant of the `oql` CLI.
 #
