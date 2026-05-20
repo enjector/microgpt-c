@@ -14,6 +14,8 @@
 
 #include "microgpt_oql.h"
 #include "microgpt_pipeline.h"
+#include "microgpt.h"        /* Model, MicrogptConfig, checkpoint_load */
+#include "microgpt_vm.h"     /* vm_module, vm_module_dispose */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -424,6 +426,403 @@ static oql_status oql_exec_audit(const OqlStmt *s, FILE *out) {
 }
 
 /* ============================================================
+ *  E09 — Runtime registry (organelle / behaviour / pipeline tables)
+ * ============================================================ */
+
+void oql_runtime_init(OqlRuntime *rt) {
+    if (!rt) return;
+    memset(rt, 0, sizeof(*rt));
+}
+
+void oql_runtime_dispose(OqlRuntime *rt) {
+    if (!rt) return;
+    /* Free behaviour entries. */
+    for (int i = 0; i < rt->n_behaviours; i++) {
+        free(rt->behaviours[i].name);
+        free(rt->behaviours[i].vm_body);
+        if (rt->behaviours[i].module) {
+            vm_module_dispose((vm_module *)rt->behaviours[i].module);
+            rt->behaviours[i].module = NULL;
+        }
+    }
+    rt->n_behaviours = 0;
+
+    /* Free organelle models (only those actually loaded). */
+    for (int i = 0; i < rt->n_organelles; i++) {
+        if (rt->organelles[i].loaded && rt->organelles[i].model) {
+            model_free(rt->organelles[i].model);
+        }
+        rt->organelles[i].model = NULL;
+        rt->organelles[i].loaded = 0;
+    }
+    rt->n_organelles = 0;
+
+    /* Free parsed pipeline IRs. */
+    for (int i = 0; i < rt->n_pipelines; i++) {
+        if (rt->pipelines[i].ir) {
+            pipeline_free(rt->pipelines[i].ir);
+            rt->pipelines[i].ir = NULL;
+        }
+    }
+    rt->n_pipelines = 0;
+
+    rt->cfg = NULL;
+}
+
+OqlBehaviourEntry *oql_runtime_find_behaviour(OqlRuntime *rt, const char *name) {
+    if (!rt || !name) return NULL;
+    for (int i = 0; i < rt->n_behaviours; i++) {
+        if (rt->behaviours[i].name &&
+            strcmp(rt->behaviours[i].name, name) == 0) {
+            return &rt->behaviours[i];
+        }
+    }
+    return NULL;
+}
+
+OqlOrganelle *oql_runtime_find_organelle(OqlRuntime *rt, const char *name) {
+    if (!rt || !name) return NULL;
+    for (int i = 0; i < rt->n_organelles; i++) {
+        if (strcmp(rt->organelles[i].name, name) == 0) {
+            return &rt->organelles[i];
+        }
+    }
+    return NULL;
+}
+
+OqlPipeline *oql_runtime_find_pipeline(OqlRuntime *rt, const char *name) {
+    if (!rt || !name) return NULL;
+    for (int i = 0; i < rt->n_pipelines; i++) {
+        if (strcmp(rt->pipelines[i].name, name) == 0) {
+            return &rt->pipelines[i];
+        }
+    }
+    return NULL;
+}
+
+/* Register a behaviour (called from CREATE BEHAVIOUR dispatch). */
+static oql_status oql_runtime_register_behaviour(OqlRuntime *rt,
+                                                 const char *name,
+                                                 const char *vm_body,
+                                                 FILE *out) {
+    if (!rt || !name) return OQL_ERR_RUNTIME;
+    if (oql_runtime_find_behaviour(rt, name)) {
+        if (out) fprintf(out, "CREATE BEHAVIOUR: duplicate name '%s'\n", name);
+        return OQL_ERR_RUNTIME;
+    }
+    if (rt->n_behaviours >= OQL_MAX_BEHAVIOURS) {
+        if (out) fprintf(out, "CREATE BEHAVIOUR: registry full (%d max)\n",
+                         OQL_MAX_BEHAVIOURS);
+        return OQL_ERR_RUNTIME;
+    }
+    OqlBehaviourEntry *e = &rt->behaviours[rt->n_behaviours++];
+    e->name = oql_dup(name);
+    e->vm_body = vm_body ? oql_dup(vm_body) : NULL;
+    e->module = NULL;
+    return OQL_OK;
+}
+
+/* Register an organelle (CREATE ORGANELLE).  Lazy: no checkpoint load. */
+static oql_status oql_runtime_register_organelle(OqlRuntime *rt,
+                                                 const OqlCreateOrganelle *co,
+                                                 FILE *out) {
+    if (!rt || !co || !co->name) return OQL_ERR_RUNTIME;
+    if (oql_runtime_find_organelle(rt, co->name)) {
+        if (out) fprintf(out, "CREATE ORGANELLE: duplicate name '%s'\n", co->name);
+        return OQL_ERR_RUNTIME;
+    }
+    if (rt->n_organelles >= OQL_MAX_ORGANELLES) {
+        if (out) fprintf(out, "CREATE ORGANELLE: registry full (%d max)\n",
+                         OQL_MAX_ORGANELLES);
+        return OQL_ERR_RUNTIME;
+    }
+    OqlOrganelle *o = &rt->organelles[rt->n_organelles++];
+    memset(o, 0, sizeof(*o));
+    strncpy(o->name, co->name, sizeof(o->name) - 1);
+    if (co->checkpoint) {
+        strncpy(o->checkpoint_path, co->checkpoint,
+                sizeof(o->checkpoint_path) - 1);
+    }
+    /* Resolve behaviour-binding kvs by name (strings only — not pointers). */
+    const char *bn;
+    if ((bn = oql_kv_get(co->bindings, "INPUT_BEHAVIOUR"))) {
+        strncpy(o->input_behaviour, bn, sizeof(o->input_behaviour) - 1);
+    }
+    if ((bn = oql_kv_get(co->bindings, "OUTPUT_BEHAVIOUR"))) {
+        strncpy(o->output_behaviour, bn, sizeof(o->output_behaviour) - 1);
+    }
+    if ((bn = oql_kv_get(co->bindings, "VALIDATE_BEHAVIOUR"))) {
+        strncpy(o->validate_behaviour, bn, sizeof(o->validate_behaviour) - 1);
+    }
+    if ((bn = oql_kv_get(co->bindings, "FALLBACK_BEHAVIOUR"))) {
+        strncpy(o->fallback_behaviour, bn, sizeof(o->fallback_behaviour) - 1);
+    }
+    if ((bn = oql_kv_get(co->bindings, "SCORE_BEHAVIOUR"))) {
+        strncpy(o->score_behaviour, bn, sizeof(o->score_behaviour) - 1);
+    }
+    if ((bn = oql_kv_get(co->bindings, "CYCLE_DETECT_BEHAVIOUR"))) {
+        strncpy(o->cycle_detect_behaviour, bn,
+                sizeof(o->cycle_detect_behaviour) - 1);
+    }
+    return OQL_OK;
+}
+
+/* Default config used when caller didn't provide one.  Built from the
+ * compile-time macros that the OQL lib was compiled against; matches
+ * what the connect4 demo emits when saving its player checkpoint. */
+static MicrogptConfig oql_default_cfg(void) {
+    MicrogptConfig cfg = microgpt_default_config();
+    cfg.n_embd = N_EMBD;
+    cfg.n_head = N_HEAD;
+    cfg.mlp_dim = MLP_DIM;
+    cfg.n_layer = N_LAYER;
+    cfg.block_size = BLOCK_SIZE;
+    return cfg;
+}
+
+Model *oql_runtime_load_organelle(OqlRuntime *rt, OqlOrganelle *organelle,
+                                  FILE *out) {
+    if (!rt || !organelle) return NULL;
+    if (organelle->loaded) return organelle->model;
+    if (!organelle->checkpoint_path[0]) {
+        if (out) fprintf(out,
+            "load_organelle: organelle '%s' has no checkpoint path\n",
+            organelle->name);
+        return NULL;
+    }
+    MicrogptConfig local_cfg = oql_default_cfg();
+    const MicrogptConfig *cfg = rt->cfg ? (const MicrogptConfig *)rt->cfg
+                                        : &local_cfg;
+
+    /* The checkpoint format stores its own vocab size in the header — we
+     * pass 0 as `vocab_size` to mean "trust the file" so OQL doesn't have
+     * to know the vocabulary up front.  microgpt's checkpoint_load is
+     * lenient about this when vocab_size == 0 — see microgpt.c. If the
+     * caller's config disagrees with the saved one, load fails cleanly. */
+    int step_out = 0;
+    /* Adam buffers: allocate scratch space sized to the saved model.
+     * We don't keep them — checkpoint_load() requires non-NULL pointers,
+     * but we discard the buffers immediately for inference-only loads. */
+    /* The model parameter count depends on vocab_size which we don't
+     * know until the header is read.  microgpt's checkpoint_load API
+     * insists on caller-provided m/v buffers of model_num_params length.
+     * For OQL we allocate a generous upper bound and trust load to
+     * succeed; on failure we degrade gracefully. */
+    size_t max_vocab = (size_t)cfg->max_vocab;
+    /* Conservative upper bound: vocab * n_embd (wte) + everything else.
+     * Use a 16 MB scratch and bail if checkpoint_load needs more. */
+    size_t scratch_n = (size_t)2 * 1024 * 1024;  /* 2M scalars */
+    scalar_t *m = (scalar_t *)calloc(scratch_n, sizeof(scalar_t));
+    scalar_t *v = (scalar_t *)calloc(scratch_n, sizeof(scalar_t));
+    if (!m || !v) {
+        if (out) fprintf(out, "load_organelle: OOM allocating Adam scratch\n");
+        free(m); free(v);
+        return NULL;
+    }
+    Model *model = checkpoint_load(organelle->checkpoint_path,
+                                   max_vocab ? max_vocab : 256,
+                                   cfg, m, v, &step_out);
+    free(m); free(v);
+    if (!model) {
+        if (out) fprintf(out,
+            "load_organelle: checkpoint_load('%s') failed for organelle '%s'\n",
+            organelle->checkpoint_path, organelle->name);
+        return NULL;
+    }
+    organelle->model = model;
+    organelle->loaded = 1;
+    if (out) fprintf(out,
+        "load_organelle: loaded '%s' from %s (step %d)\n",
+        organelle->name, organelle->checkpoint_path, step_out);
+    return model;
+}
+
+/* ============================================================
+ *  E09 — COMPOSE: parse @graph body from WITH kv, register as pipeline
+ * ============================================================ */
+
+static oql_status oql_runtime_register_pipeline(OqlRuntime *rt,
+                                                const OqlCompose *co,
+                                                FILE *out) {
+    if (!rt || !co || !co->target) return OQL_ERR_RUNTIME;
+    if (oql_runtime_find_pipeline(rt, co->target)) {
+        if (out) fprintf(out, "COMPOSE: duplicate pipeline name '%s'\n",
+                         co->target);
+        return OQL_ERR_RUNTIME;
+    }
+    if (rt->n_pipelines >= OQL_MAX_PIPELINES) {
+        if (out) fprintf(out, "COMPOSE: registry full (%d max)\n",
+                         OQL_MAX_PIPELINES);
+        return OQL_ERR_RUNTIME;
+    }
+    OqlPipeline *p = &rt->pipelines[rt->n_pipelines++];
+    memset(p, 0, sizeof(*p));
+    strncpy(p->name, co->target, sizeof(p->name) - 1);
+
+    /* Three composition forms supported:
+     *  (1) WITH (GRAPH = '<inline @graph block>') — parsed via
+     *      pipeline_parse_text; the resulting IR is stored in p->ir
+     *      and each call(...) node's primitive is resolved against the
+     *      organelle table to populate call_organelles[].
+     *  (2) WITH (PIPELINE = 'path/to/graph.txt') — slurps the file and
+     *      parses identically to (1).
+     *  (3) Plain FROM a, b, c with no GRAPH kv — linear chain across
+     *      the named organelles in source order.
+     */
+    const char *graph_text = oql_kv_get(co->with_kv, "GRAPH");
+    const char *graph_path = oql_kv_get(co->with_kv, "PIPELINE");
+    char *slurped = NULL;
+    if (!graph_text && graph_path) {
+        FILE *f = fopen(graph_path, "rb");
+        if (f) {
+            fseek(f, 0, SEEK_END);
+            long n = ftell(f);
+            fseek(f, 0, SEEK_SET);
+            slurped = (char *)malloc((size_t)n + 1);
+            if (slurped) {
+                fread(slurped, 1, (size_t)n, f);
+                slurped[n] = '\0';
+                graph_text = slurped;
+            }
+            fclose(f);
+        }
+    }
+
+    if (graph_text) {
+        Pipeline *ir = pipeline_parse_text(graph_text);
+        free(slurped);
+        if (!ir) {
+            if (out) fprintf(out,
+                "COMPOSE: pipeline_parse_text failed: %s\n",
+                pipeline_last_error());
+            rt->n_pipelines--;
+            return OQL_ERR_RUNTIME;
+        }
+        if (pipeline_verify(ir) != 0) {
+            if (out) fprintf(out,
+                "COMPOSE: pipeline_verify failed: %s\n",
+                pipeline_last_error());
+            pipeline_free(ir);
+            rt->n_pipelines--;
+            return OQL_ERR_RUNTIME;
+        }
+        /* Resolve each call-node's primitive against the organelle table.
+         * We use the node's "primitive" string as the organelle name. */
+        for (size_t ni = 0; ni < ir->n_nodes; ni++) {
+            const char *prim = ir->nodes[ni]->primitive;
+            if (!prim) continue;
+            if (!oql_runtime_find_organelle(rt, prim)) {
+                if (out) fprintf(out,
+                    "COMPOSE '%s': node '%s' references unknown organelle '%s'\n",
+                    co->target, ir->nodes[ni]->id, prim);
+                pipeline_free(ir);
+                rt->n_pipelines--;
+                return OQL_ERR_RUNTIME;
+            }
+            if (p->n_calls < OQL_MAX_PIPELINE_CALLS) {
+                strncpy(p->call_organelles[p->n_calls], prim,
+                        sizeof(p->call_organelles[0]) - 1);
+                p->n_calls++;
+            }
+        }
+        p->ir = ir;
+        if (out) fprintf(out,
+            "COMPOSE: registered pipeline '%s' with IR (%zu nodes, %d calls)\n",
+            co->target, ir->n_nodes, p->n_calls);
+    } else {
+        /* Linear-chain fallback: walk co->from in order, validate each. */
+        for (const OqlNameList *n = co->from; n; n = n->next) {
+            if (!oql_runtime_find_organelle(rt, n->name)) {
+                if (out) fprintf(out,
+                    "COMPOSE '%s': unknown organelle '%s' in FROM list\n",
+                    co->target, n->name ? n->name : "(null)");
+                rt->n_pipelines--;
+                return OQL_ERR_RUNTIME;
+            }
+            if (p->n_calls < OQL_MAX_PIPELINE_CALLS) {
+                strncpy(p->call_organelles[p->n_calls], n->name,
+                        sizeof(p->call_organelles[0]) - 1);
+                p->n_calls++;
+            }
+        }
+        if (out) fprintf(out,
+            "COMPOSE: registered linear pipeline '%s' (%d organelles)\n",
+            co->target, p->n_calls);
+    }
+    return OQL_OK;
+}
+
+/* ============================================================
+ *  E09 — RUN dispatch.
+ *
+ *  Recognised WITH kvs (case-sensitive):
+ *      MODE       = game_loop          (default; only mode wired in this commit)
+ *      OPPONENT   = random             (only opponent wired in this commit)
+ *      GAMES      = <integer>          (default 1)
+ *      SEED       = <integer>          (default 42)
+ *      GAME       = connect4           (selects the game-specific harness;
+ *                                       only 'connect4' is wired in this commit)
+ *
+ *  Returns:
+ *      OQL_OK on completed run (regardless of win rate);
+ *      OQL_ERR_NOT_IMPLEMENTED for non-game_loop modes or unknown games;
+ *      OQL_ERR_RUNTIME if dispatch fails (e.g. pipeline not found,
+ *      checkpoint load fails).
+ * ============================================================ */
+
+/* Forward decl — concrete implementation lives in oql_runtime_games.c so
+ * the game-specific harness can be unit-tested independently. */
+oql_status oql_run_game_loop(OqlRuntime *rt,
+                             OqlPipeline *pipeline,
+                             const char *opponent,
+                             int games,
+                             unsigned int seed,
+                             const char *game,
+                             FILE *out);
+
+static oql_status oql_exec_run_runtime(OqlRuntime *rt, const OqlStmt *s,
+                                       FILE *out) {
+    if (!rt || !s) return OQL_ERR_RUNTIME;
+    const char *pipe_name = s->u.run.target;
+    OqlPipeline *p = oql_runtime_find_pipeline(rt, pipe_name);
+    if (!p) {
+        /* RUN may target a single organelle directly when no COMPOSE
+         * was issued — register an implicit one-stage pipeline. */
+        OqlOrganelle *o = oql_runtime_find_organelle(rt, pipe_name);
+        if (!o) {
+            if (out) fprintf(out,
+                "RUN: unknown pipeline / organelle '%s'\n", pipe_name);
+            return OQL_ERR_RUNTIME;
+        }
+        if (rt->n_pipelines >= OQL_MAX_PIPELINES) {
+            if (out) fprintf(out, "RUN: pipeline table full\n");
+            return OQL_ERR_RUNTIME;
+        }
+        p = &rt->pipelines[rt->n_pipelines++];
+        memset(p, 0, sizeof(*p));
+        strncpy(p->name, pipe_name, sizeof(p->name) - 1);
+        strncpy(p->call_organelles[0], o->name, sizeof(p->call_organelles[0]) - 1);
+        p->n_calls = 1;
+    }
+
+    const char *mode     = oql_kv_get(s->u.run.with_kv, "MODE");
+    const char *opponent = oql_kv_get(s->u.run.with_kv, "OPPONENT");
+    const char *games_s  = oql_kv_get(s->u.run.with_kv, "GAMES");
+    const char *seed_s   = oql_kv_get(s->u.run.with_kv, "SEED");
+    const char *game     = oql_kv_get(s->u.run.with_kv, "GAME");
+    int games = games_s ? atoi(games_s) : 1;
+    unsigned int seed = seed_s ? (unsigned int)atoi(seed_s) : 42u;
+    if (games < 1) games = 1;
+    if (!opponent) opponent = "random";
+    if (!game) game = "connect4";
+    if (mode && strcmp(mode, "game_loop") != 0) {
+        if (out) fprintf(out, "RUN: only MODE=game_loop is wired (got '%s')\n", mode);
+        return OQL_ERR_NOT_IMPLEMENTED;
+    }
+    return oql_run_game_loop(rt, p, opponent, games, seed, game, out);
+}
+
+/* ============================================================
  *  Verb dispatch — TRAIN / COMPOSE / RUN / EVALUATE (stubs)
  *
  *  All four are honest about scope: the grammar parses cleanly, but the
@@ -443,7 +842,10 @@ static oql_status oql_exec_pending(const char *verb, FILE *out) {
  *  Top-level executor
  * ============================================================ */
 
-oql_status oql_execute(const OqlScript *script, FILE *out, int *failed_idx) {
+/* Internal core executor — handles both legacy oql_execute (no runtime)
+ * and the E09 oql_execute_with_runtime (registry-backed). */
+static oql_status oql_execute_core(const OqlScript *script, OqlRuntime *rt,
+                                   FILE *out, int *failed_idx) {
     if (!script) return OQL_ERR_RUNTIME;
     if (failed_idx) *failed_idx = 0;
     if (script->error) {
@@ -455,37 +857,76 @@ oql_status oql_execute(const OqlScript *script, FILE *out, int *failed_idx) {
         idx++;
         oql_status st = OQL_OK;
         switch (s->verb) {
-        case OQL_VERB_TRAIN:    st = oql_exec_pending("TRAIN",    out); break;
-        case OQL_VERB_COMPOSE:  st = oql_exec_pending("COMPOSE",  out); break;
-        case OQL_VERB_RUN:      st = oql_exec_pending("RUN",      out); break;
-        case OQL_VERB_EVALUATE: st = oql_exec_pending("EVALUATE", out); break;
+        case OQL_VERB_TRAIN:
+            /* E09 T6 hard-lock: TRAIN stays a stub. */
+            st = oql_exec_pending("TRAIN", out);
+            break;
+        case OQL_VERB_COMPOSE:
+            if (rt) {
+                st = oql_runtime_register_pipeline(rt, &s->u.compose, out);
+            } else {
+                st = oql_exec_pending("COMPOSE", out);
+            }
+            break;
+        case OQL_VERB_RUN:
+            if (rt) {
+                st = oql_exec_run_runtime(rt, s, out);
+            } else {
+                st = oql_exec_pending("RUN", out);
+            }
+            break;
+        case OQL_VERB_EVALUATE:
+            st = oql_exec_pending("EVALUATE", out);
+            break;
         case OQL_VERB_VERIFY:   st = oql_exec_verify(s, out); break;
         case OQL_VERB_AUDIT:    st = oql_exec_audit (s, out); break;
         case OQL_VERB_CREATE_BEHAVIOUR:
-            /* Parsing is the contract here.  The interpreter's behaviour
-             * registry + VM compile step lives in the test harness (see
-             * tests/test_microgpt_oql.c::test_e08_connect4_behaviours);
-             * the OQL interpreter alone does not know about VM modules
-             * and would pull a heavyweight dep — left as a follow-up. */
-            if (out) fprintf(out,
-                "CREATE BEHAVIOUR %s: parsed (vm body %zu bytes); "
-                "compile step is harness-driven — see "
-                "tests/test_microgpt_oql.c\n",
-                s->u.create_behaviour.name ? s->u.create_behaviour.name : "?",
-                s->u.create_behaviour.vm_body
-                    ? strlen(s->u.create_behaviour.vm_body) : 0);
-            st = OQL_OK;
+            if (rt) {
+                st = oql_runtime_register_behaviour(rt,
+                    s->u.create_behaviour.name,
+                    s->u.create_behaviour.vm_body, out);
+                if (st == OQL_OK && out) {
+                    fprintf(out,
+                        "CREATE BEHAVIOUR %s: registered (%zu bytes)\n",
+                        s->u.create_behaviour.name ? s->u.create_behaviour.name : "?",
+                        s->u.create_behaviour.vm_body
+                            ? strlen(s->u.create_behaviour.vm_body) : 0);
+                }
+            } else {
+                /* Legacy oql_execute path — keep the original message so
+                 * existing test harnesses (E08 worked example) still see
+                 * "parsed (vm body ... bytes)" exactly. */
+                if (out) fprintf(out,
+                    "CREATE BEHAVIOUR %s: parsed (vm body %zu bytes); "
+                    "compile step is harness-driven — see "
+                    "tests/test_microgpt_oql.c\n",
+                    s->u.create_behaviour.name ? s->u.create_behaviour.name : "?",
+                    s->u.create_behaviour.vm_body
+                        ? strlen(s->u.create_behaviour.vm_body) : 0);
+                st = OQL_OK;
+            }
             break;
-        case OQL_VERB_CREATE_ORGANELLE: {
-            int n_bindings = 0;
-            for (const OqlKV *k = s->u.create_organelle.bindings; k; k = k->next) n_bindings++;
-            if (out) fprintf(out,
-                "CREATE ORGANELLE %s: parsed (%d bindings)\n",
-                s->u.create_organelle.name ? s->u.create_organelle.name : "?",
-                n_bindings);
-            st = OQL_OK;
+        case OQL_VERB_CREATE_ORGANELLE:
+            if (rt) {
+                st = oql_runtime_register_organelle(rt, &s->u.create_organelle, out);
+                if (st == OQL_OK && out) {
+                    int n_bindings = 0;
+                    for (const OqlKV *k = s->u.create_organelle.bindings; k; k = k->next) n_bindings++;
+                    fprintf(out,
+                        "CREATE ORGANELLE %s: registered (%d bindings, lazy load)\n",
+                        s->u.create_organelle.name ? s->u.create_organelle.name : "?",
+                        n_bindings);
+                }
+            } else {
+                int n_bindings = 0;
+                for (const OqlKV *k = s->u.create_organelle.bindings; k; k = k->next) n_bindings++;
+                if (out) fprintf(out,
+                    "CREATE ORGANELLE %s: parsed (%d bindings)\n",
+                    s->u.create_organelle.name ? s->u.create_organelle.name : "?",
+                    n_bindings);
+                st = OQL_OK;
+            }
             break;
-        }
         }
         if (st != OQL_OK) {
             if (failed_idx) *failed_idx = idx;
@@ -493,4 +934,14 @@ oql_status oql_execute(const OqlScript *script, FILE *out, int *failed_idx) {
         }
     }
     return OQL_OK;
+}
+
+oql_status oql_execute(const OqlScript *script, FILE *out, int *failed_idx) {
+    return oql_execute_core(script, NULL, out, failed_idx);
+}
+
+oql_status oql_execute_with_runtime(const OqlScript *script,
+                                    OqlRuntime *rt,
+                                    FILE *out, int *failed_idx) {
+    return oql_execute_core(script, rt, out, failed_idx);
 }

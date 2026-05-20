@@ -2298,12 +2298,15 @@ endif()
 
 add_library(microgpt_oql_lib STATIC
     src/microgpt_oql.c
+    src/oql_runtime_games.c
     ${OQL_PARSER_SOURCES})
 target_include_directories(microgpt_oql_lib PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_BINARY_DIR})
 # pipeline_verify lives in microgpt_lib (microgpt_pipeline.c); link it in.
-target_link_libraries(microgpt_oql_lib PUBLIC microgpt_lib)
+# microgpt_vm_lib provides vm_module_compile / vm_module_dispose used by
+# the E09 runtime (oql_execute_with_runtime + behaviour dispatch).
+target_link_libraries(microgpt_oql_lib PUBLIC microgpt_lib microgpt_vm_lib)
 
 add_executable(test_microgpt_oql tests/test_microgpt_oql.c)
 # microgpt_vm_lib is wired in so the E08 connect4 worked-example test can
