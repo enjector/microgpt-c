@@ -1,0 +1,18 @@
+# E13 — LLM distillation into Connect-4 player (board, move) pairs
+source_experiment: experiments/E13-llm-game-distillation.md
+generated_by: tools/c4_distill_corpus_gen --games 1000 --seed 1337
+llm_model: qwen/qwen3.6-35b-a3b
+llm_endpoint: http://127.0.0.1:1234
+seed: 1337
+games_played: 1000
+games_won_by_llm: 884  # 88.4% LLM-X win rate vs random (T6 PASS)
+pairs_total: 5652  # only winning games' (board, move) pairs
+generation_date: 2026-05-20
+generation_wall_clock: ~4 h on M2 Max + LM Studio
+parent_commit: c7f030d  # E13 merge to main
+corpus_sha256: bccb72f9520c1d6d70c648f88ea4627c6696376d7420ecf88b4b1fc7b3850229
+
+# Reproduction note
+# This corpus is the canonical input that produced E13's distilled player at 89% solve rate.
+# Re-running c4_distill_corpus_gen with the same seed but different LLM may produce a
+# different distribution — the LLM is the non-deterministic dependency.

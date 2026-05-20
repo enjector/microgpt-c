@@ -1,0 +1,65 @@
+# `data/` — committed corpora and held-out sets
+
+This directory holds **the canonical training corpora and held-out evaluation sets** produced by experiments in `experiments/`. It's committed to git so:
+
+1. **Fragile LLM-generated corpora survive endpoint changes.** E12's 100-example wiring corpus required ~1.5 hours of LM Studio time on `qwen/qwen3.6-35b-a3b`; if the model is uninstalled or LM Studio changes, the original cannot be replayed.
+2. **Cross-agent reuse is mechanical.** Future agent runs read from `data/` instead of regenerating from scratch.
+3. **Audit-trail honesty.** When a published number cites "trained on the LLM corpus," reviewers can see *exactly* the corpus that produced it.
+4. **Leakage audits pick it up by default.** `tools/scaling_leakage_audit.sh` (from E05) ingests `data/` automatically.
+
+## What goes here, what doesn't
+
+| In | Out |
+|---|---|
+| Training corpora (text/tsv/jsonl) | Trained checkpoints (`.ckpt` files — regenerable from corpus + training config) |
+| Held-out evaluation sets | LLM endpoint caches (`build/.oql_llm_cache/`, `build/.oql_oracle_cache/` — implementation detail; corpus is the canonical output) |
+| Per-experiment `provenance.txt` (generation command + seed + commit hash + timestamp + SHA-256) | Compiled binaries, intermediate artefacts, build/ contents |
+| Small `.gitattributes` `linguist-vendored=true` to keep GitHub language stats clean | LLM API response logs (use the cache files in build/ for those) |
+
+**Total size budget:** keep `data/` under ~50 MB. Above that, switch to git-lfs (separate decision, not done yet).
+
+## Per-experiment layout
+
+| Directory | Source experiment | Files |
+|---|---|---|
+| `E12-wiring-llm/` | [E12](../experiments/E12-llm-wiring-corpus.md) — LLM-as-corpus-source for wiring | `corpus.txt` (100 LLM-curated `(prompt, @graph)` survivors), `provenance.txt` |
+| `E13-c4-distill/` | [E13](../experiments/E13-llm-game-distillation.md) — LLM distillation into Connect-4 player | `corpus.txt` (5,652 `(board, move)` pairs from winning games), `provenance.txt` |
+| `E15-klotski/` | [E15](../experiments/E15-composition-vs-monolithic.md) — composition-vs-monolithic on hard search | `train.tsv` (2000 oracle-optimal positions), `heldout.tsv` (113 audit-passed), `heldout_large.tsv` (the pre-Jaccard 2000-pool), `provenance.txt` |
+| `E15-puzzle15/` | E15 — 15-puzzle side of the same | `train.tsv` (2000), `heldout.tsv` (948 audit-passed from 1000-pool), `heldout_large.tsv`, `provenance.txt` |
+
+## How to regenerate any corpus from scratch
+
+Each `provenance.txt` records the exact command + seed + commit hash. For deterministic-oracle corpora (E15), regeneration is byte-identical:
+
+```bash
+# E15 (deterministic; ~40 min)
+./build/e15_generate experiments/E15-corpus.oql
+
+# E12 (requires LM Studio at http://127.0.0.1:1234 with qwen/qwen3.6-35b-a3b; ~1.5 h)
+./build/e12_generate experiments/E12-generate.oql
+
+# E13 (requires LM Studio; ~4 h)
+./build/c4_distill_corpus_gen --games 1000 --seed 1337
+```
+
+For LLM-generated corpora (E12, E13), regeneration may produce **different** outputs if the model has changed. The committed corpus is the **canonical** version cited by the experiment's measurement.
+
+## Integrity check
+
+Each `provenance.txt` includes a SHA-256 of the corpus file. To verify integrity:
+
+```bash
+cd data/E15-klotski
+shasum -a 256 -c provenance.txt   # exits 0 iff the corpus matches the recorded hash
+```
+
+## Policy for adding new corpora
+
+When a new experiment lands and generates a meaningful corpus:
+
+1. Copy the corpus to `data/EXX-<name>/<file>`.
+2. Write a `provenance.txt` with command, seed, parent commit hash, ISO date, SHA-256.
+3. Commit with message `data(corpora): record EXX corpus + provenance`.
+4. Cross-reference from the experiment's Section 3.
+
+The discipline mirrors the leakage-audit and pre-registration disciplines: **the artefact is part of the experiment, not a build by-product.**

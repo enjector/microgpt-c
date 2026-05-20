@@ -1,0 +1,27 @@
+# E15 — Klotski training corpus + held-outs (deterministic oracle output)
+source_experiment: experiments/E15-composition-vs-monolithic.md
+generated_by: tools/e15_generate experiments/E15-corpus.oql + E15-heldout.oql + E15-heldout-puzzle15-large.oql
+oracle: tools/klotski_a_star.c (BFS-optimal)
+seed: 1337
+train_count: 2000  # oracle-optimal positions, mixed difficulty (30% easy / 50% medium / 20% hard)
+
+# File naming is inverted (preserved from the agent's run):
+# heldout_large.tsv = the audit-passed CANONICAL held-out (113 positions; use this for evaluation)
+# heldout.tsv      = a smoke subset (8 positions; for quick sanity checks only)
+heldout_canonical_file: heldout_large.tsv
+heldout_canonical_count: 113  # post-audit; 94% drop rate from 2000 pre-audit pool (Klotski state space density)
+heldout_smoke_file: heldout.tsv
+heldout_smoke_count: 8
+
+audit_threshold: 0.7  # bigram-Jaccard against train
+audit_failures: 0
+generation_date: 2026-05-20
+generation_wall_clock: ~30 min on M2 Max (BFS oracle)
+parent_commit: ac7b1cb  # E15 Phases 1-3 merge to main
+train_sha256: 0663dd3f4db42286c8c284dc321dd9387869e46633a1070916f529612e5d4fd0
+heldout_canonical_sha256: 5d0a19ef4b00bca5b4eefa72c26eda6ef16f6cfb45f869c5135e1dcc31d2c18c
+heldout_smoke_sha256: 2ef9c1b440aad9aff6c24229e2341ff44c49db3bab2d9c1a5801bf9c57ffb0bb
+
+# Reproduction note
+# DETERMINISTIC: re-running ./build/e15_generate with the same seed produces byte-identical output.
+# Verified by oracle's FNV-1a-keyed .oql_oracle_cache/.

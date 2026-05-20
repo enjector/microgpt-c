@@ -1,0 +1,20 @@
+# E12 — LLM-as-corpus-source for wiring (NL → typed @graph)
+source_experiment: experiments/E12-llm-wiring-corpus.md
+generated_by: tools/e12_generate experiments/E12-generate.oql
+llm_model: qwen/qwen3.6-35b-a3b
+llm_endpoint: http://127.0.0.1:1234
+seed: 1337
+count_target: 100
+count_actual: 100
+verifier: libpipeline_ir.verify (pipeline_parse_text_tolerant → pipeline_repair → pipeline_verify)
+audit: bigram-Jaccard against pipeline_corpus_scaling_heldout_v2.txt, threshold 0.7
+audit_failures: 0
+generation_date: 2026-05-20
+generation_wall_clock: ~1.5 h on M2 Max + LM Studio
+parent_commit: de9ea6d  # E12 merge to main
+corpus_sha256: 4e487d204c5bcce8d975e52e82a8e19b5b547278b8e7bc68a92c9b6abf111751
+
+# Reproduction note
+# LLM regeneration may produce DIFFERENT outputs if the model has changed.
+# This corpus is the canonical version that produced E12's measurements
+# (T2=100% verifier yield, T3=0 leakage, T4=0/20 on v2 sealed held-out).

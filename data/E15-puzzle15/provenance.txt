@@ -1,0 +1,26 @@
+# E15 — 15-puzzle training corpus + held-outs (deterministic oracle output)
+source_experiment: experiments/E15-composition-vs-monolithic.md
+generated_by: tools/e15_generate experiments/E15-corpus.oql + E15-heldout.oql
+oracle: tools/puzzle15_a_star.c (IDA*)
+seed: 1337
+train_count: 2000  # oracle-optimal positions, mixed difficulty
+
+# File naming is inverted (preserved from the agent's run):
+# heldout_large.tsv = the audit-passed CANONICAL held-out (948 positions; use this for evaluation)
+# heldout.tsv      = a smoke subset (100 positions; for quick sanity checks only)
+heldout_canonical_file: heldout_large.tsv
+heldout_canonical_count: 948  # post-audit; 94.8% pass rate from 1000-pool pre-audit
+heldout_smoke_file: heldout.tsv
+heldout_smoke_count: 100
+
+audit_threshold: 0.7  # bigram-Jaccard against train
+audit_failures: 0
+generation_date: 2026-05-20
+generation_wall_clock: ~10 min on M2 Max (IDA* oracle)
+parent_commit: ac7b1cb
+train_sha256: 34d381ae97ffe98dde74998f13c672907b8107de364f8c2347eab14fdb256451
+heldout_canonical_sha256: 23fa815644ac4452e1ddcc5b5ca59122a84fad435b19f9674961879edb46ff6e
+heldout_smoke_sha256: 471d2e079c371953c19ad2ac11ba63179e51da457a04e105983e423fe4aa7639
+
+# Reproduction note
+# DETERMINISTIC: re-running ./build/e15_generate with the same seed produces byte-identical output.

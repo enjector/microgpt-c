@@ -1,0 +1,1079 @@
+# E12 LLM-generated wiring corpus
+# model=qwen/qwen3.6-35b-a3b endpoint=http://127.0.0.1:1234 seed=1337 count_target=100
+// multiplying x and y then adding z to the result
+@graph mul_then_add
+: in x -> int
+: in y -> int
+: in z -> int
+: out w -> int
+| n1 = multiply(x, y)
+| n2 = add(n1.out, z)
+w <- n2.out
+@end
+
+// sum of the square of a and the cube of b
+@graph sum_sq_cube
+: in a -> int
+: in b -> int
+: out d -> int
+| n1 = square(a)
+| n2 = cube(b)
+| n3 = add(n1.out, n2.out)
+d <- n3.out
+@end
+
+// the sum of the squares of two inputs
+@graph sum_squares
+: in x -> int
+: in y -> int
+: out z -> int
+| n1 = square(x)
+| n2 = square(y)
+| n3 = add(n1.out, n2.out)
+z <- n3.out
+@end
+
+// add input y to the square of input x
+@graph add_y_to_square_x
+: in x -> int
+: in y -> int
+: out z -> int
+| n1 = square(x)
+| n2 = add(y, n1.out)
+z <- n2.out
+@end
+
+// subtract y from the maximum of x and y
+@graph max_minus_y
+: in x -> int
+: in y -> int
+: out d -> int
+| n1 = max(x, y)
+| n2 = subtract(n1.out, y)
+d <- n2.out
+@end
+
+// the difference between the square of a and the square of b
+@graph diff_squares
+: in a -> int
+: in b -> int
+: out d -> int
+| n1 = square(a)
+| n2 = square(b)
+| n3 = subtract(n1.out, n2.out)
+d <- n3.out
+@end
+
+// multiply input x by weight w and add input y
+@graph weighted_sum
+: in x -> int
+: in w -> int
+: in y -> int
+: out z -> int
+| n1 = multiply(x, w)
+| n2 = add(n1.out, y)
+z <- n2.out
+@end
+
+// the average of the squares of two inputs
+@graph avg_sq
+: in a -> int
+: in b -> int
+: out c -> int
+| n1 = square(a)
+| n2 = square(b)
+| n3 = average_two(n1.out, n2.out)
+c <- n3.out
+@end
+
+// absolute value of num divided by den
+@graph abs_quotient
+: in num -> int
+: in den -> int
+: out res -> int
+| n1 = divide(num, den)
+| n2 = abs(n1.out)
+res <- n2.out
+@end
+
+// compute the square of the difference between two inputs
+@graph squared_diff
+: in a -> int
+: in b -> int
+: out result -> int
+| n1 = subtract(a, b)
+| n2 = square(n1.out)
+result <- n2.out
+@end
+
+// square the average of two inputs
+@graph square_avg
+: in x -> int
+: in y -> int
+: out z -> int
+| n1 = average_two(x, y)
+| n2 = square(n1.out)
+z <- n2.out
+@end
+
+// average a and b, then clamp result to [lo, hi]
+@graph avg_clamp
+: in a -> int
+: in b -> int
+: in lo -> int
+: in hi -> int
+: out y -> int
+| n1 = average_two(a, b)
+| n2 = clamp(n1.out, lo, hi)
+y <- n2.out
+@end
+
+// clamp the sum of two inputs to a specified range
+@graph clamped_sum
+: in x -> int
+: in y -> int
+: in lo -> int
+: in hi -> int
+: out z -> int
+| n1 = add(x, y)
+| n2 = clamp(n1.out, lo, hi)
+z <- n2.out
+@end
+
+// the maximum of a and the minimum of b and c
+@graph max_min_abc
+: in a -> int
+: in b -> int
+: in c -> int
+: out d -> int
+| n1 = min(b, c)
+| n2 = max(a, n1.out)
+d <- n2.out
+@end
+
+// the absolute value of the average of a and b multiplied by c
+@graph avg_abs_mult
+: in a -> int
+: in b -> int
+: in c -> int
+: out d -> int
+| n1 = average_two(a, b)
+| n2 = abs(n1.out)
+| n3 = multiply(n2.out, c)
+d <- n3.out
+@end
+
+// the square of the sum of two inputs
+@graph square_sum
+: in a -> int
+: in b -> int
+: out r -> int
+| n1 = add(a, b)
+| n2 = square(n1.out)
+r <- n2.out
+@end
+
+// average two inputs and add a third value
+@graph avg_ab_plus_c
+: in a -> int
+: in b -> int
+: in c -> int
+: out res -> int
+| n1 = average_two(a, b)
+| n2 = add(n1.out, c)
+res <- n2.out
+@end
+
+// clamp the input value between a lower and upper bound
+@graph clamp_value
+: in x -> int
+: in lo -> int
+: in hi -> int
+: out y -> int
+| n1 = clamp(x, lo, hi)
+y <- n1.out
+@end
+
+// the cube of the difference between two inputs
+@graph cube_diff
+: in x -> int
+: in y -> int
+: out z -> int
+| n1 = subtract(x, y)
+| n2 = cube(n1.out)
+z <- n2.out
+@end
+
+// absolute value of the product of a and b plus c
+@graph abs_prod_plus_c
+: in a -> int
+: in b -> int
+: in c -> int
+: out d -> int
+| n1 = multiply(a, b)
+| n2 = add(n1.out, c)
+| n3 = abs(n2.out)
+d <- n3.out
+@end
+
+// the square of the sum of two inputs
+@graph square_sum
+: in a -> int
+: in b -> int
+: out s -> int
+| n1 = add(a, b)
+| n2 = square(n1.out)
+s <- n2.out
+@end
+
+// clamped product of two inputs bounded by two thresholds
+@graph clamped_product
+: in a -> int
+: in b -> int
+: in lo -> int
+: in hi -> int
+: out result -> int
+| n1 = multiply(a, b)
+| n2 = clamp(n1.out, lo, hi)
+result <- n2.out
+@end
+
+// add two inputs, multiply by a third, then subtract a fourth
+@graph weighted_sum_diff
+: in a -> int
+: in b -> int
+: in c -> int
+: in d -> int
+: out result -> int
+| n1 = add(a, b)
+| n2 = multiply(n1.out, c)
+| n3 = subtract(n2.out, d)
+result <- n3.out
+@end
+
+// the square of the sum of two values minus a third
+@graph square_sum_minus
+: in a -> int
+: in b -> int
+: in c -> int
+: out d -> int
+| n1 = add(a, b)
+| n2 = square(n1.out)
+| n3 = subtract(n2.out, c)
+d <- n3.out
+@end
+
+// clamped sum of two inputs
+@graph clamped_sum
+: in x -> int
+: in y -> int
+: in lo -> int
+: in hi -> int
+: out result -> int
+| n1 = add(x, y)
+| n2 = clamp(n1.out, lo, hi)
+result <- n2.out
+@end
+
+// the square of the average of two inputs
+@graph square_average
+: in a -> int
+: in b -> int
+: out res -> int
+| n1 = average_two(a, b)
+| n2 = square(n1.out)
+res <- n2.out
+@end
+
+// the square of the sum of the product of a and b and c
+@graph square_sum_product
+: in a -> int
+: in b -> int
+: in c -> int
+: out d -> int
+| n1 = multiply(a, b)
+| n2 = add(n1.out, c)
+| n3 = square(n2.out)
+d <- n3.out
+@end
+
+// clamp the average of two inputs to a specified range
+@graph clamp_average
+: in x -> int
+: in y -> int
+: in lo -> int
+: in hi -> int
+: out z -> int
+| n1 = average_two(x, y)
+| n2 = clamp(n1.out, lo, hi)
+z <- n2.out
+@end
+
+// square the first input and add the second
+@graph square_add
+: in x -> int
+: in y -> int
+: out z -> int
+| n1 = square(x)
+| n2 = add(n1.out, y)
+z <- n2.out
+@end
+
+// subtract c from the maximum of a and b
+@graph max_sub_c
+: in a -> int
+: in b -> int
+: in c -> int
+: out d -> int
+| n1 = max(a, b)
+| n2 = subtract(n1.out, c)
+d <- n2.out
+@end
+
+// clamp the input x to stay within the bounds lo and hi
+@graph clamp_x
+: in x -> int
+: in lo -> int
+: in hi -> int
+: out y -> int
+| n1 = clamp(x, lo, hi)
+y <- n1.out
+@end
+
+// multiply the average of a and b by c
+@graph avg_times_c
+: in a -> int
+: in b -> int
+: in c -> int
+: out res -> int
+| n1 = average_two(a, b)
+| n2 = multiply(n1.out, c)
+res <- n2.out
+@end
+
+// square the average of two inputs
+@graph avg_squared
+: in a -> int
+: in b -> int
+: out squared_avg -> int
+| n1 = average_two(a, b)
+| n2 = square(n1.out)
+squared_avg <- n2.out
+@end
+
+// the square of the sum of two inputs, clamped between 0 and 100
+@graph sum_square_clamped
+: in a -> int
+: in b -> int
+: out c -> int
+| n1 = add(a, b)
+| n2 = square(n1.out)
+| n3 = clamp(n2.out, 0, 100)
+c <- n3.out
+@end
+
+// clamp the square of the input to a specified range
+@graph clamped_square
+: in x -> int
+: in lo -> int
+: in hi -> int
+: out y -> int
+| n1 = square(x)
+| n2 = clamp(n1.out, lo, hi)
+y <- n2.out
+@end
+
+// sum of squares of two inputs
+@graph sum_squares
+: in x -> int
+: in y -> int
+: out z -> int
+| n1 = square(x)
+| n2 = square(y)
+| n3 = add(n1.out, n2.out)
+z <- n3.out
+@end
+
+// square the average of two inputs
+@graph sq_avg
+: in a -> int
+: in b -> int
+: out c -> int
+| n1 = average_two(a, b)
+| n2 = square(n1.out)
+c <- n2.out
+@end
+
+// product of the sum of a and b and the difference of c and d
+@graph prod_sum_diff
+: in a -> int
+: in b -> int
+: in c -> int
+: in d -> int
+: out res -> int
+| n1 = add(a, b)
+| n2 = subtract(c, d)
+| n3 = multiply(n1.out, n2.out)
+res <- n3.out
+@end
+
+// cube of the sum of two values
+@graph cube_sum
+: in a -> int
+: in b -> int
+: out c -> int
+| n1 = add(a, b)
+| n2 = cube(n1.out)
+c <- n2.out
+@end
+
+// product of two inputs clamped to the range zero to one hundred
+@graph clamped_product
+: in a -> int
+: in b -> int
+: out result -> int
+| n1 = multiply(a, b)
+| n2 = clamp(n1.out, 0, 100)
+result <- n2.out
+@end
+
+// clamp the product of two inputs to the range zero to one hundred
+@graph clamp_product
+: in x -> int
+: in y -> int
+: out z -> int
+| n1 = multiply(x, y)
+| n2 = clamp(n1.out, 0, 100)
+z <- n2.out
+@end
+
+// the average of two inputs clamped between zero and one hundred
+@graph clamped_average
+: in a -> int
+: in b -> int
+: out d -> int
+| n1 = average_two(a, b)
+| n2 = clamp(n1.out, 0, 100)
+d <- n2.out
+@end
+
+// square of the sum of two input values
+@graph square_sum
+: in a -> int
+: in b -> int
+: out result -> int
+| n1 = add(a, b)
+| n2 = square(n1.out)
+result <- n2.out
+@end
+
+// compute the maximum of the cube of x and the square of y
+@graph max_cube_square
+: in x -> int
+: in y -> int
+: out res -> int
+| n1 = cube(x)
+| n2 = square(y)
+| n3 = max(n1.out, n2.out)
+res <- n3.out
+@end
+
+// the product of two values clamped between zero and one hundred
+@graph clamp_product
+: in x -> int
+: in y -> int
+: out z -> int
+| n1 = multiply(x, y)
+| n2 = clamp(n1.out, 0, 100)
+z <- n2.out
+@end
+
+// the cube of the difference between two inputs
+@graph cube_diff
+: in a -> int
+: in b -> int
+: out result -> int
+| n1 = subtract(a, b)
+| n2 = cube(n1.out)
+result <- n2.out
+@end
+
+// output the maximum of the cube of the first input and the square of the second input
+@graph max_cube_square
+: in x -> int
+: in y -> int
+: out z -> int
+| n1 = cube(x)
+| n2 = square(y)
+| n3 = max(n1.out, n2.out)
+z <- n3.out
+@end
+
+// Add the cube of input a to input b
+@graph cube_plus_b
+: in a -> int
+: in b -> int
+: out y -> int
+| n1 = cube(a)
+| n2 = add(n1.out, b)
+y <- n2.out
+@end
+
+// clamp the difference of two inputs to a specified range
+@graph clamp_diff_range
+: in a -> int
+: in b -> int
+: in lo -> int
+: in hi -> int
+: out result -> int
+| n1 = subtract(a, b)
+| n2 = clamp(n1.out, lo, hi)
+result <- n2.out
+@end
+
+// square the average of two inputs
+@graph square_average
+: in a -> int
+: in b -> int
+: out result -> int
+| n1 = average_two(a, b)
+| n2 = square(n1.out)
+result <- n2.out
+@end
+
+// maximum of the square of x and the cube of y
+@graph max_sq_cube
+: in x -> int
+: in y -> int
+: out z -> int
+| n1 = square(x)
+| n2 = cube(y)
+| n3 = max(n1.out, n2.out)
+z <- n3.out
+@end
+
+// subtract y from the maximum of x and z
+@graph max_sub
+: in x -> int
+: in y -> int
+: in z -> int
+: out w -> int
+| n1 = max(x, z)
+| n2 = subtract(n1.out, y)
+w <- n2.out
+@end
+
+// the square of the average of two inputs
+@graph square_of_average
+: in a -> int
+: in b -> int
+: out result -> int
+| n1 = average_two(a, b)
+| n2 = square(n1.out)
+result <- n2.out
+@end
+
+// multiplies two inputs and clamps the result between the lower and upper bounds
+@graph clamp_product
+: in x -> int
+: in y -> int
+: in lo -> int
+: in hi -> int
+: out z -> int
+| n1 = multiply(x, y)
+| n2 = clamp(n1.out, lo, hi)
+z <- n2.out
+@end
+
+// computes the square of the average of two inputs
+@graph avg_square
+: in a -> int
+: in b -> int
+: out c -> int
+| n1 = average_two(a, b)
+| n2 = square(n1.out)
+c <- n2.out
+@end
+
+// calculate the product of the average of two inputs and a scaling factor
+@graph scaled_average
+: in a -> int
+: in b -> int
+: in scale -> int
+: out result -> int
+| n1 = average_two(a, b)
+| n2 = multiply(n1.out, scale)
+result <- n2.out
+@end
+
+// square of the sum of two inputs
+@graph square_sum
+: in a -> int
+: in b -> int
+: out s -> int
+| n1 = add(a, b)
+| n2 = square(n1.out)
+s <- n2.out
+@end
+
+// square of the sum of two inputs
+@graph sum_squared
+: in a -> int
+: in b -> int
+: out d -> int
+| n1 = add(a, b)
+| n2 = square(n1.out)
+d <- n2.out
+@end
+
+// take the maximum of two inputs and subtract ten
+@graph max_minus_ten
+: in a -> int
+: in b -> int
+: out c -> int
+| n1 = max(a, b)
+| n2 = subtract(n1.out, 10)
+c <- n2.out
+@end
+
+// The difference between c and the maximum of a and b
+@graph diff_from_max
+: in a -> int
+: in b -> int
+: in c -> int
+: out d -> int
+| n1 = max(a, b)
+| n2 = subtract(c, n1.out)
+d <- n2.out
+@end
+
+// the product of two inputs clamped between a lower bound and an upper bound
+@graph clamped_product
+: in x -> int
+: in y -> int
+: in lo -> int
+: in hi -> int
+: out result -> int
+| n1 = multiply(x, y)
+| n2 = clamp(n1.out, lo, hi)
+result <- n2.out
+@end
+
+// the average of two values clamped to the range [0, 100]
+@graph avg_clamped
+: in x -> int
+: in y -> int
+: out z -> int
+| n1 = average_two(x, y)
+| n2 = clamp(n1.out, 0, 100)
+z <- n2.out
+@end
+
+// clamp the sum of two inputs to a specified range
+@graph clamped_sum
+: in x -> int
+: in y -> int
+: in lo -> int
+: in hi -> int
+: out result -> int
+| n1 = add(x, y)
+| n2 = clamp(n1.out, lo, hi)
+result <- n2.out
+@end
+
+// clamps the sum of two inputs to a specified range
+@graph clamp_sum
+: in x -> int
+: in y -> int
+: in lo -> int
+: in hi -> int
+: out z -> int
+| n1 = add(x, y)
+| n2 = clamp(n1.out, lo, hi)
+z <- n2.out
+@end
+
+// the average of two inputs multiplied by two
+@graph avg_doubled
+: in a -> int
+: in b -> int
+: out res -> int
+| n1 = average_two(a, b)
+| n2 = multiply(n1.out, 2)
+res <- n2.out
+@end
+
+// the product of x and y clamped to the range [-10, 10]
+@graph clamp_product
+: in x -> int
+: in y -> int
+: out z -> int
+| n1 = multiply(x, y)
+| n2 = clamp(n1.out, -10, 10)
+z <- n2.out
+@end
+
+// clamp the sum of two inputs to a specified range
+@graph clamp_sum
+: in x -> int
+: in y -> int
+: in lo -> int
+: in hi -> int
+: out result -> int
+| n1 = add(x, y)
+| n2 = clamp(n1.out, lo, hi)
+result <- n2.out
+@end
+
+// compute the sum of the squares of two inputs
+@graph sum_squares
+: in a -> int
+: in b -> int
+: out s -> int
+| n1 = square(a)
+| n2 = square(b)
+| n3 = add(n1.out, n2.out)
+s <- n3.out
+@end
+
+// clamp the sum of two inputs to a specified range
+@graph clamped_sum
+: in x -> int
+: in y -> int
+: in lo -> int
+: in hi -> int
+: out r -> int
+| n1 = add(x, y)
+| n2 = clamp(n1.out, lo, hi)
+r <- n2.out
+@end
+
+// the square of the sum of two inputs, capped at five hundred
+@graph square_sum_cap
+: in a -> int
+: in b -> int
+: out r -> int
+| n1 = add(a, b)
+| n2 = square(n1.out)
+| n3 = clamp(n2.out, 0, 500)
+r <- n3.out
+@end
+
+// the square of the sum of two inputs
+@graph square_of_sum
+: in x -> int
+: in y -> int
+: out z -> int
+| n1 = add(x, y)
+| n2 = square(n1.out)
+z <- n2.out
+@end
+
+// square the average of two inputs
+@graph squared_average
+: in a -> int
+: in b -> int
+: out val -> int
+| n1 = average_two(a, b)
+| n2 = square(n1.out)
+val <- n2.out
+@end
+
+// the sum of the squares of two inputs
+@graph sum_of_squares
+: in x -> int
+: in y -> int
+: out z -> int
+| n1 = square(x)
+| n2 = square(y)
+| n3 = add(n1.out, n2.out)
+z <- n3.out
+@end
+
+// the square of input x, clamped between 0 and 100
+@graph clamp_square
+: in x -> int
+: out y -> int
+| n1 = square(x)
+| n2 = clamp(n1.out, 0, 100)
+y <- n2.out
+@end
+
+// the square of the average of two readings
+@graph squared_average
+: in a -> int
+: in b -> int
+: out val -> int
+| n1 = average_two(a, b)
+| n2 = square(n1.out)
+val <- n2.out
+@end
+
+// the sum of the squares of two inputs
+@graph sum_of_squares
+: in a -> int
+: in b -> int
+: out d -> int
+| n1 = square(a)
+| n2 = square(b)
+| n3 = add(n1.out, n2.out)
+d <- n3.out
+@end
+
+// the maximum of the square of x and the cube of y
+@graph max_sq_cube
+: in x -> int
+: in y -> int
+: out z -> int
+| n1 = square(x)
+| n2 = cube(y)
+| n3 = max(n1.out, n2.out)
+z <- n3.out
+@end
+
+// square the average of two inputs
+@graph square_average
+: in a -> int
+: in b -> int
+: out r -> int
+| n1 = average_two(a, b)
+| n2 = square(n1.out)
+r <- n2.out
+@end
+
+// square input a and add constant b
+@graph square_plus
+: in a -> int
+: in b -> int
+: out r -> int
+| n1 = square(a)
+| n2 = add(n1.out, b)
+r <- n2.out
+@end
+
+// product of two inputs clamped between zero and one hundred
+@graph clamped_product
+: in x -> int
+: in y -> int
+: out z -> int
+| n1 = multiply(x, y)
+| n2 = clamp(n1.out, 0, 100)
+z <- n2.out
+@end
+
+// sum of squares of two inputs
+@graph sum_squares
+: in a -> int
+: in b -> int
+: out s -> int
+| n1 = square(a)
+| n2 = square(b)
+| n3 = add(n1.out, n2.out)
+s <- n3.out
+@end
+
+// square the input a and add ten
+@graph sq_plus_10
+: in a -> int
+: out r -> int
+| n1 = square(a)
+| n2 = add(n1.out, 10)
+r <- n2.out
+@end
+
+// the cube of the difference between two inputs
+@graph cube_diff
+: in a -> int
+: in b -> int
+: out d -> int
+| n1 = subtract(a, b)
+| n2 = cube(n1.out)
+d <- n2.out
+@end
+
+// clamps the sum of x and y between lo and hi
+@graph clamp_sum
+: in x -> int
+: in y -> int
+: in lo -> int
+: in hi -> int
+: out z -> int
+| n1 = add(x, y)
+| n2 = clamp(n1.out, lo, hi)
+z <- n2.out
+@end
+
+// the square of the sum of two values
+@graph square_sum
+: in a -> int
+: in b -> int
+: out s -> int
+| n1 = add(a, b)
+| n2 = square(n1.out)
+s <- n2.out
+@end
+
+// clamp the sum of two inputs between a lower and upper bound
+@graph sum_clamp
+: in a -> int
+: in b -> int
+: in lo -> int
+: in hi -> int
+: out c -> int
+| n1 = add(a, b)
+| n2 = clamp(n1.out, lo, hi)
+c <- n2.out
+@end
+
+// add the average of the two inputs to the first input
+@graph add_avg_first
+: in x -> int
+: in y -> int
+: out res -> int
+| n1 = average_two(x, y)
+| n2 = add(x, n1.out)
+res <- n2.out
+@end
+
+// the product of two inputs clamped between a lower bound and an upper bound
+@graph clamped_product
+: in x -> int
+: in y -> int
+: in lo -> int
+: in hi -> int
+: out result -> int
+| n1 = multiply(x, y)
+| n2 = clamp(n1.out, lo, hi)
+result <- n2.out
+@end
+
+// the average of the square and cube of a single input
+@graph avg_square_cube
+: in x -> int
+: out y -> int
+| n1 = square(x)
+| n2 = cube(x)
+| n3 = average_two(n1.out, n2.out)
+y <- n3.out
+@end
+
+// The product of two inputs clamped between a lower bound and an upper bound
+@graph clamped_product
+: in x -> int
+: in y -> int
+: in lo -> int
+: in hi -> int
+: out result -> int
+| n1 = multiply(x, y)
+| n2 = clamp(n1.out, lo, hi)
+result <- n2.out
+@end
+
+// clamp the square of the sum of a and b to the range [c, d]
+@graph clamp_square_sum
+: in a -> int
+: in b -> int
+: in c -> int
+: in d -> int
+: out res -> int
+| n1 = add(a, b)
+| n2 = square(n1.out)
+| n3 = clamp(n2.out, c, d)
+res <- n3.out
+@end
+
+// square of x added to y
+@graph square_plus_y
+: in x -> int
+: in y -> int
+: out sum -> int
+| n1 = square(x)
+| n2 = add(n1.out, y)
+sum <- n2.out
+@end
+
+// clamp the input value x to the range defined by lower bound lo and upper bound hi
+@graph clamp_range
+: in x -> int
+: in lo -> int
+: in hi -> int
+: out result -> int
+| n1 = clamp(x, lo, hi)
+result <- n1.out
+@end
+
+// the square of the first input added to the second input
+@graph square_plus_input
+: in x -> int
+: in y -> int
+: out result -> int
+| n1 = square(x)
+| n2 = add(n1.out, y)
+result <- n2.out
+@end
+
+// square of the sum of x and y
+@graph sq_sum
+: in x -> int
+: in y -> int
+: out z -> int
+| n1 = add(x, y)
+| n2 = square(n1.out)
+z <- n2.out
+@end
+
+// the product of two inputs, clamped between zero and one hundred
+@graph clamp_product
+: in x -> int
+: in y -> int
+: out z -> int
+| n1 = multiply(x, y)
+| n2 = clamp(n1.out, 0, 100)
+z <- n2.out
+@end
+
+// the square of the maximum of two inputs
+@graph squared_max
+: in a -> int
+: in b -> int
+: out d -> int
+| n1 = max(a, b)
+| n2 = square(n1.out)
+d <- n2.out
+@end
+
+// the sum of two inputs clamped to a specified range
+@graph clamped_sum
+: in x -> int
+: in y -> int
+: in lo -> int
+: in hi -> int
+: out result -> int
+| n1 = add(x, y)
+| n2 = clamp(n1.out, lo, hi)
+result <- n2.out
+@end
+
+// clamp input x between lo and hi, then multiply by scale
+@graph clamp_scale
+: in x -> int
+: in lo -> int
+: in hi -> int
+: in scale -> int
+: out result -> int
+| n1 = clamp(x, lo, hi)
+| n2 = multiply(n1.out, scale)
+result <- n2.out
+@end
+
+// calculate the cube of the absolute difference between two inputs
+@graph cube_abs_diff
+: in x -> int
+: in y -> int
+: out result -> int
+| n1 = subtract(x, y)
+| n2 = abs(n1.out)
+| n3 = cube(n2.out)
+result <- n3.out
+@end
+
