@@ -49,6 +49,8 @@ void vm_natives_ctx_init(vm_natives_ctx *ctx) {
     ctx->current_move_handle  = -1;
     ctx->last_entropy = 0.0;
     ctx->centre_column = 3; /* Connect-4 default */
+    ctx->propose_column = NULL;       /* E11: set by runtime after lazy load */
+    ctx->propose_column_state = NULL;
 }
 
 void vm_natives_ctx_dispose(vm_natives_ctx *ctx) {
@@ -174,6 +176,34 @@ static double n_c4_board_handle_from_str(vm_natives_ctx *ctx,
     return argv[0];
 }
 
+/* E11: c4_model_propose_column(temp_x100)
+ *
+ *   Asks the host (via the runtime-installed callback) to run a real
+ *   model-driven move proposal against the current board.  Returns the
+ *   proposed column in [0, 6] or -1.0 if either:
+ *     - no callback is installed (e.g. checkpoint absent / running under
+ *       a unit test that doesn't wire the runtime);
+ *     - the callback returned -1 (the model produced an unparseable
+ *       token or proposed an illegal column).
+ *
+ *   The TS-side signature is `declare function c4_model_propose_column(t: number): number;`.
+ *   The temperature argument is integer × 100 (e.g. 20 = 0.2) because the
+ *   VM ABI is number-only and the OQL runtime keeps the wire format
+ *   integer-stable.  Clamped to [1, 100] at the host before being divided
+ *   back to a scalar_t temperature.
+ */
+static double n_c4_model_propose_column(vm_natives_ctx *ctx,
+                                        int argc, const double *argv) {
+    if (!ctx) return -1.0;
+    if (!ctx->propose_column) return -1.0;
+    int temp_x100 = (argc >= 1) ? (int)argv[0] : 20;
+    if (temp_x100 < 1)   temp_x100 = 1;
+    if (temp_x100 > 100) temp_x100 = 100;
+    int col = ctx->propose_column(ctx, temp_x100);
+    if (col < 0 || col > 6) return -1.0;
+    return (double)col;
+}
+
 /* ============================================================
  *  Registration helper — adds the (name, arity, fn) entry to the dispatch
  *  table.  The TS-side `declare function NAME(...)` covers the parser
@@ -211,6 +241,8 @@ int vm_natives_register_c4(vm_natives_ctx *ctx) {
     vm_natives_add("c4_last_entropy",          0, n_c4_last_entropy);
     vm_natives_add("c4_token_handle",          1, n_c4_token_handle);
     vm_natives_add("c4_board_handle_from_str", 1, n_c4_board_handle_from_str);
+    /* E11: single new extern — full board+prompt-protocol model proposal. */
+    vm_natives_add("c4_model_propose_column",  1, n_c4_model_propose_column);
     return g_natives_count;
 }
 
