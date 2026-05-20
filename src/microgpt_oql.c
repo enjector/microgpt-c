@@ -83,6 +83,21 @@ OqlStmt *oql_y_create_corpus(char *name, char *path) {
     s->u.create_corpus.file_path = path;
     return s;
 }
+OqlStmt *oql_y_create_corpus_llm(char *name, char *model_id,
+                                 char *endpoint_url, char *prompt,
+                                 OqlKV *with_kv, int verify_via_pipeline_ir,
+                                 char *audit_held_out, OqlKV *audit_with) {
+    OqlStmt *s = oql_stmt_alloc(OQL_VERB_CREATE_CORPUS_LLM);
+    s->u.create_corpus_llm.name = name;
+    s->u.create_corpus_llm.model_id = model_id;
+    s->u.create_corpus_llm.endpoint_url = endpoint_url;
+    s->u.create_corpus_llm.prompt = prompt;
+    s->u.create_corpus_llm.with_kv = with_kv;
+    s->u.create_corpus_llm.verify_via_pipeline_ir = verify_via_pipeline_ir;
+    s->u.create_corpus_llm.audit_held_out = audit_held_out;
+    s->u.create_corpus_llm.audit_with = audit_with;
+    return s;
+}
 OqlKV *oql_y_kv(char *key, char *val) {
     OqlKV *k = (OqlKV *)calloc(1, sizeof(OqlKV));
     if (k) { k->key = key; k->value = val; }
@@ -289,6 +304,15 @@ static void oql_stmt_free_inner(OqlStmt *s) {
     case OQL_VERB_CREATE_CORPUS:
         free(s->u.create_corpus.name);
         free(s->u.create_corpus.file_path);
+        break;
+    case OQL_VERB_CREATE_CORPUS_LLM:
+        free(s->u.create_corpus_llm.name);
+        free(s->u.create_corpus_llm.model_id);
+        free(s->u.create_corpus_llm.endpoint_url);
+        free(s->u.create_corpus_llm.prompt);
+        oql_kv_free(s->u.create_corpus_llm.with_kv);
+        free(s->u.create_corpus_llm.audit_held_out);
+        oql_kv_free(s->u.create_corpus_llm.audit_with);
         break;
     }
 }
@@ -1078,6 +1102,62 @@ static oql_status oql_execute_core(const OqlScript *script, OqlRuntime *rt,
                     s->u.create_corpus.name ? s->u.create_corpus.name : "?",
                     s->u.create_corpus.file_path ? s->u.create_corpus.file_path : "?");
                 st = OQL_OK;
+            }
+            break;
+        case OQL_VERB_CREATE_CORPUS_LLM:
+            /* E12 — Parse-time path only.  Actual LLM emission happens
+             * via the standalone `e12_generate` tool which links against
+             * tools/llm_corpus_source.{c,h}.  Keeping the LLM transport
+             * out of microgpt_oql_lib preserves the rule that the OQL
+             * core does NOT depend on curl or networking — only tools do.
+             *
+             * When `oql_runner` (or any executor) sees a FROM LLM
+             * statement, the human-facing message states what would be
+             * generated; the agent then invokes e12_generate with the
+             * matching arguments to actually run the bridge.
+             *
+             * In the registry-backed runtime path (rt != NULL), we ALSO
+             * register the *output* corpus path under the corpus name
+             * so a subsequent TRAIN statement can resolve it. */
+            {
+                const OqlCreateCorpusLlm *cc = &s->u.create_corpus_llm;
+                const char *count_s = oql_kv_get(cc->with_kv, "count");
+                const char *output_path = oql_kv_get(cc->with_kv, "output");
+                if (out) {
+                    fprintf(out,
+                        "CREATE CORPUS %s FROM LLM '%s'%s%s%s PROMPT '%.40s%s'%s%s%s%s%s: parsed\n",
+                        cc->name ? cc->name : "?",
+                        cc->model_id ? cc->model_id : "",
+                        cc->endpoint_url ? "@'" : "",
+                        cc->endpoint_url ? cc->endpoint_url : "",
+                        cc->endpoint_url ? "'" : "",
+                        cc->prompt ? cc->prompt : "",
+                        (cc->prompt && strlen(cc->prompt) > 40) ? "..." : "",
+                        count_s ? " count=" : "",
+                        count_s ? count_s : "",
+                        cc->verify_via_pipeline_ir ? " VERIFY_VIA pipeline_ir" : "",
+                        cc->audit_held_out ? " AUDIT_AGAINST " : "",
+                        cc->audit_held_out ? cc->audit_held_out : "");
+                    if (output_path) {
+                        fprintf(out,
+                            "  output corpus will materialise at '%s' (invoke e12_generate to populate)\n",
+                            output_path);
+                    } else {
+                        fprintf(out,
+                            "  no `output=<path>` in WITH clause — corpus generation deferred\n");
+                    }
+                }
+                if (rt && output_path) {
+                    /* Register a corpus with the materialised path so a
+                     * follow-up TRAIN can resolve it.  TRAIN's slurp will
+                     * fail gracefully if the file doesn't exist yet. */
+                    OqlCreateCorpus shim;
+                    shim.name = cc->name;
+                    shim.file_path = (char *)output_path;
+                    st = oql_runtime_register_corpus(rt, &shim, out);
+                } else {
+                    st = OQL_OK;
+                }
             }
             break;
         }

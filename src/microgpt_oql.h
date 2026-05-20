@@ -59,7 +59,11 @@ typedef enum {
      * type (FROM FILE '<path>') — still inherits CREATE, still +6 verbs. */
     OQL_VERB_CREATE_BEHAVIOUR,
     OQL_VERB_CREATE_ORGANELLE,
-    OQL_VERB_CREATE_CORPUS
+    OQL_VERB_CREATE_CORPUS,
+    /* E12 — CREATE CORPUS FROM LLM ... (still inherits CREATE verb,
+     * still +6/-4).  The grammar reuses the same CREATE keyword and adds
+     * a new SOURCE clause (FROM LLM) rather than a new top-level verb. */
+    OQL_VERB_CREATE_CORPUS_LLM
 } OqlVerb;
 
 /* ============================================================
@@ -200,6 +204,38 @@ typedef struct {
     char *file_path;    /* source path, owned (must be non-NULL) */
 } OqlCreateCorpus;
 
+/* CREATE CORPUS <name> FROM LLM '<model>'[@'<endpoint>']
+ *   PROMPT '<text>' [WITH (count=N, seed=S, cache='<path>', max_retries=R)]
+ *   [VERIFY_VIA pipeline_ir]
+ *   [AUDIT_AGAINST <held_out_name> [WITH (mode=jaccard, threshold=F)]];
+ *
+ * E12 — LLM is a new SOURCE clause, not a new top-level verb.
+ * The generated corpus is materialised to disk lazily on first TRAIN
+ * reference (or eagerly via the oql_runner CLI's `--materialise` mode).
+ * `endpoint_url` defaults to "http://127.0.0.1:1234" when NULL.
+ * Built-in WITH keys: count (int, default 1000), seed (int, default
+ * 1337), cache (str, default ".oql_llm_cache/"), max_retries (int,
+ * default 5), output (str, output corpus file path).
+ *
+ * The verify_via_pipeline_ir bit, when set, routes each LLM emission
+ * through pipeline_parse_text_tolerant → pipeline_repair →
+ * pipeline_verify before it lands in the materialised corpus.
+ *
+ * The audit_held_out string (if non-NULL) names another corpus (a
+ * CREATE CORPUS … FROM FILE statement that precedes this one) against
+ * which each emitted prompt's max-Jaccard is computed; emissions that
+ * cross threshold are rejected. */
+typedef struct {
+    char *name;             /* corpus identifier, owned */
+    char *model_id;         /* e.g. "qwen/qwen3.6-35b-a3b", owned */
+    char *endpoint_url;     /* NULL = default endpoint; owned otherwise */
+    char *prompt;           /* prompt template, owned */
+    OqlKV *with_kv;         /* count / seed / cache / max_retries / output */
+    int   verify_via_pipeline_ir;
+    char *audit_held_out;   /* corpus name, owned (NULL if no audit) */
+    OqlKV *audit_with;      /* mode / threshold, owned (NULL if defaults) */
+} OqlCreateCorpusLlm;
+
 /* ============================================================
  *  Statement union
  * ============================================================ */
@@ -216,6 +252,7 @@ typedef struct OqlStmt {
         OqlCreateBehaviour  create_behaviour;
         OqlCreateOrganelle  create_organelle;
         OqlCreateCorpus     create_corpus;
+        OqlCreateCorpusLlm  create_corpus_llm;
     } u;
     struct OqlStmt *next;
 } OqlStmt;

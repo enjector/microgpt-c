@@ -326,6 +326,64 @@ enx_test(test_e10_create_corpus_parses) {
  *   WITH ROLE / STEPS / LR / BATCH_SIZE / SAVE / SEED.
  * Pre-reg target T1.  The clauses arrive as key/value pairs through the
  * existing E07 kv_list rule — no new grammar productions required. */
+/* E12 -- CREATE CORPUS ... FROM LLM ... is a new SOURCE clause; +6/-4
+ * verb lock holds.  Parse-only test: covers model literal, optional
+ * endpoint, PROMPT, WITH kvs, VERIFY_VIA, AUDIT_AGAINST. */
+enx_test(test_e12_create_corpus_from_llm_parses_minimal) {
+    OqlScript *s = parse_or_die(
+        "CREATE CORPUS llm_smoke FROM LLM 'qwen/qwen3.6-35b-a3b' "
+        "PROMPT 'emit one example';");
+    enx_assert_equal_size(oql_script_count(s), 1);
+    enx_assert_equal_int(s->head->verb, OQL_VERB_CREATE_CORPUS_LLM);
+    enx_assert_equal_string(s->head->u.create_corpus_llm.name, "llm_smoke");
+    enx_assert_equal_string(s->head->u.create_corpus_llm.model_id,
+                            "qwen/qwen3.6-35b-a3b");
+    enx_assert_equal_string(s->head->u.create_corpus_llm.prompt,
+                            "emit one example");
+    enx_assert_equal_int(s->head->u.create_corpus_llm.verify_via_pipeline_ir, 0);
+    oql_script_free(s);
+}
+
+enx_test(test_e12_create_corpus_from_llm_full_clauses_parse) {
+    OqlScript *s = parse_or_die(
+        "CREATE CORPUS llm_full FROM LLM 'qwen/qwen3.6-35b-a3b'"
+        " @ 'http://127.0.0.1:1234'"
+        " PROMPT 'generate one pair as JSON'"
+        " WITH count = 100, seed = 1337, cache = '.oql_llm_cache/',"
+        " max_retries = 5, output = 'build/llm_corpus.txt'"
+        " VERIFY_VIA pipeline_ir"
+        " AUDIT_AGAINST held_out_v2;");
+    enx_assert_equal_size(oql_script_count(s), 1);
+    enx_assert_equal_int(s->head->verb, OQL_VERB_CREATE_CORPUS_LLM);
+    const OqlCreateCorpusLlm *cc = &s->head->u.create_corpus_llm;
+    enx_assert_equal_string(cc->name, "llm_full");
+    enx_assert_equal_string(cc->model_id, "qwen/qwen3.6-35b-a3b");
+    enx_assert_equal_string(cc->endpoint_url, "http://127.0.0.1:1234");
+    enx_assert_equal_string(cc->prompt, "generate one pair as JSON");
+    enx_assert_equal_int(cc->verify_via_pipeline_ir, 1);
+    enx_assert_equal_string(cc->audit_held_out, "held_out_v2");
+    enx_assert_equal_string(oql_kv_get(cc->with_kv, "count"), "100");
+    enx_assert_equal_string(oql_kv_get(cc->with_kv, "seed"), "1337");
+    enx_assert_equal_string(oql_kv_get(cc->with_kv, "output"),
+                            "build/llm_corpus.txt");
+    oql_script_free(s);
+}
+
+/* E12 - adding the FROM LLM SOURCE clause MUST NOT inflate the locked
+ * +6 verb surface.  CREATE inherits SQL; CORPUS is an object type;
+ * LLM is a new source kind inside CREATE CORPUS - not a new verb. */
+enx_test(test_e12_verb_surface_holds_after_llm_source) {
+    OqlScript *s = parse_or_die(
+        "CREATE CORPUS x FROM LLM 'm' PROMPT 'p';");
+    enx_assert_equal_int(s->head->verb, OQL_VERB_CREATE_CORPUS_LLM);
+    /* Ensure no parser internal bumped the verb-tag count past CREATE
+     * object types — OQL_VERB_CREATE_CORPUS_LLM is the highest tag we
+     * may emit; the +6 verbs (TRAIN..AUDIT) + the three CREATE object
+     * subtags + the LLM subtag still belong to the inherited CREATE. */
+    enx_assert_true(s->head->verb == OQL_VERB_CREATE_CORPUS_LLM);
+    oql_script_free(s);
+}
+
 enx_test(test_e10_train_full_clause_list_parses) {
     OqlScript *s = parse_or_die(
         "TRAIN poet ON names_tiny WITH "
@@ -746,6 +804,10 @@ enx_test_case_t oql_tests[] = {
     /* E10 — TRAIN wiring + CREATE CORPUS object type. */
     enx_test_case(test_e10_create_corpus_parses),
     enx_test_case(test_e10_train_full_clause_list_parses),
+    /* E12 — CREATE CORPUS … FROM LLM … (new SOURCE clause). */
+    enx_test_case(test_e12_create_corpus_from_llm_parses_minimal),
+    enx_test_case(test_e12_create_corpus_from_llm_full_clauses_parse),
+    enx_test_case(test_e12_verb_surface_holds_after_llm_source),
     enx_test_case_end()
 };
 

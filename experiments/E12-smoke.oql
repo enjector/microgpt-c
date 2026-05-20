@@ -1,0 +1,36 @@
+-- E12 smoke: small generation run to validate the LLM understands the IR.
+-- See experiments/E12-llm-wiring-corpus.md §1.6 falsification mitigation.
+
+CREATE CORPUS llm_smoke FROM LLM 'qwen/qwen3.6-35b-a3b'
+    @ 'http://127.0.0.1:1234'
+    PROMPT 'Output ONLY a single training example for a wiring-graph organelle. The exact format (no markdown, no preamble) is:
+
+// <one-line NL description>
+@graph <snake_case_name>
+: in <port> -> int
+: out <port> -> int
+| n1 = <primitive>(<arg>, ...)
+<sig_out_port> <- n1.out
+@end
+
+Use ONLY these primitives (all binary unless noted): add, subtract, multiply, divide (binary), abs (unary), max, min (binary), square (unary), cube (unary), average_two (binary), clamp (3-ary: x, lo, hi), identity (unary).
+
+Each primitive expects "x" and "y" input ports for binary, "x" only for unary, "x", "lo", "hi" for clamp. The output port is always named "out".
+
+Edge syntax: <sig_input_name> goes into a node by listing it in the args; chain by referring to a prior node id like "n1.out" not allowed in args — instead use named binding: | n2 = add(n1, sig_y). Wait, just use sig inputs directly in args; for inter-node use named ports as written in the example.
+
+Concrete worked example to imitate (do not reuse the prompt or graph_name verbatim):
+
+// the absolute value of the difference between two readings
+@graph abs_diff
+: in a -> int
+: in b -> int
+: out d -> int
+| n1 = subtract(a, b)
+| n2 = abs(n1.out)
+d <- n2.out
+@end
+
+Now produce ONE distinct training example using a different primitive composition. Use 1 to 4 nodes. Output ONLY the // line, then the @graph block, then nothing else.'
+    WITH count = 5, seed = 1337, cache = '.oql_llm_cache/', max_retries = 3, output = 'llm_smoke_corpus.txt'
+    VERIFY_VIA pipeline_ir;

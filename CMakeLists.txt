@@ -2334,6 +2334,31 @@ if(NOT MSVC)
 endif()
 
 # ──────────────────────────────────────────────────────────────────
+#  e12_generate — LLM-as-corpus-source bridge (Experiment E12).
+#
+#  Reads an OQL script containing a CREATE CORPUS … FROM LLM …
+#  statement and actually invokes the LM Studio endpoint via curl
+#  (subprocess) to produce the materialised corpus file.  Filters
+#  each emission through pipeline_ir.verify() (if VERIFY_VIA is set)
+#  and the Jaccard audit against a held-out (if AUDIT_AGAINST is set).
+#
+#  Tool-only — never linked into any organelle runtime binary; the
+#  trained wiring organelle MUST NOT call the LLM at inference.
+#  T8 hard-lock holds: zero new build deps beyond curl.
+# ──────────────────────────────────────────────────────────────────
+add_executable(e12_generate
+    tools/e12_generate.c
+    tools/llm_corpus_source.c)
+target_link_libraries(e12_generate PRIVATE microgpt_oql_lib)
+target_include_directories(e12_generate PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/tools)
+if(NOT MSVC)
+    target_link_libraries(e12_generate PRIVATE m)
+endif()
+
+
+# ──────────────────────────────────────────────────────────────────
 #  oql_c4 — Connect-4-dims variant of the `oql` CLI.
 #
 #  E09 Pathway A: the engine's matmul hot loops constant-fold N_EMBD,
@@ -2374,6 +2399,35 @@ target_include_directories(oql_c4 PRIVATE
 target_compile_definitions(oql_c4 PRIVATE ${_C4_DEFINES})
 if(NOT MSVC)
     target_link_libraries(oql_c4 PRIVATE m)
+endif()
+
+# ──────────────────────────────────────────────────────────────────
+#  oql_wiring — Wiring-dims variant of the `oql` CLI (Experiment E12).
+#
+#  Same compile-time-macro discipline as oql_c4: the wiring organelle
+#  was trained at N_EMBD=96 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=384 MLP_DIM=384,
+#  so a TRAIN dispatch via the OQL CLI must compile against the same
+#  macros for matmul dimensions to match.  Researchers run:
+#      ./build/oql_wiring run ../experiments/E12-train.oql
+# ──────────────────────────────────────────────────────────────────
+set(_WIRING_DEFINES
+    N_EMBD=96 N_HEAD=4 N_LAYER=4 BLOCK_SIZE=384 MLP_DIM=384
+    NUM_STEPS=5000 LEARNING_RATE=0.001 BATCH_SIZE=16
+    MAX_VOCAB=1500 MAX_DOCS=5000 MAX_DOC_LEN=4096)
+_microgpt_lib_for_defines(_WIRING_LIB ${_WIRING_DEFINES})
+add_executable(oql_wiring
+    tools/oql_runner.c
+    src/oql_runtime_games.c
+    src/oql_runtime_train.c
+    src/microgpt_oql.c
+    ${OQL_PARSER_SOURCES})
+target_link_libraries(oql_wiring PRIVATE ${_WIRING_LIB} microgpt_vm_lib)
+target_include_directories(oql_wiring PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_BINARY_DIR})
+target_compile_definitions(oql_wiring PRIVATE ${_WIRING_DEFINES})
+if(NOT MSVC)
+    target_link_libraries(oql_wiring PRIVATE m)
 endif()
 
 add_executable(test_microgpt_oql tests/test_microgpt_oql.c)
