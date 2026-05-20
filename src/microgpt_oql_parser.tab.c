@@ -75,7 +75,7 @@
 #define yychar          oql_parser_char
 
 /* First part of user prologue.  */
-#line 13 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+#line 13 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
 
     #include "microgpt_oql.h"
     #include <stdio.h>
@@ -102,6 +102,9 @@
                                      char *endpoint_url, char *prompt,
                                      OqlKV *with_kv, int verify_via_pipeline_ir,
                                      char *audit_held_out, OqlKV *audit_with);
+    /* E15 — CREATE CORPUS <name> FROM ORACLE '<path>' [WITH (...)] [PROMPT '<text>']; */
+    OqlStmt *oql_y_create_corpus_oracle(char *name, char *oracle_path,
+                                        OqlKV *with_kv, char *prompt);
     OqlKV   *oql_y_kv(char *key, char *val);
     OqlKV   *oql_y_kv_concat(OqlKV *head, OqlKV *tail);
     OqlNameList *oql_y_name(char *n);
@@ -109,7 +112,7 @@
     OqlPredicate *oql_y_pred(char *lhs, OqlOp op, char *rhs);
     void oql_y_append(oql_parser *p, OqlStmt *s);
 
-#line 113 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 116 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
 
 # ifndef YY_CAST
 #  ifdef __cplusplus
@@ -176,47 +179,50 @@ enum yysymbol_kind_t
   YYSYMBOL_T_AUDIT_AGAINST = 36,           /* T_AUDIT_AGAINST  */
   YYSYMBOL_T_PIPELINE_IR = 37,             /* T_PIPELINE_IR  */
   YYSYMBOL_T_AT = 38,                      /* T_AT  */
-  YYSYMBOL_T_IDENT = 39,                   /* T_IDENT  */
-  YYSYMBOL_T_STRING = 40,                  /* T_STRING  */
-  YYSYMBOL_T_NUMBER = 41,                  /* T_NUMBER  */
-  YYSYMBOL_T_GRAPH_BLOCK = 42,             /* T_GRAPH_BLOCK  */
-  YYSYMBOL_T_VM_BODY = 43,                 /* T_VM_BODY  */
-  YYSYMBOL_44_ = 44,                       /* ';'  */
-  YYSYMBOL_45_ = 45,                       /* '('  */
-  YYSYMBOL_46_ = 46,                       /* ')'  */
-  YYSYMBOL_47_ = 47,                       /* ','  */
-  YYSYMBOL_YYACCEPT = 48,                  /* $accept  */
-  YYSYMBOL_script = 49,                    /* script  */
-  YYSYMBOL_stmt = 50,                      /* stmt  */
-  YYSYMBOL_train_stmt = 51,                /* train_stmt  */
-  YYSYMBOL_opt_on = 52,                    /* opt_on  */
-  YYSYMBOL_compose_stmt = 53,              /* compose_stmt  */
-  YYSYMBOL_run_stmt = 54,                  /* run_stmt  */
-  YYSYMBOL_evaluate_stmt = 55,             /* evaluate_stmt  */
-  YYSYMBOL_opt_metric = 56,                /* opt_metric  */
-  YYSYMBOL_opt_report = 57,                /* opt_report  */
-  YYSYMBOL_verify_stmt = 58,               /* verify_stmt  */
-  YYSYMBOL_opt_where = 59,                 /* opt_where  */
-  YYSYMBOL_predicate = 60,                 /* predicate  */
-  YYSYMBOL_op = 61,                        /* op  */
-  YYSYMBOL_audit_stmt = 62,                /* audit_stmt  */
-  YYSYMBOL_opt_thresholds = 63,            /* opt_thresholds  */
-  YYSYMBOL_create_stmt = 64,               /* create_stmt  */
-  YYSYMBOL_create_behaviour_stmt = 65,     /* create_behaviour_stmt  */
-  YYSYMBOL_create_organelle_stmt = 66,     /* create_organelle_stmt  */
-  YYSYMBOL_create_corpus_stmt = 67,        /* create_corpus_stmt  */
-  YYSYMBOL_create_corpus_llm_stmt = 68,    /* create_corpus_llm_stmt  */
-  YYSYMBOL_opt_llm_endpoint = 69,          /* opt_llm_endpoint  */
-  YYSYMBOL_opt_llm_audit_with = 70,        /* opt_llm_audit_with  */
-  YYSYMBOL_opt_with_bindings = 71,         /* opt_with_bindings  */
-  YYSYMBOL_binding_list = 72,              /* binding_list  */
-  YYSYMBOL_binding = 73,                   /* binding  */
-  YYSYMBOL_opt_with = 74,                  /* opt_with  */
-  YYSYMBOL_kv_list = 75,                   /* kv_list  */
-  YYSYMBOL_kv = 76,                        /* kv  */
-  YYSYMBOL_value = 77,                     /* value  */
-  YYSYMBOL_source = 78,                    /* source  */
-  YYSYMBOL_name_list = 79                  /* name_list  */
+  YYSYMBOL_T_ORACLE = 39,                  /* T_ORACLE  */
+  YYSYMBOL_T_IDENT = 40,                   /* T_IDENT  */
+  YYSYMBOL_T_STRING = 41,                  /* T_STRING  */
+  YYSYMBOL_T_NUMBER = 42,                  /* T_NUMBER  */
+  YYSYMBOL_T_GRAPH_BLOCK = 43,             /* T_GRAPH_BLOCK  */
+  YYSYMBOL_T_VM_BODY = 44,                 /* T_VM_BODY  */
+  YYSYMBOL_45_ = 45,                       /* ';'  */
+  YYSYMBOL_46_ = 46,                       /* '('  */
+  YYSYMBOL_47_ = 47,                       /* ')'  */
+  YYSYMBOL_48_ = 48,                       /* ','  */
+  YYSYMBOL_YYACCEPT = 49,                  /* $accept  */
+  YYSYMBOL_script = 50,                    /* script  */
+  YYSYMBOL_stmt = 51,                      /* stmt  */
+  YYSYMBOL_train_stmt = 52,                /* train_stmt  */
+  YYSYMBOL_opt_on = 53,                    /* opt_on  */
+  YYSYMBOL_compose_stmt = 54,              /* compose_stmt  */
+  YYSYMBOL_run_stmt = 55,                  /* run_stmt  */
+  YYSYMBOL_evaluate_stmt = 56,             /* evaluate_stmt  */
+  YYSYMBOL_opt_metric = 57,                /* opt_metric  */
+  YYSYMBOL_opt_report = 58,                /* opt_report  */
+  YYSYMBOL_verify_stmt = 59,               /* verify_stmt  */
+  YYSYMBOL_opt_where = 60,                 /* opt_where  */
+  YYSYMBOL_predicate = 61,                 /* predicate  */
+  YYSYMBOL_op = 62,                        /* op  */
+  YYSYMBOL_audit_stmt = 63,                /* audit_stmt  */
+  YYSYMBOL_opt_thresholds = 64,            /* opt_thresholds  */
+  YYSYMBOL_create_stmt = 65,               /* create_stmt  */
+  YYSYMBOL_create_behaviour_stmt = 66,     /* create_behaviour_stmt  */
+  YYSYMBOL_create_organelle_stmt = 67,     /* create_organelle_stmt  */
+  YYSYMBOL_create_corpus_stmt = 68,        /* create_corpus_stmt  */
+  YYSYMBOL_create_corpus_llm_stmt = 69,    /* create_corpus_llm_stmt  */
+  YYSYMBOL_opt_llm_endpoint = 70,          /* opt_llm_endpoint  */
+  YYSYMBOL_opt_llm_audit_with = 71,        /* opt_llm_audit_with  */
+  YYSYMBOL_create_corpus_oracle_stmt = 72, /* create_corpus_oracle_stmt  */
+  YYSYMBOL_opt_oracle_prompt = 73,         /* opt_oracle_prompt  */
+  YYSYMBOL_opt_with_bindings = 74,         /* opt_with_bindings  */
+  YYSYMBOL_binding_list = 75,              /* binding_list  */
+  YYSYMBOL_binding = 76,                   /* binding  */
+  YYSYMBOL_opt_with = 77,                  /* opt_with  */
+  YYSYMBOL_kv_list = 78,                   /* kv_list  */
+  YYSYMBOL_kv = 79,                        /* kv  */
+  YYSYMBOL_value = 80,                     /* value  */
+  YYSYMBOL_source = 81,                    /* source  */
+  YYSYMBOL_name_list = 82                  /* name_list  */
 };
 typedef enum yysymbol_kind_t yysymbol_kind_t;
 
@@ -544,19 +550,19 @@ union yyalloc
 /* YYFINAL -- State number of the termination state.  */
 #define YYFINAL  2
 /* YYLAST -- Last index in YYTABLE.  */
-#define YYLAST   115
+#define YYLAST   119
 
 /* YYNTOKENS -- Number of terminals.  */
-#define YYNTOKENS  48
+#define YYNTOKENS  49
 /* YYNNTS -- Number of nonterminals.  */
-#define YYNNTS  32
+#define YYNNTS  34
 /* YYNRULES -- Number of rules.  */
-#define YYNRULES  69
+#define YYNRULES  73
 /* YYNSTATES -- Number of states.  */
-#define YYNSTATES  136
+#define YYNSTATES  143
 
 /* YYMAXUTOK -- Last valid token kind.  */
-#define YYMAXUTOK   298
+#define YYMAXUTOK   299
 
 
 /* YYTRANSLATE(TOKEN-NUM) -- Symbol number corresponding to TOKEN-NUM
@@ -574,8 +580,8 @@ static const yytype_int8 yytranslate[] =
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-      45,    46,     2,     2,    47,     2,     2,     2,     2,     2,
-       2,     2,     2,     2,     2,     2,     2,     2,     2,    44,
+      46,    47,     2,     2,    48,     2,     2,     2,     2,     2,
+       2,     2,     2,     2,     2,     2,     2,     2,     2,    45,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
@@ -599,20 +605,21 @@ static const yytype_int8 yytranslate[] =
        5,     6,     7,     8,     9,    10,    11,    12,    13,    14,
       15,    16,    17,    18,    19,    20,    21,    22,    23,    24,
       25,    26,    27,    28,    29,    30,    31,    32,    33,    34,
-      35,    36,    37,    38,    39,    40,    41,    42,    43
+      35,    36,    37,    38,    39,    40,    41,    42,    43,    44
 };
 
 #if OQL_PARSER_DEBUG
 /* YYRLINE[YYN] -- Source line where rule number YYN was defined.  */
-static const yytype_uint8 yyrline[] =
+static const yytype_int16 yyrline[] =
 {
-       0,    83,    83,    83,    86,    87,    88,    89,    90,    91,
-      92,    97,   100,   101,   106,   111,   116,   120,   121,   124,
-     125,   130,   131,   132,   135,   136,   139,   142,   142,   143,
-     143,   144,   144,   149,   153,   154,   159,   160,   161,   162,
-     165,   169,   171,   178,   190,   193,   197,   201,   208,   209,
-     212,   213,   217,   218,   221,   222,   225,   230,   231,   234,
-     235,   238,   241,   241,   241,   244,   245,   246,   249,   250
+       0,    87,    87,    87,    90,    91,    92,    93,    94,    95,
+      96,   101,   104,   105,   110,   115,   120,   124,   125,   128,
+     129,   134,   135,   136,   139,   140,   143,   146,   146,   147,
+     147,   148,   148,   153,   157,   158,   163,   164,   165,   166,
+     167,   170,   174,   176,   183,   195,   198,   202,   206,   213,
+     214,   217,   218,   228,   232,   233,   237,   238,   241,   242,
+     245,   250,   251,   254,   255,   258,   261,   261,   261,   264,
+     265,   266,   269,   270
 };
 #endif
 
@@ -634,14 +641,15 @@ static const char *const yytname[] =
   "T_AGAINST", "T_USING", "T_WHERE", "T_AS", "T_FROM", "T_GRAPH",
   "T_CORPUS", "T_REPORT", "T_METRIC", "T_THRESHOLDS", "T_LT", "T_LE",
   "T_EQ", "T_NE", "T_GE", "T_GT", "T_LLM", "T_PROMPT", "T_VERIFY_VIA",
-  "T_AUDIT_AGAINST", "T_PIPELINE_IR", "T_AT", "T_IDENT", "T_STRING",
-  "T_NUMBER", "T_GRAPH_BLOCK", "T_VM_BODY", "';'", "'('", "')'", "','",
-  "$accept", "script", "stmt", "train_stmt", "opt_on", "compose_stmt",
-  "run_stmt", "evaluate_stmt", "opt_metric", "opt_report", "verify_stmt",
-  "opt_where", "predicate", "op", "audit_stmt", "opt_thresholds",
-  "create_stmt", "create_behaviour_stmt", "create_organelle_stmt",
-  "create_corpus_stmt", "create_corpus_llm_stmt", "opt_llm_endpoint",
-  "opt_llm_audit_with", "opt_with_bindings", "binding_list", "binding",
+  "T_AUDIT_AGAINST", "T_PIPELINE_IR", "T_AT", "T_ORACLE", "T_IDENT",
+  "T_STRING", "T_NUMBER", "T_GRAPH_BLOCK", "T_VM_BODY", "';'", "'('",
+  "')'", "','", "$accept", "script", "stmt", "train_stmt", "opt_on",
+  "compose_stmt", "run_stmt", "evaluate_stmt", "opt_metric", "opt_report",
+  "verify_stmt", "opt_where", "predicate", "op", "audit_stmt",
+  "opt_thresholds", "create_stmt", "create_behaviour_stmt",
+  "create_organelle_stmt", "create_corpus_stmt", "create_corpus_llm_stmt",
+  "opt_llm_endpoint", "opt_llm_audit_with", "create_corpus_oracle_stmt",
+  "opt_oracle_prompt", "opt_with_bindings", "binding_list", "binding",
   "opt_with", "kv_list", "kv", "value", "source", "name_list", YY_NULLPTR
 };
 
@@ -652,7 +660,7 @@ yysymbol_name (yysymbol_kind_t yysymbol)
 }
 #endif
 
-#define YYPACT_NINF (-43)
+#define YYPACT_NINF (-52)
 
 #define yypact_value_is_default(Yyn) \
   ((Yyn) == YYPACT_NINF)
@@ -666,20 +674,21 @@ yysymbol_name (yysymbol_kind_t yysymbol)
    STATE-NUM.  */
 static const yytype_int8 yypact[] =
 {
-     -43,    35,   -43,   -35,   -29,   -21,    -9,   -17,   -20,     2,
-       7,   -43,   -43,   -43,   -43,   -43,   -43,   -43,   -43,   -43,
-     -43,   -43,    14,    15,    36,    37,    11,    38,    38,    16,
-     -43,   -43,    41,    20,    21,    22,   -43,   -20,    36,    23,
-      24,   -43,   -20,    38,    25,   -43,   -43,   -43,   -20,    45,
-     -10,    34,   -43,   -43,   -43,   -15,    39,    19,   -43,    49,
-     -43,    18,   -43,    51,    57,    26,    60,   -43,   -12,    40,
-     -43,   -25,    24,    48,    50,   -43,   -43,   -43,   -43,   -43,
-     -43,   -25,    52,    50,    32,    42,    43,    46,    47,   -43,
-     -43,   -43,   -43,   -43,   -43,    53,    56,   -43,   -43,    54,
-     -43,   -43,    59,   -39,   -43,    61,   -43,    44,   -43,    55,
-     -43,    58,   -43,    42,   -43,    62,    64,   -43,   -43,   -43,
-     -43,    63,    36,    -8,    67,    66,    65,    69,    68,    70,
-     -43,    69,    24,   -43,   -13,   -43
+     -52,    31,   -52,   -25,    -8,    10,    11,   -18,   -16,     3,
+       8,   -52,   -52,   -52,   -52,   -52,   -52,   -52,   -52,   -52,
+     -52,   -52,   -52,    -3,     9,    36,    37,    12,    38,    38,
+      15,   -52,   -52,    41,    19,    20,    21,   -52,   -16,    36,
+      22,    23,   -52,   -16,    38,    24,   -52,   -52,   -52,   -16,
+      45,   -10,    46,   -52,   -52,   -52,   -15,    39,    18,   -52,
+      51,   -52,    14,   -52,    52,    59,    27,    62,   -52,   -12,
+      35,   -52,     7,    23,    53,    55,   -52,   -52,   -52,   -52,
+     -52,   -52,     7,    50,    55,    33,    40,    42,    43,    44,
+      47,   -52,   -52,   -52,   -52,   -52,   -52,    54,    61,   -52,
+     -52,    49,   -52,   -52,    57,   -28,   -52,    66,   -52,    58,
+      36,   -52,    56,   -52,    60,   -52,    40,   -52,    63,    64,
+      65,   -52,   -52,   -52,   -52,    67,    68,   -52,    36,   -52,
+     -27,    69,    70,    71,    75,    72,    73,   -52,    75,    23,
+     -52,   -19,   -52
 };
 
 /* YYDEFACT[STATE-NUM] -- Default reduction number in state STATE-NUM.
@@ -689,36 +698,37 @@ static const yytype_int8 yydefact[] =
 {
        2,     0,     1,     0,     0,     0,     0,     0,     0,     0,
        0,     4,     5,     6,     7,     8,     9,    10,    36,    37,
-      38,    39,    12,     0,    57,     0,     0,    24,    24,     0,
-      67,    66,     0,     0,     0,     0,     3,     0,    57,     0,
-       0,    15,     0,    24,     0,    23,    22,    65,     0,     0,
-      52,     0,    13,    11,    68,    57,     0,    58,    59,    17,
-      21,     0,    25,    34,     0,     0,     0,    42,     0,     0,
-      14,     0,     0,     0,    19,    27,    28,    29,    30,    31,
-      32,     0,     0,    19,     0,     0,     0,     0,     0,    69,
-      64,    62,    63,    61,    60,     0,     0,    16,    26,     0,
-      33,    40,     0,     0,    54,    52,    43,    48,    18,     0,
-      35,     0,    53,     0,    41,     0,     0,    20,    56,    55,
-      49,     0,    57,    44,     0,     0,    45,    50,     0,     0,
-      46,    50,     0,    47,     0,    51
+      38,    39,    40,    12,     0,    61,     0,     0,    24,    24,
+       0,    71,    70,     0,     0,     0,     0,     3,     0,    61,
+       0,     0,    15,     0,    24,     0,    23,    22,    69,     0,
+       0,    56,     0,    13,    11,    72,    61,     0,    62,    63,
+      17,    21,     0,    25,    34,     0,     0,     0,    43,     0,
+       0,    14,     0,     0,     0,    19,    27,    28,    29,    30,
+      31,    32,     0,     0,    19,     0,     0,     0,     0,     0,
+       0,    73,    68,    66,    67,    65,    64,     0,     0,    16,
+      26,     0,    33,    41,     0,     0,    58,    56,    44,    49,
+      61,    18,     0,    35,     0,    57,     0,    42,     0,     0,
+      54,    20,    60,    59,    50,     0,     0,    53,    61,    55,
+      45,     0,     0,    46,    51,     0,     0,    47,    51,     0,
+      48,     0,    52
 };
 
 /* YYPGOTO[NTERM-NUM].  */
 static const yytype_int8 yypgoto[] =
 {
-     -43,   -43,   -43,   -43,   -43,   -43,   -43,   -43,   -43,    -3,
-     -43,   -19,   -43,   -43,   -43,   -43,   -43,   -43,   -43,   -43,
-     -43,   -43,   -42,   -14,   -43,   -23,   -38,   -36,    27,    12,
-     -11,   -43
+     -52,   -52,   -52,   -52,   -52,   -52,   -52,   -52,   -52,    17,
+     -52,   -26,   -52,   -52,   -52,   -52,   -52,   -52,   -52,   -52,
+     -52,   -52,   -51,   -52,   -52,   -14,   -52,   -24,   -39,   -44,
+      29,    32,   -33,   -52
 };
 
 /* YYDEFGOTO[NTERM-NUM].  */
 static const yytype_uint8 yydefgoto[] =
 {
-       0,     1,    10,    11,    38,    12,    13,    14,    74,    97,
-      15,    45,    62,    81,    16,    83,    17,    18,    19,    20,
-      21,   116,   130,    67,   103,   104,    41,    57,    58,    93,
-      32,    55
+       0,     1,    10,    11,    39,    12,    13,    14,    75,    99,
+      15,    46,    63,    82,    16,    84,    17,    18,    19,    20,
+      21,   119,   137,    22,   127,    68,   105,   106,    42,    58,
+      59,    95,    33,    56
 };
 
 /* YYTABLE[YYPACT[STATE-NUM]] -- What to do in state STATE-NUM.  If
@@ -726,66 +736,68 @@ static const yytype_uint8 yydefgoto[] =
    number is the opposite.  If YYTABLE_NINF, syntax error.  */
 static const yytype_uint8 yytable[] =
 {
-      53,    40,    87,    29,    22,    26,    65,   112,   113,    46,
-      23,    66,    33,    34,    90,    91,    92,    70,    24,    30,
-      31,    88,    27,    28,    60,    35,    52,   124,   125,    37,
-      25,    59,    69,   135,    72,     2,    39,    63,     3,     4,
-       5,     6,     7,     8,     9,    75,    76,    77,    78,    79,
-      80,    36,    40,    43,    42,    68,    47,    44,    48,    49,
-      50,    51,    54,    56,    61,    64,    72,    73,    71,    82,
-      84,    85,    86,    95,    96,   101,   109,    65,    99,    89,
-     100,   102,   115,   105,   123,   129,   106,   107,   111,   133,
-     119,   114,   108,    98,   110,   117,   134,   118,   121,    94,
-       0,   128,   120,   122,   126,   127,     0,   131,     0,     0,
-       0,     0,     0,     0,     0,   132
+      54,    41,    88,    47,    27,    53,    66,    30,   131,   132,
+      60,    67,    38,    34,    35,    23,    64,    71,    61,   115,
+     116,    89,    28,    29,    31,    32,    36,    90,   142,    73,
+      40,     2,    24,    70,     3,     4,     5,     6,     7,     8,
+       9,    76,    77,    78,    79,    80,    81,    92,    93,    94,
+      25,    26,    41,    37,    43,    44,    48,    45,    49,    50,
+      51,    52,    55,    57,    62,    65,    73,    69,    72,    74,
+      83,   120,    85,    86,    87,    91,   101,   103,    97,    98,
+     104,   112,    66,   107,   108,   109,   114,   140,   110,   130,
+     113,   136,   123,   117,   111,   141,   118,   121,   125,   126,
+     122,   102,    96,     0,   124,     0,   133,   135,   128,   129,
+     134,     0,   138,     0,   100,     0,     0,     0,     0,   139
 };
 
 static const yytype_int16 yycheck[] =
 {
-      38,    16,    14,    23,    39,    22,    16,    46,    47,    28,
-      39,    21,    10,    11,    39,    40,    41,    55,    39,    39,
-      40,    33,    39,    40,    43,    23,    37,    35,    36,    15,
-      39,    42,    47,    46,    47,     0,    21,    48,     3,     4,
-       5,     6,     7,     8,     9,    27,    28,    29,    30,    31,
-      32,    44,    16,    42,    17,    21,    40,    19,    17,    39,
-      39,    39,    39,    39,    39,    20,    47,    18,    29,    18,
-      13,    45,    12,    25,    24,    43,    20,    16,    26,    39,
-      83,    39,    38,    40,   122,    16,    40,    40,    29,   131,
-     113,   105,    39,    81,    40,    40,   132,    39,    34,    72,
-      -1,    36,    40,    40,    37,    39,    -1,    39,    -1,    -1,
-      -1,    -1,    -1,    -1,    -1,    45
+      39,    16,    14,    29,    22,    38,    16,    23,    35,    36,
+      43,    21,    15,    10,    11,    40,    49,    56,    44,    47,
+      48,    33,    40,    41,    40,    41,    23,    39,    47,    48,
+      21,     0,    40,    48,     3,     4,     5,     6,     7,     8,
+       9,    27,    28,    29,    30,    31,    32,    40,    41,    42,
+      40,    40,    16,    45,    17,    43,    41,    19,    17,    40,
+      40,    40,    40,    40,    40,    20,    48,    21,    29,    18,
+      18,   110,    13,    46,    12,    40,    26,    44,    25,    24,
+      40,    20,    16,    41,    41,    41,    29,   138,    41,   128,
+      41,    16,   116,   107,    40,   139,    38,    41,    34,    34,
+      40,    84,    73,    -1,    41,    -1,    37,    36,    41,    41,
+      40,    -1,    40,    -1,    82,    -1,    -1,    -1,    -1,    46
 };
 
 /* YYSTOS[STATE-NUM] -- The symbol kind of the accessing symbol of
    state STATE-NUM.  */
 static const yytype_int8 yystos[] =
 {
-       0,    49,     0,     3,     4,     5,     6,     7,     8,     9,
-      50,    51,    53,    54,    55,    58,    62,    64,    65,    66,
-      67,    68,    39,    39,    39,    39,    22,    39,    40,    23,
-      39,    40,    78,    10,    11,    23,    44,    15,    52,    21,
-      16,    74,    17,    42,    19,    59,    59,    40,    17,    39,
-      39,    39,    78,    74,    39,    79,    39,    75,    76,    78,
-      59,    39,    60,    78,    20,    16,    21,    71,    21,    47,
-      74,    29,    47,    18,    56,    27,    28,    29,    30,    31,
-      32,    61,    18,    63,    13,    45,    12,    14,    33,    39,
-      39,    40,    41,    77,    76,    25,    24,    57,    77,    26,
-      57,    43,    39,    72,    73,    40,    40,    40,    39,    20,
-      40,    29,    46,    47,    71,    38,    69,    40,    39,    73,
-      40,    34,    40,    74,    35,    36,    37,    39,    36,    16,
-      70,    39,    45,    70,    75,    46
+       0,    50,     0,     3,     4,     5,     6,     7,     8,     9,
+      51,    52,    54,    55,    56,    59,    63,    65,    66,    67,
+      68,    69,    72,    40,    40,    40,    40,    22,    40,    41,
+      23,    40,    41,    81,    10,    11,    23,    45,    15,    53,
+      21,    16,    77,    17,    43,    19,    60,    60,    41,    17,
+      40,    40,    40,    81,    77,    40,    82,    40,    78,    79,
+      81,    60,    40,    61,    81,    20,    16,    21,    74,    21,
+      48,    77,    29,    48,    18,    57,    27,    28,    29,    30,
+      31,    32,    62,    18,    64,    13,    46,    12,    14,    33,
+      39,    40,    40,    41,    42,    80,    79,    25,    24,    58,
+      80,    26,    58,    44,    40,    75,    76,    41,    41,    41,
+      41,    40,    20,    41,    29,    47,    48,    74,    38,    70,
+      77,    41,    40,    76,    41,    34,    34,    73,    41,    41,
+      77,    35,    36,    37,    40,    36,    16,    71,    40,    46,
+      71,    78,    47
 };
 
 /* YYR1[RULE-NUM] -- Symbol kind of the left-hand side of rule RULE-NUM.  */
 static const yytype_int8 yyr1[] =
 {
-       0,    48,    49,    49,    50,    50,    50,    50,    50,    50,
-      50,    51,    52,    52,    53,    54,    55,    56,    56,    57,
-      57,    58,    58,    58,    59,    59,    60,    61,    61,    61,
-      61,    61,    61,    62,    63,    63,    64,    64,    64,    64,
-      65,    66,    66,    67,    68,    68,    68,    68,    69,    69,
-      70,    70,    71,    71,    72,    72,    73,    74,    74,    75,
-      75,    76,    77,    77,    77,    78,    78,    78,    79,    79
+       0,    49,    50,    50,    51,    51,    51,    51,    51,    51,
+      51,    52,    53,    53,    54,    55,    56,    57,    57,    58,
+      58,    59,    59,    59,    60,    60,    61,    62,    62,    62,
+      62,    62,    62,    63,    64,    64,    65,    65,    65,    65,
+      65,    66,    67,    67,    68,    69,    69,    69,    69,    70,
+      70,    71,    71,    72,    73,    73,    74,    74,    75,    75,
+      76,    77,    77,    78,    78,    79,    80,    80,    80,    81,
+      81,    81,    82,    82
 };
 
 /* YYR2[RULE-NUM] -- Number of symbols on the right-hand side of rule RULE-NUM.  */
@@ -795,9 +807,10 @@ static const yytype_int8 yyr2[] =
        1,     4,     0,     2,     5,     3,     6,     0,     3,     0,
        3,     4,     3,     3,     0,     2,     3,     1,     1,     1,
        1,     1,     1,     6,     0,     3,     1,     1,     1,     1,
-       6,     7,     4,     6,    10,    12,    13,    15,     0,     2,
-       0,     4,     0,     4,     1,     3,     3,     0,     2,     1,
-       3,     3,     1,     1,     1,     2,     1,     1,     1,     3
+       1,     6,     7,     4,     6,    10,    12,    13,    15,     0,
+       2,     0,     4,     8,     0,     2,     0,     4,     1,     3,
+       3,     0,     2,     1,     3,     3,     1,     1,     1,     2,
+       1,     1,     1,     3
 };
 
 
@@ -1263,409 +1276,433 @@ yyreduce:
   switch (yyn)
     {
   case 3: /* script: script stmt ';'  */
-#line 83 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+#line 87 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                        { oql_y_append(parser, (yyvsp[-1].stmt)); }
-#line 1269 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1282 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
   case 4: /* stmt: train_stmt  */
-#line 86 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+#line 90 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                     { (yyval.stmt) = (yyvsp[0].stmt); }
-#line 1275 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1288 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
   case 5: /* stmt: compose_stmt  */
-#line 87 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+#line 91 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                     { (yyval.stmt) = (yyvsp[0].stmt); }
-#line 1281 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1294 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
   case 6: /* stmt: run_stmt  */
-#line 88 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+#line 92 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                     { (yyval.stmt) = (yyvsp[0].stmt); }
-#line 1287 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1300 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
   case 7: /* stmt: evaluate_stmt  */
-#line 89 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+#line 93 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                     { (yyval.stmt) = (yyvsp[0].stmt); }
-#line 1293 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1306 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
   case 8: /* stmt: verify_stmt  */
-#line 90 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+#line 94 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                     { (yyval.stmt) = (yyvsp[0].stmt); }
-#line 1299 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1312 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
   case 9: /* stmt: audit_stmt  */
-#line 91 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+#line 95 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                     { (yyval.stmt) = (yyvsp[0].stmt); }
-#line 1305 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1318 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
   case 10: /* stmt: create_stmt  */
-#line 92 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+#line 96 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                     { (yyval.stmt) = (yyvsp[0].stmt); }
-#line 1311 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1324 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
   case 11: /* train_stmt: T_TRAIN T_IDENT opt_on opt_with  */
-#line 97 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+#line 101 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                                       { (yyval.stmt) = oql_y_train((yyvsp[-2].str), (yyvsp[-1].src), (yyvsp[0].kv)); }
-#line 1317 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1330 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
   case 12: /* opt_on: %empty  */
-#line 100 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+#line 104 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                                       { OqlSource z = {0, NULL}; (yyval.src) = z; }
-#line 1323 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1336 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
   case 13: /* opt_on: T_ON source  */
-#line 101 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+#line 105 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                                       { (yyval.src) = (yyvsp[0].src); }
-#line 1329 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1342 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
   case 14: /* compose_stmt: T_COMPOSE T_IDENT T_FROM name_list opt_with  */
-#line 106 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+#line 110 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                                       { (yyval.stmt) = oql_y_compose((yyvsp[-3].str), (yyvsp[-1].names), (yyvsp[0].kv)); }
-#line 1335 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1348 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
   case 15: /* run_stmt: T_RUN T_IDENT opt_with  */
-#line 111 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+#line 115 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                                       { (yyval.stmt) = oql_y_run((yyvsp[-1].str), (yyvsp[0].kv)); }
-#line 1341 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1354 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
   case 16: /* evaluate_stmt: T_EVALUATE T_IDENT T_AGAINST source opt_metric opt_report  */
-#line 117 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+#line 121 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
       { (yyval.stmt) = oql_y_evaluate((yyvsp[-4].str), (yyvsp[-2].src), (yyvsp[-1].str), (yyvsp[0].str)); }
-#line 1347 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1360 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
   case 17: /* opt_metric: %empty  */
-#line 120 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+#line 124 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                                       { (yyval.str) = NULL; }
-#line 1353 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1366 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
   case 18: /* opt_metric: T_USING T_METRIC T_IDENT  */
-#line 121 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+#line 125 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                                       { (yyval.str) = (yyvsp[0].str); }
-#line 1359 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1372 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
   case 19: /* opt_report: %empty  */
-#line 124 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+#line 128 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                                       { (yyval.str) = NULL; }
-#line 1365 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1378 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
   case 20: /* opt_report: T_REPORT T_AS T_STRING  */
-#line 125 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+#line 129 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                                       { (yyval.str) = (yyvsp[0].str); }
-#line 1371 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1384 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
   case 21: /* verify_stmt: T_VERIFY T_GRAPH T_GRAPH_BLOCK opt_where  */
-#line 130 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+#line 134 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                                       { (yyval.stmt) = oql_y_verify(OQL_VS_GRAPH, (yyvsp[-1].str), (yyvsp[0].pred)); }
-#line 1377 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1390 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
   case 22: /* verify_stmt: T_VERIFY T_STRING opt_where  */
-#line 131 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+#line 135 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                                       { (yyval.stmt) = oql_y_verify(OQL_VS_PATH,  (yyvsp[-1].str), (yyvsp[0].pred)); }
-#line 1383 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1396 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
   case 23: /* verify_stmt: T_VERIFY T_IDENT opt_where  */
-#line 132 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+#line 136 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                                       { (yyval.stmt) = oql_y_verify(OQL_VS_NAME,  (yyvsp[-1].str), (yyvsp[0].pred)); }
-#line 1389 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1402 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
   case 24: /* opt_where: %empty  */
-#line 135 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+#line 139 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                                       { (yyval.pred) = NULL; }
-#line 1395 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1408 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
   case 25: /* opt_where: T_WHERE predicate  */
-#line 136 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+#line 140 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                                       { (yyval.pred) = (yyvsp[0].pred); }
-#line 1401 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1414 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
   case 26: /* predicate: T_IDENT op value  */
-#line 139 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+#line 143 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                                       { (yyval.pred) = oql_y_pred((yyvsp[-2].str), (OqlOp)(yyvsp[-1].op), (yyvsp[0].str)); }
-#line 1407 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1420 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
   case 27: /* op: T_LT  */
-#line 142 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+#line 146 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
            { (yyval.op) = OQL_OP_LT; }
-#line 1413 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1426 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
   case 28: /* op: T_LE  */
-#line 142 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+#line 146 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                       { (yyval.op) = OQL_OP_LE; }
-#line 1419 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1432 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
   case 29: /* op: T_EQ  */
-#line 143 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+#line 147 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
            { (yyval.op) = OQL_OP_EQ; }
-#line 1425 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1438 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
   case 30: /* op: T_NE  */
-#line 143 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+#line 147 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                       { (yyval.op) = OQL_OP_NE; }
-#line 1431 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1444 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
   case 31: /* op: T_GE  */
-#line 144 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+#line 148 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
            { (yyval.op) = OQL_OP_GE; }
-#line 1437 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1450 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
   case 32: /* op: T_GT  */
-#line 144 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+#line 148 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                       { (yyval.op) = OQL_OP_GT; }
-#line 1443 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1456 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
   case 33: /* audit_stmt: T_AUDIT source T_AGAINST source opt_thresholds opt_report  */
-#line 150 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+#line 154 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
       { (yyval.stmt) = oql_y_audit((yyvsp[-4].src), (yyvsp[-2].src), (yyvsp[-1].str), (yyvsp[0].str)); }
-#line 1449 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1462 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
   case 34: /* opt_thresholds: %empty  */
-#line 153 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+#line 157 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                                       { (yyval.str) = NULL; }
-#line 1455 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1468 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
   case 35: /* opt_thresholds: T_USING T_THRESHOLDS T_STRING  */
-#line 154 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+#line 158 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                                       { (yyval.str) = (yyvsp[0].str); }
-#line 1461 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1474 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
   case 36: /* create_stmt: create_behaviour_stmt  */
-#line 159 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+#line 163 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                                        { (yyval.stmt) = (yyvsp[0].stmt); }
-#line 1467 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1480 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
   case 37: /* create_stmt: create_organelle_stmt  */
-#line 160 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+#line 164 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                                        { (yyval.stmt) = (yyvsp[0].stmt); }
-#line 1473 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1486 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
   case 38: /* create_stmt: create_corpus_stmt  */
-#line 161 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+#line 165 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                                        { (yyval.stmt) = (yyvsp[0].stmt); }
-#line 1479 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1492 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
   case 39: /* create_stmt: create_corpus_llm_stmt  */
-#line 162 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+#line 166 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                                        { (yyval.stmt) = (yyvsp[0].stmt); }
-#line 1485 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1498 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 40: /* create_behaviour_stmt: T_CREATE T_BEHAVIOUR T_IDENT T_AS T_VM T_VM_BODY  */
-#line 166 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+  case 40: /* create_stmt: create_corpus_oracle_stmt  */
+#line 167 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
+                                                       { (yyval.stmt) = (yyvsp[0].stmt); }
+#line 1504 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
+    break;
+
+  case 41: /* create_behaviour_stmt: T_CREATE T_BEHAVIOUR T_IDENT T_AS T_VM T_VM_BODY  */
+#line 171 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
       { (yyval.stmt) = oql_y_create_behaviour((yyvsp[-3].str), (yyvsp[0].str)); }
-#line 1491 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1510 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 41: /* create_organelle_stmt: T_CREATE T_ORGANELLE T_IDENT T_FROM T_CHECKPOINT T_STRING opt_with_bindings  */
-#line 170 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+  case 42: /* create_organelle_stmt: T_CREATE T_ORGANELLE T_IDENT T_FROM T_CHECKPOINT T_STRING opt_with_bindings  */
+#line 175 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
       { (yyval.stmt) = oql_y_create_organelle((yyvsp[-4].str), (yyvsp[-1].str), (yyvsp[0].kv)); }
-#line 1497 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1516 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 42: /* create_organelle_stmt: T_CREATE T_ORGANELLE T_IDENT opt_with_bindings  */
-#line 172 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+  case 43: /* create_organelle_stmt: T_CREATE T_ORGANELLE T_IDENT opt_with_bindings  */
+#line 177 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
       { (yyval.stmt) = oql_y_create_organelle((yyvsp[-1].str), NULL, (yyvsp[0].kv)); }
-#line 1503 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1522 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 43: /* create_corpus_stmt: T_CREATE T_CORPUS T_IDENT T_FROM T_FILE T_STRING  */
-#line 179 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+  case 44: /* create_corpus_stmt: T_CREATE T_CORPUS T_IDENT T_FROM T_FILE T_STRING  */
+#line 184 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
       { (yyval.stmt) = oql_y_create_corpus((yyvsp[-3].str), (yyvsp[0].str)); }
-#line 1509 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1528 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 44: /* create_corpus_llm_stmt: T_CREATE T_CORPUS T_IDENT T_FROM T_LLM T_STRING opt_llm_endpoint T_PROMPT T_STRING opt_with  */
-#line 192 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+  case 45: /* create_corpus_llm_stmt: T_CREATE T_CORPUS T_IDENT T_FROM T_LLM T_STRING opt_llm_endpoint T_PROMPT T_STRING opt_with  */
+#line 197 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
       { (yyval.stmt) = oql_y_create_corpus_llm((yyvsp[-7].str), (yyvsp[-4].str), (yyvsp[-3].str), (yyvsp[-1].str), (yyvsp[0].kv), 0, NULL, NULL); }
-#line 1515 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1534 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 45: /* create_corpus_llm_stmt: T_CREATE T_CORPUS T_IDENT T_FROM T_LLM T_STRING opt_llm_endpoint T_PROMPT T_STRING opt_with T_VERIFY_VIA T_PIPELINE_IR  */
-#line 196 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+  case 46: /* create_corpus_llm_stmt: T_CREATE T_CORPUS T_IDENT T_FROM T_LLM T_STRING opt_llm_endpoint T_PROMPT T_STRING opt_with T_VERIFY_VIA T_PIPELINE_IR  */
+#line 201 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
       { (yyval.stmt) = oql_y_create_corpus_llm((yyvsp[-9].str), (yyvsp[-6].str), (yyvsp[-5].str), (yyvsp[-3].str), (yyvsp[-2].kv), 1, NULL, NULL); }
-#line 1521 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1540 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 46: /* create_corpus_llm_stmt: T_CREATE T_CORPUS T_IDENT T_FROM T_LLM T_STRING opt_llm_endpoint T_PROMPT T_STRING opt_with T_AUDIT_AGAINST T_IDENT opt_llm_audit_with  */
-#line 200 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+  case 47: /* create_corpus_llm_stmt: T_CREATE T_CORPUS T_IDENT T_FROM T_LLM T_STRING opt_llm_endpoint T_PROMPT T_STRING opt_with T_AUDIT_AGAINST T_IDENT opt_llm_audit_with  */
+#line 205 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
       { (yyval.stmt) = oql_y_create_corpus_llm((yyvsp[-10].str), (yyvsp[-7].str), (yyvsp[-6].str), (yyvsp[-4].str), (yyvsp[-3].kv), 0, (yyvsp[-1].str), (yyvsp[0].kv)); }
-#line 1527 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1546 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 47: /* create_corpus_llm_stmt: T_CREATE T_CORPUS T_IDENT T_FROM T_LLM T_STRING opt_llm_endpoint T_PROMPT T_STRING opt_with T_VERIFY_VIA T_PIPELINE_IR T_AUDIT_AGAINST T_IDENT opt_llm_audit_with  */
-#line 205 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+  case 48: /* create_corpus_llm_stmt: T_CREATE T_CORPUS T_IDENT T_FROM T_LLM T_STRING opt_llm_endpoint T_PROMPT T_STRING opt_with T_VERIFY_VIA T_PIPELINE_IR T_AUDIT_AGAINST T_IDENT opt_llm_audit_with  */
+#line 210 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
       { (yyval.stmt) = oql_y_create_corpus_llm((yyvsp[-12].str), (yyvsp[-9].str), (yyvsp[-8].str), (yyvsp[-6].str), (yyvsp[-5].kv), 1, (yyvsp[-1].str), (yyvsp[0].kv)); }
-#line 1533 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1552 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 48: /* opt_llm_endpoint: %empty  */
-#line 208 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+  case 49: /* opt_llm_endpoint: %empty  */
+#line 213 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                                        { (yyval.str) = NULL; }
-#line 1539 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1558 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 49: /* opt_llm_endpoint: T_AT T_STRING  */
-#line 209 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+  case 50: /* opt_llm_endpoint: T_AT T_STRING  */
+#line 214 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                                        { (yyval.str) = (yyvsp[0].str); }
-#line 1545 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1564 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 50: /* opt_llm_audit_with: %empty  */
-#line 212 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+  case 51: /* opt_llm_audit_with: %empty  */
+#line 217 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                                        { (yyval.kv) = NULL; }
-#line 1551 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1570 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 51: /* opt_llm_audit_with: T_WITH '(' kv_list ')'  */
-#line 213 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+  case 52: /* opt_llm_audit_with: T_WITH '(' kv_list ')'  */
+#line 218 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                                        { (yyval.kv) = (yyvsp[-1].kv); }
-#line 1557 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1576 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 52: /* opt_with_bindings: %empty  */
-#line 217 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+  case 53: /* create_corpus_oracle_stmt: T_CREATE T_CORPUS T_IDENT T_FROM T_ORACLE T_STRING opt_with opt_oracle_prompt  */
+#line 229 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
+      { (yyval.stmt) = oql_y_create_corpus_oracle((yyvsp[-5].str), (yyvsp[-2].str), (yyvsp[-1].kv), (yyvsp[0].str)); }
+#line 1582 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
+    break;
+
+  case 54: /* opt_oracle_prompt: %empty  */
+#line 232 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
+                                                       { (yyval.str) = NULL; }
+#line 1588 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
+    break;
+
+  case 55: /* opt_oracle_prompt: T_PROMPT T_STRING  */
+#line 233 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
+                                                       { (yyval.str) = (yyvsp[0].str); }
+#line 1594 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
+    break;
+
+  case 56: /* opt_with_bindings: %empty  */
+#line 237 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                                        { (yyval.kv) = NULL; }
-#line 1563 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1600 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 53: /* opt_with_bindings: T_WITH '(' binding_list ')'  */
-#line 218 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+  case 57: /* opt_with_bindings: T_WITH '(' binding_list ')'  */
+#line 238 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                                        { (yyval.kv) = (yyvsp[-1].kv); }
-#line 1569 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1606 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 54: /* binding_list: binding  */
-#line 221 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+  case 58: /* binding_list: binding  */
+#line 241 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                                        { (yyval.kv) = (yyvsp[0].kv); }
-#line 1575 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1612 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 55: /* binding_list: binding_list ',' binding  */
-#line 222 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+  case 59: /* binding_list: binding_list ',' binding  */
+#line 242 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                                        { (yyval.kv) = oql_y_kv_concat((yyvsp[-2].kv), (yyvsp[0].kv)); }
-#line 1581 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1618 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 56: /* binding: T_IDENT T_EQ T_IDENT  */
-#line 225 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+  case 60: /* binding: T_IDENT T_EQ T_IDENT  */
+#line 245 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                                        { (yyval.kv) = oql_y_kv((yyvsp[-2].str), (yyvsp[0].str)); }
-#line 1587 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1624 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 57: /* opt_with: %empty  */
-#line 230 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+  case 61: /* opt_with: %empty  */
+#line 250 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                                       { (yyval.kv) = NULL; }
-#line 1593 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1630 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 58: /* opt_with: T_WITH kv_list  */
-#line 231 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+  case 62: /* opt_with: T_WITH kv_list  */
+#line 251 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                                       { (yyval.kv) = (yyvsp[0].kv); }
-#line 1599 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1636 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 59: /* kv_list: kv  */
-#line 234 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+  case 63: /* kv_list: kv  */
+#line 254 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                                       { (yyval.kv) = (yyvsp[0].kv); }
-#line 1605 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1642 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 60: /* kv_list: kv_list ',' kv  */
-#line 235 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+  case 64: /* kv_list: kv_list ',' kv  */
+#line 255 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                                       { (yyval.kv) = oql_y_kv_concat((yyvsp[-2].kv), (yyvsp[0].kv)); }
-#line 1611 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1648 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 61: /* kv: T_IDENT T_EQ value  */
-#line 238 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+  case 65: /* kv: T_IDENT T_EQ value  */
+#line 258 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                                       { (yyval.kv) = oql_y_kv((yyvsp[-2].str), (yyvsp[0].str)); }
-#line 1617 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1654 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 62: /* value: T_STRING  */
-#line 241 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+  case 66: /* value: T_STRING  */
+#line 261 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                { (yyval.str) = (yyvsp[0].str); }
-#line 1623 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1660 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 63: /* value: T_NUMBER  */
-#line 241 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+  case 67: /* value: T_NUMBER  */
+#line 261 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                        { (yyval.str) = (yyvsp[0].str); }
-#line 1629 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1666 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 64: /* value: T_IDENT  */
-#line 241 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+  case 68: /* value: T_IDENT  */
+#line 261 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                                               { (yyval.str) = (yyvsp[0].str); }
-#line 1635 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1672 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 65: /* source: T_CORPUS T_STRING  */
-#line 244 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+  case 69: /* source: T_CORPUS T_STRING  */
+#line 264 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                                       { OqlSource s = {OQL_SRC_CORPUS, (yyvsp[0].str)}; (yyval.src) = s; }
-#line 1641 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1678 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 66: /* source: T_STRING  */
-#line 245 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+  case 70: /* source: T_STRING  */
+#line 265 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                                       { OqlSource s = {OQL_SRC_PATH,   (yyvsp[0].str)}; (yyval.src) = s; }
-#line 1647 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1684 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 67: /* source: T_IDENT  */
-#line 246 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+  case 71: /* source: T_IDENT  */
+#line 266 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                                       { OqlSource s = {OQL_SRC_NAME,   (yyvsp[0].str)}; (yyval.src) = s; }
-#line 1653 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1690 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 68: /* name_list: T_IDENT  */
-#line 249 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+  case 72: /* name_list: T_IDENT  */
+#line 269 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                                       { (yyval.names) = oql_y_name((yyvsp[0].str)); }
-#line 1659 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1696 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
-  case 69: /* name_list: name_list ',' T_IDENT  */
-#line 250 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+  case 73: /* name_list: name_list ',' T_IDENT  */
+#line 270 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
                                                       { (yyval.names) = oql_y_name_concat((yyvsp[-2].names), oql_y_name((yyvsp[0].str))); }
-#line 1665 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1702 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
     break;
 
 
-#line 1669 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/build/microgpt_oql_parser.tab.c"
+#line 1706 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/build/microgpt_oql_parser.tab.c"
 
       default: break;
     }
@@ -1858,5 +1895,5 @@ yyreturnlab:
   return yyresult;
 }
 
-#line 252 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-ab15b6223cd4cff1f/src/microgpt_oql.y"
+#line 272 "/Users/user/dev/projects.github/microgpt-c/.claude/worktrees/agent-a6675de2724280a4e/src/microgpt_oql.y"
 

@@ -271,21 +271,237 @@ All four are scientifically informative. The pre-registration discipline benefit
 
 ## 3. Implementation + results
 
-**TODO** — fill on measurement commit. Sections to populate:
+This section records what was measured in the first agent run on the
+E15 worktree branch.  **Phases 1-3 are complete** (substrate +
+corpora); **Phases 4-7 are deferred** because the training-budget
+required to run two ~50k-step training schedules (monolithic vs
+3-organelle OPA) at non-trivial parameter counts exceeded the single
+agent-run wall-clock allowance.  All claims below are tied to
+on-disk artefacts that a follow-up run can verify and extend.
 
-- 3.1 OQL grammar extension: `CREATE CORPUS … FROM ORACLE …` parse tests
-- 3.2 `tools/klotski_a_star.c` + `tools/puzzle15_a_star.c` — algorithm + sanity checks
-- 3.3 Corpus generation stats (10k per task; difficulty distribution; oracle wall-clock)
-- 3.4 Held-out generation + leakage audit (T7)
-- 3.5 Monolithic baseline training run + solve rate on Klotski (T3a)
-- 3.6 Monolithic baseline solve rate on 15-puzzle (T3b)
-- 3.7 OPA composition training + Klotski solve rate (T4a)
-- 3.8 OPA 15-puzzle solve rate (T4b)
-- 3.9 Compute-equivalence audit (T6) — step count × params × batch
-- 3.10 Headline comparison table: margin on each task
-- 3.11 Per-position solution-length distribution (secondary metric)
-- 3.12 Latency p99 + audit-coverage (secondary metrics)
-- 3.13 Per-target verdict matrix (T1-T8)
+### 3.1 OQL grammar extension: `CREATE CORPUS … FROM ORACLE …` (T1)
+
+Shipped in commit `E15: grammar: …`.  Single grammar extension, ~50
+LOC of new productions + tokens + AST struct + 3 parse tests.
+
+Surface summary:
+
+- new lexer keyword: `ORACLE` (one token).  No new operators or
+  punctuation; the existing `'<string>'` literal carries the oracle
+  path.
+- new parser production `create_corpus_oracle_stmt` under
+  `create_stmt`.  Optional `WITH (k=v,...)` and optional `PROMPT
+  '<text>'` after the oracle string.
+- new AST struct `OqlCreateCorpusOracle` + verb tag
+  `OQL_VERB_CREATE_CORPUS_ORACLE`.  Still under the inherited CREATE
+  verb — the E07 +6/-4 verb lock holds (T8; see
+  `test_e15_verb_surface_holds_after_oracle_source`).
+
+3 parse-only tests in `tests/test_microgpt_oql.c`:
+
+| Test | What it covers |
+|---|---|
+| `test_e15_create_corpus_from_oracle_parses_minimal` | bare form `CREATE CORPUS x FROM ORACLE 'path';` |
+| `test_e15_create_corpus_from_oracle_full_clauses_parse` | full clause list — count + difficulty + seed + cache + output + PROMPT |
+| `test_e15_verb_surface_holds_after_oracle_source` | the +6 verb tags (TRAIN..AUDIT) are still slots 1..6; ORACLE is a sub-tag of CREATE |
+
+Test result: **27 → 30 OQL tests passing**.  **T1 = PASS.**
+
+### 3.2 Deterministic oracles (sanity-checked)
+
+Two standalone C99 binaries committed:
+
+**`tools/puzzle15_a_star.c`** — IDA* with Manhattan-distance
+heuristic + inverse-move pruning.  Self-test (`--self-test`) samples
+10 random easy positions, solves each, verifies the emitted move
+sequence drives the board to the goal.  Self-test passes 10/10.
+
+**`tools/klotski_a_star.c`** — BFS-optimal (the simplified 4×5
+Klotski's state space is small enough that A* would be no faster).
+Closed-set hash table sized for 1M nodes; guarantees optimal
+solutions by construction.  Self-test passes 10/10.
+
+Wall-clock at the actual generation scale:
+
+| Oracle | 100 positions @ difficulty=mixed | Notes |
+|---|---|---|
+| puzzle15 | ~1.1 s | dominated by hard positions (~5-10% of mixed); easy positions sub-millisecond |
+| klotski | ~0.05 s | the reachable state space is small; BFS terminates fast |
+
+Both oracles are **deterministic** under `--seed`: re-running with
+the same seed produces a bit-identical JSON-line stream.  This is
+the basis for T6's compute-equivalence reproducibility — any
+follow-up training run can regenerate the exact same training
+corpus.
+
+### 3.3 Corpus generation via `e15_generate` (T2)
+
+Driver: `tools/e15_generate.c` + `tools/oracle_corpus_source.{c,h}`.
+Reads an OQL script, finds each `CREATE CORPUS … FROM ORACLE …`
+statement, invokes the oracle binary via `popen`, caches results
+under `.oql_oracle_cache/` (FNV-1a 64-bit hash of model + count +
+seed + difficulty), parses the JSON-line stream, optionally applies
+the leakage audit, and writes TSV `(state \t solution)` lines to
+the `output=` path.
+
+OQL script `experiments/E15-corpus.oql` produces the **training
+corpora** at the §1.6-mitigated scale of **2 000 positions per
+task** (vs the pre-registration's 10 000 — the same falsification
+mitigation E12 used when the wall-clock budget came under
+pressure).
+
+Result of running `./build/e15_generate experiments/E15-corpus.oql`:
+
+| Corpus | Emitted | Survivors | Yield | Cache hit (T6) | Unique states |
+|---|---|---|---|---|---|
+| klotski_optimal | 2000 | 2000 | 100% | YES (second run) | 1279 |
+| puzzle15_optimal | 2000 | 2000 | 100% | YES (second run) | 1960 |
+
+T2 (oracle yield ≥ 95%) = **PASS** at 100% on both tasks.  The
+training corpora are committed-ignored (build artefacts in
+`build/`); the same `e15_generate` command regenerates them
+bit-identically from the seed.
+
+A bug surfaced during this phase and was fixed before the final
+generation:
+**`oracle_parse_jsonl` NUL-terminator ordering.**  The first
+extraction wrote `'\0'` at the closing quote of the `"state"`
+value, leaving the subsequent `strstr` for `"solution":"`
+operating on a truncated prefix.  Fixed by capturing both
+pointer+length pairs first and NUL-terminating only after both
+keys are extracted.  Unit tests in
+`tests/test_oracle_corpus_source.c` pin the fix.
+
+### 3.4 Held-out generation + leakage audit (T7)
+
+Two held-out corpora generated with `seed=4242` (disjoint from
+training's `seed=1337`):
+
+| Corpus | Pool | Survivors | Audit drops | Verbatim leakage |
+|---|---|---|---|---|
+| klotski_heldout_large | 2 000 | **113** | 1 887 (94%) | 0 |
+| puzzle15_heldout_large | 1 000 | **948** | 52 (5%) | 0 |
+
+The bigram-Jaccard audit at threshold 0.7 rejects **94 % of random
+Klotski boards** because the simplified Klotski state space is
+small (20 cells × 9-symbol alphabet) so the structural overlap
+between any two solvable boards is high.  Puzzle15's larger state
+space (16 cells × 16-symbol alphabet) keeps overlap below 6 %.
+
+**T7 (zero leakage) = PASS** on both tasks.
+
+But there is an important scope reduction this exposed.  The
+pre-registration calls for **500 held-out positions per task**.
+With the strict audit at threshold 0.7, Klotski only yields 113
+survivors out of a 2 000-position pool — 23% of the pre-reg target.
+Per §1.6 ("do NOT relax the audit") we **kept the audit threshold
+and accepted the smaller held-out**.  The 113-position Klotski
+held-out is statistically meaningful but the evaluation's
+confidence interval is wider than the 500-position spec
+contemplated.  Section 4 (whenever it lands) must reflect this in
+its T5 margin calculations.
+
+Puzzle15 at 948 survivors comfortably exceeds the 500-position
+target.
+
+### 3.5 — 3.8 Monolithic training / OPA training / evaluation (DEFERRED)
+
+**Not measured in this commit window.**
+
+Honest scope assessment: implementing the training pipeline cleanly
+under E09 §3.4's compile-time-macro silent-failure-mode requires
+the `_microgpt_lib_for_defines` variant pattern to produce two
+separate binary targets — one ~900 K-param monolithic, one ~300 K-
+param OPA-organelle.  Each then needs its own `add_demo` block + a
+fourth eval binary that loads both and drives the same 500-position
+held-out (now 113 / 948 per §3.4) through both with the same move
+budget.
+
+Setting this up correctly is a 1-2 day implementation task (mirrors
+E09's Connect-4 variant pattern); running it to convergence on
+50 000 steps × two-arch × two-task combinations is a 4-8 hour
+compute task.  Both exceed the single agent-run budget the worktree
+was provisioned for.
+
+Per the pre-registration's §1.6 falsification discipline: we do
+NOT estimate, extrapolate, or otherwise fabricate the unmeasured
+phases.  T3, T4, T5, T6 remain explicitly **DEFERRED**, and Section
+4 (the conclusion) cannot be written until all eight targets are
+measured.
+
+What a follow-up agent run needs (the implementation is
+substrate-ready):
+
+| Phase | Substrate now on disk |
+|---|---|
+| 4 (monolithic train) | `_microgpt_lib_for_defines` already wires per-macro variant builds in `CMakeLists.txt:130` — pattern documented in `CLAUDE.md` |
+| 4 (training driver) | A new `tools/e15_train.c` that mirrors `oql_runtime_train.c`'s loop OR a new `add_demo()` block that compiles a `e15_monolithic_demo` with the right `DEFINES` |
+| 5 (OPA train) | Same `add_demo()` pattern; 3 binaries (planner / player / judge) each at the smaller `DEFINES` block |
+| 6 (eval) | A new `tools/e15_eval.c` that loads both architectures, drives them on the on-disk held-out TSV, decodes solutions deterministically, applies the puzzle's deterministic move-rule to mark solved/unsolved |
+| 6 (audit-coverage instrumentation) | Wire `OpaKanban.history_count` + cycle-detector trip-count into a CSV emitted alongside the eval results |
+
+### 3.9 Compute-equivalence audit (T6) — DEFERRED, framework recorded
+
+T6 is the budget-equality check.  It cannot be verified until
+phases 4-5 produce training-runtime logs.  The pre-registered
+formula:
+
+> compute(monolithic) = steps × params(mono) × batch_size
+> compute(opa)        = Σ_{role ∈ {planner, player, judge}} steps × params(role) × batch_size
+> |compute(mono) − compute(opa)| / compute(mono) must be ≤ 10 %
+
+For the pre-reg targets (900 K monolithic at 50 000 steps, batch 8
+vs 3× 300 K OPA organelles at 50 000 steps, batch 8):
+
+  compute(mono) = 50 000 × 900 000 × 8 = 3.6 × 10¹¹ FLOP-steps
+  compute(opa)  = 3 × 50 000 × 300 000 × 8 = 3.6 × 10¹¹ FLOP-steps
+
+By construction the two arms are equal **iff** the OPA organelle
+parameter count is exactly one third of the monolithic.  The
+follow-up training run must validate this against the actual
+`model->n_params` field at startup.
+
+### 3.10 — 3.12 Headline comparison / solution-length / latency (DEFERRED)
+
+Cannot be measured until §3.5 — §3.8 produce trained checkpoints.
+
+### 3.13 Per-target verdict matrix (interim, this commit window)
+
+| ID | Target | Status this commit | Rationale |
+|---|---|---|---|
+| **T1** | `CREATE CORPUS … FROM ORACLE …` parses | **PASS** | 3 OQL parse tests; ctest 30/30 |
+| **T2** | 10k valid (state, solution) pairs per task | **PASS** *(at scaled 2k count)* | 2000/2000 yield = 100% on both; the 2 000-count is the §1.6 wall-clock mitigation, mirrors E12's 10k→100 scaling |
+| **T3** | Monolithic baseline solve rate measured | **DEFERRED** | training-budget out of scope this run |
+| **T4** | OPA composition solve rate measured | **DEFERRED** | training-budget out of scope this run |
+| **T5** | OPA − monolithic margin ≥ 15pp | **DEFERRED** | gated on T3 + T4 |
+| **T6** | Compute equivalence within ±10% | **DEFERRED** (formula recorded) | no training-runtime logs yet |
+| **T7** | Per-task leakage audit passes | **PASS** | 0 verbatim leakage + 0 Jaccard≥0.7 leakage on both tasks; held-out size reduced for Klotski (113 vs pre-reg 500) per §1.6 discipline |
+| **T8** | Engine surface frozen / +6 verb lock / no new opcodes / no new deps | **PASS** | `git diff main -- src/microgpt.{c,h} src/microgpt_vm.*` = 0 lines; OQL verb tags 1..6 unchanged; CMake adds 3 new tool targets, all C99+libc/libm |
+
+**Headline this commit window: 4 PASS (T1, T2, T7, T8) + 4
+DEFERRED (T3, T4, T5, T6).  No targets in the "FAIL" state.**
+
+The substrate that the follow-up run needs is all on disk:
+deterministic oracles with self-tests, working FROM ORACLE source
+clause, parsed-and-audited training+held-out corpora, and a unit
+test suite that protects the JSON-line parser + Jaccard + cache
+under regression.
+
+### 3.14 What this commit window's discipline preserved
+
+- The §1.5 four-corner ladder is **not collapsed** by writing
+  Section 4.  Per §1.6 ("If T5 trips below 5pp on either task,
+  STOP"), the rule is symmetric: do not write the conclusion until
+  the measurement is done.  This commit window measures T1, T2, T7,
+  T8 honestly and stops there.
+- T8 (engine surface + verb lock + no new opcodes) held under all
+  the pressure that adding a third SOURCE clause to OQL could have
+  applied.  The same engine binary that ships E12's FROM LLM
+  parses E15's FROM ORACLE.
+- The §1.7 falsification framing is **still intact**: a follow-up
+  run that measures T3-T6 has all four §1.5 outcomes available to
+  it — including monolithic-wins, the most valuable single result
+  the project could produce.
 
 ---
 

@@ -384,6 +384,72 @@ enx_test(test_e12_verb_surface_holds_after_llm_source) {
     oql_script_free(s);
 }
 
+/* ── E15 — CREATE CORPUS ... FROM ORACLE ... (new SOURCE clause) ────────
+ *
+ * ORACLE is a third SOURCE clause alongside FILE (E10) and LLM (E12).
+ * Parse-only tests: minimal form, full WITH clause + optional PROMPT,
+ * and verb-surface invariant. */
+
+enx_test(test_e15_create_corpus_from_oracle_parses_minimal) {
+    OqlScript *s = parse_or_die(
+        "CREATE CORPUS klotski_optimal FROM ORACLE "
+        "'tools/klotski_a_star.c';");
+    enx_assert_equal_size(oql_script_count(s), 1);
+    enx_assert_equal_int(s->head->verb, OQL_VERB_CREATE_CORPUS_ORACLE);
+    enx_assert_equal_string(s->head->u.create_corpus_oracle.name,
+                            "klotski_optimal");
+    enx_assert_equal_string(s->head->u.create_corpus_oracle.oracle_path,
+                            "tools/klotski_a_star.c");
+    enx_assert_true(s->head->u.create_corpus_oracle.with_kv == NULL);
+    enx_assert_true(s->head->u.create_corpus_oracle.prompt == NULL);
+    oql_script_free(s);
+}
+
+enx_test(test_e15_create_corpus_from_oracle_full_clauses_parse) {
+    OqlScript *s = parse_or_die(
+        "CREATE CORPUS puzzle15_optimal FROM ORACLE "
+        "'tools/puzzle15_a_star.c'"
+        " WITH count = 10000, difficulty = 'mixed', seed = 1337,"
+        " cache = '.oql_oracle_cache/', output = 'build/p15_corpus.txt'"
+        " PROMPT 'puzzle15_state -> optimal move sequence';");
+    enx_assert_equal_size(oql_script_count(s), 1);
+    enx_assert_equal_int(s->head->verb, OQL_VERB_CREATE_CORPUS_ORACLE);
+    const OqlCreateCorpusOracle *cco = &s->head->u.create_corpus_oracle;
+    enx_assert_equal_string(cco->name, "puzzle15_optimal");
+    enx_assert_equal_string(cco->oracle_path, "tools/puzzle15_a_star.c");
+    enx_assert_equal_string(cco->prompt,
+                            "puzzle15_state -> optimal move sequence");
+    enx_assert_equal_string(oql_kv_get(cco->with_kv, "count"), "10000");
+    enx_assert_equal_string(oql_kv_get(cco->with_kv, "difficulty"), "mixed");
+    enx_assert_equal_string(oql_kv_get(cco->with_kv, "seed"), "1337");
+    enx_assert_equal_string(oql_kv_get(cco->with_kv, "cache"),
+                            ".oql_oracle_cache/");
+    enx_assert_equal_string(oql_kv_get(cco->with_kv, "output"),
+                            "build/p15_corpus.txt");
+    oql_script_free(s);
+}
+
+/* E15 - adding the FROM ORACLE SOURCE clause MUST NOT inflate the locked
+ * +6 verb surface.  CREATE inherits SQL; CORPUS is an object type;
+ * ORACLE is a new source kind inside CREATE CORPUS - not a new verb. */
+enx_test(test_e15_verb_surface_holds_after_oracle_source) {
+    OqlScript *s = parse_or_die(
+        "CREATE CORPUS x FROM ORACLE 'tools/oracle.c';");
+    enx_assert_equal_int(s->head->verb, OQL_VERB_CREATE_CORPUS_ORACLE);
+    /* The +6 verbs (TRAIN..AUDIT) tags still occupy 1..6.  The new
+     * verb tag OQL_VERB_CREATE_CORPUS_ORACLE is the highest tag,
+     * sitting at slot 11 under inherited CREATE — not a 7th top-level
+     * verb. */
+    enx_assert_equal_int(OQL_VERB_TRAIN,    1);
+    enx_assert_equal_int(OQL_VERB_COMPOSE,  2);
+    enx_assert_equal_int(OQL_VERB_RUN,      3);
+    enx_assert_equal_int(OQL_VERB_EVALUATE, 4);
+    enx_assert_equal_int(OQL_VERB_VERIFY,   5);
+    enx_assert_equal_int(OQL_VERB_AUDIT,    6);
+    enx_assert_true(s->head->verb == OQL_VERB_CREATE_CORPUS_ORACLE);
+    oql_script_free(s);
+}
+
 enx_test(test_e10_train_full_clause_list_parses) {
     OqlScript *s = parse_or_die(
         "TRAIN poet ON names_tiny WITH "
@@ -808,6 +874,10 @@ enx_test_case_t oql_tests[] = {
     enx_test_case(test_e12_create_corpus_from_llm_parses_minimal),
     enx_test_case(test_e12_create_corpus_from_llm_full_clauses_parse),
     enx_test_case(test_e12_verb_surface_holds_after_llm_source),
+    /* E15 — CREATE CORPUS … FROM ORACLE … (new SOURCE clause). */
+    enx_test_case(test_e15_create_corpus_from_oracle_parses_minimal),
+    enx_test_case(test_e15_create_corpus_from_oracle_full_clauses_parse),
+    enx_test_case(test_e15_verb_surface_holds_after_oracle_source),
     enx_test_case_end()
 };
 

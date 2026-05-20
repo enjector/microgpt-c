@@ -98,6 +98,16 @@ OqlStmt *oql_y_create_corpus_llm(char *name, char *model_id,
     s->u.create_corpus_llm.audit_with = audit_with;
     return s;
 }
+/* E15 — CREATE CORPUS <name> FROM ORACLE '<path>' [WITH (...)] [PROMPT '...']; */
+OqlStmt *oql_y_create_corpus_oracle(char *name, char *oracle_path,
+                                    OqlKV *with_kv, char *prompt) {
+    OqlStmt *s = oql_stmt_alloc(OQL_VERB_CREATE_CORPUS_ORACLE);
+    s->u.create_corpus_oracle.name = name;
+    s->u.create_corpus_oracle.oracle_path = oracle_path;
+    s->u.create_corpus_oracle.with_kv = with_kv;
+    s->u.create_corpus_oracle.prompt = prompt;
+    return s;
+}
 OqlKV *oql_y_kv(char *key, char *val) {
     OqlKV *k = (OqlKV *)calloc(1, sizeof(OqlKV));
     if (k) { k->key = key; k->value = val; }
@@ -313,6 +323,12 @@ static void oql_stmt_free_inner(OqlStmt *s) {
         oql_kv_free(s->u.create_corpus_llm.with_kv);
         free(s->u.create_corpus_llm.audit_held_out);
         oql_kv_free(s->u.create_corpus_llm.audit_with);
+        break;
+    case OQL_VERB_CREATE_CORPUS_ORACLE:
+        free(s->u.create_corpus_oracle.name);
+        free(s->u.create_corpus_oracle.oracle_path);
+        oql_kv_free(s->u.create_corpus_oracle.with_kv);
+        free(s->u.create_corpus_oracle.prompt);
         break;
     }
 }
@@ -1153,6 +1169,50 @@ static oql_status oql_execute_core(const OqlScript *script, OqlRuntime *rt,
                      * fail gracefully if the file doesn't exist yet. */
                     OqlCreateCorpus shim;
                     shim.name = cc->name;
+                    shim.file_path = (char *)output_path;
+                    st = oql_runtime_register_corpus(rt, &shim, out);
+                } else {
+                    st = OQL_OK;
+                }
+            }
+            break;
+        case OQL_VERB_CREATE_CORPUS_ORACLE:
+            /* E15 — Parse-time path only.  Actual oracle invocation
+             * happens via the standalone `e15_generate` tool which
+             * links against tools/oracle_corpus_source.{c,h}.  Keeping
+             * the oracle invocation out of microgpt_oql_lib preserves
+             * the rule that the OQL core does NOT shell out — only
+             * tools do.
+             *
+             * In the registry-backed runtime path (rt != NULL), we ALSO
+             * register the *output* corpus path under the corpus name
+             * so a subsequent TRAIN statement can resolve it. */
+            {
+                const OqlCreateCorpusOracle *cco = &s->u.create_corpus_oracle;
+                const char *count_s = oql_kv_get(cco->with_kv, "count");
+                const char *output_path = oql_kv_get(cco->with_kv, "output");
+                const char *difficulty = oql_kv_get(cco->with_kv, "difficulty");
+                if (out) {
+                    fprintf(out,
+                        "CREATE CORPUS %s FROM ORACLE '%s'%s%s%s%s: parsed\n",
+                        cco->name ? cco->name : "?",
+                        cco->oracle_path ? cco->oracle_path : "?",
+                        count_s ? " count=" : "",
+                        count_s ? count_s : "",
+                        difficulty ? " difficulty=" : "",
+                        difficulty ? difficulty : "");
+                    if (output_path) {
+                        fprintf(out,
+                            "  output corpus will materialise at '%s' (invoke e15_generate to populate)\n",
+                            output_path);
+                    } else {
+                        fprintf(out,
+                            "  no `output=<path>` in WITH clause — corpus generation deferred\n");
+                    }
+                }
+                if (rt && output_path) {
+                    OqlCreateCorpus shim;
+                    shim.name = cco->name;
                     shim.file_path = (char *)output_path;
                     st = oql_runtime_register_corpus(rt, &shim, out);
                 } else {

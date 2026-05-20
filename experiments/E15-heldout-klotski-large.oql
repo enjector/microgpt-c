@@ -1,0 +1,17 @@
+-- E15 — supplemental Klotski held-out (larger pool, same disjoint-seed
+-- discipline) to compensate for the high audit drop-rate caused by the
+-- small Klotski state space + bigram-Jaccard threshold 0.7.
+--
+-- Documented in Section 3 of the writeup as the §1.6 mitigation for the
+-- T7 leakage audit: we DO NOT relax the audit threshold; we generate
+-- enough candidate positions that the survivor count is large enough for
+-- a meaningful held-out evaluation.
+
+CREATE CORPUS klotski_heldout_large
+  FROM ORACLE 'tools/klotski_a_star.c'
+  WITH count = 2000,
+       difficulty = 'mixed',
+       seed = 4242,
+       cache = '.oql_oracle_cache/',
+       output = 'build/klotski_heldout_large.tsv'
+  PROMPT 'klotski large held-out pool';

@@ -63,7 +63,12 @@ typedef enum {
     /* E12 — CREATE CORPUS FROM LLM ... (still inherits CREATE verb,
      * still +6/-4).  The grammar reuses the same CREATE keyword and adds
      * a new SOURCE clause (FROM LLM) rather than a new top-level verb. */
-    OQL_VERB_CREATE_CORPUS_LLM
+    OQL_VERB_CREATE_CORPUS_LLM,
+    /* E15 — CREATE CORPUS FROM ORACLE ... (still inherits CREATE verb,
+     * still +6/-4).  ORACLE is a third SOURCE clause alongside FILE (E10)
+     * and LLM (E12) — a new source kind inside CREATE CORPUS, NOT a new
+     * top-level verb.  Verb count remains six (TRAIN..AUDIT). */
+    OQL_VERB_CREATE_CORPUS_ORACLE
 } OqlVerb;
 
 /* ============================================================
@@ -236,6 +241,31 @@ typedef struct {
     OqlKV *audit_with;      /* mode / threshold, owned (NULL if defaults) */
 } OqlCreateCorpusLlm;
 
+/* E15 — CREATE CORPUS <name> FROM ORACLE '<oracle_path>'
+ *           [WITH (count=N, seed=S, cache='<dir>', difficulty='mixed', output='<path>')]
+ *           [PROMPT '<text>'];
+ *
+ * `oracle_path` is a path to a deterministic solver binary or source
+ * file (e.g. tools/klotski_a_star.c, tools/puzzle15_a_star.c).  The
+ * adapter (tools/oracle_corpus_source.{c,h}) invokes the solver
+ * binary via popen, caches results under cache, and produces
+ * (state, solution) pairs as JSON lines in the output file.
+ *
+ * Built-in WITH keys: count (int, default 1000), seed (int, default
+ * 1337), cache (str, default ".oql_oracle_cache/"), difficulty (str:
+ * 'mixed', 'easy', 'medium', 'hard'; default 'mixed'), output (str,
+ * output corpus file path).
+ *
+ * `prompt` is optional human-readable documentation (e.g. "klotski
+ * state -> optimal move sequence (A* shortest path)").  Does not
+ * affect generation. */
+typedef struct {
+    char *name;             /* corpus identifier, owned */
+    char *oracle_path;      /* path to solver binary/source, owned */
+    OqlKV *with_kv;         /* count / seed / cache / difficulty / output */
+    char *prompt;           /* optional human-readable doc, owned (may be NULL) */
+} OqlCreateCorpusOracle;
+
 /* ============================================================
  *  Statement union
  * ============================================================ */
@@ -253,6 +283,7 @@ typedef struct OqlStmt {
         OqlCreateOrganelle  create_organelle;
         OqlCreateCorpus     create_corpus;
         OqlCreateCorpusLlm  create_corpus_llm;
+        OqlCreateCorpusOracle create_corpus_oracle;
     } u;
     struct OqlStmt *next;
 } OqlStmt;
