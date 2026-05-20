@@ -427,19 +427,65 @@ backwards-compatible), and the OQL/experiment scripts.
 
 ## 4. Conclusion
 
-**TODO** — fill on measurement commit when ALL 9 targets are measured. Sections to populate:
+### 4.1 Verdict per T1-T9
 
-- 4.1 Verdict per T1-T9
-- 4.2 Headline outcome:
-  - ≥ 93%: tiny-specialist thesis strengthened with a frontier-distillation result
-  - 88-92%: distillation neutral; tiny-specialist thesis robust but unboosted
-  - < 88%: tiny-specialist thesis robust to distillation attempts (the §5.1 explicit fallback wording)
-- 4.3 What this says about distillation as a tool for OPA:
-  - If T1 PASS: future experiments (E14+) can distill into other games (Mastermind 84%, Pentago etc. per §5.1)
-  - If T1 FAIL: the tiny-specialist architecture absorbs frontier-LLM behaviour poorly at this scale; OQL `TRAIN` on hand-curated corpora remains the primary path
-- 4.4 What this says about [E12](E12-llm-wiring-corpus.md):
-  - If both PASS: LLMs are useful design-time tools for OPA across structurally different domains (curator + teacher)
-  - If E12 PASS / E13 FAIL: LLMs are good *curators* (NL → typed-graph) but bad *teachers* (game play). Interesting asymmetry.
-  - If E12 FAIL / E13 PASS: LLMs are good *teachers* (game play) but bad *curators*. Different asymmetry.
-- 4.5 Replication plan: if T1 PASS, follow-on E14 can extend to Mastermind (§5.1 target ≥ 84%) and Pentago (no §5.1 target — exploratory)
-- 4.6 Traceability updates (`TRACEABILITY.md`, `ORGANELLE_STATE.md`, `RESEARCH_DISCLOSURE.md`)
+[**TO BE FINALISED** on §3.5 completion.]  Current state at commit time:
+
+| ID | Target | Verdict | Notes |
+|---|---|---|---|
+| T1 | Win rate ≥ 93% over 100 games vs random | **PENDING** | depends on §3.5 |
+| T2 | Student ≤ 460K params | **PASS** | 459,648 params confirmed in smoke training (`/tmp/c4_distill_smoke.ckpt.log`) |
+| T3 | Per-move latency p99 ≤ 5 ms | **PENDING** | depends on §3.5 |
+| T4 | All existing tests pass | **PASS** | `ctest --output-on-failure` 15/15 PASS at commit `e650ef3` |
+| T5 | Zero new VM opcodes | **PASS** | `git diff main -- src/microgpt_vm.*` = 0 lines, confirmed every commit |
+| T6 | LLM corpus diagnostics | **PASS** | LLM-X win rate ~87% vs random (well above 50% skip-rule), N games / pairs / wallclock all reported by `c4_distill_corpus_gen` summary |
+| T7 | Determinism via cache | **PASS** | per-(board, model, seed) FNV-1a cache verified in smoke test (game 2 reused game 1's empty-board cached move) |
+| T8 | Zero new build deps beyond curl | **PASS** | `c4_distill_corpus_gen` links neither `microgpt_lib` nor `microgpt_vm_lib`; only curl subprocess required at runtime |
+| T9 | Engine surface frozen | **PASS** | `git diff main -- src/microgpt.{c,h}` = 0 lines, confirmed every commit |
+
+### 4.2 Headline outcome
+
+[**TO BE FILLED** on §3.5 measurement.]  Per the locked verdict ladder:
+
+  - ≥ 93%: tiny-specialist thesis strengthened with a frontier-distillation result.
+  - 88-92%: distillation neutral; tiny-specialist thesis robust but unboosted.
+  - < 88%: tiny-specialist thesis robust to distillation attempts (the §5.1 explicit fallback wording).
+
+### 4.3 What this says about distillation as a tool for OPA
+
+[**TO BE FILLED**.]
+
+### 4.4 What this says about E12
+
+[**TO BE FILLED** after both experiments complete.]
+
+### 4.5 Replication plan
+
+[**TO BE FILLED** based on T1 verdict.]
+
+### 4.6 Traceability updates
+
+Files touched by E13 (file-list audit for `TRACEABILITY.md`):
+
+- `tools/llm_game_player.{h,c}` — NEW; LLM bridge.
+- `tools/c4_distill_corpus_gen.c` — NEW; corpus generator driver.
+- `demos/character-level/connect4/main.c` — added CLI args
+  `--player-corpus / --player-ckpt / --skip-planner-train /
+  --skip-play`; default behaviour unchanged.
+- `experiments/connect4_distill_train.oql` — NEW; Pathway A train
+  script (kept for documentation even though Pathway B was used).
+- `experiments/connect4_distilled.oql` — NEW; eval script.
+- `experiments/E13-llm-game-distillation.md` — Section 3 + 4
+  measurement writeup.
+- `CMakeLists.txt` — new `c4_distill_corpus_gen` executable
+  registration (one block, no other targets touched).
+
+Files explicitly NOT touched (E13 hard-locks):
+
+- `src/microgpt.{c,h}` — engine surface (T9).
+- `src/microgpt_vm.{c,h,l,y}` — VM (T5).
+- `src/microgpt_oql.{c,h,l,y}` — OQL grammar (E07 verb lock + E12
+  parallel territory).
+- `src/oql_runtime_*` — OQL runtime (E10/E11 territory).
+- `src/microgpt_vm_natives.{c,h}` — VM externs (E08 lock).
+- `tests/` — no test changes; existing 15/15 PASS held.
