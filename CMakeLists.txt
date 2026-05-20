@@ -2404,6 +2404,24 @@ add_test(NAME microgpt_oql_train_tests
          COMMAND test_microgpt_oql_train
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
+# Long-horizon (5000-step) loss-curve benchmark — kept out of ctest
+# (3-10s runtime) but registered so engineers can re-measure when the
+# adapter changes.  Run from build/ as `./bench_microgpt_oql_train`.
+add_executable(bench_microgpt_oql_train tests/bench_microgpt_oql_train.c)
+target_link_libraries(bench_microgpt_oql_train PRIVATE microgpt_oql_lib)
+target_include_directories(bench_microgpt_oql_train PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests
+    ${CMAKE_CURRENT_SOURCE_DIR}/src)
+if(NOT MSVC)
+    target_link_libraries(bench_microgpt_oql_train PRIVATE m)
+endif()
+add_custom_command(TARGET bench_microgpt_oql_train POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/demos/character-level/names/c_names.txt"
+        "$<TARGET_FILE_DIR:bench_microgpt_oql_train>/c_names.txt"
+    COMMENT "Copying c_names.txt for bench_microgpt_oql_train"
+)
+
 # ==================================================================
 #  TurboQuant Integration Evaluation Targets
 # ==================================================================
