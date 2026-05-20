@@ -42,6 +42,8 @@ Each of these directions has a dedicated experiment doc in this folder:
 7. **Elevate the operator surface to a SQL-shaped DSL — OQL (Organelle Query Language).** Inspired by [EQL](../../EnX/EnX-Research-Prototypes/aerospike.github/cpp/enx-db/book-eql.v7/The_Expressive_Power_of_EQL.md)'s "the query language is the product" thesis. SQL + 6 verbs (`TRAIN`, `COMPOSE`, `RUN`, `EVALUATE`, `VERIFY`, `AUDIT`) - 4 verbs (`CREATE TRIGGER`, `CREATE FUNCTION`, `DECLARE CURSOR`, `SAVEPOINT`). Re-uses the existing Flex/Bison VM infrastructure. Compounds with E05 — pre-registration becomes a first-class `CREATE EXPERIMENT … WITH TARGETS …` statement instead of prose. Each of E01-E06 rewrites to ≤ 50 lines of OQL. → **[E07](E07-oql-dsl.md)**
 8. **High-level researcher surface — `BEHAVIOUR` objects in OQL whose body is the VM's TypeScript dialect.** Researchers stop writing C wrappers for organelles; they write TS functions (`function eval(board: string): string { ... }`) that bind to engine primitives via `declare function` externs. Connect-4's ~500 LOC C demo collapses to ~80 lines of OQL + 4 small TS bodies. Zero new VM opcodes (extern table only). Worked target: Connect-4 win rate held within ±3 pp, then replicated to 3 more games. → **[E08](E08-oql-behaviours.md)**
 9. **Make OQL actually run things — wire `RUN` / `COMPOSE` / `CREATE ORGANELLE FROM CHECKPOINT` so `connect4.oql` drives a real game loop.** Closes E08's deferred T1 measurement and unblocks E01's System C authoring. `TRAIN` honestly deferred to E10. → **[E09](E09-oql-runtime-wiring.md)**
+10. **Wire OQL `TRAIN` — the last `OQL_ERR_NOT_IMPLEMENTED` stub.** OQL scripts go from "load a checkpoint and run" to "train + save + load + run" in one file. Loss-curve fidelity locked at ±10% vs the C-demo equivalent. → **[E10](E10-oql-train-wiring.md)**
+11. **Close E09's Connect-4 win-rate gap (51% → ≥85%).** The wiring is correct; the gap is a prompt-protocol mismatch at `INPUT_BEHAVIOUR`. Pathway A (behaviour-side fix) preferred; Pathway B (one new VM extern, zero new opcodes) as fallback. → **[E11](E11-connect4-win-rate-fix.md)**
 
 ### What we explicitly will NOT prioritise
 
@@ -78,7 +80,7 @@ Every experiment doc is a single markdown file with four sections:
 | **3. Implementation + results** | Measurement commit | What was built, raw numbers, links to artefacts |
 | **4. Conclusion** | Measurement commit | Verdict against each pre-reg target, lessons, next moves, traceability updates |
 
-## The nine experiments
+## The eleven experiments
 
 | ID | Title | Direction | Cost | Falsification risk |
 |---|---|---|---|---|
@@ -91,6 +93,8 @@ Every experiment doc is a single markdown file with four sections:
 | [E07](E07-oql-dsl.md) | OQL — a SQL-shaped DSL for organelles, pipelines, behaviours, and experiments | Replace 3 surfaces (C demos + scripts + markdown specs) with one declarative dialect | ~6-8 wk | Medium |
 | [E08](E08-oql-behaviours.md) | VM TypeScript dialect as the body of OQL `BEHAVIOUR` objects | High-level researcher surface — Connect-4 ~500 LOC C → ~80 lines OQL+TS, zero new VM opcodes | ~4-5 wk | Medium |
 | [E09](E09-oql-runtime-wiring.md) | Wire OQL `RUN` / `COMPOSE` / `CREATE ORGANELLE FROM CHECKPOINT` end-to-end | Make `oql run connect4.oql` actually drive a game loop; closes E08's T1 | ~5-7 wk | Medium |
+| [E10](E10-oql-train-wiring.md) | Wire OQL `TRAIN` so scripts can train organelles from scratch | Last `OQL_ERR_NOT_IMPLEMENTED` stub closes; loss-curve fidelity ±10% vs C-demo | ~3-5 wk | Medium |
+| [E11](E11-connect4-win-rate-fix.md) | Close E09's Connect-4 win-rate gap (51% → ≥85%) | Behaviour-side prompt-protocol fix (Pathway A) or single new VM extern (Pathway B) | ~2-3 wk | Low-medium |
 
 ## Status legend
 
@@ -111,7 +115,9 @@ Measured (worktree-branch agent runs, all merged into main):
 - E05 ✅ merged at `6aba1c8` — 6/6 targets PASS; methodology paper draft 13 pages
 - E07 ✅ merged at `83e5673` — verb-discipline lock held; 5 PASS, 1 PARTIAL, 2 deferred
 - E08 ✅ merged at `e9b8620` — 3 PASS (T2 18.5% LOC, T3 zero new opcodes, T4 +4 tests); 5 honestly deferred
-- E09 ✅ merged at `d4eb478` — 6 PASS (T1 RUN completes; T3 sub-ms; T4 17→22 tests; T5 zero VM diff; T6 TRAIN stub; T7 23.4% LOC); T2 PARTIAL (51% win-rate, two named E10 paths); T8 PARTIAL
+- E09 ✅ merged at `d4eb478` — 6 PASS (T1 RUN completes; T3 sub-ms; T4 17→22 tests; T5 zero VM diff; T6 TRAIN stub; T7 23.4% LOC); T2 PARTIAL (51% win-rate); T8 PARTIAL
+- E10 🔬 agent running (wire TRAIN)
+- E11 🔬 agent running (close E09's T2 win-rate gap)
 
 Awaiting external inputs:
 - E01 — needs Anthropic API budget (~$100)
