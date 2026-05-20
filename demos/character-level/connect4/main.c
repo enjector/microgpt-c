@@ -180,6 +180,7 @@ typedef struct {
   const char *player_ckpt;
   int skip_planner_train;
   int skip_play;
+  int max_docs;       /* 0 = use compile-time default (5000) */
 } C4Args;
 
 static void parse_c4_args(int argc, char **argv, C4Args *a) {
@@ -187,20 +188,24 @@ static void parse_c4_args(int argc, char **argv, C4Args *a) {
   a->player_ckpt = NULL;
   a->skip_planner_train = 0;
   a->skip_play = 0;
+  a->max_docs = 0;
   for (int i = 1; i < argc; i++) {
     const char *s = argv[i];
     if (!strncmp(s, "--player-corpus=", 16))      a->player_corpus = s + 16;
     else if (!strncmp(s, "--player-ckpt=", 14))   a->player_ckpt = s + 14;
+    else if (!strncmp(s, "--max-docs=", 11))      a->max_docs = atoi(s + 11);
     else if (!strcmp(s, "--skip-planner-train")) a->skip_planner_train = 1;
     else if (!strcmp(s, "--skip-play"))           a->skip_play = 1;
     else if (!strcmp(s, "--help") || !strcmp(s, "-h")) {
       fprintf(stderr,
         "usage: %s [--player-corpus=PATH] [--player-ckpt=PATH]\n"
-        "          [--skip-planner-train] [--skip-play]\n"
+        "          [--max-docs=N] [--skip-planner-train] [--skip-play]\n"
         "  Default: trains planner+player from corpora next to the binary\n"
         "           and plays 100 games vs random.  E13 Pathway B uses the\n"
         "           --player-corpus / --player-ckpt flags to train the\n"
-        "           distillation student.\n", argv[0]);
+        "           distillation student.  --max-docs lifts the 5000-doc\n"
+        "           cap so an augmented corpus's LLM moves AND baseline\n"
+        "           records both fit in the training window.\n", argv[0]);
       exit(0);
     } else {
       fprintf(stderr, "warn: unknown arg '%s' (use --help)\n", s);
@@ -228,7 +233,7 @@ int main(int argc, char **argv) {
   g_cfg.num_steps = 25000;
   g_cfg.learning_rate = 0.001;
   g_cfg.max_vocab = 50;
-  g_cfg.max_docs = 5000;
+  g_cfg.max_docs = (cli.max_docs > 0) ? cli.max_docs : 5000;
   g_cfg.max_doc_len = 128;
   microgpt_print_config("MicroGPT-C - Connect-4 Kanban Pipeline Demo", &g_cfg);
 
