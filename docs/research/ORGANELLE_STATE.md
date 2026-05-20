@@ -98,6 +98,51 @@ In all three cases, the productisation work is **a continuation of the research 
 | Game / vision / planner organelle applications | `RESEARCH_ORGANELLE_GAMES.md`, `RESEARCH_ORGANELLE_VISION.md`, `RESEARCH_ORGANELLE_PLANNER.md` |
 | Productisation thinking | `STRATEGY_ONE_PAGER.md` → `PRODUCTIZATION_VERTICALS.md` → vertical sketches → `DEPENDENCY_POLICY.md` |
 
-## Closing line
+## Closing line (original — pre-OQL arc)
 
 The organelle research arc has reached the point where the architecture is *understood* — its strengths, its three structural bounds, the honest numbers it produces, the gating decision that opens the next chapter. There is no more research question the architecture itself can pose at the current scale. **What's left is committing to one of the verticals on real data, which is itself a research move that will refine these claims further.**
+
+---
+
+## May 2026 update — the OQL substrate arc (E07 onwards)
+
+The closing line above is preserved verbatim because the calibrated three-bound claim it captures (75-80% novel-paraphrase ceiling; curator-, model-, domain-bounded) remains accurate for the wiring arc. What follows is what has been *added on top* during the experiments/ work, all of which sits within the original architectural envelope.
+
+### What's been added — eight measured experiments
+
+| Experiment | Headline finding | What it adds to the project's claims |
+|---|---|---|
+| [E02](../../experiments/E02-pipeline-ir-library.md) — `libpipeline_ir` | Pipeline IR + verifier + DOT extracted to 58 KB standalone C99 library; consumed by E08-E13 cleanly | First reusable standalone artefact; verifier-as-Judge is portable |
+| [E04](../../experiments/E04-eml-neural-hybrid.md) — Neural + EML hybrid | **100% hybrid extrapolation vs 1.5% pure-neural** at 50x wider input range (two orders of magnitude gap) | Complementary-organelle-classes story is **measurable**, not rhetorical |
+| [E05](../../experiments/E05-prereg-methodology-public.md) — Methodology artefact | 13-page paper draft + ~700 LOC C99 pre-reg parser + CI hook catches both known historical leakage incidents | Project's pre-reg/audit discipline is **portable** to other projects |
+| [E07](../../experiments/E07-oql-dsl.md) — OQL DSL | +6/-4 verb surface; grammar 129+81 LOC; **verb-discipline lock held under cumulative pressure from six subsequent experiments** | OQL is the right operator surface |
+| [E08](../../experiments/E08-oql-behaviours.md) — BEHAVIOUR + VM TS | Connect-4 wrapper at **18.5% of C-demo LOC**; zero new VM opcodes under hard-lock | Researcher surface earns its cost |
+| [E09](../../experiments/E09-oql-runtime-wiring.md) — OQL runtime wiring | `oql run` drives a real game loop; T2 PARTIAL at 51% closed by E11 at 89% | OQL is **executable**, not parse-only |
+| [E10](../../experiments/E10-oql-train-wiring.md) — OQL TRAIN | **Bit-identical loss curves** vs C-demo at every measurement step (0.0000 relative delta) | OQL is **self-sufficient** — corpus -> trained organelle -> running pipeline in one .oql file |
+| [E11](../../experiments/E11-connect4-win-rate-fix.md) — Connect-4 win rate | **51% -> 89%** (+38pp, +1pp above C-demo's 88% baseline); one new extern, zero new opcodes | "OQL competitive with hand-coded C" is **measured** |
+| [E13](../../experiments/E13-llm-game-distillation.md) — LLM distillation | T1 = 89% in the §4.2 *neutral band* — teacher (Qwen 3.6 35B) wins 88.4% itself, so cannot lift student beyond that ceiling | Saturated-distillation regime — first publishable negative result about LLM-distillation-into-tiny-specialists |
+
+### Standing architectural locks (held under cumulative pressure)
+
+- **+6/-4 OQL verb surface** — E07 → E13 added six new object types or SOURCE clauses; ZERO new top-level verbs
+- **Zero new VM opcodes** — E08 → E13 added 9 externs in a separate file (`microgpt_vm_natives.{h,c}`); `src/microgpt_vm.{c,h,l,y}` has 0-line diff cumulative
+- **Engine surface frozen** — `src/microgpt.{c,h}` has 0-line diff across the entire OQL arc
+- **Zero new build deps** — Flex/Bison fallback + curl only; same as the pre-OQL baseline
+
+### Two key cross-experiment architectural findings
+
+1. **Compile-time-macro silent failure mode (E09 §3.4).** Loading a checkpoint trained with different `N_EMBD`/`N_HEAD`/`BLOCK_SIZE` macros silently fails because the macros constant-fold into matmul loops. Resolved by `_microgpt_lib_for_defines` binary variant pattern. **Honoured by every downstream experiment** (E10 `oql_names`, E11 `oql_c4`, E13 same).
+
+2. **Hidden coupling only surfaces when separation is attempted.** Two examples: corpus-coupled native references (E02 — `ref_bmi_clamped` exists because the wiring corpus says "BMI clamped"); STACK_PUSH-only `return` opcode (E08 — only visible because the agent tried to use early-exit and worked around it). Both became **named follow-ups** rather than silent expansions.
+
+### What's still pre-registered but not measured
+
+- [E01](../../experiments/E01-llm-head-to-head.md) — head-to-head vs frontier LLM (Anthropic API budget gated)
+- [E03](../../experiments/E03-independent-curator-reproducibility.md) — independent-curator reproducibility (human curator gated; **E12 is the LLM-curator proxy** running in parallel)
+- [E06](../../experiments/E06-medical-guideline-graphs.md) — medical guideline -> typed treatment graph (clinician reviewer gated)
+- [E12](../../experiments/E12-llm-wiring-corpus.md) — LLM-as-corpus-source for wiring (E03 from a different curator type)
+- E14 (named, not drafted) — `LLM_SOURCE` first-class object unifying E12's `FROM LLM` source and E13's procedural distillation tool
+
+### The new closing line
+
+The architecture is now **executable end-to-end through one declarative dialect**, with eight cross-validating measurements that the discipline holds: verb-surface lock, opcode lock, engine-surface freeze. The wiring-arc's calibrated three-bound ceiling above is unchanged; what's changed is that everything *around* that ceiling — corpus generation, organelle training, pipeline composition, audit emission — is now expressible in one .oql file. **The pre-OQL closing line said "what's left is productisation"; the OQL substrate arc has produced the operator surface productisation would need.**
