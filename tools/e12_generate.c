@@ -307,7 +307,7 @@ static int run_one_llm_corpus(const OqlCreateCorpusLlm *cc,
                 }
             }
             if (verify_ok && audit_ok) {
-                fprintf(out, "// %s\n%s\n\n", pair.prompt, pair.graph);
+                fprintf(out, "// %s\n%s\n---\n", pair.prompt, pair.graph);
                 st->survivors++;
                 if (st->survivors % 100 == 0) {
                     time_t elapsed = time(NULL) - t0;
