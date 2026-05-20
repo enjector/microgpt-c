@@ -310,7 +310,7 @@ static int do_one_curl(const LlmSource *src, const char *prompt,
     snprintf(payload, payload_cap,
              "{\"model\":\"%s\","
              "\"messages\":[{\"role\":\"user\",\"content\":\"%s\"}],"
-             "\"max_tokens\":1024,"
+             "\"max_tokens\":16384,"
              "\"temperature\":0.2,"
              "\"seed\":%d,"
              "\"stream\":false}",
@@ -401,6 +401,12 @@ int llm_emit(const LlmSource *src,
         }
         if (stats) stats->bytes_received = (long)body_len;
         rc = llm_json_extract(body, "choices.0.message.content", &content);
+        if (rc != 0 || !content || !*content) {
+            /* Qwen3/Gemma4 thinking models emit useful output in reasoning_content
+             * when max_tokens runs out before content begins.  Fall back. */
+            free(content); content = NULL;
+            rc = llm_json_extract(body, "choices.0.message.reasoning_content", &content);
+        }
         free(body);
         if (rc == 0 && content && content[0]) break;
         if (log) fprintf(log, "[llm] attempt %d/%d parse failed\n", attempt, max);

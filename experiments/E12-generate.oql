@@ -1,0 +1,40 @@
+-- E12 Phase 3: corpus generation against v2 sealed held-out audit.
+--
+-- Per the §1.6 falsification mitigation: the configured 35B-class thinking
+-- model takes ~30-60s per call on the user's hardware, which makes the
+-- pre-reg's 10k target infeasible within the T7 4-hour budget.  We honour
+-- the §1.6 mitigation by scaling down (here, to 200 examples) and reporting
+-- the actual wall-clock honestly in Section 3.5 / 3.7.
+
+CREATE CORPUS llm_corpus_v3 FROM LLM 'qwen/qwen3.6-35b-a3b'
+    @ 'http://127.0.0.1:1234'
+    PROMPT 'Output ONLY a single training example for a wiring-graph organelle. The exact format (no markdown, no preamble) is:
+
+// <one-line NL description>
+@graph <snake_case_name>
+: in <port> -> int
+: out <port> -> int
+| n1 = <primitive>(<arg>, ...)
+<sig_out_port> <- n1.out
+@end
+
+Use ONLY these primitives (binary unless noted): add, subtract, multiply, divide (binary), abs (unary), max, min (binary), square (unary), cube (unary), average_two (binary), clamp (3-ary: x, lo, hi), identity (unary).
+
+Each primitive expects "x" and "y" input ports for binary, "x" only for unary, "x", "lo", "hi" for clamp. The output port is always named "out". Inter-node refs use "n1.out" form.
+
+Concrete worked example to imitate (do not reuse the prompt or graph_name verbatim):
+
+// the absolute value of the difference between two readings
+@graph abs_diff
+: in a -> int
+: in b -> int
+: out d -> int
+| n1 = subtract(a, b)
+| n2 = abs(n1.out)
+d <- n2.out
+@end
+
+Now produce ONE distinct training example using a different primitive composition. Use 1 to 4 nodes. Output ONLY the // line, then the @graph block, then nothing else.'
+    WITH count = 200, seed = 1337, cache = '.oql_llm_cache/', max_retries = 2, output = 'llm_corpus_v3.txt'
+    VERIFY_VIA pipeline_ir
+    AUDIT_AGAINST scaling_heldout_v2;

@@ -1,0 +1,12 @@
+-- E12 Phase 4: train wiring organelle on the LLM-generated corpus.
+
+CREATE CORPUS llm_corpus_v3 FROM FILE 'llm_corpus_v3.txt';
+
+TRAIN wiring_llm_v3
+    ON llm_corpus_v3
+    WITH ROLE = player,
+         STEPS = 5000,
+         LR = 0.001,
+         BATCH_SIZE = 16,
+         SEED = 1337,
+         SAVE = 'checkpoints/wiring_llm_v3.ckpt';
