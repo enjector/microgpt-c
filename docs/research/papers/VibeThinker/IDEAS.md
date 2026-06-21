@@ -132,7 +132,13 @@ After reading the full wiring arc, this was run as **[E18](../../../../experimen
 
 ### 3.6 Where CLR *does* transfer — E19 (games)
 
-E18 left a converse open: does CLR work where a **semantic** (not structural) verifier exists? [E19](../../../../experiments/E19-game-clr-quality-verifier.md) answers yes. On Connect-4, a cheap 1-ply *quality* verifier turns the oracle-first probe around: on 273 critical decisions, **Baseline (ensemble pick) good = 37%, Oracle@16 good = 60% → +23pp re-ranking headroom** — the inverse of the wiring null. The model generates good moves; the legality-only Judge just can't select them. **The unifying lesson across E18+E19: the project's deterministic Judges are all *structural*; CLR (and test-time scaling generally) pays off exactly when you add a cheap *semantic*/quality verifier — and not before.**
+E18 left a converse open: does CLR work where a **semantic** (not structural) verifier exists? [E19](../../../../experiments/E19-game-clr-quality-verifier.md) answers it across two games, and the answer is a **gradient**, not a yes/no:
+
+- **Connect-4** (legality-only Judge): a cheap 1-ply quality verifier flips the probe — Baseline 37% vs **Oracle@16 60% → +23pp headroom**; the verifier-gated CLR re-rank then lifts win rate **9% → 30%** against a punishing opponent. Big gap → big lift.
+- **8-puzzle hard-tier** (pipeline already bakes in an MD quality heuristic): only a **+8pp** oracle gap; the re-rank saturates it but **does not lift the solve rate** (70% hard, unchanged). Small gap → no outcome lift.
+- **Wiring** (E18, structural verifier, generation-bound): Oracle = Majority = 35%, **zero gap → dead.**
+
+**The unifying lesson: CLR / test-time scaling pays off in proportion to the *oracle gap*, which is large only when the existing Judge is purely *structural*. The lever is adding a semantic/quality verifier — but only where the pipeline doesn't already encode quality.**
 
 ---
 

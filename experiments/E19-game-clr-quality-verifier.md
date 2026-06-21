@@ -1,6 +1,6 @@
 # E19 — Does CLR transfer to games? Oracle-first probe finds the headroom wiring lacked
 
-**Status:** ✅ **MEASURED — both stages complete.** Oracle-first probe: +23pp headroom confirmed. Full verifier-gated CLR re-rank: **all four pre-registered targets PASS** — headline T3 = **9% → 30% win vs a punishing opponent (+21pp, 3.3×)**.
+**Status:** ✅ **MEASURED — Connect-4 PASS, 8-puzzle null-with-diagnosis.** Connect-4 oracle-first probe (+23pp headroom) → verifier-gated CLR re-rank: **all four targets PASS**, headline T3 = **9% → 30% win vs a punishing opponent (+21pp, 3.3×)**. 8-puzzle hard-tier (H10, §3.5): **solve-rate NOT lifted** — the demo already bakes in an MD quality heuristic, so the oracle gap is small (+8pp) and the re-rank saturates it without moving the outcome. Together they turn the thesis into a **gradient** (§3.5): CLR helps in proportion to the oracle gap, which is large only when the existing Judge is purely structural.
 
 **Origin:** Follow-on from [E18](E18-clr-reliability-reranker.md). E18 falsified VibeThinker-3B's Claim-Level Reliability Assessment (CLR) as a lift for the *wiring* organelle, isolating the precise reason: the Pipeline-IR verifier is **structural** (type/cycle/connectivity), so it gives uniform reliability to the semantically-wrong candidates, and the failures are generation-bound anyway. The open question E18 left: **does CLR transfer to a task that has a *semantic* (quality) verifier?** A code-level check (`demos/character-level/connect4/main.c:9` — "Judge is fully deterministic: column valid + win/draw check") confirmed the games have only *structural* judges too — but unlike wiring, a cheap *semantic* verifier is trivially constructible (1-ply move quality). E19 builds it and runs the same oracle-first diagnostic.
 
@@ -140,19 +140,53 @@ C4_GREEDY_O=1             ./c_connect4_demo   # C: ensemble vs punishing O
 C4_RERANK=1 C4_GREEDY_O=1 ./c_connect4_demo   # D: re-rank vs punishing O (T3)
 ```
 
+### 3.5 Extension to 8-puzzle hard-tier (H10) — solve-rate NOT lifted; the result that turns the thesis into a gradient
+
+The same pattern was ported to the 8-puzzle demo (`demos/character-level/puzzle8/main.c`), the named **H10** target. Single-player, so the semantic verifier is **exact BFS-from-goal optimal distance** over all 9! permutations (precomputed once; a move is "good" iff it strictly reduces distance), and **no opponent variant is needed** — a wrong move directly wastes the move budget. All flag-gated (`P8_ORACLE` / `P8_RERANK`), zero default-behaviour change.
+
+| Config | Overall | HARD solve | HARD per-move progress | HARD Oracle@16 | Avg moves (M / H) |
+|---|---|---|---|---|---|
+| ensemble | 90% | **70%** (7/10) | 61% (115/188) | 69% (129/188) | 6.1 / 9.7 |
+| CLR re-rank | 90% | **70%** (7/10) | 64% (118/184) | 65% (119/184) | 5.7 / 9.1 |
+
+**The solve rate did not move (90% overall, 70% hard, unchanged) — the opposite of Connect-4.** Three reasons, all honest:
+
+1. **The oracle gap is tiny here — just +8pp** (hard: played-good 61% vs Oracle@16 69%), versus Connect-4's +23pp. The re-rank captures it (61%→64%, **saturating its own oracle** 64% vs 65%) but there is almost nothing to capture.
+2. **This demo already bakes in a quality heuristic.** Unlike Connect-4's legality-only Judge, the 8-puzzle pipeline feeds **MD-delta encoding into the mover prompt** and uses an **MD-based cycle-breaker** — so the model is *already* steered toward progress (which is why this checkpoint is 70% hard, not the ~30% the H10 framing assumed). A semantic verifier on top is largely **redundant**.
+3. **The residual hard failures are a generation ceiling.** Oracle@16 is only 65-69% on hard — on ~1/3 of hard steps *no* sampled move is optimal progress. Re-ranking can't fix what the model never generates (the E18 lesson). The 3 unsolved hard puzzles stay unsolved.
+
+The re-rank *did* produce a small efficiency win — shorter solutions (medium avg 6.1→5.7 moves, hard 9.7→9.1) by avoiding regressions even when no progress move is available (the Long2Short flavor) — but that is not a solve-rate lift.
+
+**The refined thesis (the value of this extension).** 8-puzzle is the **middle case** that turns E18+E19 from a binary into a gradient:
+
+> CLR re-ranking helps **in proportion to the oracle gap**, which is large only when the existing Judge is purely *structural*.
+> - **Wiring** (E18): structural verifier, generation-bound → Oracle = Majority = 35%, **zero gap → dead.**
+> - **8-puzzle**: pipeline already encodes an MD quality heuristic → small gap (+8pp) → **re-rank saturates it but no solve-rate lift.**
+> - **Connect-4**: legality-only Judge → large gap (+23pp) → **big lift (9%→30% vs a punisher).**
+>
+> The lever is not "add a semantic verifier" unconditionally — it is "add one **where the pipeline doesn't already encode quality**."
+
+Reproduce:
+```sh
+P8_ORACLE=1             ./c_puzzle8_demo   # ensemble + per-band probe
+P8_ORACLE=1 P8_RERANK=1 ./c_puzzle8_demo   # verifier-gated CLR re-rank + probe
+```
+
 ---
 
 ## 4. Conclusion
 
 ### 4.1 Verdict
 
-**Both stages PASS.** The oracle-first probe confirmed +23pp re-ranking headroom (the inverse of E18); the verifier-gated CLR re-rank then met all four pre-registered targets, headlined by **9% → 30% win (+21pp) against a punishing opponent**. CLR is not dead in this codebase — E18 falsified it for *wiring* (structural verifier, generation-bound), and E19 shows it *transfers to games* where a cheap semantic verifier exists. The general finding stands: **the project's deterministic Judges are all structural; the lever that makes test-time scaling pay off is adding a cheap semantic/quality verifier — and not before.**
+**Connect-4 PASS; 8-puzzle null-with-diagnosis; together a gradient.** The Connect-4 probe confirmed +23pp re-ranking headroom (the inverse of E18) and the verifier-gated CLR re-rank met all four targets (T3 **9%→30%** vs a punishing opponent). The 8-puzzle extension (§3.5) did **not** lift the solve rate (70% hard, unchanged) because that pipeline already encodes an MD quality heuristic, leaving only a +8pp oracle gap the re-rank merely saturates.
+
+The unified finding — sharper than "structural dead, semantic alive": **CLR / test-time scaling pays off in proportion to the *oracle gap*, which is large only when the existing Judge is purely structural.** Wiring (structural, generation-bound) → zero gap → dead. 8-puzzle (MD heuristic already in the pipeline) → small gap → saturated, no outcome lift. Connect-4 (legality-only Judge) → large gap → big lift. The lever is "add a semantic verifier **where the pipeline doesn't already encode quality**."
 
 ### 4.2 Next
 
-E19 is complete (probe + re-rank, all targets PASS). The natural follow-ons, none required:
-- **Harder games where the headroom is larger.** Connect-4 is near-ceiling vs random; the lift is bigger where the model blunders more — Hex (27%) or the named **H10** target (8-puzzle hard-tier 30%→80%, `ORGANELLE_STATE.md` open-question #4). The probe + 1-ply-verifier pattern ports directly.
-- **Deeper verifier.** The 60% oracle ceiling, not the re-rank, is now the bound; a 2-ply verifier (or a small search corpus, cf. E11's `c4_model_propose_column`) would raise it — but that shades from "CLR re-rank" toward "search," a different experiment.
+E19 is complete (Connect-4 probe + re-rank PASS; 8-puzzle measured null-with-diagnosis). Follow-ons, none required:
+- **Games with a structural-only Judge and a high blunder rate** — that is where the gap (and the lift) is largest. Hex (27% win) is the natural next probe; its quality verifier (BFS connectivity) is more work than Connect-4's 1-ply but cheaper than nothing.
+- **Deeper verifier where the gap is generation-bound.** For 8-puzzle the bound is the model's ~65-69% hard-tier oracle, not the re-rank; raising it needs better *generation* (more candidates, a search corpus à la E11's `c4_model_propose_column`), which shades from "CLR re-rank" toward "search" — a different experiment.
 
 ### 4.3 Traceability
 

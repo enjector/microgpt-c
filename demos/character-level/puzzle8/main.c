@@ -246,6 +246,139 @@ static int dir_to_id(const char *dir) {
   return -1;
 }
 
+/* ============================================================================
+ * E19 (H10) — exact semantic verifier for 8-puzzle.
+ *
+ * The demo's Judge is structural only (legality / boundary check). E18 + E19
+ * (Connect-4) showed CLR / test-time scaling pays off only when a *semantic*
+ * (quality) verifier exists. For a sliding-tile puzzle the exact quality of a
+ * move is whether it reduces the *optimal* distance to goal — so we precompute
+ * BFS-from-goal distance over all 9! permutations (181,440 solvable states)
+ * once, and a move is "good" (true progress) iff it strictly reduces it.
+ *
+ * Gated on P8_ORACLE (probe) / P8_RERANK (verifier-gated CLR re-rank);
+ * zero default-behaviour change.
+ * ============================================================================ */
+#define P8_NPERM 362880
+static unsigned char *g_pdist = NULL;     /* distance by perm rank; 255 = unreached */
+static const int P8_FACT[9] = {40320, 5040, 720, 120, 24, 6, 2, 1, 1};
+
+static int perm_rank(const int *b) {
+  int rank = 0;
+  for (int i = 0; i < 9; i++) {
+    int smaller = 0;
+    for (int j = i + 1; j < 9; j++)
+      if (b[j] < b[i])
+        smaller++;
+    rank += smaller * P8_FACT[i];
+  }
+  return rank;
+}
+
+static void perm_unrank(int rank, int *b) {
+  int avail[9] = {0, 1, 2, 3, 4, 5, 6, 7, 8};
+  int n = 9;
+  for (int i = 0; i < 9; i++) {
+    int idx = rank / P8_FACT[i];
+    rank %= P8_FACT[i];
+    b[i] = avail[idx];
+    for (int j = idx; j < n - 1; j++)
+      avail[j] = avail[j + 1];
+    n--;
+  }
+}
+
+static void p8_bfs_fill(void) {
+  if (g_pdist)
+    return;
+  g_pdist = (unsigned char *)malloc(P8_NPERM);
+  memset(g_pdist, 255, P8_NPERM);
+  int *q = (int *)malloc(sizeof(int) * P8_NPERM);
+  int head = 0, tail = 0;
+  const char *dirs[] = {"up", "down", "left", "right"};
+  int gr = perm_rank(GOAL_BOARD);
+  g_pdist[gr] = 0;
+  q[tail++] = gr;
+  while (head < tail) {
+    int r = q[head++];
+    int b[9];
+    perm_unrank(r, b);
+    unsigned char d = g_pdist[r];
+    for (int k = 0; k < 4; k++) {
+      int nb[9];
+      memcpy(nb, b, sizeof(nb));
+      if (!apply_move(nb, dirs[k]))
+        continue;
+      int nr = perm_rank(nb);
+      if (g_pdist[nr] == 255) {
+        g_pdist[nr] = (unsigned char)(d + 1);
+        q[tail++] = nr;
+      }
+    }
+  }
+  free(q);
+}
+
+static int p8_dist(const int *b) { return g_pdist ? g_pdist[perm_rank(b)] : -1; }
+
+/* Quality of applying `dir` from `board`: 2 = strict progress (dist-1),
+ * 1 = neutral (same dist), 0 = regress (dist+1), -1 = illegal. */
+static int p8_move_quality(const int *board, const char *dir) {
+  int before = p8_dist(board);
+  int t[9];
+  memcpy(t, board, sizeof(t));
+  if (!apply_move(t, dir))
+    return -1;
+  int after = p8_dist(t);
+  if (after == before - 1)
+    return 2;
+  if (after == before)
+    return 1;
+  return 0;
+}
+static int p8_move_good(const int *board, const char *dir) {
+  return p8_move_quality(board, dir) == 2;
+}
+
+/* E19 §1 (H10): verifier-gated CLR move selection. Sample N candidates from
+ * the mover, keep legal, pick by 1-move BFS-distance quality (progress >
+ * neutral > regress), tie-break by self-consistency vote. Pool-bounded — it
+ * re-ranks the model's candidates, so it cannot exceed Oracle@N. Returns a dir
+ * string (static literal) or NULL if no legal candidate was sampled. */
+static const char *p8_rerank_select(const Organelle *mover,
+                                    const MicrogptConfig *cfg, const char *prompt,
+                                    const int *board, const char *valid_dirs) {
+  static const char *dirs[] = {"up", "down", "left", "right"};
+  int votes[4] = {0}, seen[4] = {0};
+  const int N = 16;
+  for (int v = 0; v < N; v++) {
+    char mo[INF_GEN_LEN + 1];
+    scalar_t t = (scalar_t)(0.20 + 0.05 * v);
+    organelle_generate(mover, cfg, prompt, mo, INF_GEN_LEN, t);
+    int id = -1;
+    if (strncmp(mo, "up", 2) == 0) id = 0;
+    else if (strncmp(mo, "down", 4) == 0) id = 1;
+    else if (strncmp(mo, "left", 4) == 0) id = 2;
+    else if (strncmp(mo, "right", 5) == 0) id = 3;
+    if (id < 0 || !opa_valid_filter(dirs[id], valid_dirs))
+      continue;
+    votes[id]++;
+    seen[id] = 1;
+  }
+  int best = -1, best_label = -2, best_votes = -1;
+  for (int id = 0; id < 4; id++) {
+    if (!seen[id])
+      continue;
+    int label = p8_move_quality(board, dirs[id]);
+    if (label > best_label || (label == best_label && votes[id] > best_votes)) {
+      best_label = label;
+      best_votes = votes[id];
+      best = id;
+    }
+  }
+  return best >= 0 ? dirs[best] : NULL;
+}
+
 /* ---- Main ---- */
 
 int main(void) {
@@ -334,6 +467,15 @@ int main(void) {
   int total_detour_uses = 0;
   int total_greedy_uses = 0;
   int total_cycle_breaks = 0;
+
+  /* E19 (H10): semantic-verifier probe + verifier-gated CLR re-rank. */
+  const int p8_oracle_on = (getenv("P8_ORACLE") != NULL);
+  const int p8_rerank_on = (getenv("P8_RERANK") != NULL);
+  if (p8_oracle_on || p8_rerank_on)
+    p8_bfs_fill();
+  int band_orc_steps[3] = {0, 0, 0};      /* steps measured per band */
+  int band_orc_base_good[3] = {0, 0, 0};  /* played move was true progress */
+  int band_orc_pool_good[3] = {0, 0, 0};  /* >=1 of 16 sampled was progress */
 
   struct timespec pipeline_start, pipeline_end;
   clock_gettime(CLOCK_MONOTONIC, &pipeline_start);
@@ -493,6 +635,44 @@ int main(void) {
           }
         }
 
+        /* E19 §1 (H10): verifier-gated CLR re-rank overrides the ensemble
+         * pick with a strict-progress move when one is in the sampled pool.
+         * Pool-bounded -> capped by Oracle@N. */
+        if (p8_rerank_on) {
+          const char *rr =
+              p8_rerank_select(mover, &g_cfg, mover_prompt, board, valid_dirs);
+          if (rr) {
+            dir = rr;
+            dir_id = dir_to_id(dir);
+          }
+        }
+        /* E19 probe: on each step, is the played move true progress
+         * (baseline / re-rank), and is a progress move in a best-of-16 pool
+         * (Oracle@16)? `board` is pre-move; `dir` is the final choice. */
+        if (p8_oracle_on) {
+          static const char *DN[] = {"up", "down", "left", "right"};
+          band_orc_steps[band]++;
+          if (dir && p8_move_good(board, dir))
+            band_orc_base_good[band]++;
+          int pool_good = 0;
+          for (int v = 0; v < 16 && !pool_good; v++) {
+            char mo[INF_GEN_LEN + 1];
+            scalar_t t = (scalar_t)(0.20 + 0.05 * v);
+            organelle_generate(mover, &g_cfg, mover_prompt, mo, INF_GEN_LEN, t);
+            int id = -1;
+            if (strncmp(mo, "up", 2) == 0) id = 0;
+            else if (strncmp(mo, "down", 4) == 0) id = 1;
+            else if (strncmp(mo, "left", 4) == 0) id = 2;
+            else if (strncmp(mo, "right", 5) == 0) id = 3;
+            if (id < 0 || !opa_valid_filter(DN[id], valid_dirs))
+              continue;
+            if (p8_move_good(board, DN[id]))
+              pool_good = 1;
+          }
+          if (pool_good)
+            band_orc_pool_good[band]++;
+        }
+
         /* Deterministic Judge: try the move */
         int test_board[9];
         memcpy(test_board, board, sizeof(board));
@@ -576,6 +756,24 @@ int main(void) {
         band_solved[b] > 0 ? (double)band_moves[b] / band_solved[b] : 0.0;
     printf("%-8s  %d/%-8d  %5.0f%%       %.1f\n", band_names[b], band_solved[b],
            band_counts[b], rate, avg_moves);
+  }
+
+  if (p8_oracle_on) {
+    printf("\n  --- E19 (H10) probe: 1-move BFS-distance quality verifier ---\n");
+    printf("Selection: %s\n",
+           p8_rerank_on ? "VERIFIER-GATED CLR RE-RANK (E19 §1)"
+                        : "ensemble vote (baseline)");
+    printf("%-8s  %-8s  %-14s  %-14s\n", "Band", "Steps",
+           p8_rerank_on ? "Re-rank good" : "Played good", "Oracle@16 good");
+    for (int b = 0; b < 3; b++) {
+      int s = band_orc_steps[b] ? band_orc_steps[b] : 1;
+      printf("%-8s  %-8d  %3d (%3.0f%%)     %3d (%3.0f%%)\n", band_names[b],
+             band_orc_steps[b], band_orc_base_good[b],
+             100.0 * band_orc_base_good[b] / s, band_orc_pool_good[b],
+             100.0 * band_orc_pool_good[b] / s);
+    }
+    printf("(Played-good = fraction of moves that are true optimal progress; "
+           "Oracle@16 = a progress move was in the pool)\n");
   }
 
   printf("\nTotal moves:      %d\n", total_moves);
