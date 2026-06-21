@@ -1,6 +1,6 @@
 # E19 — Does CLR transfer to games? Oracle-first probe finds the headroom wiring lacked
 
-**Status:** 🔬 **Oracle-first probe MEASURED (+23pp headroom confirmed on Connect-4).** The full verifier-gated CLR re-rank + punishing-opponent measurement is **pre-registered below but not yet run.**
+**Status:** ✅ **MEASURED — both stages complete.** Oracle-first probe: +23pp headroom confirmed. Full verifier-gated CLR re-rank: **all four pre-registered targets PASS** — headline T3 = **9% → 30% win vs a punishing opponent (+21pp, 3.3×)**.
 
 **Origin:** Follow-on from [E18](E18-clr-reliability-reranker.md). E18 falsified VibeThinker-3B's Claim-Level Reliability Assessment (CLR) as a lift for the *wiring* organelle, isolating the precise reason: the Pipeline-IR verifier is **structural** (type/cycle/connectivity), so it gives uniform reliability to the semantically-wrong candidates, and the failures are generation-bound anyway. The open question E18 left: **does CLR transfer to a task that has a *semantic* (quality) verifier?** A code-level check (`demos/character-level/connect4/main.c:9` — "Judge is fully deterministic: column valid + win/draw check") confirmed the games have only *structural* judges too — but unlike wiring, a cheap *semantic* verifier is trivially constructible (1-ply move quality). E19 builds it and runs the same oracle-first diagnostic.
 
@@ -22,7 +22,7 @@
 | **Oracle@16 good** (≥1 of 16 candidates non-blunder) | **164/273 = 60%** |
 | **Headroom** | **+23 pp** |
 
-**Push.** The "headroom exists" branch fires. The full verifier-gated CLR re-rank (§1) is worth running — with a *punishing* opponent, because random O masks the lift.
+**Push.** The "headroom exists" branch fired and the re-rank was run (§3.4). All four targets PASS: critical good-rate **37% → 63%** (T1), win vs random **91% → 94%** (T2, masked as predicted), and against a 1-ply punishing opponent the ensemble **collapses to 9%** while CLR re-rank holds **30%** (T3, **+21pp**). The clean inverse of E18: CLR pays off precisely because a semantic verifier exists.
 
 ---
 
@@ -106,17 +106,53 @@ C4_ORACLE=1 ./c_connect4_demo
 - **60% is a partial generation ceiling**: 40% of critical decisions have *no* good move in the 16-pool — a verifier+CLR re-rank caps out at 60% there, not 100%.
 - The +23pp is a *critical-decision* number; its translation to **win rate** is masked by random O (which rarely punishes blunders) — hence T3's punishing-opponent requirement.
 
+### 3.4 Re-rank results (MEASURED — all four targets PASS)
+
+Implemented in `connect4/main.c` (all flag-gated, zero default-behaviour change):
+- `c4_rerank_select` — verifier-gated CLR: sample N=16 candidates, keep legal, pick by 1-ply quality label (win > safe > loses-in-1), tie-break by self-consistency vote. **Pool-bounded** (re-ranks the model's candidates; capped by Oracle@N — it is CLR, not verifier-as-policy search). Gated on `C4_RERANK`.
+- `greedy_opponent_move` — punishing 1-ply O: take an immediate win, else block X's immediate win, else random. Gated on `C4_GREEDY_O`.
+
+Four configs, 100 games each (checkpoints cached, no retrain):
+
+| Config | Selection | Opponent | Win rate | Critical good-rate |
+|---|---|---|---|---|
+| A | ensemble vote | random | 91% | 37% (102/277) |
+| B | **CLR re-rank** | random | **94%** | **63%** (109/174) |
+| C | ensemble vote | **1-ply greedy** | **9%** | — |
+| D | **CLR re-rank** | **1-ply greedy** | **30%** | — |
+
+| Target | Pre-reg (§1.3) | Measured | Verdict |
+|---|---|---|---|
+| **T1** critical good-rate | 37% → ≥ 55% | **37% → 63%** (A→B) | ✅ PASS — saturates the ~58-60% oracle ceiling |
+| **T2** win vs random | ≥ baseline | **91% → 94%** (A→B) | ✅ PASS — +3pp, masked as predicted |
+| **T3** win vs punishing O | ≥ +10pp | **9% → 30%** (C→D) = **+21pp** | ✅ PASS — exceeded 2×, 3.3× win rate |
+| **T4** no default change | flag-gated | env-var gated, clean build | ✅ PASS |
+
+The C→D contrast is the demonstration: against random O both policies look fine (91% / 94%) — the blundering is invisible. Against a punishing opponent the ensemble **collapses to 9%** (blunders on ~63% of critical decisions, punished every time) while the verifier-gated CLR re-rank holds **30%**.
+
+**Honest bounds.** 30% vs greedy is modest in absolute terms — the 60% oracle ceiling caps it (40% of critical decisions have no good move in the 16-pool), and a 460K pattern-matcher with no search can't outplay a punishing 1-ply opponent. The re-rank captures the *available* headroom; it cannot exceed the generation ceiling. Critical-decision sets differ across configs (trajectories diverge once X plays better), so T1 compares each policy on the decisions it actually faces, not identical boards.
+
+Reproduce:
+```sh
+C4_ORACLE=1               ./c_connect4_demo   # A: probe + ensemble baseline
+C4_ORACLE=1 C4_RERANK=1   ./c_connect4_demo   # B: re-rank vs random (T1, T2)
+C4_GREEDY_O=1             ./c_connect4_demo   # C: ensemble vs punishing O
+C4_RERANK=1 C4_GREEDY_O=1 ./c_connect4_demo   # D: re-rank vs punishing O (T3)
+```
+
 ---
 
-## 4. Conclusion (probe verdict; full re-rank pending)
+## 4. Conclusion
 
-### 4.1 Probe verdict
+### 4.1 Verdict
 
-**Headroom confirmed (+23pp).** CLR is not dead in this codebase — E18 falsified it for *wiring* (structural verifier, generation-bound), and E19's probe shows it *transfers to games* where a cheap semantic verifier exists and the candidate pool already contains good moves. The general finding: **the project's deterministic Judges are all structural; the lever that makes test-time scaling pay off is adding a cheap semantic/quality verifier.**
+**Both stages PASS.** The oracle-first probe confirmed +23pp re-ranking headroom (the inverse of E18); the verifier-gated CLR re-rank then met all four pre-registered targets, headlined by **9% → 30% win (+21pp) against a punishing opponent**. CLR is not dead in this codebase — E18 falsified it for *wiring* (structural verifier, generation-bound), and E19 shows it *transfers to games* where a cheap semantic verifier exists. The general finding stands: **the project's deterministic Judges are all structural; the lever that makes test-time scaling pay off is adding a cheap semantic/quality verifier — and not before.**
 
-### 4.2 Next (the pre-registered §1 re-rank)
+### 4.2 Next
 
-Two-commit pattern: this commit lands the probe + pre-registration; a follow-up implements the verifier-gated CLR re-rank + a 1-ply/greedy opponent and measures T1–T4. Expected: critical-decision good-rate 37%→~55-60%, win-rate lift modest vs random O, ≥+10pp vs a punishing O.
+E19 is complete (probe + re-rank, all targets PASS). The natural follow-ons, none required:
+- **Harder games where the headroom is larger.** Connect-4 is near-ceiling vs random; the lift is bigger where the model blunders more — Hex (27%) or the named **H10** target (8-puzzle hard-tier 30%→80%, `ORGANELLE_STATE.md` open-question #4). The probe + 1-ply-verifier pattern ports directly.
+- **Deeper verifier.** The 60% oracle ceiling, not the re-rank, is now the bound; a 2-ply verifier (or a small search corpus, cf. E11's `c4_model_propose_column`) would raise it — but that shades from "CLR re-rank" toward "search," a different experiment.
 
 ### 4.3 Traceability
 

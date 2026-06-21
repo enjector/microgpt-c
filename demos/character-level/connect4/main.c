@@ -196,6 +196,87 @@ static int random_opponent_move(const char *board, unsigned int *seed) {
   return cols[rand_r(seed) % count];
 }
 
+/* E19 §1: column where `player` drops and wins immediately, or -1. */
+static int c4_immediate_win_col(const char *board, char player) {
+  int cols[BOARD_COLS];
+  int n = get_valid_columns(board, cols);
+  for (int i = 0; i < n; i++) {
+    char tmp[BOARD_SIZE + 1];
+    memcpy(tmp, board, BOARD_SIZE);
+    tmp[BOARD_SIZE] = '\0';
+    if (drop_piece(tmp, cols[i], player) < 0)
+      continue;
+    if (check_winner(tmp) == player)
+      return cols[i];
+  }
+  return -1;
+}
+
+/* E19 §1: punishing 1-ply opponent — take an immediate win, else block X's
+ * immediate win, else random. Makes X's blunders actually cost games (random
+ * O masks them). Gated on C4_GREEDY_O. */
+static int greedy_opponent_move(const char *board, unsigned int *seed) {
+  int w = c4_immediate_win_col(board, PLAYER_O);
+  if (w >= 0)
+    return w;
+  int b = c4_immediate_win_col(board, PLAYER_X);
+  if (b >= 0)
+    return b;
+  return random_opponent_move(board, seed);
+}
+
+static int opponent_move(const char *board, unsigned int *seed, int greedy) {
+  return greedy ? greedy_opponent_move(board, seed)
+                : random_opponent_move(board, seed);
+}
+
+/* E19 §1: verifier-gated CLR move selection. Sample N candidates, keep legal
+ * ones, and pick by the 1-ply quality verifier (win > safe > loses-in-1),
+ * breaking ties by self-consistency vote count (CLR reliability). Returns the
+ * chosen column, or -1 if no legal candidate was sampled (caller falls back).
+ *
+ * This is pool-bounded by design — it re-ranks the candidates the model
+ * generates, so it cannot exceed the Oracle@N ceiling (§3.2: ~60% on critical
+ * decisions). It is CLR, not a verifier-as-policy search. Gated on C4_RERANK. */
+static int c4_rerank_select(const Organelle *player, const MicrogptConfig *cfg,
+                            const char *prompt, const char *board) {
+  int legal[BOARD_COLS];
+  int nlegal = get_valid_columns(board, legal);
+  if (nlegal == 0)
+    return -1;
+  int votes[BOARD_COLS] = {0};
+  int seen[BOARD_COLS] = {0};
+  const int N = 16;
+  for (int v = 0; v < N; v++) {
+    char mo[INF_GEN_LEN + 1];
+    scalar_t t = (scalar_t)(0.20 + 0.05 * v);
+    organelle_generate(player, cfg, prompt, mo, INF_GEN_LEN, t);
+    int col = (mo[0] >= '0' && mo[0] <= '6') ? mo[0] - '0' : -1;
+    if (col < 0)
+      continue;
+    int isleg = 0;
+    for (int j = 0; j < nlegal; j++)
+      if (legal[j] == col)
+        isleg = 1;
+    if (!isleg)
+      continue;
+    votes[col]++;
+    seen[col] = 1;
+  }
+  int best = -1, best_label = -2, best_votes = -1;
+  for (int c = 0; c < BOARD_COLS; c++) {
+    if (!seen[c])
+      continue;
+    int l = c4_classify_move(board, c, PLAYER_X, PLAYER_O);
+    if (l > best_label || (l == best_label && votes[c] > best_votes)) {
+      best_label = l;
+      best_votes = votes[c];
+      best = c;
+    }
+  }
+  return best;
+}
+
 /* ---- Main ---- */
 
 /* E13 Pathway B — minimal CLI to override the player corpus + ckpt path
@@ -343,8 +424,11 @@ int main(int argc, char **argv) {
   const int c4_oracle_on = (getenv("C4_ORACLE") != NULL);
   const int ORC_N = 16;            /* candidate pool size, matches wiring N */
   int orc_critical = 0;            /* decisions where 1-ply quality matters */
-  int orc_baseline_good = 0;       /* ensemble pick was a good (non-blunder) move */
+  int orc_baseline_good = 0;       /* played pick was a good (non-blunder) move */
   int orc_pool_good = 0;           /* >=1 of ORC_N sampled candidates was good */
+  /* E19 §1 re-rank: verifier-gated CLR selection + punishing opponent. */
+  const int c4_rerank_on = (getenv("C4_RERANK") != NULL);
+  const int c4_greedy_o = (getenv("C4_GREEDY_O") != NULL);
 
   struct timespec pipeline_start, pipeline_end;
   clock_gettime(CLOCK_MONOTONIC, &pipeline_start);
@@ -491,6 +575,16 @@ int main(int argc, char **argv) {
         if (proposed_col < 0)
           break;
       }
+
+      /* E19 §1: verifier-gated CLR re-rank overrides the ensemble pick.
+       * Pool-bounded (re-ranks sampled candidates), so capped by Oracle@N. */
+      if (c4_rerank_on) {
+        int rc = c4_rerank_select(player, &g_cfg, player_prompt, board);
+        if (rc >= 0) {
+          proposed_col = rc;
+          from_model = 1;
+        }
+      }
 #endif
 
       if (from_model)
@@ -585,7 +679,7 @@ int main(int argc, char **argv) {
           break;
         }
 
-        int opp_col = random_opponent_move(board, &game_seed);
+        int opp_col = opponent_move(board, &game_seed, c4_greedy_o);
         if (opp_col >= 0) {
           drop_piece(board, opp_col, PLAYER_O);
           moves_made++;
@@ -631,7 +725,7 @@ int main(int argc, char **argv) {
               break;
             }
 
-            int opp_col = random_opponent_move(board, &game_seed);
+            int opp_col = opponent_move(board, &game_seed, c4_greedy_o);
             if (opp_col >= 0) {
               drop_piece(board, opp_col, PLAYER_O);
               moves_made++;
@@ -706,20 +800,25 @@ int main(int argc, char **argv) {
   printf("Pipeline time:      %.2fs\n", pipeline_time);
   printf("================================================================\n");
 
+  printf("Selection mode:     %s\n",
+         c4_rerank_on ? "VERIFIER-GATED CLR RE-RANK (E19 §1)" : "ensemble vote");
+  printf("Opponent:           %s\n",
+         c4_greedy_o ? "1-ply greedy (punishing)" : "random");
+  printf("================================================================\n");
   if (c4_oracle_on) {
     int d = orc_critical > 0 ? orc_critical : 1;
-    printf("\n  --- E19 oracle-first probe (1-ply quality verifier, N=%d) ---\n",
+    printf("\n  --- E19 oracle probe (1-ply quality verifier, N=%d) ---\n",
            ORC_N);
     printf("Critical decisions (win-to-take / threat-to-block): %d\n",
            orc_critical);
-    printf("Baseline good (ensemble pick non-blunder):  %d/%d (%.0f%%)\n",
-           orc_baseline_good, orc_critical, 100.0 * orc_baseline_good / d);
+    printf("%s good (played pick non-blunder):  %d/%d (%.0f%%)%s\n",
+           c4_rerank_on ? "Re-rank" : "Baseline",
+           orc_baseline_good, orc_critical, 100.0 * orc_baseline_good / d,
+           c4_rerank_on ? "  [T1]" : "");
     printf("Oracle@%-2d good (>=1 candidate non-blunder): %d/%d (%.0f%%)\n",
            ORC_N, orc_pool_good, orc_critical, 100.0 * orc_pool_good / d);
-    printf("=> verifier-rerank headroom on critical decisions: %+.0f pp\n",
+    printf("=> headroom captured by selection: %+.0f pp of the +23pp ceiling\n",
            100.0 * (orc_pool_good - orc_baseline_good) / d);
-    printf("   (Oracle>>baseline => quality-verifier+CLR has room; "
-           "Oracle==baseline => generation ceiling, like wiring/E18)\n");
     printf("================================================================\n");
   }
 
