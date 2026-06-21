@@ -731,6 +731,36 @@ static int g_composition_eval = 0;
 /* Phase 3b: when true, also disable fragment composition (paired with
  * --no-anchor to get a pure wiring-only baseline on composition prompts). */
 static int g_no_composition = 0;
+/* E18 (VibeThinker CLR study): when true, report three additional metrics
+ * over the full best-of-N candidate pool, as a pure measurement that does
+ * NOT change the headline pick:
+ *   Oracle@N    — is ANY candidate correct on all 5 inputs? (the ceiling
+ *                 for any re-ranker; bounds Phase 1a/1c re-rank work)
+ *   Majority@N  — pure self-consistency vote, no anchor/geo/planner bonus
+ *   CLR@N       — VibeThinker reliability-weighted aggregation, r=(v/5)^5
+ * The flag also disables the first-fidelity early-break so the pool is the
+ * genuine full N votes (otherwise Oracle@N would be undercounted). */
+static int g_oracle = 0;
+
+/* E18: node-count proxy for audit cost — counts node-construction lines
+ * ("| id = prim(...)") in a rendered @graph. Used for the brevity
+ * tie-breaker diagnostic (Long2Short survivor). */
+static int count_node_lines(const char *text) {
+    if (!text) return 0;
+    int n = 0;
+    for (const char *p = text; *p; p++) {
+        if (p[0] == '|' && p[1] == ' ') n++;
+    }
+    return n;
+}
+
+/* E18: equality of two cached candidate result vectors (5 input sets). */
+static int e18_vec_eq(const int64_t *a, const int64_t *b) {
+    for (int s = 0; s < WIRING_INPUT_SETS; s++) {
+        if (a[s] != b[s]) return 0;
+    }
+    return 1;
+}
 
 int main(int argc, char **argv) {
     for (int i = 1; i < argc; i++) {
@@ -738,8 +768,9 @@ int main(int argc, char **argv) {
         else if (strcmp(argv[i], "--clean-only") == 0) g_clean_only = 1;
         else if (strcmp(argv[i], "--composition") == 0) g_composition_eval = 1;
         else if (strcmp(argv[i], "--no-composition") == 0) g_no_composition = 1;
+        else if (strcmp(argv[i], "--oracle") == 0) g_oracle = 1;
         else {
-            fprintf(stderr, "usage: %s [--no-anchor] [--clean-only] [--composition] [--no-composition]\n", argv[0]);
+            fprintf(stderr, "usage: %s [--no-anchor] [--clean-only] [--composition] [--no-composition] [--oracle]\n", argv[0]);
             return 1;
         }
     }
@@ -751,6 +782,7 @@ int main(int argc, char **argv) {
     printf("  Wiring Organelle Demo (Pipeline IR Phase 3c)\n");
     if (g_no_anchor)  printf("  [--no-anchor]   anchor retrieval DISABLED (wiring-only baseline)\n");
     if (g_clean_only) printf("  [--clean-only]  evaluating ONLY the 20 leakage-free paraphrases\n");
+    if (g_oracle)     printf("  [--oracle]      E18: report Oracle@N / Majority@N / CLR@N (full-pool measurement)\n");
     printf("================================================================\n\n");
 
     /* Step 1: Preprocess corpora. */
@@ -1032,6 +1064,13 @@ int main(int argc, char **argv) {
         int held_executed = 0;     /* Phase 6: end-to-end pipeline_execute success */
         int held_correct = 0;      /* Phase 7: numeric answer matches reference (single input) */
         int held_correct_all = 0;  /* Phase 8: matches reference on all 5 input sets */
+        /* E18 (VibeThinker CLR study) — pure-measurement counters, only
+         * populated under --oracle. See §"E18" block in the eval loop. */
+        int held_oracle = 0;       /* any candidate correct on all 5 inputs */
+        int held_majority = 0;     /* self-consistency vote winner correct */
+        int held_clr = 0;          /* CLR reliability-weighted winner correct */
+        int oracle_eval_n = 0;     /* prompts with a usable reference vector */
+        long brevity_clr_nodes = 0, brevity_min_nodes = 0, brevity_n = 0;
         int held_print = 0;
         const int MAX_HELD_PRINTS = 100;
 
@@ -1234,9 +1273,11 @@ int main(int argc, char **argv) {
                         n_cands++;
                     }
 
-                    if (fid_ok && have_verified_with_fidelity) {
+                    if (fid_ok && have_verified_with_fidelity && !g_oracle) {
                         /* Stop early once we have at least one fidelity
-                         * match — diminishing returns for self-consistency. */
+                         * match — diminishing returns for self-consistency.
+                         * E18 --oracle disables this so the candidate pool
+                         * is the genuine full N votes (Oracle@N needs it). */
                         break;
                     }
                 }
@@ -1643,6 +1684,115 @@ int main(int argc, char **argv) {
             }
             if (correct_all) held_correct_all++;
 
+            /* ============================================================
+             * E18 (VibeThinker CLR study) — pure measurement over the full
+             * candidate pool. Does NOT touch the headline pick above.
+             *
+             * Computes three selector outcomes against the reference
+             * 5-vector, plus a brevity (audit-cost) diagnostic:
+             *   Oracle@N    — is ANY candidate correct on all 5 inputs?
+             *                 This is the information-theoretic ceiling for
+             *                 ANY re-ranker, including the project's own
+             *                 Phase 1a (VR) and Phase 1c (geo-hint) work.
+             *   Majority@N  — pure self-consistency vote (no anchor/geo/
+             *                 planner bonus), tie-break earliest.
+             *   CLR@N       — VibeThinker reliability-weighted aggregation:
+             *                 per-candidate reliability r = (v/5)^5 where v
+             *                 is the count of input sets it executed on (the
+             *                 nonlinear r_k=(mean verdict)^M with M=5 claims
+             *                 = the 5 input-set executions); cluster by
+             *                 identical 5-vector, sum reliability, argmax.
+             *
+             * Pre-registered prediction (E18): on the clean set,
+             *   Oracle@N ≈ Majority@N ≈ CLR@N ≈ 35%.
+             * If so, the 35% wiring ceiling is a *generation* ceiling with
+             * no re-ranking headroom (formalises §32/§38). Falsification:
+             * Oracle@N ≫ Majority@N would mean re-ranking left value on the
+             * table and CLR could capture it.
+             * ============================================================ */
+            if (g_oracle && has_ref) {
+                int64_t refv[WIRING_INPUT_SETS];
+                int ref_ok = 1;
+                for (int s = 0; s < WIRING_INPUT_SETS; s++) {
+                    if (!wiring_reference_compute_at(held[i].reference, s, &refv[s])) {
+                        ref_ok = 0; break;
+                    }
+                }
+                if (ref_ok) {
+                    oracle_eval_n++;
+                    /* A candidate is "correct" iff it executed on all 5 sets
+                     * and its 5-vector equals the reference 5-vector. */
+                    #define E18_CAND_CORRECT(a) ( \
+                        cands[a].has_results && \
+                        cands[a].valid_results == WIRING_INPUT_SETS && \
+                        e18_vec_eq(cands[a].results, refv))
+
+                    /* Oracle@N: any correct candidate in the pool? */
+                    int oracle_hit = 0, oracle_pick = -1;
+                    for (int a = 0; a < n_cands; a++) {
+                        if (E18_CAND_CORRECT(a)) { oracle_hit = 1; oracle_pick = a; break; }
+                    }
+                    if (oracle_hit) held_oracle++;
+
+                    /* Majority@N: pure self-consistency vote. */
+                    int maj_pick = -1, maj_best = -1;
+                    for (int a = 0; a < n_cands; a++) {
+                        if (!cands[a].has_results) continue;
+                        int sc = 0;
+                        for (int b = 0; b < n_cands; b++) {
+                            if (a == b || !cands[b].has_results) continue;
+                            if (e18_vec_eq(cands[a].results, cands[b].results)) sc++;
+                        }
+                        if (sc > maj_best) { maj_best = sc; maj_pick = a; }
+                    }
+                    if (maj_pick >= 0 && cands[maj_pick].valid_results == WIRING_INPUT_SETS
+                        && e18_vec_eq(cands[maj_pick].results, refv)) {
+                        held_majority++;
+                    }
+
+                    /* CLR@N: reliability-weighted aggregation. */
+                    double clr_best = -1.0; int clr_pick = -1;
+                    for (int a = 0; a < n_cands; a++) {
+                        if (!cands[a].has_results) continue;
+                        double sum = 0.0;
+                        for (int b = 0; b < n_cands; b++) {
+                            if (!cands[b].has_results) continue;
+                            if (!e18_vec_eq(cands[a].results, cands[b].results)) continue;
+                            double frac = (double)cands[b].valid_results
+                                        / (double)WIRING_INPUT_SETS;
+                            double rel = 1.0;          /* rel = frac^WIRING_INPUT_SETS */
+                            for (int m = 0; m < WIRING_INPUT_SETS; m++) rel *= frac;
+                            sum += rel;
+                        }
+                        if (sum > clr_best) { clr_best = sum; clr_pick = a; }
+                    }
+                    if (clr_pick >= 0 && cands[clr_pick].valid_results == WIRING_INPUT_SETS
+                        && e18_vec_eq(cands[clr_pick].results, refv)) {
+                        held_clr++;
+                    }
+
+                    /* Brevity audit-cost: when a correct candidate exists,
+                     * compare the CLR pick's node-count to the smallest
+                     * correct candidate's node-count (Long2Short survivor). */
+                    if (oracle_hit && clr_pick >= 0) {
+                        int clr_nodes = count_node_lines(cands[clr_pick].text);
+                        int min_correct = 1 << 30;
+                        for (int a = 0; a < n_cands; a++) {
+                            if (!E18_CAND_CORRECT(a)) continue;
+                            int nn = count_node_lines(cands[a].text);
+                            if (nn < min_correct) min_correct = nn;
+                        }
+                        if (min_correct < (1 << 30)) {
+                            brevity_clr_nodes += clr_nodes;
+                            brevity_min_nodes += min_correct;
+                            brevity_n++;
+                        }
+                    }
+                    #undef E18_CAND_CORRECT
+                    (void)oracle_pick;
+                }
+            }
+
             if (held_print < MAX_HELD_PRINTS) {
                 printf("[%d] %s\n", i + 1, held[i].prompt);
                 printf("    EXPECTED: %s\n", held[i].expected[0] ? held[i].expected : "(none)");
@@ -1741,6 +1891,23 @@ int main(int argc, char **argv) {
         printf("Composition wins the vote:            %d/%d (%.0f%%)  [Phase 3b: composition pick-rate]\n",
                composition_picked, n_held,
                n_held > 0 ? 100.0 * composition_picked / n_held : 0.0);
+        if (g_oracle) {
+            int od = oracle_eval_n > 0 ? oracle_eval_n : 1;
+            printf("\n");
+            printf("  --- E18: VibeThinker CLR study (full-pool measurement, N=%d) ---\n", N_VOTES);
+            printf("Oracle@%-2d  (any candidate correct):    %d/%d (%.0f%%)  [ceiling for ANY re-ranker]\n",
+                   N_VOTES, held_oracle, oracle_eval_n, 100.0 * held_oracle / od);
+            printf("Majority@%-2d (self-consistency vote):   %d/%d (%.0f%%)  [no anchor/geo/planner bonus]\n",
+                   N_VOTES, held_majority, oracle_eval_n, 100.0 * held_majority / od);
+            printf("CLR@%-2d     (reliability-weighted):     %d/%d (%.0f%%)  [r=(v/5)^5, cluster argmax]\n",
+                   N_VOTES, held_clr, oracle_eval_n, 100.0 * held_clr / od);
+            if (brevity_n > 0) {
+                printf("Brevity audit-cost: CLR-pick avg %.1f nodes vs smallest-correct avg %.1f nodes (n=%ld)\n",
+                       (double)brevity_clr_nodes / (double)brevity_n,
+                       (double)brevity_min_nodes / (double)brevity_n,
+                       brevity_n);
+            }
+        }
         printf("\n");
         n_held = n_orig_held;  /* restore for cleanup loop */
 

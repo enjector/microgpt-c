@@ -2,7 +2,7 @@
 
 > Which VibeThinker post-training ideas *survive contact* with this project's prior findings — and how they map onto the organelle stack.
 
-**Status:** Draft — evaluation notes, not a pre-registered experiment. Nothing here is locked.
+**Status:** Idea 1 (CLR) **measured** — see [`experiments/E18-clr-reliability-reranker.md`](../../../../experiments/E18-clr-reliability-reranker.md): falsified as a lift mechanism, exactly as the §3.4 ceiling pre-stated. The rest remain evaluation notes.
 
 **Reference:** [VibeThinker-3B.pdf](VibeThinker-3B.pdf) · paper summary in [README.md](README.md).
 
@@ -117,6 +117,18 @@ CLR re-ranks; it **cannot rescue a candidate the model never generates**. The pr
 A candidate experiment should pre-state: measure on the **leakage-free Phase 2c clean set**, with `--no-anchor` to isolate the transformer; expected lift is small (a few points at most) and is **0 if generation never surfaces a correct candidate**. That outcome would *confirm* the project's generation-bottleneck thesis, not contradict it — making this a low-cost, can't-lose diagnostic regardless of sign.
 
 **This is the only idea here worth an E-number.** Before locking it, re-read `RESEARCH_PIPELINE_IR.md` (wiring arc, Phases 1–15) and `RESEARCH_MANIFOLD_LEARNING.md` in full.
+
+### 3.5 Measured outcome (E18)
+
+After reading the full wiring arc, this was run as **[E18](../../../../experiments/E18-clr-reliability-reranker.md)**. The §3.4 ceiling held — and tightened into a clean falsification. On the 20 leakage-free clean paraphrases, wiring transformer only:
+
+| Selector | Result |
+|---|---|
+| **Oracle@16** (correct candidate in pool at all?) | **35%** |
+| **Majority@16** | **35%** |
+| **CLR@16** | **35%** |
+
+`Oracle@16 = Majority@16` ⇒ **zero re-ranking headroom**: the correct answer is absent from the pool for 13/20 clean prompts, so no re-ranker (CLR included) can promote it. And CLR specifically can't discriminate because the IR verifier is *structural* — the failing candidates verify and execute fine (uniform reliability `r=1`), so CLR collapses to majority. The lever is candidate **generation/retrieval**, not scoring: injecting the retrieved anchor candidate raises Oracle 35→100%. **CLR falsified as a lift; the oracle-bound proof is the keeper.**
 
 ---
 
