@@ -70,7 +70,7 @@ Three open follow-ups, each documented in its own home but worth listing:
 
 1. **Wiring binary vote-loop scoring** (`docs/research/wiring_binary_phase8_regression.md`). The candidate-scoring in `demos/wiring_organelle/main.c` lets new-family anchors out-vote correct existing-family anchors when arities coincide. Surgical rollback restored Phase 8 to 20/20; the real fix (paths 1-3) is engineering work not done yet. Affects how many new families the wiring binary can absorb at once.
 
-2. **Whether external pretrained embeddings break the ~80% ceiling** (`docs/research/wiring_scaling_post_phase3.md` §3 follow-up). Three bag-of-features variants (unigram / bigram / char-ngram) all hit the same ceiling on novel-paraphrase tests. The hypothesis "the ceiling is model-bound, not curator-bound" can only be tested by a genuinely semantic feature (sentence-transformer, fastText, GloVe). Untested because it requires breaking the project's "pure C99, zero deps" policy — which is the gating call for productisation (`MIGRATED:DEPENDENCY_POLICY.md → see docs/MIGRATED_TO_ORGANELLES_BIO.md`).
+2. **Whether external pretrained embeddings break the ~80% ceiling** (`docs/research/wiring_scaling_post_phase3.md` §3 follow-up). Three bag-of-features variants (unigram / bigram / char-ngram) all hit the same ceiling on novel-paraphrase tests. The hypothesis "the ceiling is model-bound, not curator-bound" can only be tested by a genuinely semantic feature (sentence-transformer, fastText, GloVe). Untested because it requires breaking the project's "pure C99, zero deps" policy — which is the gating call for productisation (`MIGRATED:DEPENDENCY_POLICY.md → see docs/MIGRATED_TO_ORGANELLES_BIO.md`). **[E18](../../experiments/E18-clr-reliability-reranker.md) narrows where the escape can come from:** it proves the wiring transformer's 35% clean-set ceiling is a *generation* ceiling, not a *ranking* one (Oracle@16 = Majority@16 = 35% — the correct candidate is simply absent from the pool for 13/20 prompts). So no re-ranker — including frontier-LLM test-time scaling like VibeThinker-3B's CLR — can move it. Only **candidate-side** levers can: a more semantic encoder (this bullet), retrieval (the anchor mechanism, which lifts Oracle to 100%), or anchor-table extension.
 
 3. **Independent-curator reproducibility.** Every measurement so far has had one author writing both the synonym tables and the held-out paraphrases. A second person rebuilding v2's family library from scratch with their own vocabulary would test whether the 75-80% ceiling is curator-vocabulary-specific or genuinely architectural. No work done; depends on a second engineer's availability.
 
@@ -154,3 +154,31 @@ The closing line above is preserved verbatim because the calibrated three-bound 
 ### The new closing line
 
 The architecture is now **executable end-to-end through one declarative dialect**, with eight cross-validating measurements that the discipline holds: verb-surface lock, opcode lock, engine-surface freeze. The wiring-arc's calibrated three-bound ceiling above is unchanged; what's changed is that everything *around* that ceiling — corpus generation, organelle training, pipeline composition, audit emission — is now expressible in one .oql file. **The pre-OQL closing line said "what's left is productisation"; the OQL substrate arc has produced the operator surface productisation would need.**
+
+---
+
+## June 2026 update — E18: the ceiling is a *generation* ceiling, proven by the oracle bound
+
+The calibrated three-bound claim above says the ~80% / 35% wiring ceiling is "structural to bag-of-features classifiers in the curator's vocabulary regime." [E18](../../experiments/E18-clr-reliability-reranker.md) sharpens *which kind* of structural — and rules out a whole class of would-be escapes.
+
+E18 mapped VibeThinker-3B's **Claim-Level Reliability Assessment** (CLR — a frontier-LLM test-time-scaling method: sample K trajectories, self-verify M claims each, weight by a nonlinear reliability score, aggregate) onto the wiring organelle's best-of-16 + verify-as-judge loop, and measured it against a metric the 17-phase arc never computed: **Oracle@N** — *is a correct candidate ever in the pool?*, the information-theoretic ceiling for **any** re-ranker.
+
+On the 20 leakage-free Phase 2c paraphrases, wiring transformer only (`--no-anchor`):
+
+| Selector | Result |
+|---|---|
+| **Oracle@16** (any candidate correct) | **35%** |
+| **Majority@16** (self-consistency vote) | **35%** |
+| **CLR@16** (reliability-weighted) | **35%** |
+
+`Oracle@16 = Majority@16` ⇒ **zero re-ranking headroom**: for 13/20 clean prompts, *no* candidate among the 16 is correct, so no re-ranker — CLR included — can promote one. And CLR specifically can't discriminate because the Pipeline-IR verifier is **structural**, not semantic: the failing candidates verify and execute fine (they compute the wrong *number*), so every candidate gets uniform reliability `r=1` and CLR collapses to majority vote.
+
+The full-pool variant (anchor retrieval ON) is the sharp contrast: injecting the *retrieved* anchor candidate lifts **Oracle 35→100%** — what re-ranking structurally cannot do — but generic re-rankers (majority *and* CLR) reach only 80%. The residual 20pp is recovered **only** by the system's existing **source-trust** signal (geodesic + planner agreement gating), i.e. trusting *where a candidate came from*, not *how reliably it verifies*.
+
+**What this adds to the calibrated claim (it strengthens, doesn't revise it):**
+
+- The three documented bounds are unchanged. E18 explains *why re-ranking has never moved them* (Phases 1a, 1c, 17) at the information level: the lever is **candidate generation / retrieval**, never candidate scoring.
+- It closes the door on frontier-style test-time scaling as a cheap escape — a question worth settling explicitly given how much 2026 work leans on it.
+- It independently rediscovers the transferable half of CLR: the project's anchor source-trust bonus *is* "weight by provenance," which is exactly the part of CLR that survives here; the part that doesn't (verifier/claim reliability) is precisely what a structural Judge can't supply.
+
+All five pre-registered targets passed; CLR is **falsified as a lift**, and the `--oracle` measurement instrument ships as a permanent, zero-cost diagnostic of the generation ceiling for any future candidate source. Origin: [`docs/research/papers/VibeThinker/IDEAS.md`](papers/VibeThinker/IDEAS.md) §3. Full record: [E18](../../experiments/E18-clr-reliability-reranker.md).
