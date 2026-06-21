@@ -135,6 +135,46 @@ static int is_draw(const char *board) {
   return check_winner(board) == EMPTY_CELL && count_pieces(board) == BOARD_SIZE;
 }
 
+/* ============================================================================
+ * E19 oracle-first probe (VibeThinker CLR study — see experiments/E18).
+ *
+ * The Connect-4 demo's Judge is structural only ("column valid + win/draw
+ * check"). E18 showed re-ranking can't help unless a *semantic* (quality)
+ * verifier exists. This probe builds the cheapest such verifier — a 1-ply
+ * move-quality oracle — and measures, on the decisions where quality
+ * actually matters, whether a good move is even present in a best-of-N
+ * candidate pool (Oracle@N) versus whether the demo's ensemble pick is good
+ * (baseline). If Oracle@N >> baseline, a quality-verifier + CLR re-rank has
+ * real headroom; if Oracle@N == baseline, it's a generation ceiling (no fix
+ * possible from re-ranking) — the same dichotomy E18 settled for wiring.
+ *
+ * Pure measurement, gated on the C4_ORACLE env var; zero default-behaviour
+ * change.
+ *
+ * c4_classify_move: simulate `me` dropping at `col`. Returns
+ *   2 = immediate win, 0 = leaves `opp` an immediate winning reply (blunder),
+ *   1 = safe (neither), -1 = illegal column.
+ * ============================================================================ */
+static int c4_classify_move(const char *board, int col, char me, char opp) {
+  char tmp[BOARD_SIZE + 1];
+  memcpy(tmp, board, BOARD_SIZE);
+  tmp[BOARD_SIZE] = '\0';
+  if (drop_piece(tmp, col, me) < 0)
+    return -1;
+  if (check_winner(tmp) == me)
+    return 2;
+  for (int c = 0; c < BOARD_COLS; c++) {
+    char t2[BOARD_SIZE + 1];
+    memcpy(t2, tmp, BOARD_SIZE);
+    t2[BOARD_SIZE] = '\0';
+    if (drop_piece(t2, c, opp) < 0)
+      continue;
+    if (check_winner(t2) == opp)
+      return 0; /* blunder: opp wins on the immediate reply */
+  }
+  return 1;
+}
+
 static void print_board(const char *board) {
   printf("  0 1 2 3 4 5 6\n");
   for (int r = 0; r < BOARD_ROWS; r++) {
@@ -299,6 +339,13 @@ int main(int argc, char **argv) {
   int total_model_sourced = 0;
   int total_fallback_sourced = 0;
 
+  /* E19 oracle-first probe (gated on C4_ORACLE env var). */
+  const int c4_oracle_on = (getenv("C4_ORACLE") != NULL);
+  const int ORC_N = 16;            /* candidate pool size, matches wiring N */
+  int orc_critical = 0;            /* decisions where 1-ply quality matters */
+  int orc_baseline_good = 0;       /* ensemble pick was a good (non-blunder) move */
+  int orc_pool_good = 0;           /* >=1 of ORC_N sampled candidates was good */
+
   struct timespec pipeline_start, pipeline_end;
   clock_gettime(CLOCK_MONOTONIC, &pipeline_start);
 
@@ -450,6 +497,49 @@ int main(int argc, char **argv) {
         total_model_sourced++;
       else
         total_fallback_sourced++;
+
+      /* E19 oracle-first probe: on decisions where 1-ply quality matters,
+       * compare the demo's ensemble pick (baseline) to the best achievable
+       * over an ORC_N candidate pool (oracle). board/proposed_col are the
+       * pre-move state and the played move. */
+      if (c4_oracle_on) {
+        int legal[BOARD_COLS];
+        int nlegal = get_valid_columns(board, legal);
+        int has_win = 0, has_loss = 0, has_nonloss = 0;
+        for (int i = 0; i < nlegal; i++) {
+          int l = c4_classify_move(board, legal[i], PLAYER_X, PLAYER_O);
+          if (l == 2) has_win = 1;
+          else if (l == 0) has_loss = 1;
+          if (l >= 1) has_nonloss = 1;
+        }
+        /* "critical" = the choice changes the 1-ply outcome: a win is
+         * available (and >1 legal move), or some move loses-in-1 while
+         * another does not. Non-critical decisions are excluded — every
+         * legal move is equally (non-)blundering there. */
+        int critical = (has_win && nlegal > 1) || (has_loss && has_nonloss);
+        if (critical) {
+          orc_critical++;
+          /* good(col): if a win exists it must be taken; else any non-losing. */
+          #define C4_GOOD(L) ((L) >= 0 && (has_win ? ((L) == 2) : ((L) >= 1)))
+          int played_l = c4_classify_move(board, proposed_col, PLAYER_X, PLAYER_O);
+          if (C4_GOOD(played_l)) orc_baseline_good++;
+          int pool_good = 0;
+          for (int v = 0; v < ORC_N && !pool_good; v++) {
+            char mo[INF_GEN_LEN + 1];
+            scalar_t t = (scalar_t)(0.20 + 0.05 * v); /* temp jitter, matches wiring */
+            organelle_generate(player, &g_cfg, player_prompt, mo, INF_GEN_LEN, t);
+            int col = (mo[0] >= '0' && mo[0] <= '6') ? mo[0] - '0' : -1;
+            if (col < 0) continue;
+            int isleg = 0;
+            for (int j = 0; j < nlegal; j++) if (legal[j] == col) isleg = 1;
+            if (!isleg) continue;
+            int l = c4_classify_move(board, col, PLAYER_X, PLAYER_O);
+            if (C4_GOOD(l)) pool_good = 1;
+          }
+          if (pool_good) orc_pool_good++;
+          #undef C4_GOOD
+        }
+      }
 
       /* E11 T4 trace — log first N X-moves of first M games for token-
        * divergence comparison vs the OQL run.  Activate with
@@ -615,6 +705,23 @@ int main(int argc, char **argv) {
   printf("Planner re-plans:   %d\n", total_replans);
   printf("Pipeline time:      %.2fs\n", pipeline_time);
   printf("================================================================\n");
+
+  if (c4_oracle_on) {
+    int d = orc_critical > 0 ? orc_critical : 1;
+    printf("\n  --- E19 oracle-first probe (1-ply quality verifier, N=%d) ---\n",
+           ORC_N);
+    printf("Critical decisions (win-to-take / threat-to-block): %d\n",
+           orc_critical);
+    printf("Baseline good (ensemble pick non-blunder):  %d/%d (%.0f%%)\n",
+           orc_baseline_good, orc_critical, 100.0 * orc_baseline_good / d);
+    printf("Oracle@%-2d good (>=1 candidate non-blunder): %d/%d (%.0f%%)\n",
+           ORC_N, orc_pool_good, orc_critical, 100.0 * orc_pool_good / d);
+    printf("=> verifier-rerank headroom on critical decisions: %+.0f pp\n",
+           100.0 * (orc_pool_good - orc_baseline_good) / d);
+    printf("   (Oracle>>baseline => quality-verifier+CLR has room; "
+           "Oracle==baseline => generation ceiling, like wiring/E18)\n");
+    printf("================================================================\n");
+  }
 
   /* Cleanup */
   if (planner) organelle_free(planner);

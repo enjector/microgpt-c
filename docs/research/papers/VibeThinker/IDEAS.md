@@ -130,6 +130,10 @@ After reading the full wiring arc, this was run as **[E18](../../../../experimen
 
 `Oracle@16 = Majority@16` ⇒ **zero re-ranking headroom**: the correct answer is absent from the pool for 13/20 clean prompts, so no re-ranker (CLR included) can promote it. And CLR specifically can't discriminate because the IR verifier is *structural* — the failing candidates verify and execute fine (uniform reliability `r=1`), so CLR collapses to majority. The lever is candidate **generation/retrieval**, not scoring: injecting the retrieved anchor candidate raises Oracle 35→100%. **CLR falsified as a lift; the oracle-bound proof is the keeper.**
 
+### 3.6 Where CLR *does* transfer — E19 (games)
+
+E18 left a converse open: does CLR work where a **semantic** (not structural) verifier exists? [E19](../../../../experiments/E19-game-clr-quality-verifier.md) answers yes. On Connect-4, a cheap 1-ply *quality* verifier turns the oracle-first probe around: on 273 critical decisions, **Baseline (ensemble pick) good = 37%, Oracle@16 good = 60% → +23pp re-ranking headroom** — the inverse of the wiring null. The model generates good moves; the legality-only Judge just can't select them. **The unifying lesson across E18+E19: the project's deterministic Judges are all *structural*; CLR (and test-time scaling generally) pays off exactly when you add a cheap *semantic*/quality verifier — and not before.**
+
 ---
 
 ## 4. Idea 2 (framing): the Compression-Coverage hypothesis as a shared vocabulary
