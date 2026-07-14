@@ -2926,15 +2926,34 @@ void forward_inference(const Model *model, size_t token_id, size_t pos_id,
  *   gradients are scaled proportionally so the norm equals the threshold.
  *   No-op if GRAD_CLIP <= 0.
  */
+static double g_opt_lr     = -1.0; /* <0 → LEARNING_RATE */
+static int    g_opt_warmup = -1;   /* <0 → WARMUP_STEPS  */
+static int    g_opt_total  = -1;   /* <0 → NUM_STEPS     */
+static double g_opt_clip   = -1.0; /* <0 → GRAD_CLIP     */
+
+void microgpt_set_optim(double lr, int warmup, int total, double grad_clip) {
+  g_opt_lr     = lr;
+  g_opt_warmup = warmup;
+  g_opt_total  = total;
+  g_opt_clip   = grad_clip;
+}
+
 void clip_gradients(scalar_t *grads, size_t n) {
-  if (GRAD_CLIP <= 0)
+  const scalar_t clip_at =
+      (scalar_t)((g_opt_clip >= 0.0) ? g_opt_clip : (double)GRAD_CLIP);
+  if (clip_at <= 0)
     return;
   scalar_t norm_sq = 0;
   for (size_t i = 0; i < n; i++)
     norm_sq += grads[i] * grads[i];
   scalar_t norm = M_SQRT(norm_sq);
-  if (norm > (scalar_t)GRAD_CLIP) {
-    scalar_t scale = (scalar_t)GRAD_CLIP / norm;
+  if (norm > clip_at) {
+    /* clip_at, NOT the GRAD_CLIP macro. Using the macro here while the threshold
+     * above uses clip_at means that in any binary compiled with GRAD_CLIP=0 (the
+     * default!) a runtime override would pass the "is clipping on?" test and then
+     * scale every gradient by 0/norm = 0 — silently zeroing the whole update and
+     * freezing training at its initialisation loss. */
+    scalar_t scale = clip_at / norm;
     for (size_t i = 0; i < n; i++)
       grads[i] *= scale;
   }
@@ -2986,12 +3005,34 @@ void clip_gradients(scalar_t *grads, size_t n) {
  *   directly — that would lose precision).  After all parameters are
  *   updated, the master copy is requantised to int8 with fresh scales.
  */
+/* ── Runtime optimiser overrides ──────────────────────────────────────────
+ *
+ * WHY THIS EXISTS.  adam_step() and clip_gradients() read LEARNING_RATE,
+ * WARMUP_STEPS, NUM_STEPS and GRAD_CLIP directly as COMPILE-TIME MACROS, while
+ * MicrogptConfig carries learning_rate / warmup_steps / batch_size fields that
+ * look settable.  The fields were dead: the optimiser ignored them, yet
+ * microgpt_print_config() and the training log both PRINTED them — so a caller
+ * tuning the LR at runtime was silently ignored AND told it had worked.
+ *
+ * There was a second, subtler bug.  The cosine schedule's denominator was the
+ * NUM_STEPS *macro*, but callers pass num_steps as a runtime ARGUMENT.  Training
+ * for fewer steps than the macro (e.g. a short sweep against a long-configured
+ * binary) meant the LR never finished decaying — the whole run happened at a
+ * near-peak learning rate.
+ *
+ * These overrides are ADDITIVE and default to the macros, so behaviour is
+ * unchanged unless a caller opts in via microgpt_set_optim().  They make LR,
+ * warmup, schedule length and gradient clipping tunable WITHOUT a recompile —
+ * which matters because every hyperparameter change otherwise forces a new
+ * microgpt_lib_<md5> variant, making hyperparameter search impractical.
+ */
 void adam_step(Model *model, const scalar_t *grads, scalar_t *m, scalar_t *v,
                int step) {
   /* ── Cosine LR schedule with linear warmup ─────────────────────────── */
-  const int warmup = WARMUP_STEPS;
-  const int total = NUM_STEPS;
-  const scalar_t peak_lr = (scalar_t)LEARNING_RATE;
+  const int warmup = (g_opt_warmup >= 0) ? g_opt_warmup : WARMUP_STEPS;
+  const int total  = (g_opt_total   >  0) ? g_opt_total  : NUM_STEPS;
+  const scalar_t peak_lr =
+      (scalar_t)((g_opt_lr >= 0.0) ? g_opt_lr : (double)LEARNING_RATE);
   scalar_t lr;
   if (step < warmup)
     /* Warmup: linearly ramp from 0 → peak_lr */
