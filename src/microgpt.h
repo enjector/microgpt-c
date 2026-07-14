@@ -917,6 +917,27 @@ void clip_gradients(scalar_t *grads, size_t n);
  *   For INT8 models, Adam updates the fp64 master copy and then requantises
  *   all weight matrices back to int8 with fresh per-matrix scales.
  */
+/*
+ * microgpt_set_optim - Override the optimiser hyperparameters at RUNTIME.
+ *
+ * adam_step()/clip_gradients() otherwise read LEARNING_RATE, WARMUP_STEPS,
+ * NUM_STEPS and GRAD_CLIP as compile-time macros, which meant every
+ * hyperparameter trial required a recompile (and a fresh microgpt_lib_<md5>
+ * variant) — and MicrogptConfig's learning_rate/warmup_steps fields were dead:
+ * printed by the config banner and the training log, but ignored by the
+ * optimiser.
+ *
+ * Pass a negative value for any argument to keep that macro's value.
+ *   lr        peak learning rate    (<0 → LEARNING_RATE)
+ *   warmup    linear warmup steps   (<0 → WARMUP_STEPS)
+ *   total     cosine schedule span  (<=0 → NUM_STEPS). Set this to the number of
+ *             steps you are ACTUALLY training for, or the LR never finishes
+ *             decaying.
+ *   grad_clip max global grad norm  (<0 → GRAD_CLIP; note the macro DEFAULTS TO
+ *             0.0, i.e. NO CLIPPING)
+ */
+void microgpt_set_optim(double lr, int warmup, int total, double grad_clip);
+
 void adam_step(Model *model, const scalar_t *grads, scalar_t *m, scalar_t *v,
                int step);
 
