@@ -3038,8 +3038,23 @@ void adam_step(Model *model, const scalar_t *grads, scalar_t *m, scalar_t *v,
     /* Warmup: linearly ramp from 0 → peak_lr */
     lr = peak_lr * ((scalar_t)(step + 1) / (scalar_t)warmup);
   else {
-    /* Cosine decay: peak_lr → ~0 following a half-cosine curve */
-    scalar_t progress = (scalar_t)(step - warmup) / (scalar_t)(total - warmup);
+    /* Cosine decay: peak_lr → ~0 following a half-cosine curve.
+     *
+     * progress MUST be clamped to 1.  cos() is periodic, so an unclamped
+     * progress walks past pi and back UP the curve: a run that trains for more
+     * steps than `total` decays to ~0 and then climbs back to the FULL peak LR
+     * at progress == 2 — an accidental warm restart that blasts a converged
+     * model.  (Training for FEWER steps than `total` is the opposite defect:
+     * the LR never finishes decaying.  Both are fixed by giving adam_step the
+     * true step count via microgpt_set_optim(); the clamp makes the overrun
+     * case fail safe rather than destructively.)
+     *
+     * The span guard keeps the denominator positive if a caller passes a
+     * total <= warmup. */
+    const int span = (total > warmup) ? (total - warmup) : 1;
+    scalar_t progress = (scalar_t)(step - warmup) / (scalar_t)span;
+    if (progress > (scalar_t)1)
+      progress = (scalar_t)1;
     lr = peak_lr * 0.5 * (1.0 + cos(progress * 3.14159265358979323846));
   }
   scalar_t b1 = BETA1, b2 = BETA2, eps = EPS_ADAM;

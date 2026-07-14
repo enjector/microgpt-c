@@ -421,6 +421,18 @@ int main(void) {
   cfg.max_vocab = 1200; /* word tokens — expanded vocab for domain coverage */
   cfg.max_docs = 5000;
   cfg.max_doc_len = 512;
+
+  /* adam_step() reads the LEARNING_RATE / NUM_STEPS macros, NOT cfg — so
+   * without this call the values the banner prints below are not the ones
+   * training actually uses.  Under c_vm_codegen the macros agree with cfg
+   * (15000 / 5e-4) and this is a no-op.  Under c_vm_codegen_v2 they do NOT
+   * (5000 / 1e-3): this 15000-step loop ran at 2x the reported LR on a cosine
+   * schedule sized for 5000 steps, which decayed to ~0 by step 5000 and then
+   * climbed back to the full peak by step ~9900.  Bind the optimiser to the
+   * config we declare and print.  grad_clip stays on the macro (-1) so each
+   * target's clipping behaviour is unchanged. */
+  microgpt_set_optim(cfg.learning_rate, cfg.warmup_steps, cfg.num_steps, -1.0);
+
   microgpt_print_config("MicroGPT-C - VM Code Generation (Word-Level)", &cfg);
 
   const int nl = cfg.n_layer;
